@@ -13,8 +13,12 @@ import com.autowashpro.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import com.autowashpro.entity.PasswordReset;
+import com.autowashpro.repository.PasswordResetRepository;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +26,7 @@ public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final PasswordResetRepository passwordResetRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
@@ -170,4 +175,102 @@ public class AuthServiceImpl implements AuthService {
 
         refreshTokenRepository.save(refreshToken);
     }
+    @Override
+public String forgotPassword(String email) {
+
+    User user = userRepository.findByEmail(email)
+            .orElseThrow(() ->
+                    new RuntimeException("User not found"));
+
+    String rawToken =
+            UUID.randomUUID().toString();
+
+    String hashedToken =
+            passwordEncoder.encode(rawToken);
+
+    PasswordReset passwordReset =
+            PasswordReset.builder()
+                    .user(user)
+                    .token(hashedToken)
+                    .expiresAt(
+                            LocalDateTime.now()
+                                    .plusMinutes(15)
+                    )
+                    .isUsed(false)
+                    .createdAt(
+                            LocalDateTime.now()
+                    )
+                    .build();
+
+    passwordResetRepository.save(passwordReset);
+
+    return rawToken;
+}
+@Override
+public String resetPassword(
+        String token,
+        String newPassword) {
+
+    List<PasswordReset> resets =
+            passwordResetRepository.findAll();
+
+    PasswordReset matchedReset = null;
+
+    for (PasswordReset reset : resets) {
+
+        boolean matched =
+                passwordEncoder.matches(
+                        token,
+                        reset.getToken());
+
+        if (matched) {
+            matchedReset = reset;
+            break;
+        }
+    }
+
+    if (matchedReset == null) {
+        throw new RuntimeException(
+                "Invalid reset token");
+    }
+
+    if (matchedReset.getIsUsed()) {
+        throw new RuntimeException(
+                "Token already used");
+    }
+
+    if (matchedReset.getExpiresAt()
+            .isBefore(LocalDateTime.now())) {
+
+        throw new RuntimeException(
+                "Token expired");
+    }
+
+    User user =
+            matchedReset.getUser();
+
+    user.setPasswordHash(
+            passwordEncoder.encode(
+                    newPassword));
+
+    userRepository.save(user);
+
+    matchedReset.setIsUsed(true);
+
+    passwordResetRepository.save(
+            matchedReset);
+
+    List<RefreshToken> refreshTokens =
+            refreshTokenRepository
+                    .findAllByUser_Id(
+                            user.getId());
+
+    refreshTokens.forEach(tokenItem ->
+            tokenItem.setIsRevoked(true));
+
+    refreshTokenRepository.saveAll(
+            refreshTokens);
+
+    return "Password reset success";
+}
 }

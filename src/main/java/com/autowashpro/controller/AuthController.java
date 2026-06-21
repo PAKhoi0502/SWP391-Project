@@ -10,6 +10,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
+import com.autowashpro.dto.request.ForgotPasswordRequest;
+import com.autowashpro.dto.request.ResetPasswordRequest;
 
 @RestController
 @RequestMapping("/auth")
@@ -56,5 +58,21 @@ public String logout(
             request.getRefreshToken());
 
     return "Logout success";
+}
+@PostMapping("/forgot-password")
+public String forgotPassword(
+        @RequestBody ForgotPasswordRequest request) {
+
+    return authService.forgotPassword(
+            request.getEmail());
+}
+
+@PostMapping("/reset-password")
+public String resetPassword(
+        @RequestBody ResetPasswordRequest request) {
+
+    return authService.resetPassword(
+            request.getToken(),
+            request.getNewPassword());
 }
 }
