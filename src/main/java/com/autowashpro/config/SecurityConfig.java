@@ -54,6 +54,16 @@ public class SecurityConfig {
                                                 .hasRole("ADMIN")
 
                                                 .requestMatchers(
+                                                                "/service-packages",
+                                                                "/service-packages/*",
+                                                                "/service-packages/*/status")
+                                                .hasRole("ADMIN")
+
+                                                .requestMatchers(
+                                                                "/service-packages/available")
+                                                .permitAll()
+
+                                                .requestMatchers(
                                                                 "/users/me")
                                                 .authenticated()
 
