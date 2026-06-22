@@ -13,41 +13,56 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtFilter;
+        private final JwtAuthenticationFilter jwtFilter;
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(
-            HttpSecurity http) throws Exception {
+        @Bean
+        public SecurityFilterChain securityFilterChain(
+                        HttpSecurity http) throws Exception {
 
-        http
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(
-                                SessionCreationPolicy.STATELESS
-                        ))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/health",
-                                "/api/v1",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html",
-                                "/v3/api-docs/**",
-                                "/auth/register",
-                                "/auth/login",
-                                "/auth/refresh-token",
-                                "/auth/logout",
-                                "/auth/forgot-password",
-                                "/auth/reset-password"  
-                        )
-                        .permitAll()
-                        .anyRequest()
-                        .authenticated()
-                )
-                .addFilterBefore(
-                        jwtFilter,
-                        UsernamePasswordAuthenticationFilter.class
-                );
+                http
+                                .csrf(csrf -> csrf.disable())
+                                .sessionManagement(session -> session.sessionCreationPolicy(
+                                                SessionCreationPolicy.STATELESS))
+                                .authorizeHttpRequests(auth -> auth
+                                                .requestMatchers(
+                                                                "/health",
+                                                                "/api/v1",
+                                                                "/swagger-ui/**",
+                                                                "/swagger-ui.html",
+                                                                "/v3/api-docs/**",
+                                                                "/auth/register",
+                                                                "/auth/login",
+                                                                "/auth/refresh-token",
+                                                                "/auth/logout",
+                                                                "/auth/forgot-password",
+                                                                "/auth/reset-password")
+                                                .permitAll()
+                                                .requestMatchers(
+                                                                "/users")
+                                                .hasRole("ADMIN")
 
-        return http.build();
-    }
+                                                .requestMatchers(
+                                                                "/users/*")
+                                                .hasRole("ADMIN")
+
+                                                .requestMatchers(
+                                                                "/users/*/status")
+                                                .hasRole("ADMIN")
+
+                                                .requestMatchers(
+                                                                "/users/*/role")
+                                                .hasRole("ADMIN")
+
+                                                .requestMatchers(
+                                                                "/users/me")
+                                                .authenticated()
+
+                                                .anyRequest()
+                                                .authenticated())
+                                .addFilterBefore(
+                                                jwtFilter,
+                                                UsernamePasswordAuthenticationFilter.class);
+
+                return http.build();
+        }
 }
