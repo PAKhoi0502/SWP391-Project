@@ -5,6 +5,7 @@ import com.autowashpro.dto.request.BookingCreateRequest;
 import com.autowashpro.dto.request.WalkInBookingCreateRequest;
 import com.autowashpro.dto.response.AvailableSlotResponse;
 import com.autowashpro.dto.response.BookingResponse;
+import com.autowashpro.dto.response.BookingSummaryResponse;
 import com.autowashpro.service.BookingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 import java.time.LocalDate;
 
@@ -64,4 +66,84 @@ public class BookingController {
                 .data(bookingService.createWalkInBooking(request, staffUserId))
                 .build();
     }
+    @GetMapping
+@PreAuthorize("hasRole('CUSTOMER')")
+public ApiResponse<List<BookingSummaryResponse>> getCustomerBookings(
+        @AuthenticationPrincipal UserDetails userDetails,
+        @RequestParam(required = false) String status) {
+
+    Long customerId = Long.valueOf(userDetails.getUsername());
+
+    return ApiResponse.<List<BookingSummaryResponse>>builder()
+            .success(true)
+            .message("Customer bookings retrieved")
+            .data(
+                    bookingService.getCustomerBookings(
+                            customerId,
+                            status))
+            .build();
+}
+@GetMapping("/{id}")
+@PreAuthorize("hasRole('CUSTOMER')")
+public ApiResponse<BookingResponse> getCustomerBookingDetail(
+        @PathVariable Long id,
+        @AuthenticationPrincipal UserDetails userDetails) {
+
+    Long customerId = Long.valueOf(userDetails.getUsername());
+
+    return ApiResponse.<BookingResponse>builder()
+            .success(true)
+            .message("Booking detail retrieved")
+            .data(
+                    bookingService.getCustomerBookingDetail(
+                            id,
+                            customerId))
+            .build();
+}
+@GetMapping("/staff/bookings")
+@PreAuthorize("hasRole('STAFF')")
+public ApiResponse<List<BookingSummaryResponse>> getStaffBookings(
+
+        @AuthenticationPrincipal UserDetails userDetails,
+
+        @RequestParam(required = false) String status,
+
+        @RequestParam(required = false)
+
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+
+        LocalDate date) {
+
+    Long staffUserId = Long.valueOf(userDetails.getUsername());
+
+    return ApiResponse.<List<BookingSummaryResponse>>builder()
+            .success(true)
+            .message("Staff bookings retrieved")
+            .data(
+                    bookingService.getStaffBookings(
+                            staffUserId,
+                            status,
+                            date))
+            .build();
+}
+@GetMapping("/admin/bookings")
+@PreAuthorize("hasRole('ADMIN')")
+public ApiResponse<List<BookingSummaryResponse>> getAdminBookings(
+
+        @RequestParam(required = false) Long garageId,
+
+        @RequestParam(required = false) String status,
+
+        @RequestParam(required = false) String paymentStatus) {
+
+    return ApiResponse.<List<BookingSummaryResponse>>builder()
+            .success(true)
+            .message("Admin bookings retrieved")
+            .data(
+                    bookingService.getAdminBookings(
+                            garageId,
+                            status,
+                            paymentStatus))
+            .build();
+}
 }
