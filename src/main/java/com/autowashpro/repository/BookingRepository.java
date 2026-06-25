@@ -5,8 +5,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
@@ -47,6 +49,23 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     // Issue #11: Lấy bookings theo customer
     List<Booking> findByCustomerIdOrderByStartTimeDesc(Long customerId);
 
+    // ===== Issue #13 =====
+
+    Optional<Booking> findByIdAndCustomerId(
+            Long id,
+            Long customerId);
+
+    List<Booking> findByGarageIdOrderByStartTimeDesc(
+            Long garageId);
+
+    List<Booking> findByGarageIdAndBookingDateOrderByStartTimeDesc(
+            Long garageId,
+            LocalDate bookingDate);
+
+    List<Booking> findAllByOrderByStartTimeDesc();
+
+    // ====================
+
     // Issue #11: Đếm booking chiếm wash bay theo garage + vehicle type
     @Query("""
         SELECT COUNT(b) FROM Booking b
@@ -77,7 +96,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime
     );
-// Issue #12: Đếm tất cả booking đang chiếm wash bay theo garage (dùng cho walk-in)
+
+    // Issue #12: Đếm tất cả booking đang chiếm wash bay theo garage (dùng cho walk-in)
     @Query("""
         SELECT COUNT(b) FROM Booking b
         WHERE b.garageId = :garageId

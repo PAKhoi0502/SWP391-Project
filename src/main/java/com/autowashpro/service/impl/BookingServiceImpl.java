@@ -13,6 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.autowashpro.dto.response.BookingSummaryResponse;
+import com.autowashpro.dto.response.BookingDetailResponse;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -416,4 +418,126 @@ public class BookingServiceImpl implements BookingService {
 .createdByStaffId(b.getCreatedByStaffId())
                 .build();
     }
+    private BookingSummaryResponse toSummaryResponse(Booking b) {
+
+    return BookingSummaryResponse.builder()
+            .id(b.getId())
+            .customerId(b.getCustomerId())
+            .garageId(b.getGarageId())
+            .vehicleId(b.getVehicleId())
+            .servicePackageId(b.getServicePackageId())
+            .startTime(b.getStartTime())
+            .endTime(b.getEndTime())
+            .status(b.getStatus())
+            .paymentStatus(b.getPaymentStatus())
+            .finalPrice(b.getFinalPrice())
+            .isWalkIn(b.getIsWalkIn())
+            .build();
+}
+    // ===================== ISSUE #13 =====================
+
+@Override
+public List<BookingSummaryResponse> getCustomerBookings(
+        Long customerId,
+        String status) {
+
+    List<Booking> bookings =
+            bookingRepository.findByCustomerIdOrderByStartTimeDesc(customerId);
+
+    return bookings.stream()
+
+            .filter(b -> status == null
+                    || status.isBlank()
+                    || b.getStatus().equalsIgnoreCase(status))
+
+            .map(this::toSummaryResponse)
+
+            .toList();
+}
+
+@Override
+public BookingResponse getCustomerBookingDetail(
+        Long bookingId,
+        Long customerId) {
+
+    Booking booking = bookingRepository
+            .findByIdAndCustomerId(bookingId, customerId)
+            .orElseThrow(() ->
+                    new ResponseStatusException(
+                            HttpStatus.NOT_FOUND,
+                            "Booking not found"));
+
+    return toResponse(booking);
+}
+
+@Override
+public List<BookingSummaryResponse> getStaffBookings(
+        Long staffUserId,
+        String status,
+        LocalDate date) {
+
+    StaffProfile staffProfile = staffProfileRepository
+            .findByUser_Id(staffUserId)
+            .orElseThrow(() ->
+                    new ResponseStatusException(
+                            HttpStatus.FORBIDDEN,
+                            "Staff profile not found"));
+
+    if (!Boolean.TRUE.equals(staffProfile.getIsActive())) {
+        throw new ResponseStatusException(
+                HttpStatus.FORBIDDEN,
+                "Staff profile is inactive");
+    }
+
+    List<Booking> bookings;
+
+    if (date != null) {
+
+        bookings = bookingRepository.findByGarageIdAndBookingDateOrderByStartTimeDesc(
+                staffProfile.getGarageId(),
+                date);
+
+    } else {
+
+        bookings = bookingRepository.findByGarageIdOrderByStartTimeDesc(
+                staffProfile.getGarageId());
+
+    }
+
+    return bookings.stream()
+
+            .filter(b -> status == null
+                    || status.isBlank()
+                    || b.getStatus().equalsIgnoreCase(status))
+
+            .map(this::toSummaryResponse)
+
+            .toList();
+}
+
+@Override
+public List<BookingSummaryResponse> getAdminBookings(
+        Long garageId,
+        String status,
+        String paymentStatus) {
+
+    List<Booking> bookings = bookingRepository.findAllByOrderByStartTimeDesc();
+
+    return bookings.stream()
+
+            .filter(b -> garageId == null
+                    || b.getGarageId().equals(garageId))
+
+            .filter(b -> status == null
+                    || status.isBlank()
+                    || b.getStatus().equalsIgnoreCase(status))
+
+            .filter(b -> paymentStatus == null
+                    || paymentStatus.isBlank()
+                    || b.getPaymentStatus().equalsIgnoreCase(paymentStatus))
+
+            .map(this::toSummaryResponse)
+
+            .toList();
+}
 }
