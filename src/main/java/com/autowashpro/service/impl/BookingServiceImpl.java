@@ -28,516 +28,583 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BookingServiceImpl implements BookingService {
 
-    private final GarageRepository garageRepository;
-    private final ServicePackageRepository servicePackageRepository;
-    private final WashBayRepository washBayRepository;
-    private final BookingRepository bookingRepository;
-    private final VehicleRepository vehicleRepository;
-    private final CustomerLoyaltyRepository customerLoyaltyRepository;
-    private final LoyaltyTierRuleRepository loyaltyTierRuleRepository;
-    private final PromotionRepository promotionRepository;
-    private final BookingAssignedStaffRepository bookingAssignedStaffRepository;
-    private final StaffProfileRepository staffProfileRepository;
-    private final UserRepository userRepository;
+        private final GarageRepository garageRepository;
+        private final ServicePackageRepository servicePackageRepository;
+        private final WashBayRepository washBayRepository;
+        private final BookingRepository bookingRepository;
+        private final VehicleRepository vehicleRepository;
+        private final CustomerLoyaltyRepository customerLoyaltyRepository;
+        private final LoyaltyTierRuleRepository loyaltyTierRuleRepository;
+        private final PromotionRepository promotionRepository;
+        private final BookingAssignedStaffRepository bookingAssignedStaffRepository;
+        private final StaffProfileRepository staffProfileRepository;
+        private final UserRepository userRepository;
 
-    // ===================== ISSUE #10 =====================
+        // ===================== ISSUE #10 =====================
 
-    @Override
-    public AvailableSlotResponse getAvailableSlots(
-            Long garageId,
-            Long servicePackageId,
-            String vehicleType,
-            LocalDate date) {
+        @Override
+        public AvailableSlotResponse getAvailableSlots(
+                        Long garageId,
+                        Long servicePackageId,
+                        String vehicleType,
+                        LocalDate date) {
 
-        Garage garage = garageRepository.findById(garageId)
-                .orElseThrow(() -> new RuntimeException("Garage not found"));
+                Garage garage = garageRepository.findById(garageId)
+                                .orElseThrow(() -> new RuntimeException("Garage not found"));
 
-        ServicePackage servicePackage = servicePackageRepository.findById(servicePackageId)
-                .orElseThrow(() -> new RuntimeException("Service package not found"));
+                ServicePackage servicePackage = servicePackageRepository.findById(servicePackageId)
+                                .orElseThrow(() -> new RuntimeException("Service package not found"));
 
-        if (!servicePackage.getVehicleType().equals(vehicleType)) {
-            throw new RuntimeException("Service package does not support vehicle type: " + vehicleType);
-        }
-
-        List<String> supportedVehicleTypes = washBayRepository.findDistinctVehicleTypesByGarageId(garageId);
-        String bayType = mapVehicleTypeToBayType(vehicleType);
-        long availableBayCount = washBayRepository.countAvailableByGarageAndVehicleType(garageId, bayType);
-
-        if (!supportedVehicleTypes.contains(bayType)) {
-            throw new RuntimeException("Garage does not support vehicle type: " + vehicleType);
-        }
-
-        List<SlotResponse> slots = new ArrayList<>();
-        List<Booking> bookings = bookingRepository.findByGarageIdAndStartTimeBetween(
-                garageId, date.atStartOfDay(), date.plusDays(1).atStartOfDay());
-
-        LocalTime current = garage.getOpeningTime();
-        while (current.plusMinutes(servicePackage.getDurationMinutes()).isBefore(garage.getClosingTime())
-                || current.plusMinutes(servicePackage.getDurationMinutes()).equals(garage.getClosingTime())) {
-
-            LocalDateTime start = LocalDateTime.of(date, current);
-            LocalDateTime end = start.plusMinutes(servicePackage.getDurationMinutes());
-            boolean available = availableBayCount > 0;
-
-            for (Booking booking : bookings) {
-                String status = booking.getStatus();
-                boolean holdCapacity = "CONFIRMED".equals(status)
-                        || "CHECKED_IN".equals(status)
-                        || "IN_PROGRESS".equals(status);
-                if (!holdCapacity) continue;
-
-                boolean overlap = start.isBefore(booking.getEndTime()) && end.isAfter(booking.getStartTime());
-                if (overlap) {
-                    available = false;
-                    break;
+                if (!servicePackage.getVehicleType().equals(vehicleType)) {
+                        throw new RuntimeException("Service package does not support vehicle type: " + vehicleType);
                 }
-            }
 
-            slots.add(SlotResponse.builder().startTime(start).endTime(end).available(available).build());
-            current = current.plusMinutes(garage.getSlotIntervalMinutes());
-        }
+                List<String> supportedVehicleTypes = washBayRepository.findDistinctVehicleTypesByGarageId(garageId);
+                String bayType = mapVehicleTypeToBayType(vehicleType);
+                long availableBayCount = washBayRepository.countAvailableByGarageAndVehicleType(garageId, bayType);
 
-        return AvailableSlotResponse.builder()
-                .garageId(garageId)
-                .servicePackageId(servicePackageId)
-                .date(date)
-                .slots(slots)
-                .build();
-    }
-
-    private String mapVehicleTypeToBayType(String vehicleType) {
-        return vehicleType.startsWith("BIKE") ? "BIKE" : "CAR";
-    }
-
-    // ===================== ISSUE #11 =====================
-
-    @Override
-    @Transactional
-    public BookingResponse createBooking(BookingCreateRequest request, Long customerId) {
-
-        User customer = userRepository.findById(customerId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Customer not found"));
-
-        Vehicle vehicle = vehicleRepository.findByIdAndCustomer_Id(request.getVehicleId(), customerId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Vehicle not found or does not belong to current customer"));
-        if (!Boolean.TRUE.equals(vehicle.getIsActive())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vehicle is inactive");
-        }
-
-        ServicePackage pkg = servicePackageRepository.findById(request.getServicePackageId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Service package not found"));
-        if (!Boolean.TRUE.equals(pkg.getIsActive())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Service package is inactive");
-        }
-
-        Garage garage = garageRepository.findById(request.getGarageId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Garage not found"));
-        if (!Boolean.TRUE.equals(garage.getIsActive())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Garage is inactive");
-        }
-
-        LocalDateTime startTime = request.getStartTime();
-        LocalDateTime endTime = startTime.plusMinutes(pkg.getDurationMinutes());
-
-        String bayType = mapVehicleTypeToBayType(vehicle.getVehicleType());
-        List<String> supportedTypes = washBayRepository.findDistinctVehicleTypesByGarageId(request.getGarageId());
-        if (!supportedTypes.contains(bayType)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Garage does not support vehicle type: " + vehicle.getVehicleType());
-        }
-
-        if (!pkg.getVehicleType().startsWith(vehicle.getVehicleType())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Service package does not support vehicle type: " + vehicle.getVehicleType());
-        }
-
-        CustomerLoyalty loyalty = customerLoyaltyRepository.findByCustomerId(customerId).orElse(null);
-        String tier = loyalty != null ? loyalty.getCurrentTier() : "SILVER";
-
-        LoyaltyTierRule tierRule = loyaltyTierRuleRepository.findByTierAndIsActiveTrue(tier)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                        "Loyalty tier rule not found for tier: " + tier));
-
-        LocalDateTime maxBookingTime = LocalDateTime.now().plusDays(tierRule.getBookingWindowDays());
-        if (startTime.isAfter(maxBookingTime)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Booking date exceeds allowed window of " + tierRule.getBookingWindowDays() + " days for tier " + tier);
-        }
-
-        long upcomingCount = bookingRepository.countUpcomingBookings(customerId, LocalDateTime.now());
-        if (upcomingCount >= tierRule.getMaxUpcomingBookings()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Exceeded maximum upcoming bookings limit of " + tierRule.getMaxUpcomingBookings() + " for tier " + tier);
-        }
-
-        long vehicleOverlap = bookingRepository.countOverlappingBookingsByVehicle(
-                request.getVehicleId(), startTime, endTime);
-        if (vehicleOverlap > 0) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Vehicle already has an active booking during this time");
-        }
-
-        if (Boolean.TRUE.equals(pkg.getRequiresWashBay())) {
-            long availableBays = washBayRepository.countAvailableByGarageAndVehicleType(request.getGarageId(), bayType);
-            long occupiedBays = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
-                    request.getGarageId(), vehicle.getVehicleType(), startTime, endTime);
-            if (occupiedBays >= availableBays) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "No wash bay available for this time slot");
-            }
-        }
-
-        if (Boolean.TRUE.equals(pkg.getRequiresCareStaff()) && pkg.getCareStaffRequiredCount() > 0) {
-            long totalStaff = staffProfileRepository.countByGarageIdAndStaffTypeAndIsActiveTrue(
-                    request.getGarageId(), pkg.getCareStaffType());
-            long assignedStaff = bookingAssignedStaffRepository.countAssignedStaffByGarageAndTypeAndTime(
-                    request.getGarageId(), pkg.getCareStaffType(), startTime, endTime);
-            if ((totalStaff - assignedStaff) < pkg.getCareStaffRequiredCount()) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "Not enough care staff available for this time slot");
-            }
-        }
-
-        BigDecimal originalPrice = pkg.getBasePrice();
-        BigDecimal discountAmount = BigDecimal.ZERO;
-        Long promotionId = null;
-
-        if (request.getPromotionCode() != null && !request.getPromotionCode().isBlank()) {
-            Promotion promotion = promotionRepository.findByCodeAndIsActiveTrue(request.getPromotionCode())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                            "Invalid or expired promotion code: " + request.getPromotionCode()));
-
-            LocalDateTime now = LocalDateTime.now();
-            if (now.isBefore(promotion.getStartAt()) || now.isAfter(promotion.getEndAt())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion is not active");
-            }
-            if (promotion.getMinOrderAmount() != null
-                    && originalPrice.compareTo(promotion.getMinOrderAmount()) < 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Order amount does not meet minimum requirement for this promotion");
-            }
-            if (promotion.getUsageLimit() != null && promotion.getUsedCount() >= promotion.getUsageLimit()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion usage limit reached");
-            }
-
-            BigDecimal promoDiscount;
-            if ("PERCENT".equalsIgnoreCase(promotion.getDiscountType())) {
-                promoDiscount = originalPrice.multiply(promotion.getDiscountValue())
-                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-                if (promotion.getMaxDiscountAmount() != null) {
-                    promoDiscount = promoDiscount.min(promotion.getMaxDiscountAmount());
+                if (!supportedVehicleTypes.contains(bayType)) {
+                        throw new RuntimeException("Garage does not support vehicle type: " + vehicleType);
                 }
-            } else {
-                promoDiscount = promotion.getDiscountValue();
-            }
 
-            discountAmount = discountAmount.add(promoDiscount);
-            promotionId = promotion.getId();
-            promotion.setUsedCount(promotion.getUsedCount() + 1);
-            promotionRepository.save(promotion);
+                List<SlotResponse> slots = new ArrayList<>();
+                List<Booking> bookings = bookingRepository.findByGarageIdAndStartTimeBetween(
+                                garageId, date.atStartOfDay(), date.plusDays(1).atStartOfDay());
+
+                LocalTime current = garage.getOpeningTime();
+                while (current.plusMinutes(servicePackage.getDurationMinutes()).isBefore(garage.getClosingTime())
+                                || current.plusMinutes(servicePackage.getDurationMinutes())
+                                                .equals(garage.getClosingTime())) {
+
+                        LocalDateTime start = LocalDateTime.of(date, current);
+                        LocalDateTime end = start.plusMinutes(servicePackage.getDurationMinutes());
+                        boolean available = availableBayCount > 0;
+
+                        for (Booking booking : bookings) {
+                                String status = booking.getStatus();
+                                boolean holdCapacity = "CONFIRMED".equals(status)
+                                                || "CHECKED_IN".equals(status)
+                                                || "IN_PROGRESS".equals(status);
+                                if (!holdCapacity)
+                                        continue;
+
+                                boolean overlap = start.isBefore(booking.getEndTime())
+                                                && end.isAfter(booking.getStartTime());
+                                if (overlap) {
+                                        available = false;
+                                        break;
+                                }
+                        }
+
+                        slots.add(SlotResponse.builder().startTime(start).endTime(end).available(available).build());
+                        current = current.plusMinutes(garage.getSlotIntervalMinutes());
+                }
+
+                return AvailableSlotResponse.builder()
+                                .garageId(garageId)
+                                .servicePackageId(servicePackageId)
+                                .date(date)
+                                .slots(slots)
+                                .build();
         }
 
-        int usedPoints = request.getUsedPoints() != null ? request.getUsedPoints() : 0;
-        if (usedPoints > 0) {
-            if (loyalty == null || loyalty.getAvailablePoints() < usedPoints) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient loyalty points");
-            }
-            BigDecimal pointDiscount = BigDecimal.valueOf(usedPoints * 1000L);
-            discountAmount = discountAmount.add(pointDiscount);
+        private String mapVehicleTypeToBayType(String vehicleType) {
+                return vehicleType.startsWith("BIKE") ? "BIKE" : "CAR";
         }
 
-        if (discountAmount.compareTo(originalPrice) > 0) {
-            discountAmount = originalPrice;
+        // ===================== ISSUE #11 =====================
+
+        @Override
+        @Transactional
+        public BookingResponse createBooking(BookingCreateRequest request, Long customerId) {
+
+                User customer = userRepository.findById(customerId)
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Customer not found"));
+
+                Vehicle vehicle = vehicleRepository.findByIdAndCustomer_Id(request.getVehicleId(), customerId)
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                                "Vehicle not found or does not belong to current customer"));
+                if (!Boolean.TRUE.equals(vehicle.getIsActive())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vehicle is inactive");
+                }
+
+                ServicePackage pkg = servicePackageRepository.findById(request.getServicePackageId())
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Service package not found"));
+                if (!Boolean.TRUE.equals(pkg.getIsActive())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Service package is inactive");
+                }
+
+                Garage garage = garageRepository.findById(request.getGarageId())
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Garage not found"));
+                if (!Boolean.TRUE.equals(garage.getIsActive())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Garage is inactive");
+                }
+
+                LocalDateTime startTime = request.getStartTime();
+                LocalDateTime endTime = startTime.plusMinutes(pkg.getDurationMinutes());
+
+                String bayType = mapVehicleTypeToBayType(vehicle.getVehicleType());
+                List<String> supportedTypes = washBayRepository
+                                .findDistinctVehicleTypesByGarageId(request.getGarageId());
+                if (!supportedTypes.contains(bayType)) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Garage does not support vehicle type: " + vehicle.getVehicleType());
+                }
+
+                if (!pkg.getVehicleType().startsWith(vehicle.getVehicleType())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Service package does not support vehicle type: " + vehicle.getVehicleType());
+                }
+
+                CustomerLoyalty loyalty = customerLoyaltyRepository.findByCustomerId(customerId).orElse(null);
+                String tier = loyalty != null ? loyalty.getCurrentTier() : "SILVER";
+
+                LoyaltyTierRule tierRule = loyaltyTierRuleRepository.findByTierAndIsActiveTrue(tier)
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                                                "Loyalty tier rule not found for tier: " + tier));
+
+                LocalDateTime maxBookingTime = LocalDateTime.now().plusDays(tierRule.getBookingWindowDays());
+                if (startTime.isAfter(maxBookingTime)) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Booking date exceeds allowed window of " + tierRule.getBookingWindowDays()
+                                                        + " days for tier " + tier);
+                }
+
+                long upcomingCount = bookingRepository.countUpcomingBookings(customerId, LocalDateTime.now());
+                if (upcomingCount >= tierRule.getMaxUpcomingBookings()) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Exceeded maximum upcoming bookings limit of "
+                                                        + tierRule.getMaxUpcomingBookings() + " for tier " + tier);
+                }
+
+                long vehicleOverlap = bookingRepository.countOverlappingBookingsByVehicle(
+                                request.getVehicleId(), startTime, endTime);
+                if (vehicleOverlap > 0) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                        "Vehicle already has an active booking during this time");
+                }
+
+                if (Boolean.TRUE.equals(pkg.getRequiresWashBay())) {
+                        long availableBays = washBayRepository
+                                        .countAvailableByGarageAndVehicleType(request.getGarageId(), bayType);
+                        long occupiedBays = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
+                                        request.getGarageId(), vehicle.getVehicleType(), startTime, endTime);
+                        if (occupiedBays >= availableBays) {
+                                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                                "No wash bay available for this time slot");
+                        }
+                }
+
+                if (Boolean.TRUE.equals(pkg.getRequiresCareStaff()) && pkg.getCareStaffRequiredCount() > 0) {
+                        long totalStaff = staffProfileRepository.countByGarageIdAndStaffTypeAndIsActiveTrue(
+                                        request.getGarageId(), pkg.getCareStaffType());
+                        long assignedStaff = bookingAssignedStaffRepository.countAssignedStaffByGarageAndTypeAndTime(
+                                        request.getGarageId(), pkg.getCareStaffType(), startTime, endTime);
+                        if ((totalStaff - assignedStaff) < pkg.getCareStaffRequiredCount()) {
+                                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                                "Not enough care staff available for this time slot");
+                        }
+                }
+
+                BigDecimal originalPrice = pkg.getBasePrice();
+                BigDecimal discountAmount = BigDecimal.ZERO;
+                Long promotionId = null;
+
+                if (request.getPromotionCode() != null && !request.getPromotionCode().isBlank()) {
+                        Promotion promotion = promotionRepository.findByCodeAndIsActiveTrue(request.getPromotionCode())
+                                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                                        "Invalid or expired promotion code: "
+                                                                        + request.getPromotionCode()));
+
+                        LocalDateTime now = LocalDateTime.now();
+                        if (now.isBefore(promotion.getStartAt()) || now.isAfter(promotion.getEndAt())) {
+                                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion is not active");
+                        }
+                        if (promotion.getMinOrderAmount() != null
+                                        && originalPrice.compareTo(promotion.getMinOrderAmount()) < 0) {
+                                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                                "Order amount does not meet minimum requirement for this promotion");
+                        }
+                        if (promotion.getUsageLimit() != null
+                                        && promotion.getUsedCount() >= promotion.getUsageLimit()) {
+                                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                                "Promotion usage limit reached");
+                        }
+
+                        BigDecimal promoDiscount;
+                        if ("PERCENT".equalsIgnoreCase(promotion.getDiscountType())) {
+                                promoDiscount = originalPrice.multiply(promotion.getDiscountValue())
+                                                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                                if (promotion.getMaxDiscountAmount() != null) {
+                                        promoDiscount = promoDiscount.min(promotion.getMaxDiscountAmount());
+                                }
+                        } else {
+                                promoDiscount = promotion.getDiscountValue();
+                        }
+
+                        discountAmount = discountAmount.add(promoDiscount);
+                        promotionId = promotion.getId();
+                        promotion.setUsedCount(promotion.getUsedCount() + 1);
+                        promotionRepository.save(promotion);
+                }
+
+                int usedPoints = request.getUsedPoints() != null ? request.getUsedPoints() : 0;
+                if (usedPoints > 0) {
+                        if (loyalty == null || loyalty.getAvailablePoints() < usedPoints) {
+                                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                                "Insufficient loyalty points");
+                        }
+                        BigDecimal pointDiscount = BigDecimal.valueOf(usedPoints * 1000L);
+                        discountAmount = discountAmount.add(pointDiscount);
+                }
+
+                if (discountAmount.compareTo(originalPrice) > 0) {
+                        discountAmount = originalPrice;
+                }
+
+                BigDecimal finalPrice = originalPrice.subtract(discountAmount);
+                BigDecimal depositAmount = finalPrice.multiply(BigDecimal.valueOf(0.3)).setScale(2,
+                                RoundingMode.HALF_UP);
+
+                Booking booking = new Booking();
+                booking.setCustomerId(customerId);
+                booking.setVehicleId(request.getVehicleId());
+                booking.setGarageId(request.getGarageId());
+                booking.setServicePackageId(request.getServicePackageId());
+                booking.setPromotionId(promotionId);
+                booking.setBookingDate(startTime.toLocalDate());
+                booking.setStartTime(startTime);
+                booking.setEndTime(endTime);
+                booking.setStatus("CONFIRMED");
+                booking.setPaymentStatus("UNPAID");
+                booking.setOriginalPrice(originalPrice);
+                booking.setSurchargeAmount(BigDecimal.ZERO);
+                booking.setDiscountAmount(discountAmount);
+                booking.setFinalPrice(finalPrice);
+                booking.setDepositAmount(depositAmount);
+                booking.setDepositStatus("UNPAID");
+                booking.setRefundAmount(BigDecimal.ZERO);
+                booking.setIsWalkIn(false);
+                booking.setRewardProcessed(false);
+                booking.setUsedPoints(usedPoints);
+                booking.setNote(request.getNote());
+
+                Booking saved = bookingRepository.save(booking);
+                return toResponse(saved);
         }
 
-        BigDecimal finalPrice = originalPrice.subtract(discountAmount);
-        BigDecimal depositAmount = finalPrice.multiply(BigDecimal.valueOf(0.3)).setScale(2, RoundingMode.HALF_UP);
+        // ===================== ISSUE #12 =====================
 
-        Booking booking = new Booking();
-        booking.setCustomerId(customerId);
-        booking.setVehicleId(request.getVehicleId());
-        booking.setGarageId(request.getGarageId());
-        booking.setServicePackageId(request.getServicePackageId());
-        booking.setPromotionId(promotionId);
-        booking.setBookingDate(startTime.toLocalDate());
-        booking.setStartTime(startTime);
-        booking.setEndTime(endTime);
-        booking.setStatus("CONFIRMED");
-        booking.setPaymentStatus("UNPAID");
-        booking.setOriginalPrice(originalPrice);
-        booking.setSurchargeAmount(BigDecimal.ZERO);
-        booking.setDiscountAmount(discountAmount);
-        booking.setFinalPrice(finalPrice);
-        booking.setDepositAmount(depositAmount);
-        booking.setDepositStatus("UNPAID");
-        booking.setRefundAmount(BigDecimal.ZERO);
-        booking.setIsWalkIn(false);
-        booking.setRewardProcessed(false);
-        booking.setUsedPoints(usedPoints);
-        booking.setNote(request.getNote());
+        @Override
+        @Transactional
+        public BookingResponse createWalkInBooking(WalkInBookingCreateRequest request, Long staffUserId) {
 
-        Booking saved = bookingRepository.save(booking);
-        return toResponse(saved);
-    }
+                StaffProfile staffProfile = staffProfileRepository.findByUser_Id(staffUserId)
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
+                                                "No staff profile found for current user"));
 
-    // ===================== ISSUE #12 =====================
+                if (!Boolean.TRUE.equals(staffProfile.getIsActive())) {
+                        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Staff profile is inactive");
+                }
 
-    @Override
-    @Transactional
-    public BookingResponse createWalkInBooking(WalkInBookingCreateRequest request, Long staffUserId) {
+                if (!staffProfile.getGarageId().equals(request.getGarageId())) {
+                        throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                                        "Staff can only create walk-in booking for their assigned garage");
+                }
 
-        StaffProfile staffProfile = staffProfileRepository.findByUser_Id(staffUserId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
-                        "No staff profile found for current user"));
+                Garage garage = garageRepository.findById(request.getGarageId())
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Garage not found"));
+                if (!Boolean.TRUE.equals(garage.getIsActive())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Garage is inactive");
+                }
 
-        if (!Boolean.TRUE.equals(staffProfile.getIsActive())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Staff profile is inactive");
+                ServicePackage pkg = servicePackageRepository.findById(request.getServicePackageId())
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Service package not found"));
+                if (!Boolean.TRUE.equals(pkg.getIsActive())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Service package is inactive");
+                }
+
+                String normalizedPlate = request.getLicensePlate().toUpperCase()
+                                .replaceAll("[\\s.\\-]", "")
+                                .replaceAll("[^A-Z0-9]", "");
+
+                LocalDateTime startTime = request.getStartTime();
+                LocalDateTime endTime = startTime.plusMinutes(pkg.getDurationMinutes());
+
+                String bayType = mapVehicleTypeToBayType(request.getVehicleType());
+                List<String> supportedTypes = washBayRepository
+                                .findDistinctVehicleTypesByGarageId(request.getGarageId());
+                if (!supportedTypes.contains(bayType)) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Garage does not support vehicle type: " + request.getVehicleType());
+                }
+
+                if (!pkg.getVehicleType().startsWith(request.getVehicleType())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Service package does not support vehicle type: " + request.getVehicleType());
+                }
+
+                long plateOverlap = bookingRepository.countOverlappingBookingsByLicensePlate(
+                                normalizedPlate, startTime, endTime);
+                if (plateOverlap > 0) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                        "License plate already has an active booking during this time");
+                }
+
+                if (Boolean.TRUE.equals(pkg.getRequiresWashBay())) {
+                        long availableBays = washBayRepository.countAvailableByGarageAndVehicleType(
+                                        request.getGarageId(), bayType);
+                        long occupiedBays = bookingRepository.countOverlappingBookingsByGarage(
+                                        request.getGarageId(), startTime, endTime);
+                        if (occupiedBays >= availableBays) {
+                                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                                "No wash bay available for this time slot");
+                        }
+                }
+
+                if (Boolean.TRUE.equals(pkg.getRequiresCareStaff()) && pkg.getCareStaffRequiredCount() > 0) {
+                        long totalStaff = staffProfileRepository.countByGarageIdAndStaffTypeAndIsActiveTrue(
+                                        request.getGarageId(), pkg.getCareStaffType());
+                        long assignedStaff = bookingAssignedStaffRepository.countAssignedStaffByGarageAndTypeAndTime(
+                                        request.getGarageId(), pkg.getCareStaffType(), startTime, endTime);
+                        if ((totalStaff - assignedStaff) < pkg.getCareStaffRequiredCount()) {
+                                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                                "Not enough care staff available for this time slot");
+                        }
+                }
+
+                Booking booking = new Booking();
+                booking.setCustomerId(null);
+                booking.setVehicleId(null);
+                booking.setGarageId(request.getGarageId());
+                booking.setServicePackageId(request.getServicePackageId());
+                booking.setCreatedByStaffId(staffUserId);
+                booking.setBookingDate(startTime.toLocalDate());
+                booking.setStartTime(startTime);
+                booking.setEndTime(endTime);
+                booking.setStatus("CONFIRMED");
+                booking.setPaymentStatus("UNPAID");
+                booking.setOriginalPrice(pkg.getBasePrice());
+                booking.setSurchargeAmount(BigDecimal.ZERO);
+                booking.setDiscountAmount(BigDecimal.ZERO);
+                booking.setFinalPrice(pkg.getBasePrice());
+                booking.setDepositAmount(BigDecimal.ZERO);
+                booking.setDepositStatus("UNPAID");
+                booking.setRefundAmount(BigDecimal.ZERO);
+                booking.setIsWalkIn(true);
+                booking.setGuestName(request.getGuestName());
+                booking.setGuestPhone(request.getGuestPhone());
+                booking.setLicensePlate(normalizedPlate);
+                booking.setRewardProcessed(false);
+                booking.setUsedPoints(0);
+                booking.setNote(request.getNote());
+
+                Booking saved = bookingRepository.save(booking);
+                return toResponse(saved);
         }
 
-        if (!staffProfile.getGarageId().equals(request.getGarageId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "Staff can only create walk-in booking for their assigned garage");
+        // ===================== HELPER =====================
+
+        private BookingResponse toResponse(Booking b) {
+                return BookingResponse.builder()
+                                .id(b.getId())
+                                .customerId(b.getCustomerId())
+                                .vehicleId(b.getVehicleId())
+                                .garageId(b.getGarageId())
+                                .servicePackageId(b.getServicePackageId())
+                                .promotionId(b.getPromotionId())
+                                .startTime(b.getStartTime())
+                                .endTime(b.getEndTime())
+                                .status(b.getStatus())
+                                .paymentStatus(b.getPaymentStatus())
+                                .originalPrice(b.getOriginalPrice())
+                                .discountAmount(b.getDiscountAmount())
+                                .finalPrice(b.getFinalPrice())
+                                .depositAmount(b.getDepositAmount())
+                                .depositStatus(b.getDepositStatus())
+                                .isWalkIn(b.getIsWalkIn())
+                                .usedPoints(b.getUsedPoints())
+                                .note(b.getNote())
+                                .createdAt(b.getCreatedAt())
+                                .guestName(b.getGuestName())
+                                .guestPhone(b.getGuestPhone())
+                                .licensePlate(b.getLicensePlate())
+                                .createdByStaffId(b.getCreatedByStaffId())
+                                .checkedInAt(b.getCheckedInAt())
+                                .build();
         }
 
-        Garage garage = garageRepository.findById(request.getGarageId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Garage not found"));
-        if (!Boolean.TRUE.equals(garage.getIsActive())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Garage is inactive");
+        private BookingSummaryResponse toSummaryResponse(Booking b) {
+
+                return BookingSummaryResponse.builder()
+                                .id(b.getId())
+                                .customerId(b.getCustomerId())
+                                .garageId(b.getGarageId())
+                                .vehicleId(b.getVehicleId())
+                                .servicePackageId(b.getServicePackageId())
+                                .startTime(b.getStartTime())
+                                .endTime(b.getEndTime())
+                                .status(b.getStatus())
+                                .paymentStatus(b.getPaymentStatus())
+                                .finalPrice(b.getFinalPrice())
+                                .isWalkIn(b.getIsWalkIn())
+                                .build();
+        }
+        // ===================== ISSUE #13 =====================
+
+        @Override
+        public List<BookingSummaryResponse> getCustomerBookings(
+                        Long customerId,
+                        String status) {
+
+                List<Booking> bookings = bookingRepository.findByCustomerIdOrderByStartTimeDesc(customerId);
+
+                return bookings.stream()
+
+                                .filter(b -> status == null
+                                                || status.isBlank()
+                                                || b.getStatus().equalsIgnoreCase(status))
+
+                                .map(this::toSummaryResponse)
+
+                                .toList();
         }
 
-        ServicePackage pkg = servicePackageRepository.findById(request.getServicePackageId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Service package not found"));
-        if (!Boolean.TRUE.equals(pkg.getIsActive())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Service package is inactive");
+        @Override
+        public BookingResponse getCustomerBookingDetail(
+                        Long bookingId,
+                        Long customerId) {
+
+                Booking booking = bookingRepository
+                                .findByIdAndCustomerId(bookingId, customerId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
+
+                return toResponse(booking);
         }
 
-        String normalizedPlate = request.getLicensePlate().toUpperCase()
-                .replaceAll("[\\s.\\-]", "")
-                .replaceAll("[^A-Z0-9]", "");
+        @Override
+        public List<BookingSummaryResponse> getStaffBookings(
+                        Long staffUserId,
+                        String status,
+                        LocalDate date) {
 
-        LocalDateTime startTime = request.getStartTime();
-        LocalDateTime endTime = startTime.plusMinutes(pkg.getDurationMinutes());
+                StaffProfile staffProfile = staffProfileRepository
+                                .findByUser_Id(staffUserId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.FORBIDDEN,
+                                                "Staff profile not found"));
 
-        String bayType = mapVehicleTypeToBayType(request.getVehicleType());
-        List<String> supportedTypes = washBayRepository.findDistinctVehicleTypesByGarageId(request.getGarageId());
-        if (!supportedTypes.contains(bayType)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Garage does not support vehicle type: " + request.getVehicleType());
+                if (!Boolean.TRUE.equals(staffProfile.getIsActive())) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "Staff profile is inactive");
+                }
+
+                List<Booking> bookings;
+
+                if (date != null) {
+
+                        bookings = bookingRepository.findByGarageIdAndBookingDateOrderByStartTimeDesc(
+                                        staffProfile.getGarageId(),
+                                        date);
+
+                } else {
+
+                        bookings = bookingRepository.findByGarageIdOrderByStartTimeDesc(
+                                        staffProfile.getGarageId());
+
+                }
+
+                return bookings.stream()
+
+                                .filter(b -> status == null
+                                                || status.isBlank()
+                                                || b.getStatus().equalsIgnoreCase(status))
+
+                                .map(this::toSummaryResponse)
+
+                                .toList();
         }
 
-        if (!pkg.getVehicleType().startsWith(request.getVehicleType())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Service package does not support vehicle type: " + request.getVehicleType());
+        @Override
+        public List<BookingSummaryResponse> getAdminBookings(
+                        Long garageId,
+                        String status,
+                        String paymentStatus) {
+
+                List<Booking> bookings = bookingRepository.findAllByOrderByStartTimeDesc();
+
+                return bookings.stream()
+
+                                .filter(b -> garageId == null
+                                                || b.getGarageId().equals(garageId))
+
+                                .filter(b -> status == null
+                                                || status.isBlank()
+                                                || b.getStatus().equalsIgnoreCase(status))
+
+                                .filter(b -> paymentStatus == null
+                                                || paymentStatus.isBlank()
+                                                || b.getPaymentStatus().equalsIgnoreCase(paymentStatus))
+
+                                .map(this::toSummaryResponse)
+
+                                .toList();
         }
 
-        long plateOverlap = bookingRepository.countOverlappingBookingsByLicensePlate(
-                normalizedPlate, startTime, endTime);
-        if (plateOverlap > 0) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "License plate already has an active booking during this time");
+        // ===================== ISSUE #14 =====================
+        @Override
+        @Transactional
+        public BookingResponse checkInBooking(
+                        Long bookingId,
+                        Long staffUserId,
+                        String note) {
+
+                StaffProfile staff = staffProfileRepository
+                                .findByUser_Id(staffUserId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.FORBIDDEN,
+                                                "Staff profile not found"));
+
+                Booking booking = bookingRepository.findById(bookingId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
+
+                if (!booking.getGarageId().equals(staff.getGarageId())) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "Booking belongs to another garage");
+                }
+
+                if (!"CONFIRMED".equals(booking.getStatus())) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Only confirmed booking can be checked in");
+                }
+
+                booking.setStatus("CHECKED_IN");
+
+                booking.setCheckedInAt(
+                                LocalDateTime.now());
+
+                if (note != null && !note.isBlank()) {
+
+                        booking.setNote(note);
+                }
+
+                Booking saved = bookingRepository.save(booking);
+
+                return toResponse(saved);
         }
 
-        if (Boolean.TRUE.equals(pkg.getRequiresWashBay())) {
-            long availableBays = washBayRepository.countAvailableByGarageAndVehicleType(
-                    request.getGarageId(), bayType);
-            long occupiedBays = bookingRepository.countOverlappingBookingsByGarage(
-        request.getGarageId(), startTime, endTime);
-            if (occupiedBays >= availableBays) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "No wash bay available for this time slot");
-            }
-        }
-
-        if (Boolean.TRUE.equals(pkg.getRequiresCareStaff()) && pkg.getCareStaffRequiredCount() > 0) {
-            long totalStaff = staffProfileRepository.countByGarageIdAndStaffTypeAndIsActiveTrue(
-                    request.getGarageId(), pkg.getCareStaffType());
-            long assignedStaff = bookingAssignedStaffRepository.countAssignedStaffByGarageAndTypeAndTime(
-                    request.getGarageId(), pkg.getCareStaffType(), startTime, endTime);
-            if ((totalStaff - assignedStaff) < pkg.getCareStaffRequiredCount()) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "Not enough care staff available for this time slot");
-            }
-        }
-
-        Booking booking = new Booking();
-        booking.setCustomerId(null);
-        booking.setVehicleId(null);
-        booking.setGarageId(request.getGarageId());
-        booking.setServicePackageId(request.getServicePackageId());
-        booking.setCreatedByStaffId(staffUserId);
-        booking.setBookingDate(startTime.toLocalDate());
-        booking.setStartTime(startTime);
-        booking.setEndTime(endTime);
-        booking.setStatus("CONFIRMED");
-        booking.setPaymentStatus("UNPAID");
-        booking.setOriginalPrice(pkg.getBasePrice());
-        booking.setSurchargeAmount(BigDecimal.ZERO);
-        booking.setDiscountAmount(BigDecimal.ZERO);
-        booking.setFinalPrice(pkg.getBasePrice());
-        booking.setDepositAmount(BigDecimal.ZERO);
-        booking.setDepositStatus("UNPAID");
-        booking.setRefundAmount(BigDecimal.ZERO);
-        booking.setIsWalkIn(true);
-        booking.setGuestName(request.getGuestName());
-        booking.setGuestPhone(request.getGuestPhone());
-        booking.setLicensePlate(normalizedPlate);
-        booking.setRewardProcessed(false);
-        booking.setUsedPoints(0);
-        booking.setNote(request.getNote());
-
-        Booking saved = bookingRepository.save(booking);
-        return toResponse(saved);
-    }
-
-    // ===================== HELPER =====================
-
-    private BookingResponse toResponse(Booking b) {
-        return BookingResponse.builder()
-                .id(b.getId())
-                .customerId(b.getCustomerId())
-                .vehicleId(b.getVehicleId())
-                .garageId(b.getGarageId())
-                .servicePackageId(b.getServicePackageId())
-                .promotionId(b.getPromotionId())
-                .startTime(b.getStartTime())
-                .endTime(b.getEndTime())
-                .status(b.getStatus())
-                .paymentStatus(b.getPaymentStatus())
-                .originalPrice(b.getOriginalPrice())
-                .discountAmount(b.getDiscountAmount())
-                .finalPrice(b.getFinalPrice())
-                .depositAmount(b.getDepositAmount())
-                .depositStatus(b.getDepositStatus())
-                .isWalkIn(b.getIsWalkIn())
-                .usedPoints(b.getUsedPoints())
-                .note(b.getNote())
-                .createdAt(b.getCreatedAt())
-                .guestName(b.getGuestName())
-.guestPhone(b.getGuestPhone())
-.licensePlate(b.getLicensePlate())
-.createdByStaffId(b.getCreatedByStaffId())
-                .build();
-    }
-    private BookingSummaryResponse toSummaryResponse(Booking b) {
-
-    return BookingSummaryResponse.builder()
-            .id(b.getId())
-            .customerId(b.getCustomerId())
-            .garageId(b.getGarageId())
-            .vehicleId(b.getVehicleId())
-            .servicePackageId(b.getServicePackageId())
-            .startTime(b.getStartTime())
-            .endTime(b.getEndTime())
-            .status(b.getStatus())
-            .paymentStatus(b.getPaymentStatus())
-            .finalPrice(b.getFinalPrice())
-            .isWalkIn(b.getIsWalkIn())
-            .build();
-}
-    // ===================== ISSUE #13 =====================
-
-@Override
-public List<BookingSummaryResponse> getCustomerBookings(
-        Long customerId,
-        String status) {
-
-    List<Booking> bookings =
-            bookingRepository.findByCustomerIdOrderByStartTimeDesc(customerId);
-
-    return bookings.stream()
-
-            .filter(b -> status == null
-                    || status.isBlank()
-                    || b.getStatus().equalsIgnoreCase(status))
-
-            .map(this::toSummaryResponse)
-
-            .toList();
-}
-
-@Override
-public BookingResponse getCustomerBookingDetail(
-        Long bookingId,
-        Long customerId) {
-
-    Booking booking = bookingRepository
-            .findByIdAndCustomerId(bookingId, customerId)
-            .orElseThrow(() ->
-                    new ResponseStatusException(
-                            HttpStatus.NOT_FOUND,
-                            "Booking not found"));
-
-    return toResponse(booking);
-}
-
-@Override
-public List<BookingSummaryResponse> getStaffBookings(
-        Long staffUserId,
-        String status,
-        LocalDate date) {
-
-    StaffProfile staffProfile = staffProfileRepository
-            .findByUser_Id(staffUserId)
-            .orElseThrow(() ->
-                    new ResponseStatusException(
-                            HttpStatus.FORBIDDEN,
-                            "Staff profile not found"));
-
-    if (!Boolean.TRUE.equals(staffProfile.getIsActive())) {
-        throw new ResponseStatusException(
-                HttpStatus.FORBIDDEN,
-                "Staff profile is inactive");
-    }
-
-    List<Booking> bookings;
-
-    if (date != null) {
-
-        bookings = bookingRepository.findByGarageIdAndBookingDateOrderByStartTimeDesc(
-                staffProfile.getGarageId(),
-                date);
-
-    } else {
-
-        bookings = bookingRepository.findByGarageIdOrderByStartTimeDesc(
-                staffProfile.getGarageId());
-
-    }
-
-    return bookings.stream()
-
-            .filter(b -> status == null
-                    || status.isBlank()
-                    || b.getStatus().equalsIgnoreCase(status))
-
-            .map(this::toSummaryResponse)
-
-            .toList();
-}
-
-@Override
-public List<BookingSummaryResponse> getAdminBookings(
-        Long garageId,
-        String status,
-        String paymentStatus) {
-
-    List<Booking> bookings = bookingRepository.findAllByOrderByStartTimeDesc();
-
-    return bookings.stream()
-
-            .filter(b -> garageId == null
-                    || b.getGarageId().equals(garageId))
-
-            .filter(b -> status == null
-                    || status.isBlank()
-                    || b.getStatus().equalsIgnoreCase(status))
-
-            .filter(b -> paymentStatus == null
-                    || paymentStatus.isBlank()
-                    || b.getPaymentStatus().equalsIgnoreCase(paymentStatus))
-
-            .map(this::toSummaryResponse)
-
-            .toList();
-}
 }

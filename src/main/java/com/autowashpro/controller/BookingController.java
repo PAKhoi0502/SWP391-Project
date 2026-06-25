@@ -14,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import com.autowashpro.dto.request.BookingCheckInRequest;
 import java.util.List;
 
 import java.time.LocalDate;
@@ -23,127 +24,154 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 public class BookingController {
 
-    private final BookingService bookingService;
+        private final BookingService bookingService;
 
-    @GetMapping("/available-slots")
-    public ApiResponse<AvailableSlotResponse> getAvailableSlots(
-            @RequestParam("garage_id") Long garageId,
-            @RequestParam("service_package_id") Long servicePackageId,
-            @RequestParam("vehicle_type") String vehicleType,
-            @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        @GetMapping("/available-slots")
+        public ApiResponse<AvailableSlotResponse> getAvailableSlots(
+                        @RequestParam("garage_id") Long garageId,
+                        @RequestParam("service_package_id") Long servicePackageId,
+                        @RequestParam("vehicle_type") String vehicleType,
+                        @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
 
-        return ApiResponse.<AvailableSlotResponse>builder()
-                .success(true)
-                .message("Available slots retrieved")
-                .data(bookingService.getAvailableSlots(garageId, servicePackageId, vehicleType, date))
-                .build();
-    }
+                return ApiResponse.<AvailableSlotResponse>builder()
+                                .success(true)
+                                .message("Available slots retrieved")
+                                .data(bookingService.getAvailableSlots(garageId, servicePackageId, vehicleType, date))
+                                .build();
+        }
 
-    @PostMapping
-    @PreAuthorize("hasRole('CUSTOMER')")
-    public ApiResponse<BookingResponse> createBooking(
-            @Valid @RequestBody BookingCreateRequest request,
-            @AuthenticationPrincipal UserDetails userDetails) {
+        @PostMapping
+        @PreAuthorize("hasRole('CUSTOMER')")
+        public ApiResponse<BookingResponse> createBooking(
+                        @Valid @RequestBody BookingCreateRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
 
-        Long customerId = Long.valueOf(userDetails.getUsername());
-        return ApiResponse.<BookingResponse>builder()
-                .success(true)
-                .message("Booking created successfully")
-                .data(bookingService.createBooking(request, customerId))
-                .build();
-    }
+                Long customerId = Long.valueOf(userDetails.getUsername());
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true)
+                                .message("Booking created successfully")
+                                .data(bookingService.createBooking(request, customerId))
+                                .build();
+        }
 
-    @PostMapping("/walk-in")
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
-    public ApiResponse<BookingResponse> createWalkInBooking(
-            @Valid @RequestBody WalkInBookingCreateRequest request,
-            @AuthenticationPrincipal UserDetails userDetails) {
+        @PostMapping("/walk-in")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> createWalkInBooking(
+                        @Valid @RequestBody WalkInBookingCreateRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
 
-        Long staffUserId = Long.valueOf(userDetails.getUsername());
-        return ApiResponse.<BookingResponse>builder()
-                .success(true)
-                .message("Walk-in booking created successfully")
-                .data(bookingService.createWalkInBooking(request, staffUserId))
-                .build();
-    }
-    @GetMapping
-@PreAuthorize("hasRole('CUSTOMER')")
-public ApiResponse<List<BookingSummaryResponse>> getCustomerBookings(
-        @AuthenticationPrincipal UserDetails userDetails,
-        @RequestParam(required = false) String status) {
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true)
+                                .message("Walk-in booking created successfully")
+                                .data(bookingService.createWalkInBooking(request, staffUserId))
+                                .build();
+        }
 
-    Long customerId = Long.valueOf(userDetails.getUsername());
+        @GetMapping
+        @PreAuthorize("hasRole('CUSTOMER')")
+        public ApiResponse<List<BookingSummaryResponse>> getCustomerBookings(
+                        @AuthenticationPrincipal UserDetails userDetails,
+                        @RequestParam(required = false) String status) {
 
-    return ApiResponse.<List<BookingSummaryResponse>>builder()
-            .success(true)
-            .message("Customer bookings retrieved")
-            .data(
-                    bookingService.getCustomerBookings(
-                            customerId,
-                            status))
-            .build();
-}
-@GetMapping("/{id}")
-@PreAuthorize("hasRole('CUSTOMER')")
-public ApiResponse<BookingResponse> getCustomerBookingDetail(
-        @PathVariable Long id,
-        @AuthenticationPrincipal UserDetails userDetails) {
+                Long customerId = Long.valueOf(userDetails.getUsername());
 
-    Long customerId = Long.valueOf(userDetails.getUsername());
+                return ApiResponse.<List<BookingSummaryResponse>>builder()
+                                .success(true)
+                                .message("Customer bookings retrieved")
+                                .data(
+                                                bookingService.getCustomerBookings(
+                                                                customerId,
+                                                                status))
+                                .build();
+        }
 
-    return ApiResponse.<BookingResponse>builder()
-            .success(true)
-            .message("Booking detail retrieved")
-            .data(
-                    bookingService.getCustomerBookingDetail(
-                            id,
-                            customerId))
-            .build();
-}
-@GetMapping("/staff/bookings")
-@PreAuthorize("hasRole('STAFF')")
-public ApiResponse<List<BookingSummaryResponse>> getStaffBookings(
+        @GetMapping("/{id}")
+        @PreAuthorize("hasRole('CUSTOMER')")
+        public ApiResponse<BookingResponse> getCustomerBookingDetail(
+                        @PathVariable Long id,
+                        @AuthenticationPrincipal UserDetails userDetails) {
 
-        @AuthenticationPrincipal UserDetails userDetails,
+                Long customerId = Long.valueOf(userDetails.getUsername());
 
-        @RequestParam(required = false) String status,
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true)
+                                .message("Booking detail retrieved")
+                                .data(
+                                                bookingService.getCustomerBookingDetail(
+                                                                id,
+                                                                customerId))
+                                .build();
+        }
 
-        @RequestParam(required = false)
+        @GetMapping("/staff/bookings")
+        @PreAuthorize("hasRole('STAFF')")
+        public ApiResponse<List<BookingSummaryResponse>> getStaffBookings(
 
-        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                        @AuthenticationPrincipal UserDetails userDetails,
 
-        LocalDate date) {
+                        @RequestParam(required = false) String status,
 
-    Long staffUserId = Long.valueOf(userDetails.getUsername());
+                        @RequestParam(required = false)
 
-    return ApiResponse.<List<BookingSummaryResponse>>builder()
-            .success(true)
-            .message("Staff bookings retrieved")
-            .data(
-                    bookingService.getStaffBookings(
-                            staffUserId,
-                            status,
-                            date))
-            .build();
-}
-@GetMapping("/admin/bookings")
-@PreAuthorize("hasRole('ADMIN')")
-public ApiResponse<List<BookingSummaryResponse>> getAdminBookings(
+                        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
 
-        @RequestParam(required = false) Long garageId,
+                        LocalDate date) {
 
-        @RequestParam(required = false) String status,
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
 
-        @RequestParam(required = false) String paymentStatus) {
+                return ApiResponse.<List<BookingSummaryResponse>>builder()
+                                .success(true)
+                                .message("Staff bookings retrieved")
+                                .data(
+                                                bookingService.getStaffBookings(
+                                                                staffUserId,
+                                                                status,
+                                                                date))
+                                .build();
+        }
 
-    return ApiResponse.<List<BookingSummaryResponse>>builder()
-            .success(true)
-            .message("Admin bookings retrieved")
-            .data(
-                    bookingService.getAdminBookings(
-                            garageId,
-                            status,
-                            paymentStatus))
-            .build();
-}
+        @GetMapping("/admin/bookings")
+        @PreAuthorize("hasRole('ADMIN')")
+        public ApiResponse<List<BookingSummaryResponse>> getAdminBookings(
+
+                        @RequestParam(required = false) Long garageId,
+
+                        @RequestParam(required = false) String status,
+
+                        @RequestParam(required = false) String paymentStatus) {
+
+                return ApiResponse.<List<BookingSummaryResponse>>builder()
+                                .success(true)
+                                .message("Admin bookings retrieved")
+                                .data(
+                                                bookingService.getAdminBookings(
+                                                                garageId,
+                                                                status,
+                                                                paymentStatus))
+                                .build();
+        }
+
+        @PatchMapping("/{id}/check-in")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> checkInBooking(
+
+                        @PathVariable Long id,
+
+                        @RequestBody BookingCheckInRequest request,
+
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true)
+                                .message("Booking checked in successfully")
+                                .data(
+                                                bookingService.checkInBooking(
+                                                                id,
+                                                                staffUserId,
+                                                                request.getNote()))
+                                .build();
+        }
 }

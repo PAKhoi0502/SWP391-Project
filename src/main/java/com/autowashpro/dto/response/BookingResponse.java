@@ -17,6 +17,7 @@ public class BookingResponse {
     private Long promotionId;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
+    private LocalDateTime checkedInAt;
     private String status;
     private String paymentStatus;
     private BigDecimal originalPrice;
@@ -29,7 +30,7 @@ public class BookingResponse {
     private String note;
     private LocalDateTime createdAt;
     private String guestName;
-private String guestPhone;
-private String licensePlate;
-private Long createdByStaffId;
+    private String guestPhone;
+    private String licensePlate;
+    private Long createdByStaffId;
 }
