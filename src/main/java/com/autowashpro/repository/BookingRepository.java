@@ -18,8 +18,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             LocalDateTime start,
             LocalDateTime end);
 
-    // Thêm cho issue #11
-    // Kiểm tra xe có booking active nào overlap không
+    // Issue #11: Kiểm tra xe có booking active nào overlap không
     @Query("""
         SELECT COUNT(b) FROM Booking b
         WHERE b.vehicleId = :vehicleId
@@ -33,7 +32,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("endTime") LocalDateTime endTime
     );
 
-    // Đếm upcoming bookings của customer
+    // Issue #11: Đếm upcoming bookings của customer
     @Query("""
         SELECT COUNT(b) FROM Booking b
         WHERE b.customerId = :customerId
@@ -45,22 +44,50 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("now") LocalDateTime now
     );
 
-    // Lấy bookings theo customer
+    // Issue #11: Lấy bookings theo customer
     List<Booking> findByCustomerIdOrderByStartTimeDesc(Long customerId);
 
+    // Issue #11: Đếm booking chiếm wash bay theo garage + vehicle type
     @Query("""
-    SELECT COUNT(b) FROM Booking b
-    JOIN Vehicle v ON v.id = b.vehicleId
-    WHERE b.garageId = :garageId
-    AND v.vehicleType = :vehicleType
-    AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
-    AND b.startTime < :endTime
-    AND b.endTime > :startTime
-    """)
-long countOverlappingBookingsByGarageAndVehicleType(
-        @Param("garageId") Long garageId,
-        @Param("vehicleType") String vehicleType,
-        @Param("startTime") LocalDateTime startTime,
-        @Param("endTime") LocalDateTime endTime
-);
+        SELECT COUNT(b) FROM Booking b
+        JOIN Vehicle v ON v.id = b.vehicleId
+        WHERE b.garageId = :garageId
+        AND v.vehicleType = :vehicleType
+        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+        AND b.startTime < :endTime
+        AND b.endTime > :startTime
+        """)
+    long countOverlappingBookingsByGarageAndVehicleType(
+            @Param("garageId") Long garageId,
+            @Param("vehicleType") String vehicleType,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime
+    );
+
+    // Issue #12: Kiểm tra license plate overlap (walk-in booking)
+    @Query("""
+        SELECT COUNT(b) FROM Booking b
+        WHERE b.licensePlate = :licensePlate
+        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+        AND b.startTime < :endTime
+        AND b.endTime > :startTime
+        """)
+    long countOverlappingBookingsByLicensePlate(
+            @Param("licensePlate") String licensePlate,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime
+    );
+// Issue #12: Đếm tất cả booking đang chiếm wash bay theo garage (dùng cho walk-in)
+    @Query("""
+        SELECT COUNT(b) FROM Booking b
+        WHERE b.garageId = :garageId
+        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+        AND b.startTime < :endTime
+        AND b.endTime > :startTime
+        """)
+    long countOverlappingBookingsByGarage(
+            @Param("garageId") Long garageId,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime
+    );
 }

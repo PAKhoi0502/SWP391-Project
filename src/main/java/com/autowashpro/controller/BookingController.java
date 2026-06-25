@@ -2,6 +2,7 @@ package com.autowashpro.controller;
 
 import com.autowashpro.common.ApiResponse;
 import com.autowashpro.dto.request.BookingCreateRequest;
+import com.autowashpro.dto.request.WalkInBookingCreateRequest;
 import com.autowashpro.dto.response.AvailableSlotResponse;
 import com.autowashpro.dto.response.BookingResponse;
 import com.autowashpro.service.BookingService;
@@ -22,7 +23,6 @@ public class BookingController {
 
     private final BookingService bookingService;
 
-    // Giữ nguyên từ phong-bk (issue #10)
     @GetMapping("/available-slots")
     public ApiResponse<AvailableSlotResponse> getAvailableSlots(
             @RequestParam("garage_id") Long garageId,
@@ -37,7 +37,6 @@ public class BookingController {
                 .build();
     }
 
-    // Thêm mới cho issue #11
     @PostMapping
     @PreAuthorize("hasRole('CUSTOMER')")
     public ApiResponse<BookingResponse> createBooking(
@@ -49,6 +48,20 @@ public class BookingController {
                 .success(true)
                 .message("Booking created successfully")
                 .data(bookingService.createBooking(request, customerId))
+                .build();
+    }
+
+    @PostMapping("/walk-in")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    public ApiResponse<BookingResponse> createWalkInBooking(
+            @Valid @RequestBody WalkInBookingCreateRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        Long staffUserId = Long.valueOf(userDetails.getUsername());
+        return ApiResponse.<BookingResponse>builder()
+                .success(true)
+                .message("Walk-in booking created successfully")
+                .data(bookingService.createWalkInBooking(request, staffUserId))
                 .build();
     }
 }
