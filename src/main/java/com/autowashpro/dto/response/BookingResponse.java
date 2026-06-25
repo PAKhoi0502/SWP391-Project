@@ -28,4 +28,8 @@ public class BookingResponse {
     private Integer usedPoints;
     private String note;
     private LocalDateTime createdAt;
+    private String guestName;
+private String guestPhone;
+private String licensePlate;
+private Long createdByStaffId;
 }
