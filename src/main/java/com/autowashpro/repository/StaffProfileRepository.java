@@ -12,4 +12,6 @@ public interface StaffProfileRepository
     boolean existsByUser_Id(Long userId);
     boolean existsByStaffCode(String staffCode);
     Optional<StaffProfile> findByUser_Id(Long userId);
+
+    long countByGarageIdAndStaffTypeAndIsActiveTrue(Long garageId, String staffType);
 }

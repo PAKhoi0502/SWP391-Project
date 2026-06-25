@@ -23,4 +23,19 @@ public interface WashBayRepository
     List<Object[]> countAvailableGroupedByVehicleType(@Param("garageId") Long garageId);
 
     boolean existsByGarageIdAndBayCode(Long garageId, String bayCode);
+    
+    // Đếm booking đang chiếm wash bay theo garage + vehicle type + time
+@Query("""
+    SELECT COUNT(b) FROM Booking b
+    WHERE b.garageId = :garageId
+    AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+    AND b.startTime < :endTime
+    AND b.endTime > :startTime
+    """)
+long countOverlappingBookingsByGarageAndVehicleType(
+        @Param("garageId") Long garageId,
+        @Param("vehicleType") String vehicleType,
+        @Param("startTime") java.time.LocalDateTime startTime,
+        @Param("endTime") java.time.LocalDateTime endTime
+);
 }
