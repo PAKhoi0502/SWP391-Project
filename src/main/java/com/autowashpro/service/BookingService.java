@@ -12,32 +12,38 @@ import java.util.List;
 
 public interface BookingService {
 
-    AvailableSlotResponse getAvailableSlots(
-            Long garageId,
-            Long servicePackageId,
-            String vehicleType,
-            LocalDate date);
+        AvailableSlotResponse getAvailableSlots(
+                        Long garageId,
+                        Long servicePackageId,
+                        String vehicleType,
+                        LocalDate date);
 
-    BookingResponse createBooking(BookingCreateRequest request, Long customerId);
+        BookingResponse createBooking(BookingCreateRequest request, Long customerId);
 
-    BookingResponse createWalkInBooking(WalkInBookingCreateRequest request, Long staffUserId);
-    // ===================== ISSUE #13 =====================
+        BookingResponse createWalkInBooking(WalkInBookingCreateRequest request, Long staffUserId);
+        // ===================== ISSUE #13 =====================
 
-    List<BookingSummaryResponse> getCustomerBookings(
-            Long customerId,
-            String status);
+        List<BookingSummaryResponse> getCustomerBookings(
+                        Long customerId,
+                        String status);
 
-    BookingResponse getCustomerBookingDetail(
-            Long bookingId,
-            Long customerId);
+        BookingResponse getCustomerBookingDetail(
+                        Long bookingId,
+                        Long customerId);
 
-    List<BookingSummaryResponse> getStaffBookings(
-            Long staffUserId,
-            String status,
-            LocalDate date);
+        List<BookingSummaryResponse> getStaffBookings(
+                        Long staffUserId,
+                        String status,
+                        LocalDate date);
 
-    List<BookingSummaryResponse> getAdminBookings(
-            Long garageId,
-            String status,
-            String paymentStatus);
+        List<BookingSummaryResponse> getAdminBookings(
+                        Long garageId,
+                        String status,
+                        String paymentStatus);
+
+        // ===================== ISSUE #14 =====================
+        BookingResponse checkInBooking(
+                        Long bookingId,
+                        Long staffUserId,
+                        String note);
 }

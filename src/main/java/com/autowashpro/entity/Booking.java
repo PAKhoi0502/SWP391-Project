@@ -50,6 +50,9 @@ public class Booking {
     @Column(name = "end_time")
     private LocalDateTime endTime;
 
+    @Column(name = "checked_in_at")
+    private LocalDateTime checkedInAt;
+
     @Column(name = "wash_bay_start_time")
     private LocalDateTime washBayStartTime;
 
