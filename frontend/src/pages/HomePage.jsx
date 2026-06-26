@@ -2,22 +2,23 @@
 // Đồng thời dùng làm "trang kiểm tra liên thông" backend: gọi GET /health khi mở
 // trang và hiển thị trạng thái Loading / ErrorState / kết quả.
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+
 import { healthApi } from '../api/healthApi'
 import Loading from '../components/common/Loading'
 import ErrorState from '../components/common/ErrorState'
+import { useAuth } from '../contexts/AuthContext'
 
 function HomePage() {
+  const navigate = useNavigate()
+  const { user, isAuthenticated, logout } = useAuth()
+
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  // Tăng giá trị này (trong event handler) để buộc effect chạy lại => gọi lại API.
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
-    // Pattern React khuyến nghị cho fetch trong effect:
-    // - cờ ignore để bỏ qua kết quả nếu component unmount / effect chạy lại;
-    // - chỉ setState bên trong callback bất đồng bộ (.then/.catch/.finally),
-    //   KHÔNG setState đồng bộ trong thân effect (tránh cascading render).
     let ignore = false
 
     healthApi
@@ -37,8 +38,6 @@ function HomePage() {
     }
   }, [reloadKey])
 
-  // Nút "Thử lại": reset trạng thái (được phép setState đồng bộ trong event
-  // handler) rồi đổi reloadKey để effect gọi lại API.
   const handleRetry = () => {
     setLoading(true)
     setError(null)
@@ -46,14 +45,55 @@ function HomePage() {
     setReloadKey((k) => k + 1)
   }
 
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
+  }
+
   return (
     <div>
       <h1>Trang chủ</h1>
       <p>Chào mừng đến với AutoWash Pro.</p>
 
+      {isAuthenticated && (
+        <section style={{ marginTop: 20 }}>
+          <div
+            style={{
+              padding: '14px 18px',
+              borderRadius: 14,
+              background: 'rgba(167,139,250,0.12)',
+              border: '1px solid rgba(167,139,250,0.32)',
+              color: '#a78bfa',
+              fontWeight: 700,
+            }}
+          >
+            Xin chào {user?.fullName || 'khách hàng'}!
+          </div>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            style={{
+              marginTop: 14,
+              padding: '10px 18px',
+              borderRadius: 999,
+              border: '1px solid rgba(250,204,21,0.4)',
+              background: 'rgba(250,204,21,0.12)',
+              color: '#facc15',
+              fontWeight: 800,
+              cursor: 'pointer',
+            }}
+          >
+            Đăng xuất
+          </button>
+        </section>
+      )}
+
       <section style={{ marginTop: 24 }}>
         <h2 style={{ fontSize: 18 }}>Trạng thái máy chủ</h2>
+
         {loading && <Loading message="Đang kiểm tra máy chủ..." />}
+
         {!loading && error && (
           <ErrorState
             title="Không kết nối được máy chủ"
@@ -61,6 +101,7 @@ function HomePage() {
             onRetry={handleRetry}
           />
         )}
+
         {!loading && !error && (
           <p style={{ color: '#16a34a', fontWeight: 600 }}>
             Máy chủ hoạt động: {String(status)}
