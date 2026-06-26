@@ -1,33 +1,39 @@
-// Route được bảo vệ theo trạng thái đăng nhập và vai trò.
-//
-// - Chưa đăng nhập (không có token)  -> chuyển về /login.
-// - Đã đăng nhập nhưng sai vai trò   -> chuyển về /forbidden (403).
-// - Hợp lệ                            -> render route con qua <Outlet />.
-//
-// Cách dùng: bọc nhóm route cần bảo vệ và (tùy chọn) truyền danh sách vai trò:
-//   <Route element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]} />}> ... </Route>
-import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { storage } from '../utils/storage'
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
-function ProtectedRoute({ allowedRoles }) {
-  const location = useLocation()
-  const token = storage.getToken()
-  const user = storage.getUser()
+function normalizeRole(role) {
+  return String(role || "").toUpperCase();
+}
 
-  // Chưa đăng nhập -> về trang đăng nhập, nhớ lại trang đang muốn vào.
-  if (!token) {
-    return <Navigate to="/login" replace state={{ from: location }} />
+function ProtectedRoute({ allowedRoles = [] }) {
+  const location = useLocation();
+  const { user, role, loading, isAuthenticated } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
+        Đang kiểm tra đăng nhập...
+      </div>
+    );
   }
 
-  // Có giới hạn vai trò và vai trò hiện tại không nằm trong danh sách cho phép.
-  if (allowedRoles && allowedRoles.length > 0) {
-    const role = user?.role
-    if (!role || !allowedRoles.includes(role)) {
-      return <Navigate to="/forbidden" replace />
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  if (allowedRoles.length > 0) {
+    const currentRole = normalizeRole(role);
+
+    const canAccess = allowedRoles
+      .map(normalizeRole)
+      .some((allowedRole) => currentRole.includes(allowedRole));
+
+    if (!canAccess) {
+      return <Navigate to="/forbidden" replace />;
     }
   }
 
-  return <Outlet />
+  return <Outlet />;
 }
 
-export default ProtectedRoute
+export default ProtectedRoute;
