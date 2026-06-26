@@ -1,11 +1,13 @@
 package com.autowashpro.service.impl;
 
 import com.autowashpro.dto.request.BookingCreateRequest;
+import com.autowashpro.dto.request.StartServiceRequest;
 import com.autowashpro.dto.request.WalkInBookingCreateRequest;
 import com.autowashpro.dto.response.AvailableSlotResponse;
 import com.autowashpro.dto.response.BookingResponse;
 import com.autowashpro.dto.response.SlotResponse;
 import com.autowashpro.entity.*;
+import com.autowashpro.entity.enums.WashBayStatus;
 import com.autowashpro.repository.*;
 import com.autowashpro.service.BookingService;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.autowashpro.dto.response.BookingSummaryResponse;
 import com.autowashpro.dto.response.BookingDetailResponse;
+import com.autowashpro.dto.request.StartServiceRequest;
+import com.autowashpro.entity.enums.WashBayStatus;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -39,6 +43,8 @@ public class BookingServiceImpl implements BookingService {
         private final BookingAssignedStaffRepository bookingAssignedStaffRepository;
         private final StaffProfileRepository staffProfileRepository;
         private final UserRepository userRepository;
+        private final BookingServiceStepRepository bookingServiceStepRepository;
+        private final ServicePackageStepRepository servicePackageStepRepository;
 
         // ===================== ISSUE #10 =====================
 
@@ -436,6 +442,8 @@ public class BookingServiceImpl implements BookingService {
                                 .licensePlate(b.getLicensePlate())
                                 .createdByStaffId(b.getCreatedByStaffId())
                                 .checkedInAt(b.getCheckedInAt())
+                                .startedAt(b.getStartedAt())
+                                .washBayId(b.getWashBayId())
                                 .build();
         }
 
@@ -607,4 +615,168 @@ public class BookingServiceImpl implements BookingService {
                 return toResponse(saved);
         }
 
+        // ===================== ISSUE #16 =====================
+        @Override
+        @Transactional
+        public BookingResponse startService(
+                        Long bookingId,
+                        Long staffUserId,
+                        StartServiceRequest request) {
+
+                StaffProfile staff = staffProfileRepository
+                                .findByUser_Id(staffUserId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.FORBIDDEN,
+                                                "Staff profile not found"));
+
+                if (!Boolean.TRUE.equals(staff.getIsActive())) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "Staff profile is inactive");
+                }
+
+                Booking booking = bookingRepository
+                                .findById(bookingId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
+
+                if (!booking.getGarageId().equals(staff.getGarageId())) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "Booking belongs to another garage");
+                }
+
+                if (!"CHECKED_IN".equals(booking.getStatus())) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Only checked-in booking can start service");
+                }
+
+                ServicePackage servicePackage = servicePackageRepository
+                                .findById(booking.getServicePackageId())
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Service package not found"));
+
+                // ================= Assign Wash Bay =================
+                if (Boolean.TRUE.equals(servicePackage.getRequiresWashBay())) {
+
+                        String bayType = mapVehicleTypeToBayType(servicePackage.getVehicleType());
+
+                        WashBay washBay = washBayRepository
+                                        .findFirstByGarageIdAndVehicleTypeAndStatusAndIsActiveTrue(
+                                                        booking.getGarageId(),
+                                                        bayType,
+                                                        WashBayStatus.AVAILABLE)
+                                        .orElseThrow(() -> new ResponseStatusException(
+                                                        HttpStatus.BAD_REQUEST,
+                                                        "No wash bay available"));
+
+                        booking.setWashBayId(washBay.getId());
+
+                        washBay.setStatus(WashBayStatus.IN_USE);
+
+                        washBay.setCurrentBookingId(booking.getId());
+
+                        washBayRepository.save(washBay);
+                }
+
+                // ================= Assign Care Staff =================
+                if (Boolean.TRUE.equals(servicePackage.getRequiresCareStaff())) {
+
+                        List<StaffProfile> staffs = staffProfileRepository
+                                        .findByGarageIdAndStaffTypeAndIsActiveTrue(
+                                                        booking.getGarageId(),
+                                                        servicePackage.getCareStaffType());
+
+                        int assigned = 0;
+
+                        for (StaffProfile staffProfile : staffs) {
+
+                                if (assigned >= servicePackage.getCareStaffRequiredCount()) {
+                                        break;
+                                }
+                                long overlap = bookingAssignedStaffRepository
+                                                .countOverlap(
+                                                                staffProfile.getId(),
+                                                                booking.getStartTime(),
+                                                                booking.getEndTime());
+
+                                if (overlap > 0) {
+                                        continue;
+                                }
+
+                                BookingAssignedStaff bas = new BookingAssignedStaff();
+
+                                bas.setBookingId(booking.getId());
+                                bas.setStaffProfileId(staffProfile.getId());
+                                bas.setAssignedFrom(booking.getStartTime());
+                                bas.setAssignedTo(booking.getEndTime());
+                                bas.setRoleInBooking(servicePackage.getCareStaffType());
+
+                                bookingAssignedStaffRepository.save(bas);
+
+                                assigned++;
+                        }
+
+                        if (assigned < servicePackage.getCareStaffRequiredCount()) {
+
+                                throw new ResponseStatusException(
+                                                HttpStatus.BAD_REQUEST,
+                                                "Not enough care staff");
+                        }
+                }
+
+                // ================= Generate Booking Service Steps =================
+                List<ServicePackageStep> templates = servicePackageStepRepository
+                                .findByServicePackage_IdOrderByStepOrder(
+                                                servicePackage.getId());
+
+                for (ServicePackageStep template : templates) {
+
+                        BookingServiceStep step = new BookingServiceStep();
+
+                        step.setBookingId(booking.getId());
+
+                        step.setServicePackageId(servicePackage.getId());
+
+                        step.setServicePackageStepId(template.getId());
+
+                        step.setStepOrder(template.getStepOrder());
+
+                        step.setName(template.getName());
+
+                        step.setDescription(template.getDescription());
+
+                        step.setStatus("PENDING");
+
+                        bookingServiceStepRepository.save(step);
+                }
+
+                // ================= Update Booking =================
+                booking.setStatus("IN_PROGRESS");
+
+                booking.setStartedAt(LocalDateTime.now());
+
+                if (request.getNote() != null
+                                && !request.getNote().isBlank()) {
+
+                        booking.setNote(request.getNote());
+                }
+
+                Booking saved = bookingRepository.save(booking);
+
+                BookingResponse response = toResponse(saved);
+
+                List<Long> staffIds = bookingAssignedStaffRepository
+                                .findByBookingId(saved.getId())
+                                .stream()
+                                .map(BookingAssignedStaff::getStaffProfileId)
+                                .toList();
+
+                response.setAssignedCareStaffIds(staffIds);
+
+                return response;
+        }
 }

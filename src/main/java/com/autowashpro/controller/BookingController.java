@@ -16,7 +16,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import com.autowashpro.dto.request.BookingCheckInRequest;
 import java.util.List;
-
+import com.autowashpro.dto.request.StartServiceRequest;
 import java.time.LocalDate;
 
 @RestController
@@ -172,6 +172,29 @@ public class BookingController {
                                                                 id,
                                                                 staffUserId,
                                                                 request.getNote()))
+                                .build();
+        }
+
+        @PatchMapping("/{id}/start-service")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> startService(
+
+                        @PathVariable Long id,
+
+                        @AuthenticationPrincipal UserDetails userDetails,
+
+                        @RequestBody StartServiceRequest request) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true)
+                                .message("Service started successfully")
+                                .data(
+                                                bookingService.startService(
+                                                                id,
+                                                                staffUserId,
+                                                                request))
                                 .build();
         }
 }
