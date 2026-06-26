@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(timeout 90 ./mvnw spring-boot:run)",
+      "Bash(netstat -ano)",
+      "Bash(tasklist)"
+    ]
+  }
+}
