@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { ROLES } from '../constants/roles'
-import { storage } from '../utils/storage'
+import { useAuth } from '../contexts/AuthContext'
 import './layout.css'
 
 const NAV_ITEMS = {
@@ -23,11 +23,11 @@ const NAV_ITEMS = {
 
 function DashboardLayout({ role }) {
   const navigate = useNavigate()
-  const user = storage.getUser()
+  const { logout, user } = useAuth()
   const items = NAV_ITEMS[role] || []
 
-  const handleLogout = () => {
-    storage.clearAuth()
+  const handleLogout = async () => {
+    await logout()
     navigate('/login')
   }
 
