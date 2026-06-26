@@ -21,10 +21,6 @@ function MainLayout() {
           <Link to="/" style={{ textDecoration: 'none', color: '#374151' }}>
             Trang chủ
           </Link>
-
-          <Link to="/ui-kit" style={{ textDecoration: 'none', color: '#374151' }}>
-            UI Kit
-          </Link>
         </nav>
       </header>
 
