@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { getRedirectPathByRole, useAuth } from '../contexts/AuthContext'
 
-
 export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -50,17 +49,17 @@ export default function LoginPage() {
 
     try {
       const loggedUser = await login({
-  phone: form.identifier.trim(),
-  password: form.password,
-})
+        phone: form.identifier.trim(),
+        password: form.password,
+      })
 
       const fromPath = location.state?.from?.pathname
       const redirectPath = fromPath || getRedirectPathByRole(getRole(loggedUser))
 
       navigate(redirectPath, {
-  replace: true,
-  state: { loginSuccess: true },
-})
+        replace: true,
+        state: { loginSuccess: true },
+      })
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -74,23 +73,15 @@ export default function LoginPage() {
 
   return (
     <div style={{
-  minHeight: 'calc(100vh - 130px)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  position: 'relative',
-  fontFamily: "'Be Vietnam Pro', sans-serif",
-  overflow: 'hidden',
-}}>
+      minHeight: 'calc(100vh - 130px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
+      fontFamily: "'Be Vietnam Pro', sans-serif",
+      overflow: 'hidden',
+    }}>
       <style>{`
-        @keyframes orbFloat {
-          0%, 100% { transform: translateY(0px); }
-          50%       { transform: translateY(-24px); }
-        }
-        @keyframes orbDrift {
-          0%, 100% { transform: translateX(0px) scale(1); }
-          50%       { transform: translateX(18px) scale(1.04); }
-        }
         @keyframes fadeSlideIn {
           from { opacity: 0; transform: translateY(-6px); }
           to   { opacity: 1; transform: translateY(0); }
@@ -132,13 +123,11 @@ export default function LoginPage() {
               <path d="M2 15 Q10 9 20 15 Q30 21 44 15" stroke="#8b5cf6" strokeWidth="2.5" strokeLinecap="round" />
               <path d="M4 22 Q14 16 24 22 Q34 28 44 22" stroke="#c4b5fd" strokeWidth="2" strokeLinecap="round" />
             </svg>
-
             <span style={{ fontFamily: "'Be Vietnam Pro', sans-serif", fontSize: '1.5rem', fontWeight: 900, letterSpacing: '-0.5px' }}>
               <span style={{ color: '#ffffff', textShadow: '0 0 10px rgba(255,255,255,0.18), 0 0 20px rgba(167,139,250,0.12)' }}>Audela</span>
               <span style={{ color: '#a78bfa', textShadow: '0 0 12px rgba(167,139,250,0.38), 0 0 24px rgba(167,139,250,0.18)' }}>Washing</span>
             </span>
           </div>
-
           <div style={{ color: 'rgba(255,255,255,0.42)', fontSize: 13, marginTop: 4 }}>
             Sign in to your account
           </div>
@@ -152,7 +141,7 @@ export default function LoginPage() {
             color: '#4ade80', fontSize: 13, marginBottom: 20,
             display: 'flex', alignItems: 'center', gap: 8,
           }}>
-            ✅ Đăng ký thành công! Hãy đăng nhập.
+            Dang ky thanh cong! Hay dang nhap.
           </div>
         )}
 
@@ -165,19 +154,19 @@ export default function LoginPage() {
               color: '#f87171', fontSize: 13,
               animation: 'fadeSlideIn 0.3s ease forwards',
             }}>
-              ⚠️ {error}
+              {error}
             </div>
           )}
         </div>
 
         <form onSubmit={handleSubmit} style={{ textAlign: 'left' }}>
           <div style={{ marginBottom: 18 }}>
-            <label style={labelStyle}>số điện thoại</label>
+            <label style={labelStyle}>so dien thoai</label>
             <input
               className="login-input"
               type="text"
               name="identifier"
-              placeholder="nhập số điện thoại đã đăng ký"
+              placeholder="nhap so dien thoai da dang ky"
               value={form.identifier}
               onChange={handleChange}
               required
@@ -189,7 +178,7 @@ export default function LoginPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
               <label style={labelStyle}>Password</label>
               <Link to="/forgot-password" style={{ color: '#a78bfa', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
-                Quên mật khẩu?
+                Quen mat khau?
               </Link>
             </div>
 
@@ -198,51 +187,20 @@ export default function LoginPage() {
                 className="login-input"
                 type={showPass ? 'text' : 'password'}
                 name="password"
-                placeholder="••••••••"
+                placeholder="********"
                 value={form.password}
                 onChange={handleChange}
                 required
                 style={{ ...inputStyle, paddingRight: 44 }}
               />
-
               <button type="button" onClick={() => setShowPass(p => !p)} style={eyeBtnStyle}>
                 {showPass ? <EyeOff /> : <EyeOn />}
               </button>
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%',
-              background: 'rgba(250,204,21,0.12)',
-              border: '1px solid rgba(250,204,21,0.38)',
-              borderRadius: 999,
-              padding: '13px',
-              color: '#facc15',
-              fontWeight: 800,
-              fontSize: 15,
-              fontFamily: 'inherit',
-              letterSpacing: '0.03em',
-              backdropFilter: 'blur(12px)',
-              boxShadow: '0 0 20px rgba(250,204,21,0.15), inset 0 1px 0 rgba(255,255,255,0.12)',
-              transition: 'all 0.25s cubic-bezier(0.22,1,0.36,1)',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.7 : 1,
-            }}
-            onMouseEnter={e => {
-              if (!loading) {
-                e.currentTarget.style.background = 'rgba(250,204,21,0.22)'
-                e.currentTarget.style.boxShadow = '0 0 32px rgba(250,204,21,0.3), inset 0 1px 0 rgba(255,255,255,0.18)'
-              }
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'rgba(250,204,21,0.12)'
-              e.currentTarget.style.boxShadow = '0 0 20px rgba(250,204,21,0.15), inset 0 1px 0 rgba(255,255,255,0.12)'
-            }}
-          >
-            {loading ? '⏳ Signing in...' : 'Sign In →'}
+          <button type="submit" disabled={loading} style={submitStyle}>
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
@@ -290,6 +248,20 @@ const eyeBtnStyle = {
   color: 'rgba(167,139,250,0.55)',
   display: 'flex',
   alignItems: 'center',
+}
+
+const submitStyle = {
+  width: '100%',
+  background: 'rgba(250,204,21,0.12)',
+  border: '1px solid rgba(250,204,21,0.38)',
+  borderRadius: 999,
+  padding: '13px',
+  color: '#facc15',
+  fontWeight: 800,
+  fontSize: 15,
+  fontFamily: 'inherit',
+  letterSpacing: '0.03em',
+  cursor: 'pointer',
 }
 
 function EyeOn() {
