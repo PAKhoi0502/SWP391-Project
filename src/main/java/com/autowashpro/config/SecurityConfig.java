@@ -63,19 +63,23 @@ public class SecurityConfig {
                                 "/users/*/status")
                         .hasRole("ADMIN")
 
-                        .requestMatchers(
-                                "/users/*/role")
-                        .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/service-packages/available")
+.permitAll()
 
-                        .requestMatchers(
-                                "/service-packages",
-                                "/service-packages/*",
-                                "/service-packages/*/status")
-                        .hasRole("ADMIN")
+.requestMatchers(HttpMethod.GET, "/service-packages")
+.permitAll()
 
-                        .requestMatchers(
-                                "/service-packages/available")
-                        .permitAll()
+.requestMatchers(HttpMethod.GET, "/service-packages/*")
+.permitAll()
+
+.requestMatchers(HttpMethod.POST, "/service-packages")
+.hasRole("ADMIN")
+
+.requestMatchers(HttpMethod.PATCH, "/service-packages/*")
+.hasRole("ADMIN")
+
+.requestMatchers(HttpMethod.PATCH, "/service-packages/*/status")
+.hasRole("ADMIN")
 
                         .requestMatchers(
                                 "/users/me",
