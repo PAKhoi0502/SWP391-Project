@@ -78,6 +78,11 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const setCurrentUser = (currentUser) => {
+    setUser(currentUser);
+    authStorage.setAuth({ user: currentUser });
+  };
+
   useEffect(() => {
     loadCurrentUser();
   }, []);
@@ -92,6 +97,7 @@ export function AuthProvider({ children }) {
       register,
       logout,
       loadCurrentUser,
+      setCurrentUser,
     }),
     [user, loading, isAuthenticated]
   );
