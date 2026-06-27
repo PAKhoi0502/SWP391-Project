@@ -15,12 +15,13 @@ const NAV_ITEMS = {
     { to: '/staff/inspections', label: 'Kiểm tra xe' },
     { to: '/staff/profile', label: 'Hồ sơ' },
   ],
-  [ROLES.ADMIN]: [
-    { to: '/admin', label: 'Tổng quan' },
-    { to: '/admin/users', label: 'Người dùng' },
-    { to: '/admin/staff-profiles', label: 'Nhân viên' },
-    { to: '/admin/garages', label: 'Garage' },
-  ],
+ [ROLES.ADMIN]: [
+  { to: '/admin', label: 'Tổng quan' },
+  { to: '/admin/users', label: 'Người dùng' },
+  { to: '/admin/staff-profiles', label: 'Nhân viên' },
+  { to: '/admin/garages', label: 'Garage' },
+  { to: '/admin/wash-bays', label: 'Wash Bays' },
+],
 }
 
 function DashboardLayout({ role }) {

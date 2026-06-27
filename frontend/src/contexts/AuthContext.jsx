@@ -3,45 +3,146 @@ import { authService, authStorage } from "../services/authService";
 
 const AuthContext = createContext(null);
 
-function getRole(user) {
-  return (
+function decodeJwt(token) {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
+        .join("")
+    );
+
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+function buildUserFromToken(token) {
+  const decoded = decodeJwt(token);
+
+  if (!decoded) return null;
+
+  return {
+    id: decoded.sub,
+    role: decoded.role,
+    email: decoded.email,
+    fullName: decoded.fullName || decoded.name,
+  };
+}
+function normalizeUser(user, token) {
+  const tokenUser = token ? buildUserFromToken(token) : null;
+
+  const role =
     user?.role ||
     user?.roleName ||
     user?.accountRole ||
     user?.authorities?.[0]?.authority ||
-    "CUSTOMER"
+    tokenUser?.role ||
+    "";
+
+  return {
+    id: user?.id || user?.userId || user?.accountId || tokenUser?.id || null,
+    fullName:
+      user?.fullName ||
+      user?.name ||
+      tokenUser?.fullName ||
+      `User ${tokenUser?.id || ""}`,
+    email: user?.email || tokenUser?.email || null,
+    phone: user?.phone || null,
+    role: String(role).toUpperCase(),
+  };
+}
+
+function getRole(user) {
+  return String(
+    user?.role ||
+      user?.roleName ||
+      user?.accountRole ||
+      user?.authorities?.[0]?.authority ||
+      ""
   ).toUpperCase();
 }
 
 export function getRedirectPathByRole(role) {
-  const normalizedRole = String(role || "CUSTOMER").toUpperCase();
+  const normalizedRole = String(role || "").toUpperCase();
 
   if (normalizedRole.includes("ADMIN")) return "/admin";
   if (normalizedRole.includes("STAFF")) return "/staff";
   if (normalizedRole.includes("MANAGER")) return "/manager";
+  if (normalizedRole.includes("CUSTOMER")) return "/";
 
-  return "/";
+  return "/login";
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => authStorage.getUser());
+  const [accessToken, setAccessToken] = useState(() => {
+    return authStorage.getAccessToken() || null;
+  });
+
+  const [user, setUser] = useState(() => {
+    const savedUser = authStorage.getUser();
+
+    if (savedUser) return savedUser;
+
+    const token = authStorage.getAccessToken();
+    return token ? buildUserFromToken(token) : null;
+  });
+
   const [loading, setLoading] = useState(true);
 
-  const isAuthenticated = Boolean(authStorage.getAccessToken());
+  const isAuthenticated = Boolean(accessToken);
 
   const loadCurrentUser = async () => {
-    if (!authStorage.getAccessToken()) {
+    const token = authStorage.getAccessToken();
+
+    if (!token) {
+      setAccessToken(null);
+      setUser(null);
       setLoading(false);
       return null;
     }
 
+    setAccessToken(token);
+
+    const savedUser = authStorage.getUser();
+    const tokenUser = buildUserFromToken(token);
+
     try {
       const currentUser = await authService.getCurrentUser();
-      setUser(currentUser);
-      authStorage.setAuth({ user: currentUser });
-      return currentUser;
+      const rawUser = currentUser || savedUser || tokenUser;
+const finalUser = rawUser ? normalizeUser(rawUser, token) : null;
+
+if (finalUser) {
+  setUser(finalUser);
+
+  authStorage.setAuth({
+    accessToken: token,
+    user: finalUser,
+  });
+}
+
+      return finalUser;
     } catch {
-      authStorage.clearAuth();
+      const rawFallbackUser = savedUser || tokenUser;
+const fallbackUser = rawFallbackUser
+  ? normalizeUser(rawFallbackUser, token)
+  : null;
+
+if (fallbackUser) {
+  setUser(fallbackUser);
+
+  authStorage.setAuth({
+    accessToken: token,
+    user: fallbackUser,
+  });
+
+  return fallbackUser;
+}
+
       setUser(null);
       return null;
     } finally {
@@ -49,33 +150,52 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const login = async (payload) => {
-    const authData = await authService.login(payload);
+ const login = async (payload) => {
+  const authData = await authService.login(payload);
 
-    authStorage.setAuth({
-      accessToken: authData.accessToken,
-      refreshToken: authData.refreshToken,
-      user: authData.user,
-    });
+  const token =
+    authData.accessToken ||
+    authData.token ||
+    authData.data?.accessToken;
 
-    let loggedUser = authData.user;
+  const refreshToken =
+    authData.refreshToken ||
+    authData.data?.refreshToken ||
+    null;
 
-    if (!loggedUser) {
-      loggedUser = await authService.getCurrentUser();
-      authStorage.setAuth({ user: loggedUser });
-    }
+  const rawLoggedUser =
+    authData.user ||
+    authData.data?.user ||
+    buildUserFromToken(token);
 
-    setUser(loggedUser);
-    return loggedUser;
-  };
+  const loggedUser = normalizeUser(rawLoggedUser, token);
 
+  // QUAN TRỌNG: xóa session cũ trước khi lưu tài khoản mới
+  authStorage.clearAuth();
+
+  authStorage.setAuth({
+    accessToken: token,
+    refreshToken,
+    user: loggedUser,
+  });
+
+  setAccessToken(token);
+  setUser(loggedUser);
+
+  return loggedUser;
+};
   const register = async (payload) => {
     return authService.register(payload);
   };
 
   const logout = async () => {
-    await authService.logout();
-    setUser(null);
+    try {
+      await authService.logout();
+    } finally {
+      authStorage.clearAuth();
+      setAccessToken(null);
+      setUser(null);
+    }
   };
 
   const setCurrentUser = (currentUser) => {
