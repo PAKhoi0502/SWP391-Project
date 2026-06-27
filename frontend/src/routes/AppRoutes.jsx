@@ -5,6 +5,7 @@ import CustomerLayout from '../layouts/CustomerLayout'
 import PublicLayout from '../layouts/PublicLayout'
 import StaffLayout from '../layouts/StaffLayout'
 import AdminUsersPage from '../pages/AdminUsersPage'
+import AdminStaffProfilesPage from '../pages/AdminStaffProfilesPage'
 import ProtectedRoute from './ProtectedRoute'
 import DashboardPlaceholderPage from '../pages/DashboardPlaceholderPage'
 import ForbiddenPage from '../pages/ForbiddenPage'
@@ -15,6 +16,7 @@ import NotFoundPage from '../pages/NotFoundPage'
 import ProfilePage from '../pages/ProfilePage'
 import RegisterPage from '../pages/RegisterPage'
 import ResetPasswordPage from '../pages/ResetPasswordPage'
+import StaffProfilePage from '../pages/StaffProfilePage'
 import UikitDemo from '../pages/UikitDemo'
 
 function AppRoutes() {
@@ -43,6 +45,7 @@ function AppRoutes() {
           <Route path="staff" element={<DashboardPlaceholderPage title="Staff Dashboard" />} />
           <Route path="staff/bookings" element={<DashboardPlaceholderPage title="Booking can xu ly" />} />
           <Route path="staff/inspections" element={<DashboardPlaceholderPage title="Kiem tra xe" />} />
+          <Route path="staff/profile" element={<StaffProfilePage />} />
         </Route>
       </Route>
 
@@ -50,6 +53,7 @@ function AppRoutes() {
         <Route element={<AdminLayout />}>
           <Route path="admin" element={<DashboardPlaceholderPage title="Admin Dashboard" />} />
           <Route path="admin/users" element={<AdminUsersPage />} />
+          <Route path="admin/staff-profiles" element={<AdminStaffProfilesPage />} />
           <Route path="admin/garages" element={<DashboardPlaceholderPage title="Quan ly garage" />} />
         </Route>
       </Route>

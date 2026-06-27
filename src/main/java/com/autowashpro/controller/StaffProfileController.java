@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -40,8 +41,8 @@ public class StaffProfileController {
 
     @GetMapping("/me")
     @PreAuthorize("hasRole('STAFF')")
-    public ResponseEntity<StaffProfileResponse> getMyProfile() {
-        Long currentUserId = null; // TODO: lấy từ JWT principal
+    public ResponseEntity<StaffProfileResponse> getMyProfile(Authentication authentication) {
+        Long currentUserId = Long.valueOf(authentication.getName());
         return ResponseEntity.ok(staffProfileService.getByUserId(currentUserId));
     }
 
