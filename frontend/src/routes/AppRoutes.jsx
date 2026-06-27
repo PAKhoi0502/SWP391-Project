@@ -23,6 +23,8 @@ import GarageDetailPage from '../pages/GarageDetailPage'
 import AdminGarageListPage from '../pages/admin/AdminGarageListPage'
 import AdminGarageFormPage from '../pages/admin/AdminGarageFormPage'
 import AdminWashBayManagementPage from '../pages/admin/AdminWashBayManagementPage'
+import AdminVehiclesPage from '../pages/admin/AdminVehiclesPage'
+import CustomerVehiclesPage from '../pages/CustomerVehiclesPage'
 
 function AppRoutes() {
   return (
@@ -42,6 +44,7 @@ function AppRoutes() {
           <Route path="customer" element={<Navigate to="/" replace />} />
           <Route path="customer/bookings" element={<DashboardPlaceholderPage title="Lich hen khach hang" />} />
           <Route path="customer/profile" element={<ProfilePage />} />
+          <Route path="customer/vehicles" element={<CustomerVehiclesPage />} />
           <Route path="customer/garages" element={<GarageListPage />} />
           <Route path="customer/garages/:id" element={<GarageDetailPage />} />
         </Route>
@@ -61,6 +64,7 @@ function AppRoutes() {
           <Route path="admin" element={<DashboardPlaceholderPage title="Admin Dashboard" />} />
           <Route path="admin/users" element={<AdminUsersPage />} />
           <Route path="admin/staff-profiles" element={<AdminStaffProfilesPage />} />
+          <Route path="admin/vehicles" element={<AdminVehiclesPage />} />
           <Route path="admin/garages" element={<AdminGarageListPage />} />
           <Route path="admin/garages/create" element={<AdminGarageFormPage />} />
           <Route path="admin/garages/:id" element={<GarageDetailPage />} />

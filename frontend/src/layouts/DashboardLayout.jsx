@@ -5,9 +5,10 @@ import './layout.css'
 
 const NAV_ITEMS = {
   [ROLES.CUSTOMER]: [
-    { to: '/customer', label: 'Tổng quan' },
+    { to: '/', label: 'Trang chủ' },
     { to: '/customer/bookings', label: 'Lịch hẹn' },
-    { to: '/customer/profile', label: 'Hồ sơ' },
+    { to: '/customer/vehicles', label: 'Xe của tôi' },
+    { to: '/customer/profile', label: 'Setting' },
   ],
   [ROLES.STAFF]: [
     { to: '/staff', label: 'Ca làm' },
@@ -15,13 +16,14 @@ const NAV_ITEMS = {
     { to: '/staff/inspections', label: 'Kiểm tra xe' },
     { to: '/staff/profile', label: 'Hồ sơ' },
   ],
- [ROLES.ADMIN]: [
-  { to: '/admin', label: 'Tổng quan' },
-  { to: '/admin/users', label: 'Người dùng' },
-  { to: '/admin/staff-profiles', label: 'Nhân viên' },
-  { to: '/admin/garages', label: 'Garage' },
-  { to: '/admin/wash-bays', label: 'Wash Bays' },
-],
+  [ROLES.ADMIN]: [
+    { to: '/admin', label: 'Tổng quan' },
+    { to: '/admin/users', label: 'Người dùng' },
+    { to: '/admin/staff-profiles', label: 'Nhân viên' },
+    { to: '/admin/vehicles', label: 'Xe' },
+    { to: '/admin/garages', label: 'Garage' },
+    { to: '/admin/wash-bays', label: 'Wash Bays' },
+  ],
 }
 
 function DashboardLayout({ role }) {
@@ -31,7 +33,7 @@ function DashboardLayout({ role }) {
 
   const handleLogout = async () => {
     await logout()
-    navigate('/login')
+    navigate('/')
   }
 
   return (
@@ -40,24 +42,28 @@ function DashboardLayout({ role }) {
         <Link className="app-brand" to="/">
           AutoWash Pro
         </Link>
+
         <nav className="dashboard-nav" aria-label={`${role} navigation`}>
           {items.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.to.split('/').length === 2}>
+            <NavLink key={item.to} to={item.to} end={item.to === '/' || item.to.split('/').length === 2}>
               {item.label}
             </NavLink>
           ))}
         </nav>
       </aside>
+
       <div className="dashboard-shell">
         <header className="dashboard-header">
           <div>
             <strong>{role}</strong>
-            <span>{user?.fullName || user?.email || 'Người dùng'}</span>
+            <span>{user?.fullName || user?.email || user?.phone || 'Người dùng'}</span>
           </div>
+
           <button className="text-button" type="button" onClick={handleLogout}>
             Đăng xuất
           </button>
         </header>
+
         <main className="dashboard-main">
           <Outlet />
         </main>
