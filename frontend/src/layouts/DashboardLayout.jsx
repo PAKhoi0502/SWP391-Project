@@ -9,6 +9,7 @@ const NAV_ITEMS = {
     { to: '/customer/bookings', label: 'Lịch hẹn' },
     { to: '/customer/vehicles', label: 'Xe của tôi' },
     { to: '/customer/profile', label: 'Hồ sơ' },
+  ],
 
   [ROLES.STAFF]: [
     { to: '/staff', label: 'Ca làm' },
