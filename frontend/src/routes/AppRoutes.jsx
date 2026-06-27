@@ -18,6 +18,11 @@ import RegisterPage from '../pages/RegisterPage'
 import ResetPasswordPage from '../pages/ResetPasswordPage'
 import StaffProfilePage from '../pages/StaffProfilePage'
 import UikitDemo from '../pages/UikitDemo'
+import GarageListPage from '../pages/GarageListPage'
+import GarageDetailPage from '../pages/GarageDetailPage'
+import AdminGarageListPage from '../pages/admin/AdminGarageListPage'
+import AdminGarageFormPage from '../pages/admin/AdminGarageFormPage'
+
 
 function AppRoutes() {
   return (
@@ -37,6 +42,8 @@ function AppRoutes() {
           <Route path="customer" element={<DashboardPlaceholderPage title="Customer Dashboard" />} />
           <Route path="customer/bookings" element={<DashboardPlaceholderPage title="Lich hen khach hang" />} />
           <Route path="customer/profile" element={<ProfilePage />} />
+          <Route path="customer/garages" element={<GarageListPage />} />
+          <Route path="customer/garages/:id" element={<GarageDetailPage />} />
         </Route>
       </Route>
 
@@ -54,7 +61,10 @@ function AppRoutes() {
           <Route path="admin" element={<DashboardPlaceholderPage title="Admin Dashboard" />} />
           <Route path="admin/users" element={<AdminUsersPage />} />
           <Route path="admin/staff-profiles" element={<AdminStaffProfilesPage />} />
-          <Route path="admin/garages" element={<DashboardPlaceholderPage title="Quan ly garage" />} />
+          <Route path="admin/garages" element={<AdminGarageListPage />} />
+          <Route path="admin/garages/create" element={<AdminGarageFormPage />} />
+          <Route path="admin/garages/:id" element={<GarageDetailPage />} />
+          <Route path="admin/garages/:id/edit" element={<AdminGarageFormPage />} />
         </Route>
       </Route>
 
