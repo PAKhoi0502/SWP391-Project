@@ -7,6 +7,7 @@ const NAV_ITEMS = {
   [ROLES.CUSTOMER]: [
     { to: '/customer', label: 'Tổng quan' },
     { to: '/customer/bookings', label: 'Lịch hẹn' },
+    { to: '/customer/vehicles', label: 'Xe của tôi' },
     { to: '/customer/profile', label: 'Hồ sơ' },
   ],
   [ROLES.STAFF]: [
@@ -19,6 +20,7 @@ const NAV_ITEMS = {
     { to: '/admin', label: 'Tổng quan' },
     { to: '/admin/users', label: 'Người dùng' },
     { to: '/admin/staff-profiles', label: 'Nhân viên' },
+    { to: '/admin/vehicles', label: 'Xe' },
     { to: '/admin/garages', label: 'Garage' },
   ],
 }
