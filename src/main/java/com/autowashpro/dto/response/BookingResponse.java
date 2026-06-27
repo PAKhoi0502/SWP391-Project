@@ -2,7 +2,7 @@ package com.autowashpro.dto.response;
 
 import lombok.Builder;
 import lombok.Data;
-
+import java.util.List;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -33,4 +33,8 @@ public class BookingResponse {
     private String guestPhone;
     private String licensePlate;
     private Long createdByStaffId;
+    private LocalDateTime startedAt;
+    private Long washBayId;
+
+    private List<Long> assignedCareStaffIds;
 }

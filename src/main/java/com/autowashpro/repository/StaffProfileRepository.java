@@ -3,7 +3,7 @@ package com.autowashpro.repository;
 import com.autowashpro.entity.StaffProfile;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
-
+import java.util.List;
 import java.util.Optional;
 
 public interface StaffProfileRepository
@@ -14,4 +14,7 @@ public interface StaffProfileRepository
     Optional<StaffProfile> findByUser_Id(Long userId);
 
     long countByGarageIdAndStaffTypeAndIsActiveTrue(Long garageId, String staffType);
+    List<StaffProfile> findByGarageIdAndStaffTypeAndIsActiveTrue(
+        Long garageId,
+        String staffType);
 }

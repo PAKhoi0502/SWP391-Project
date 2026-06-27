@@ -6,6 +6,7 @@ import com.autowashpro.dto.response.AvailableSlotResponse;
 import com.autowashpro.dto.response.BookingResponse;
 import com.autowashpro.dto.response.BookingDetailResponse;
 import com.autowashpro.dto.response.BookingSummaryResponse;
+import com.autowashpro.dto.request.StartServiceRequest;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -46,4 +47,10 @@ public interface BookingService {
                         Long bookingId,
                         Long staffUserId,
                         String note);
+
+        // ===================== ISSUE #16 =====================
+        BookingResponse startService(
+                        Long bookingId,
+                        Long staffUserId,
+                        StartServiceRequest request);
 }
