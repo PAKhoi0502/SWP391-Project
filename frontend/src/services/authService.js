@@ -103,4 +103,14 @@ export const authService = {
     const res = await api.get("/auth/me");
     return res.data?.user || res.data?.data || res.data;
   },
+
+  async forgotPassword(payload) {
+    const res = await api.post("/auth/forgot-password", payload);
+    return res.data;
+  },
+
+  async resetPassword(payload) {
+    const res = await api.post("/auth/reset-password", payload);
+    return res.data;
+  },
 };
