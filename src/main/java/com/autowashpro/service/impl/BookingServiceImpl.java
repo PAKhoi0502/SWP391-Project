@@ -16,10 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.autowashpro.dto.response.BookingSummaryResponse;
-import com.autowashpro.dto.response.BookingDetailResponse;
-import com.autowashpro.dto.request.StartServiceRequest;
-import com.autowashpro.entity.enums.WashBayStatus;
-
+import com.autowashpro.entity.BookingAssignedStaff;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -779,4 +776,138 @@ public class BookingServiceImpl implements BookingService {
 
                 return response;
         }
+
+        // ===================== ISSUE #19 =====================
+
+@Override
+@Transactional
+public BookingResponse cancelBooking(Long bookingId, Long currentUserId, String role, String reason) {
+
+    Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Booking not found: " + bookingId));
+
+    String status = booking.getStatus();
+
+    // Validate permission theo role
+    if ("ROLE_CUSTOMER".equals(role)) {
+        // Customer chỉ cancel được booking của mình
+        if (!currentUserId.equals(booking.getCustomerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You can only cancel your own bookings");
+        }
+        // Customer chỉ cancel được khi CONFIRMED (chưa check-in)
+        if (!"CONFIRMED".equals(status) && !"PENDING_DEPOSIT".equals(status)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Customer can only cancel booking before check-in. Current status: " + status);
+        }
+    } else {
+        // Staff/Admin: validate garage permission
+        if ("ROLE_STAFF".equals(role)) {
+            StaffProfile staffProfile = staffProfileRepository.findByUser_Id(currentUserId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
+                            "No staff profile found"));
+            if (!staffProfile.getGarageId().equals(booking.getGarageId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "Staff can only cancel bookings in their assigned garage");
+            }
+        }
+        // Staff/Admin có thể cancel CONFIRMED hoặc CHECKED_IN
+        if (!"CONFIRMED".equals(status) && !"CHECKED_IN".equals(status)
+                && !"PENDING_DEPOSIT".equals(status)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Cannot cancel booking with status: " + status);
+        }
+    }
+
+    // Release wash bay nếu có
+    if (booking.getWashBayId() != null) {
+        washBayRepository.findById(booking.getWashBayId()).ifPresent(washBay -> {
+            washBay.setStatus(com.autowashpro.entity.enums.WashBayStatus.AVAILABLE);
+            washBay.setCurrentBookingId(null);
+            washBayRepository.save(washBay);
+        });
+        booking.setWashBayId(null);
+    }
+
+    // Release care staff nếu có
+    List<BookingAssignedStaff> assignedStaffs = bookingAssignedStaffRepository
+            .findByBookingId(bookingId);
+    for (BookingAssignedStaff assignedStaff : assignedStaffs) {
+        assignedStaff.setStatus("RELEASED");
+        bookingAssignedStaffRepository.save(assignedStaff);
+    }
+
+    // Refund used points nếu cancel hợp lệ (chỉ khi CONFIRMED, chưa check-in)
+    if (booking.getUsedPoints() != null && booking.getUsedPoints() > 0
+            && !"CHECKED_IN".equals(status)) {
+        customerLoyaltyRepository.findByCustomerId(booking.getCustomerId())
+                .ifPresent(loyalty -> {
+                    loyalty.setAvailablePoints(
+                            loyalty.getAvailablePoints() + booking.getUsedPoints());
+                    loyalty.setRedeemedPoints(
+                            Math.max(0, loyalty.getRedeemedPoints() - booking.getUsedPoints()));
+                    customerLoyaltyRepository.save(loyalty);
+                });
+    }
+
+    // Update booking status
+    booking.setStatus("CANCELED");
+    booking.setNote(reason != null ? reason : booking.getNote());
+    booking.setRewardProcessed(false);
+
+    Booking saved = bookingRepository.save(booking);
+    return toResponse(saved);
+}
+
+@Override
+@Transactional
+public BookingResponse markNoShow(Long bookingId, Long staffUserId, String reason) {
+
+    Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Booking not found: " + bookingId));
+
+    // Validate staff garage permission
+    StaffProfile staffProfile = staffProfileRepository.findByUser_Id(staffUserId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "No staff profile found"));
+    if (!staffProfile.getGarageId().equals(booking.getGarageId())) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "Staff can only mark no-show for bookings in their assigned garage");
+    }
+
+    // Chỉ CONFIRMED mới được mark no-show
+    if (!"CONFIRMED".equals(booking.getStatus())) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Can only mark no-show for CONFIRMED bookings. Current status: "
+                        + booking.getStatus());
+    }
+
+    // Release wash bay nếu có
+    if (booking.getWashBayId() != null) {
+        washBayRepository.findById(booking.getWashBayId()).ifPresent(washBay -> {
+            washBay.setStatus(com.autowashpro.entity.enums.WashBayStatus.AVAILABLE);
+            washBay.setCurrentBookingId(null);
+            washBayRepository.save(washBay);
+        });
+        booking.setWashBayId(null);
+    }
+
+    // Release care staff nếu có
+    List<BookingAssignedStaff> assignedStaffs = bookingAssignedStaffRepository
+            .findByBookingId(bookingId);
+    for (BookingAssignedStaff assignedStaff : assignedStaffs) {
+        assignedStaff.setStatus("RELEASED");
+        bookingAssignedStaffRepository.save(assignedStaff);
+    }
+
+    // NO_SHOW không refund points tự động
+    booking.setStatus("NO_SHOW");
+    booking.setNote(reason != null ? reason : booking.getNote());
+    booking.setRewardProcessed(false);
+
+    Booking saved = bookingRepository.save(booking);
+    return toResponse(saved);
+}
 }
