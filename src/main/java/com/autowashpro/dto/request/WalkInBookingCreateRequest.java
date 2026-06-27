@@ -33,4 +33,8 @@ public class WalkInBookingCreateRequest {
     private LocalDateTime startTime;
 
     private String note;
+
+    private Integer seatCount;
+
+    private String motorbikeGroup;
 }
