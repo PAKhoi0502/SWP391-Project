@@ -8,8 +8,8 @@ const NAV_ITEMS = {
     { to: '/', label: 'Trang chủ' },
     { to: '/customer/bookings', label: 'Lịch hẹn' },
     { to: '/customer/vehicles', label: 'Xe của tôi' },
-    { to: '/customer/profile', label: 'Setting' },
-  ],
+    { to: '/customer/profile', label: 'Hồ sơ' },
+
   [ROLES.STAFF]: [
     { to: '/staff', label: 'Ca làm' },
     { to: '/staff/bookings', label: 'Booking' },

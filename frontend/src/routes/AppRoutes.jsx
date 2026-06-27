@@ -26,6 +26,7 @@ import AdminWashBayManagementPage from '../pages/admin/AdminWashBayManagementPag
 import AdminVehiclesPage from '../pages/admin/AdminVehiclesPage'
 import CustomerVehiclesPage from '../pages/CustomerVehiclesPage'
 
+
 function AppRoutes() {
   return (
     <Routes>
@@ -43,6 +44,7 @@ function AppRoutes() {
         <Route element={<CustomerLayout />}>
           <Route path="customer" element={<Navigate to="/" replace />} />
           <Route path="customer/bookings" element={<DashboardPlaceholderPage title="Lich hen khach hang" />} />
+          <Route path="customer/vehicles" element={<CustomerVehiclesPage />} />
           <Route path="customer/profile" element={<ProfilePage />} />
           <Route path="customer/vehicles" element={<CustomerVehiclesPage />} />
           <Route path="customer/garages" element={<GarageListPage />} />
