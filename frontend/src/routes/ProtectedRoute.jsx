@@ -1,39 +1,32 @@
-import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
-
-function normalizeRole(role) {
-  return String(role || "").toUpperCase();
-}
+import { Navigate, Outlet } from "react-router-dom";
+import { useAuth } from '../contexts/AuthContext'
 
 function ProtectedRoute({ allowedRoles = [] }) {
-  const location = useLocation();
-  const { user, role, loading, isAuthenticated } = useAuth();
+  const { isAuthenticated, role, loading } = useAuth()
 
   if (loading) {
     return (
-      <div style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
+      <div style={{ padding: 32 }}>
         Đang kiểm tra đăng nhập...
       </div>
-    );
+    )
   }
 
-  if (!isAuthenticated || !user) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles.length > 0) {
-    const currentRole = normalizeRole(role);
+  const normalizedRole = String(role || '').toUpperCase()
 
-    const canAccess = allowedRoles
-      .map(normalizeRole)
-      .some((allowedRole) => currentRole.includes(allowedRole));
+  const canAccess =
+    allowedRoles.length === 0 ||
+    allowedRoles.some((item) => String(item).toUpperCase() === normalizedRole)
 
-    if (!canAccess) {
-      return <Navigate to="/forbidden" replace />;
-    }
+  if (!canAccess) {
+    return <Navigate to="/forbidden" replace />
   }
 
-  return <Outlet />;
+  return <Outlet />
 }
 
-export default ProtectedRoute;
+export default ProtectedRoute

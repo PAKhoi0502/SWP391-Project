@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { ROLES } from '../constants/roles'
 import AdminLayout from '../layouts/AdminLayout'
 import CustomerLayout from '../layouts/CustomerLayout'
@@ -22,6 +22,7 @@ import GarageListPage from '../pages/GarageListPage'
 import GarageDetailPage from '../pages/GarageDetailPage'
 import AdminGarageListPage from '../pages/admin/AdminGarageListPage'
 import AdminGarageFormPage from '../pages/admin/AdminGarageFormPage'
+import AdminWashBayManagementPage from '../pages/admin/AdminWashBayManagementPage'
 import AdminVehiclesPage from '../pages/admin/AdminVehiclesPage'
 import CustomerVehiclesPage from '../pages/CustomerVehiclesPage'
 
@@ -41,10 +42,11 @@ function AppRoutes() {
 
       <Route element={<ProtectedRoute allowedRoles={[ROLES.CUSTOMER]} />}>
         <Route element={<CustomerLayout />}>
-          <Route path="customer" element={<DashboardPlaceholderPage title="Customer Dashboard" />} />
+          <Route path="customer" element={<Navigate to="/" replace />} />
           <Route path="customer/bookings" element={<DashboardPlaceholderPage title="Lich hen khach hang" />} />
           <Route path="customer/vehicles" element={<CustomerVehiclesPage />} />
           <Route path="customer/profile" element={<ProfilePage />} />
+          <Route path="customer/vehicles" element={<CustomerVehiclesPage />} />
           <Route path="customer/garages" element={<GarageListPage />} />
           <Route path="customer/garages/:id" element={<GarageDetailPage />} />
         </Route>
@@ -69,6 +71,7 @@ function AppRoutes() {
           <Route path="admin/garages/create" element={<AdminGarageFormPage />} />
           <Route path="admin/garages/:id" element={<GarageDetailPage />} />
           <Route path="admin/garages/:id/edit" element={<AdminGarageFormPage />} />
+          <Route path="admin/wash-bays" element={<AdminWashBayManagementPage />} />
         </Route>
       </Route>
 

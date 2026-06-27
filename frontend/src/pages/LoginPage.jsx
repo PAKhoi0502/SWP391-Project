@@ -48,19 +48,18 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const loggedUser = await login({
-        phone: form.identifier.trim(),
-        password: form.password,
-      })
+  const loggedUser = await login({
+    phone: form.identifier.trim(),
+    password: form.password,
+  })
 
-      const fromPath = location.state?.from?.pathname
-      const redirectPath = fromPath || getRedirectPathByRole(getRole(loggedUser))
+  const redirectPath = getRedirectPathByRole(getRole(loggedUser))
 
-      navigate(redirectPath, {
-        replace: true,
-        state: { loginSuccess: true },
-      })
-    } catch (err) {
+  navigate(redirectPath, {
+    replace: true,
+    state: { loginSuccess: true },
+  })
+} catch (err) {
       setError(
         err.response?.data?.message ||
           err.response?.data?.error ||
