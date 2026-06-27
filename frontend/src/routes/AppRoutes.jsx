@@ -4,6 +4,7 @@ import AdminLayout from '../layouts/AdminLayout'
 import CustomerLayout from '../layouts/CustomerLayout'
 import PublicLayout from '../layouts/PublicLayout'
 import StaffLayout from '../layouts/StaffLayout'
+import AdminUsersPage from '../pages/AdminUsersPage'
 import ProtectedRoute from './ProtectedRoute'
 import DashboardPlaceholderPage from '../pages/DashboardPlaceholderPage'
 import ForbiddenPage from '../pages/ForbiddenPage'
@@ -48,7 +49,7 @@ function AppRoutes() {
       <Route element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]} />}>
         <Route element={<AdminLayout />}>
           <Route path="admin" element={<DashboardPlaceholderPage title="Admin Dashboard" />} />
-          <Route path="admin/users" element={<DashboardPlaceholderPage title="Quan ly nguoi dung" />} />
+          <Route path="admin/users" element={<AdminUsersPage />} />
           <Route path="admin/garages" element={<DashboardPlaceholderPage title="Quan ly garage" />} />
         </Route>
       </Route>
