@@ -12,6 +12,7 @@ import ForgotPasswordPage from '../pages/ForgotPasswordPage'
 import HomePage from '../pages/HomePage'
 import LoginPage from '../pages/LoginPage'
 import NotFoundPage from '../pages/NotFoundPage'
+import ProfilePage from '../pages/ProfilePage'
 import RegisterPage from '../pages/RegisterPage'
 import ResetPasswordPage from '../pages/ResetPasswordPage'
 import UikitDemo from '../pages/UikitDemo'
@@ -33,7 +34,7 @@ function AppRoutes() {
         <Route element={<CustomerLayout />}>
           <Route path="customer" element={<DashboardPlaceholderPage title="Customer Dashboard" />} />
           <Route path="customer/bookings" element={<DashboardPlaceholderPage title="Lich hen khach hang" />} />
-          <Route path="customer/profile" element={<DashboardPlaceholderPage title="Ho so khach hang" />} />
+          <Route path="customer/profile" element={<ProfilePage />} />
         </Route>
       </Route>
 
