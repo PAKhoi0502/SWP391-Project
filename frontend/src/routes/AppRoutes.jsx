@@ -25,6 +25,9 @@ import AdminGarageFormPage from '../pages/admin/AdminGarageFormPage'
 import AdminWashBayManagementPage from '../pages/admin/AdminWashBayManagementPage'
 import AdminVehiclesPage from '../pages/admin/AdminVehiclesPage'
 import CustomerVehiclesPage from '../pages/CustomerVehiclesPage'
+import ServicePackageListPage from '../pages/ServicePackageListPage'
+import ServicePackageDetailPage from '../pages/ServicePackageDetailPage'
+import AdminServicePackagePage from '../pages/admin/AdminServicePackagePage'
 
 
 function AppRoutes() {
@@ -49,6 +52,8 @@ function AppRoutes() {
           <Route path="customer/vehicles" element={<CustomerVehiclesPage />} />
           <Route path="customer/garages" element={<GarageListPage />} />
           <Route path="customer/garages/:id" element={<GarageDetailPage />} />
+          <Route path="customer/service-packages" element={<ServicePackageListPage />} />
+          <Route path="customer/service-packages/:id" element={<ServicePackageDetailPage />} />
         </Route>
       </Route>
 
@@ -72,6 +77,7 @@ function AppRoutes() {
           <Route path="admin/garages/:id" element={<GarageDetailPage />} />
           <Route path="admin/garages/:id/edit" element={<AdminGarageFormPage />} />
           <Route path="admin/wash-bays" element={<AdminWashBayManagementPage />} />
+          <Route path="admin/service-packages" element={<AdminServicePackagePage />} />
         </Route>
       </Route>
 
