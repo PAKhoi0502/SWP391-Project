@@ -29,7 +29,9 @@ import ServicePackageListPage from '../pages/ServicePackageListPage'
 import ServicePackageDetailPage from '../pages/ServicePackageDetailPage'
 import AdminServicePackagePage from '../pages/admin/AdminServicePackagePage'
 import AvailableSlotsPickerPage from '../pages/booking/AvailableSlotsPickerPage'
+import CustomerCreateBookingPage from '../pages/booking/CustomerCreateBookingPage'
 import WaitlistPage from '../pages/booking/WaitlistPage'
+import BookingHistoryPage from '../pages/booking/BookingHistoryPage'
 
 
 function AppRoutes() {
@@ -56,8 +58,11 @@ function AppRoutes() {
           <Route path="customer/garages/:id" element={<GarageDetailPage />} />
           <Route path="customer/service-packages" element={<ServicePackageListPage />} />
           <Route path="customer/service-packages/:id" element={<ServicePackageDetailPage />} />
-          <Route path="/booking" element={<AvailableSlotsPickerPage />} />
+          <Route path="/booking" element={<CustomerCreateBookingPage />} />
+          <Route path="/booking/available-slots" element={<AvailableSlotsPickerPage />} />
           <Route path="/waitlist" element={<WaitlistPage />} />
+          <Route path="/customer/bookings" element={<BookingHistoryPage />} />
+<Route path="/customer/booking-history" element={<BookingHistoryPage />} />
         </Route>
       </Route>
 

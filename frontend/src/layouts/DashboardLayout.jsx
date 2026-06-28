@@ -7,7 +7,9 @@ const NAV_ITEMS = {
   [ROLES.CUSTOMER]: [
   { to: '/', label: 'Trang chủ' },
   { to: '/customer/service-packages', label: 'Gói dịch vụ' },
+  { to: '/booking', label: 'Booking' },
   { to: '/customer/bookings', label: 'Lịch hẹn' },
+  { to: '/customer/booking-history', label: 'Booking History' },
   { to: '/customer/vehicles', label: 'Xe của tôi' },
   { to: '/customer/profile', label: 'Hồ sơ' },
 ],
