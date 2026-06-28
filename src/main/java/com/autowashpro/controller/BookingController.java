@@ -21,10 +21,12 @@ import java.time.LocalDate;
 import com.autowashpro.dto.request.CancelBookingRequest;
 import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
 import com.autowashpro.dto.request.CompleteServiceRequest;
+import com.autowashpro.dto.request.MarkBookingPaidRequest;
 import com.autowashpro.dto.request.NoShowBookingRequest;
 import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
 import com.autowashpro.dto.response.BookingServiceStepResponse;
 import org.springframework.security.core.Authentication;
+import com.autowashpro.dto.request.MarkBookingPaidRequest;
 
 @RestController
 @RequestMapping("/bookings")
@@ -307,22 +309,47 @@ public class BookingController {
                                 .build();
         }
 
-@PatchMapping("/{id}/complete-service")
-@PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
-public ApiResponse<BookingResponse> completeService(
-        @PathVariable Long id,
-        @RequestBody(required = false) CompleteServiceRequest request,
-        @AuthenticationPrincipal UserDetails userDetails) {
+        @PatchMapping("/{id}/complete-service")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> completeService(
+                        @PathVariable Long id,
+                        @RequestBody(required = false) CompleteServiceRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
 
-    Long staffUserId = Long.valueOf(userDetails.getUsername());
-    String role = userDetails.getAuthorities().iterator().next().getAuthority();
-    String note = request != null ? request.getNote() : null;
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                String note = request != null ? request.getNote() : null;
 
-    return ApiResponse.<BookingResponse>builder()
-            .success(true)
-            .message("Service completed successfully")
-            .data(bookingService.completeService(id, staffUserId, role, note))
-            .build();
-}
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true)
+                                .message("Service completed successfully")
+                                .data(bookingService.completeService(id, staffUserId, role, note))
+                                .build();
+        }
 
+        @PatchMapping("/{id}/mark-paid")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> markBookingPaid(
+                        @PathVariable Long id,
+                        @Valid @RequestBody MarkBookingPaidRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+
+                String role = userDetails.getAuthorities()
+                                .iterator()
+                                .next()
+                                .getAuthority();
+
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true)
+                                .message("Booking marked as paid successfully")
+                                .data(
+                                                bookingService.markBookingPaid(
+                                                                id,
+                                                                staffUserId,
+                                                                role,
+                                                                request))
+                                .build();
+        }
 }

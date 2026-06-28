@@ -20,6 +20,7 @@ public class BookingResponse {
     private LocalDateTime checkedInAt;
     private String status;
     private String paymentStatus;
+    private String paymentMethod;
     private BigDecimal originalPrice;
     private BigDecimal discountAmount;
     private BigDecimal finalPrice;
@@ -36,6 +37,7 @@ public class BookingResponse {
     private LocalDateTime startedAt;
     private Long washBayId;
     private LocalDateTime completedAt;
+    private LocalDateTime paidAt;
 
     private List<Long> assignedCareStaffIds;
 }

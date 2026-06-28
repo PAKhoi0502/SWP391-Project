@@ -132,8 +132,11 @@ public class Booking {
 
     @Column(name = "started_at")
     private LocalDateTime startedAt;
-    
+
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
-    
+
+    @Column(name = "paid_at")
+    private LocalDateTime paidAt;
+
 }

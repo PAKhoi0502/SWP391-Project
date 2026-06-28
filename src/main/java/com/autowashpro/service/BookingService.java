@@ -10,6 +10,7 @@ import com.autowashpro.dto.request.StartServiceRequest;
 import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
 import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
 import com.autowashpro.dto.response.BookingServiceStepResponse;
+import com.autowashpro.dto.request.MarkBookingPaidRequest;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -78,7 +79,14 @@ public interface BookingService {
                         Long staffUserId,
                         ReopenBookingServiceStepRequest request);
 
+        // ===================== ISSUE #18 =====================
+        BookingResponse completeService(Long bookingId, Long staffUserId, String role, String note);
 
-                        // ===================== ISSUE #18 =====================
-BookingResponse completeService(Long bookingId, Long staffUserId, String role, String note);
+        // ===================== ISSUE #20 =====================
+        BookingResponse markBookingPaid(
+                        Long bookingId,
+                        Long staffUserId,
+                        String role,
+                        MarkBookingPaidRequest request);
+
 }
