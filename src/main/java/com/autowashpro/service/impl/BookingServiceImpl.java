@@ -3,6 +3,7 @@ package com.autowashpro.service.impl;
 import com.autowashpro.entity.enums.StaffType;
 import com.autowashpro.dto.request.BookingCreateRequest;
 import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
+import com.autowashpro.dto.request.MarkBookingPaidRequest;
 import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
 import com.autowashpro.dto.request.StartServiceRequest;
 import com.autowashpro.dto.request.WalkInBookingCreateRequest;
@@ -1031,69 +1032,70 @@ public class BookingServiceImpl implements BookingService {
                                 .toList();
         }
 
-
         // ===================== ISSUE #18 =====================
 
-@Override
-@Transactional
-public BookingResponse completeService(Long bookingId, Long staffUserId, String role, String note) {
+        @Override
+        @Transactional
+        public BookingResponse completeService(Long bookingId, Long staffUserId, String role, String note) {
 
-    // 1. Validate booking
-    Booking booking = bookingRepository.findById(bookingId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Booking not found: " + bookingId));
+                // 1. Validate booking
+                Booking booking = bookingRepository.findById(bookingId)
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Booking not found: " + bookingId));
 
-    // 2. Validate garage permission — ADMIN bypass
-    if (!"ROLE_ADMIN".equals(role)) {
-        StaffProfile staff = staffProfileRepository.findByUser_Id(staffUserId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
-                        "Staff profile not found"));
+                // 2. Validate garage permission — ADMIN bypass
+                if (!"ROLE_ADMIN".equals(role)) {
+                        StaffProfile staff = staffProfileRepository.findByUser_Id(staffUserId)
+                                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
+                                                        "Staff profile not found"));
 
-        if (!Boolean.TRUE.equals(staff.getIsActive())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Staff profile is inactive");
+                        if (!Boolean.TRUE.equals(staff.getIsActive())) {
+                                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Staff profile is inactive");
+                        }
+
+                        if (!booking.getGarageId().equals(staff.getGarageId())) {
+                                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                                                "Staff cannot complete booking from another garage");
+                        }
+                }
+
+                // 3. Validate status
+                if (!"IN_PROGRESS".equals(booking.getStatus())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Only IN_PROGRESS booking can be completed. Current status: "
+                                                        + booking.getStatus());
+                }
+
+                // 4. Release wash bay nếu có
+                if (booking.getWashBayId() != null) {
+                        washBayRepository.findById(booking.getWashBayId()).ifPresent(washBay -> {
+                                washBay.setStatus(WashBayStatus.AVAILABLE);
+                                washBay.setCurrentBookingId(null);
+                                washBayRepository.save(washBay);
+                        });
+                        booking.setWashBayId(null);
+                }
+
+                // 5. Release care staff nếu có
+                List<BookingAssignedStaff> assignedStaffs = bookingAssignedStaffRepository
+                                .findByBookingId(bookingId);
+                for (BookingAssignedStaff assignedStaff : assignedStaffs) {
+                        assignedStaff.setStatus("RELEASED");
+                        bookingAssignedStaffRepository.save(assignedStaff);
+                }
+
+                // 6. Update booking
+                booking.setStatus("COMPLETED");
+                booking.setCompletedAt(LocalDateTime.now());
+                booking.setRewardProcessed(false);
+                if (note != null && !note.isBlank()) {
+                        booking.setNote(note);
+                }
+
+                Booking saved = bookingRepository.save(booking);
+                return toResponse(saved);
         }
 
-        if (!booking.getGarageId().equals(staff.getGarageId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "Staff cannot complete booking from another garage");
-        }
-    }
-
-    // 3. Validate status
-    if (!"IN_PROGRESS".equals(booking.getStatus())) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Only IN_PROGRESS booking can be completed. Current status: " + booking.getStatus());
-    }
-
-    // 4. Release wash bay nếu có
-    if (booking.getWashBayId() != null) {
-        washBayRepository.findById(booking.getWashBayId()).ifPresent(washBay -> {
-            washBay.setStatus(WashBayStatus.AVAILABLE);
-            washBay.setCurrentBookingId(null);
-            washBayRepository.save(washBay);
-        });
-        booking.setWashBayId(null);
-    }
-
-    // 5. Release care staff nếu có
-    List<BookingAssignedStaff> assignedStaffs = bookingAssignedStaffRepository
-            .findByBookingId(bookingId);
-    for (BookingAssignedStaff assignedStaff : assignedStaffs) {
-        assignedStaff.setStatus("RELEASED");
-        bookingAssignedStaffRepository.save(assignedStaff);
-    }
-
-    // 6. Update booking
-    booking.setStatus("COMPLETED");
-    booking.setCompletedAt(LocalDateTime.now());
-    booking.setRewardProcessed(false);
-    if (note != null && !note.isBlank()) {
-        booking.setNote(note);
-    }
-
-    Booking saved = bookingRepository.save(booking);
-    return toResponse(saved);
-}
         @Override
         public BookingServiceStepResponse completeServiceStep(
                         Long stepId,
@@ -1218,6 +1220,80 @@ public BookingResponse completeService(Long bookingId, Long staffUserId, String 
 
                 return toServiceStepResponse(saved);
         }
+
+        @Override
+        @Transactional
+        public BookingResponse markBookingPaid(
+                        Long bookingId,
+                        Long staffUserId,
+                        String role,
+                        MarkBookingPaidRequest request) {
+
+                Booking booking = bookingRepository
+                                .findById(bookingId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
+
+                StaffProfile staffProfile = staffProfileRepository
+                                .findByUser_Id(staffUserId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.FORBIDDEN,
+                                                "Staff profile not found"));
+
+                if (!Boolean.TRUE.equals(staffProfile.getIsActive())) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "Staff profile is inactive");
+                }
+
+                if (!staffProfile.getGarageId().equals(booking.getGarageId())) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "You cannot update booking from another garage");
+                }
+
+                if (!"COMPLETED".equals(booking.getStatus())) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Only completed booking can be marked as paid");
+                }
+
+                if ("PAID".equals(booking.getPaymentStatus())) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Booking already paid");
+                }
+
+                if (!"CASH".equalsIgnoreCase(request.getPaymentMethod())) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Only CASH payment is supported");
+                }
+
+                booking.setPaymentStatus("PAID");
+
+                booking.setPaymentMethod(request.getPaymentMethod().toUpperCase());
+
+                booking.setPaidAt(LocalDateTime.now());
+
+                booking.setRewardProcessed(true);
+
+                if (request.getNote() != null
+                                && !request.getNote().isBlank()) {
+
+                        booking.setNote(request.getNote());
+                }
+
+                Booking saved = bookingRepository.save(booking);
+
+                return toResponse(saved);
+        }
         // ===================== HELPER =====================
 
         private BookingResponse toResponse(Booking b) {
@@ -1232,6 +1308,7 @@ public BookingResponse completeService(Long bookingId, Long staffUserId, String 
                                 .endTime(b.getEndTime())
                                 .status(b.getStatus())
                                 .paymentStatus(b.getPaymentStatus())
+                                .paymentMethod(b.getPaymentMethod())
                                 .originalPrice(b.getOriginalPrice())
                                 .discountAmount(b.getDiscountAmount())
                                 .finalPrice(b.getFinalPrice())
@@ -1249,6 +1326,7 @@ public BookingResponse completeService(Long bookingId, Long staffUserId, String 
                                 .startedAt(b.getStartedAt())
                                 .washBayId(b.getWashBayId())
                                 .completedAt(b.getCompletedAt())
+                                .paidAt(b.getPaidAt())
                                 .build();
         }
 
@@ -1344,22 +1422,22 @@ public BookingResponse completeService(Long bookingId, Long staffUserId, String 
                                 .equals(normalizeVehicleType(servicePackage.getVehicleType()));
         }
 
-private BookingServiceStepResponse toServiceStepResponse(
-        BookingServiceStep step) {
+        private BookingServiceStepResponse toServiceStepResponse(
+                        BookingServiceStep step) {
 
-    return BookingServiceStepResponse.builder()
-            .id(step.getId())
-            .bookingId(step.getBookingId())
-            .servicePackageId(step.getServicePackageId())
-            .servicePackageStepId(step.getServicePackageStepId())
-            .stepOrder(step.getStepOrder())
-            .name(step.getName())
-            .description(step.getDescription())
-            .status(step.getStatus())
-            .startedAt(step.getStartedAt())
-            .completedAt(step.getCompletedAt())
-            .completedByStaffId(step.getCompletedByStaffId())
-            
-            .build();
-}
+                return BookingServiceStepResponse.builder()
+                                .id(step.getId())
+                                .bookingId(step.getBookingId())
+                                .servicePackageId(step.getServicePackageId())
+                                .servicePackageStepId(step.getServicePackageStepId())
+                                .stepOrder(step.getStepOrder())
+                                .name(step.getName())
+                                .description(step.getDescription())
+                                .status(step.getStatus())
+                                .startedAt(step.getStartedAt())
+                                .completedAt(step.getCompletedAt())
+                                .completedByStaffId(step.getCompletedByStaffId())
+
+                                .build();
+        }
 }
