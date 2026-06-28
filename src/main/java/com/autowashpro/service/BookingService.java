@@ -7,6 +7,9 @@ import com.autowashpro.dto.response.BookingResponse;
 import com.autowashpro.dto.response.BookingDetailResponse;
 import com.autowashpro.dto.response.BookingSummaryResponse;
 import com.autowashpro.dto.request.StartServiceRequest;
+import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
+import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
+import com.autowashpro.dto.response.BookingServiceStepResponse;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -54,8 +57,24 @@ public interface BookingService {
                         Long staffUserId,
                         StartServiceRequest request);
 
-                        // ===================== ISSUE #19 =====================
-BookingResponse cancelBooking(Long bookingId, Long currentUserId, String role, String reason);
+        // ===================== ISSUE #19 =====================
+        BookingResponse cancelBooking(Long bookingId, Long currentUserId, String role, String reason);
 
-BookingResponse markNoShow(Long bookingId, Long staffUserId, String reason);
+        BookingResponse markNoShow(Long bookingId, Long staffUserId, String reason);
+
+        // ===================== ISSUE #17 =====================
+        List<BookingServiceStepResponse> getBookingServiceSteps(
+                        Long bookingId,
+                        Long currentUserId,
+                        String role);
+
+        BookingServiceStepResponse completeServiceStep(
+                        Long stepId,
+                        Long staffUserId,
+                        CompleteBookingServiceStepRequest request);
+
+        BookingServiceStepResponse reopenServiceStep(
+                        Long stepId,
+                        Long staffUserId,
+                        ReopenBookingServiceStepRequest request);
 }
