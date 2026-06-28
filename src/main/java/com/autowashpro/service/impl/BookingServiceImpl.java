@@ -8,6 +8,7 @@ import com.autowashpro.dto.response.BookingResponse;
 import com.autowashpro.dto.response.SlotResponse;
 import com.autowashpro.entity.*;
 import com.autowashpro.entity.enums.WashBayStatus;
+import com.autowashpro.entity.enums.StaffType;
 import com.autowashpro.repository.*;
 import com.autowashpro.service.BookingService;
 import lombok.RequiredArgsConstructor;
@@ -16,9 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.autowashpro.dto.response.BookingSummaryResponse;
-import com.autowashpro.dto.response.BookingDetailResponse;
-import com.autowashpro.dto.request.StartServiceRequest;
-import com.autowashpro.entity.enums.WashBayStatus;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -61,7 +59,7 @@ public class BookingServiceImpl implements BookingService {
                 ServicePackage servicePackage = servicePackageRepository.findById(servicePackageId)
                                 .orElseThrow(() -> new RuntimeException("Service package not found"));
 
-                if (!servicePackage.getVehicleType().equals(vehicleType)) {
+                if (!isVehicleTypeCompatible(vehicleType, servicePackage)) {
                         throw new RuntimeException("Service package does not support vehicle type: " + vehicleType);
                 }
 
@@ -114,22 +112,23 @@ public class BookingServiceImpl implements BookingService {
                                 .build();
         }
 
-        /*private String mapVehicleTypeToBayType(String vehicleType) {
-                return vehicleType.startsWith("BIKE") ? "BIKE" : "CAR";} */
-                private String mapVehicleTypeToBayType(String vehicleType) {
-        if (vehicleType == null) {
+        private String mapVehicleTypeToBayType(String vehicleType) {
+                if (vehicleType == null || vehicleType.isBlank()) {
+                        return "CAR";
+                }
+
+                String normalized = vehicleType.trim().toUpperCase();
+
+                if (normalized.equals("MOTORBIKE")
+                                || normalized.equals("BIKE")
+                                || normalized.equals("MOTORCYCLE")
+                                || normalized.equals("XE_MAY")) {
+                        return "BIKE";
+                }
+
                 return "CAR";
         }
 
-        String normalized = vehicleType.trim().toUpperCase();
-
-        if (normalized.equals("MOTORBIKE") || normalized.equals("BIKE")) {
-                return "MOTORBIKE";
-        }
-
-        return "CAR";
-}
-        
 
         // ===================== ISSUE #11 =====================
 
@@ -173,7 +172,7 @@ public class BookingServiceImpl implements BookingService {
                                         "Garage does not support vehicle type: " + vehicle.getVehicleType());
                 }
 
-                if (!pkg.getVehicleType().startsWith(vehicle.getVehicleType())) {
+                if (!isVehicleTypeCompatible(vehicle.getVehicleType(), pkg)) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                                         "Service package does not support vehicle type: " + vehicle.getVehicleType());
                 }
@@ -218,10 +217,13 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 if (Boolean.TRUE.equals(pkg.getRequiresCareStaff()) && pkg.getCareStaffRequiredCount() > 0) {
-                        long totalStaff = staffProfileRepository.countByGarageIdAndStaffTypeAndIsActiveTrue(
-                                        request.getGarageId(), pkg.getCareStaffType());
-                        long assignedStaff = bookingAssignedStaffRepository.countAssignedStaffByGarageAndTypeAndTime(
-                                        request.getGarageId(), pkg.getCareStaffType(), startTime, endTime);
+                       String staffType = pkg.getCareStaffType();
+
+long totalStaff = staffProfileRepository.countByGarageIdAndStaffTypeAndIsActiveTrue(
+                request.getGarageId(), staffType);
+
+long assignedStaff = bookingAssignedStaffRepository.countAssignedStaffByGarageAndTypeAndTime(
+                request.getGarageId(), staffType, startTime, endTime);
                         if ((totalStaff - assignedStaff) < pkg.getCareStaffRequiredCount()) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                                                 "Not enough care staff available for this time slot");
@@ -363,7 +365,7 @@ public class BookingServiceImpl implements BookingService {
                                         "Garage does not support vehicle type: " + request.getVehicleType());
                 }
 
-                if (!pkg.getVehicleType().startsWith(request.getVehicleType())) {
+                if (!isVehicleTypeCompatible(request.getVehicleType(), pkg)) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                                         "Service package does not support vehicle type: " + request.getVehicleType());
                 }
@@ -387,10 +389,13 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 if (Boolean.TRUE.equals(pkg.getRequiresCareStaff()) && pkg.getCareStaffRequiredCount() > 0) {
-                        long totalStaff = staffProfileRepository.countByGarageIdAndStaffTypeAndIsActiveTrue(
-                                        request.getGarageId(), pkg.getCareStaffType());
-                        long assignedStaff = bookingAssignedStaffRepository.countAssignedStaffByGarageAndTypeAndTime(
-                                        request.getGarageId(), pkg.getCareStaffType(), startTime, endTime);
+                        String staffType = pkg.getCareStaffType();
+
+long totalStaff = staffProfileRepository.countByGarageIdAndStaffTypeAndIsActiveTrue(
+                request.getGarageId(), staffType);
+
+long assignedStaff = bookingAssignedStaffRepository.countAssignedStaffByGarageAndTypeAndTime(
+                request.getGarageId(), staffType, startTime, endTime);
                         if ((totalStaff - assignedStaff) < pkg.getCareStaffRequiredCount()) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                                                 "Not enough care staff available for this time slot");
@@ -698,10 +703,12 @@ public class BookingServiceImpl implements BookingService {
                 // ================= Assign Care Staff =================
                 if (Boolean.TRUE.equals(servicePackage.getRequiresCareStaff())) {
 
-                        List<StaffProfile> staffs = staffProfileRepository
-                                        .findByGarageIdAndStaffTypeAndIsActiveTrue(
-                                                        booking.getGarageId(),
-                                                        servicePackage.getCareStaffType());
+                        String staffType = servicePackage.getCareStaffType();
+
+List<StaffProfile> staffs = staffProfileRepository
+                .findByGarageIdAndStaffTypeAndIsActiveTrue(
+                                booking.getGarageId(),
+                                staffType);
 
                         int assigned = 0;
 
@@ -792,4 +799,33 @@ public class BookingServiceImpl implements BookingService {
 
                 return response;
         }
+        private boolean isVehicleTypeCompatible(String vehicleType, ServicePackage servicePackage) {
+                if (vehicleType == null || servicePackage == null || servicePackage.getVehicleType() == null) {
+                        return false;
+                }
+
+                return normalizeVehicleType(vehicleType).equals(normalizeVehicleType(servicePackage.getVehicleType()));
+        }
+
+        private String normalizeVehicleType(String vehicleType) {
+                if (vehicleType == null) {
+                        return "";
+                }
+
+                String normalized = vehicleType.trim().toUpperCase();
+
+                if (normalized.equals("MOTORBIKE")
+                                || normalized.equals("BIKE")
+                                || normalized.equals("MOTORCYCLE")
+                                || normalized.equals("XE_MAY")) {
+                        return "BIKE";
+                }
+
+                if (normalized.equals("CAR") || normalized.equals("AUTO") || normalized.equals("Ô TÔ")) {
+                        return "CAR";
+                }
+
+                return normalized;
+        }
+
 }
