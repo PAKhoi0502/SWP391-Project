@@ -77,4 +77,8 @@ public interface BookingService {
                         Long stepId,
                         Long staffUserId,
                         ReopenBookingServiceStepRequest request);
+
+
+                        // ===================== ISSUE #18 =====================
+BookingResponse completeService(Long bookingId, Long staffUserId, String role, String note);
 }

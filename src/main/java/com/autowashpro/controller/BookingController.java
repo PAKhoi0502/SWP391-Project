@@ -20,6 +20,7 @@ import com.autowashpro.dto.request.StartServiceRequest;
 import java.time.LocalDate;
 import com.autowashpro.dto.request.CancelBookingRequest;
 import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
+import com.autowashpro.dto.request.CompleteServiceRequest;
 import com.autowashpro.dto.request.NoShowBookingRequest;
 import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
 import com.autowashpro.dto.response.BookingServiceStepResponse;
@@ -305,4 +306,23 @@ public class BookingController {
                                                                 request))
                                 .build();
         }
+
+@PatchMapping("/{id}/complete-service")
+@PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+public ApiResponse<BookingResponse> completeService(
+        @PathVariable Long id,
+        @RequestBody(required = false) CompleteServiceRequest request,
+        @AuthenticationPrincipal UserDetails userDetails) {
+
+    Long staffUserId = Long.valueOf(userDetails.getUsername());
+    String role = userDetails.getAuthorities().iterator().next().getAuthority();
+    String note = request != null ? request.getNote() : null;
+
+    return ApiResponse.<BookingResponse>builder()
+            .success(true)
+            .message("Service completed successfully")
+            .data(bookingService.completeService(id, staffUserId, role, note))
+            .build();
+}
+
 }

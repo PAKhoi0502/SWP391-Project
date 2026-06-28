@@ -1031,6 +1031,69 @@ public class BookingServiceImpl implements BookingService {
                                 .toList();
         }
 
+
+        // ===================== ISSUE #18 =====================
+
+@Override
+@Transactional
+public BookingResponse completeService(Long bookingId, Long staffUserId, String role, String note) {
+
+    // 1. Validate booking
+    Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Booking not found: " + bookingId));
+
+    // 2. Validate garage permission — ADMIN bypass
+    if (!"ROLE_ADMIN".equals(role)) {
+        StaffProfile staff = staffProfileRepository.findByUser_Id(staffUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "Staff profile not found"));
+
+        if (!Boolean.TRUE.equals(staff.getIsActive())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Staff profile is inactive");
+        }
+
+        if (!booking.getGarageId().equals(staff.getGarageId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Staff cannot complete booking from another garage");
+        }
+    }
+
+    // 3. Validate status
+    if (!"IN_PROGRESS".equals(booking.getStatus())) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Only IN_PROGRESS booking can be completed. Current status: " + booking.getStatus());
+    }
+
+    // 4. Release wash bay nếu có
+    if (booking.getWashBayId() != null) {
+        washBayRepository.findById(booking.getWashBayId()).ifPresent(washBay -> {
+            washBay.setStatus(WashBayStatus.AVAILABLE);
+            washBay.setCurrentBookingId(null);
+            washBayRepository.save(washBay);
+        });
+        booking.setWashBayId(null);
+    }
+
+    // 5. Release care staff nếu có
+    List<BookingAssignedStaff> assignedStaffs = bookingAssignedStaffRepository
+            .findByBookingId(bookingId);
+    for (BookingAssignedStaff assignedStaff : assignedStaffs) {
+        assignedStaff.setStatus("RELEASED");
+        bookingAssignedStaffRepository.save(assignedStaff);
+    }
+
+    // 6. Update booking
+    booking.setStatus("COMPLETED");
+    booking.setCompletedAt(LocalDateTime.now());
+    booking.setRewardProcessed(false);
+    if (note != null && !note.isBlank()) {
+        booking.setNote(note);
+    }
+
+    Booking saved = bookingRepository.save(booking);
+    return toResponse(saved);
+}
         @Override
         public BookingServiceStepResponse completeServiceStep(
                         Long stepId,
@@ -1185,6 +1248,7 @@ public class BookingServiceImpl implements BookingService {
                                 .checkedInAt(b.getCheckedInAt())
                                 .startedAt(b.getStartedAt())
                                 .washBayId(b.getWashBayId())
+                                .completedAt(b.getCompletedAt())
                                 .build();
         }
 
@@ -1295,6 +1359,7 @@ private BookingServiceStepResponse toServiceStepResponse(
             .startedAt(step.getStartedAt())
             .completedAt(step.getCompletedAt())
             .completedByStaffId(step.getCompletedByStaffId())
+            
             .build();
 }
 }
