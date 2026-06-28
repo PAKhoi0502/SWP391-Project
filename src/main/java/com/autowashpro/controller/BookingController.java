@@ -19,7 +19,11 @@ import java.util.List;
 import com.autowashpro.dto.request.StartServiceRequest;
 import java.time.LocalDate;
 import com.autowashpro.dto.request.CancelBookingRequest;
+import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
 import com.autowashpro.dto.request.NoShowBookingRequest;
+import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
+import com.autowashpro.dto.response.BookingServiceStepResponse;
+import org.springframework.security.core.Authentication;
 
 @RestController
 @RequestMapping("/bookings")
@@ -201,37 +205,104 @@ public class BookingController {
         }
 
         @PatchMapping("/{id}/cancel")
-@PreAuthorize("hasRole('CUSTOMER') or hasRole('STAFF') or hasRole('ADMIN')")
-public ApiResponse<BookingResponse> cancelBooking(
-        @PathVariable Long id,
-        @RequestBody(required = false) CancelBookingRequest request,
-        @AuthenticationPrincipal UserDetails userDetails) {
+        @PreAuthorize("hasRole('CUSTOMER') or hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> cancelBooking(
+                        @PathVariable Long id,
+                        @RequestBody(required = false) CancelBookingRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
 
-    Long currentUserId = Long.valueOf(userDetails.getUsername());
-    String role = userDetails.getAuthorities().iterator().next().getAuthority();
-    String reason = request != null ? request.getReason() : null;
+                Long currentUserId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                String reason = request != null ? request.getReason() : null;
 
-    return ApiResponse.<BookingResponse>builder()
-            .success(true)
-            .message("Booking cancelled successfully")
-            .data(bookingService.cancelBooking(id, currentUserId, role, reason))
-            .build();
-}
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true)
+                                .message("Booking cancelled successfully")
+                                .data(bookingService.cancelBooking(id, currentUserId, role, reason))
+                                .build();
+        }
 
-@PatchMapping("/{id}/no-show")
-@PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
-public ApiResponse<BookingResponse> markNoShow(
-        @PathVariable Long id,
-        @RequestBody(required = false) NoShowBookingRequest request,
-        @AuthenticationPrincipal UserDetails userDetails) {
+        @PatchMapping("/{id}/no-show")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> markNoShow(
+                        @PathVariable Long id,
+                        @RequestBody(required = false) NoShowBookingRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
 
-    Long staffUserId = Long.valueOf(userDetails.getUsername());
-    String reason = request != null ? request.getReason() : null;
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String reason = request != null ? request.getReason() : null;
 
-    return ApiResponse.<BookingResponse>builder()
-            .success(true)
-            .message("Booking marked as no-show successfully")
-            .data(bookingService.markNoShow(id, staffUserId, reason))
-            .build();
-}
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true)
+                                .message("Booking marked as no-show successfully")
+                                .data(bookingService.markNoShow(id, staffUserId, reason))
+                                .build();
+        }
+
+        @GetMapping("/{bookingId}/service-steps")
+        @PreAuthorize("hasRole('CUSTOMER') or hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<List<BookingServiceStepResponse>> getBookingServiceSteps(
+                        @PathVariable Long bookingId,
+                        @AuthenticationPrincipal UserDetails userDetails,
+                        Authentication authentication) {
+
+                Long currentUserId = Long.valueOf(userDetails.getUsername());
+
+                String role = authentication.getAuthorities()
+                                .stream()
+                                .findFirst()
+                                .orElseThrow()
+                                .getAuthority()
+                                .replace("ROLE_", "");
+
+                return ApiResponse.<List<BookingServiceStepResponse>>builder()
+                                .success(true)
+                                .message("Booking service steps retrieved successfully")
+                                .data(
+                                                bookingService.getBookingServiceSteps(
+                                                                bookingId,
+                                                                currentUserId,
+                                                                role))
+                                .build();
+        }
+
+        @PatchMapping("/booking-service-steps/{stepId}/complete")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingServiceStepResponse> completeServiceStep(
+                        @PathVariable Long stepId,
+                        @Valid @RequestBody CompleteBookingServiceStepRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+
+                return ApiResponse.<BookingServiceStepResponse>builder()
+                                .success(true)
+                                .message("Service step completed successfully")
+                                .data(
+                                                bookingService.completeServiceStep(
+                                                                stepId,
+                                                                staffUserId,
+                                                                request))
+                                .build();
+        }
+
+        @PatchMapping("/booking-service-steps/{stepId}/reopen")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingServiceStepResponse> reopenServiceStep(
+                        @PathVariable Long stepId,
+                        @Valid @RequestBody ReopenBookingServiceStepRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+
+                return ApiResponse.<BookingServiceStepResponse>builder()
+                                .success(true)
+                                .message("Service step reopened successfully")
+                                .data(
+                                                bookingService.reopenServiceStep(
+                                                                stepId,
+                                                                staffUserId,
+                                                                request))
+                                .build();
+        }
 }

@@ -1,10 +1,13 @@
 package com.autowashpro.service.impl;
 
 import com.autowashpro.dto.request.BookingCreateRequest;
+import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
+import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
 import com.autowashpro.dto.request.StartServiceRequest;
 import com.autowashpro.dto.request.WalkInBookingCreateRequest;
 import com.autowashpro.dto.response.AvailableSlotResponse;
 import com.autowashpro.dto.response.BookingResponse;
+import com.autowashpro.dto.response.BookingServiceStepResponse;
 import com.autowashpro.dto.response.SlotResponse;
 import com.autowashpro.entity.*;
 import com.autowashpro.entity.enums.WashBayStatus;
@@ -17,6 +20,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.autowashpro.dto.response.BookingSummaryResponse;
+import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
+import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
+import com.autowashpro.dto.response.BookingServiceStepResponse;
 import java.util.Objects;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -810,7 +816,7 @@ public class BookingServiceImpl implements BookingService {
 
                 return response;
         }
-// ===================== ISSUE #19 =====================
+        // ===================== ISSUE #19 =====================
 
         @Override
         @Transactional
@@ -829,7 +835,8 @@ public class BookingServiceImpl implements BookingService {
                         }
                         if (!"CONFIRMED".equals(status) && !"PENDING_DEPOSIT".equals(status)) {
                                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                                "Customer can only cancel booking before check-in. Current status: " + status);
+                                                "Customer can only cancel booking before check-in. Current status: "
+                                                                + status);
                         }
                 } else {
                         if ("ROLE_STAFF".equals(role)) {
@@ -871,7 +878,8 @@ public class BookingServiceImpl implements BookingService {
                                                 loyalty.setAvailablePoints(
                                                                 loyalty.getAvailablePoints() + booking.getUsedPoints());
                                                 loyalty.setRedeemedPoints(
-                                                                Math.max(0, loyalty.getRedeemedPoints() - booking.getUsedPoints()));
+                                                                Math.max(0, loyalty.getRedeemedPoints()
+                                                                                - booking.getUsedPoints()));
                                                 customerLoyaltyRepository.save(loyalty);
                                         });
                 }
@@ -929,7 +937,183 @@ public class BookingServiceImpl implements BookingService {
                 Booking saved = bookingRepository.save(booking);
                 return toResponse(saved);
         }
+        // ===================== ISSUE #17 =====================
 
+        @Override
+        public List<BookingServiceStepResponse> getBookingServiceSteps(
+                        Long bookingId,
+                        Long currentUserId,
+                        String role) {
+
+                Booking booking = bookingRepository.findById(bookingId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
+
+                // CUSTOMER
+                if ("CUSTOMER".equalsIgnoreCase(role)) {
+
+                        if (!booking.getCustomerId().equals(currentUserId)) {
+                                throw new ResponseStatusException(
+                                                HttpStatus.FORBIDDEN,
+                                                "You cannot access this booking");
+                        }
+                }
+
+                // STAFF
+                if ("STAFF".equalsIgnoreCase(role)) {
+
+                        StaffProfile staffProfile = staffProfileRepository
+                                        .findByUser_Id(currentUserId)
+                                        .orElseThrow(() -> new ResponseStatusException(
+                                                        HttpStatus.FORBIDDEN,
+                                                        "Staff profile not found"));
+
+                        if (!Boolean.TRUE.equals(staffProfile.getIsActive())) {
+                                throw new ResponseStatusException(
+                                                HttpStatus.FORBIDDEN,
+                                                "Staff profile is inactive");
+                        }
+
+                        if (!staffProfile.getGarageId().equals(booking.getGarageId())) {
+                                throw new ResponseStatusException(
+                                                HttpStatus.FORBIDDEN,
+                                                "You cannot access booking from another garage");
+                        }
+                }
+
+                List<BookingServiceStep> steps = bookingServiceStepRepository
+                                .findByBookingIdOrderByStepOrder(bookingId);
+
+                return steps.stream()
+                                .map(this::toServiceStepResponse)
+                                .toList();
+        }
+
+        @Override
+        public BookingServiceStepResponse completeServiceStep(
+                        Long stepId,
+                        Long staffUserId,
+                        CompleteBookingServiceStepRequest request) {
+
+                BookingServiceStep step = bookingServiceStepRepository
+                                .findById(stepId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Service step not found"));
+
+                Booking booking = bookingRepository
+                                .findById(step.getBookingId())
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
+
+                StaffProfile staffProfile = staffProfileRepository
+                                .findByUser_Id(staffUserId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.FORBIDDEN,
+                                                "Staff profile not found"));
+
+                if (!Boolean.TRUE.equals(staffProfile.getIsActive())) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "Staff profile is inactive");
+                }
+
+                if (!staffProfile.getGarageId().equals(booking.getGarageId())) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "You cannot update service steps from another garage");
+                }
+
+                if (!"IN_PROGRESS".equals(booking.getStatus())) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Service has not started");
+                }
+
+                if ("COMPLETED".equals(step.getStatus())) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Service step already completed");
+                }
+
+                step.setStatus("COMPLETED");
+
+                step.setCompletedAt(LocalDateTime.now());
+
+                step.setCompletedByStaffId(staffUserId);
+
+                BookingServiceStep saved = bookingServiceStepRepository.save(step);
+
+                return toServiceStepResponse(saved);
+        }
+
+        @Override
+        public BookingServiceStepResponse reopenServiceStep(
+                        Long stepId,
+                        Long staffUserId,
+                        ReopenBookingServiceStepRequest request) {
+
+                BookingServiceStep step = bookingServiceStepRepository
+                                .findById(stepId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Service step not found"));
+
+                Booking booking = bookingRepository
+                                .findById(step.getBookingId())
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
+
+                StaffProfile staffProfile = staffProfileRepository
+                                .findByUser_Id(staffUserId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.FORBIDDEN,
+                                                "Staff profile not found"));
+
+                if (!Boolean.TRUE.equals(staffProfile.getIsActive())) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "Staff profile is inactive");
+                }
+
+                if (!staffProfile.getGarageId().equals(booking.getGarageId())) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.FORBIDDEN,
+                                        "You cannot update service steps from another garage");
+                }
+
+                if (!"IN_PROGRESS".equals(booking.getStatus())) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Service has not started");
+                }
+
+                if (!"COMPLETED".equals(step.getStatus())) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Service step is not completed");
+                }
+
+                step.setStatus("PENDING");
+
+                step.setCompletedAt(null);
+
+                step.setCompletedByStaffId(null);
+
+                // Save
+                BookingServiceStep saved = bookingServiceStepRepository.save(step);
+
+                return toServiceStepResponse(saved);
+        }
         // ===================== HELPER =====================
 
         private BookingResponse toResponse(Booking b) {
@@ -1044,5 +1228,23 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 return vehicleType.equalsIgnoreCase(servicePackage.getVehicleType());
+        }
+
+        private BookingServiceStepResponse toServiceStepResponse(
+                        BookingServiceStep step) {
+
+                return BookingServiceStepResponse.builder()
+                                .id(step.getId())
+                                .bookingId(step.getBookingId())
+                                .servicePackageId(step.getServicePackageId())
+                                .servicePackageStepId(step.getServicePackageStepId())
+                                .stepOrder(step.getStepOrder())
+                                .name(step.getName())
+                                .description(step.getDescription())
+                                .status(step.getStatus())
+                                .startedAt(step.getStartedAt())
+                                .completedAt(step.getCompletedAt())
+                                .completedByStaffId(step.getCompletedByStaffId())
+                                .build();
         }
 }
