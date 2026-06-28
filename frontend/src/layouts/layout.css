@@ -1,22 +1,25 @@
 .public-layout,
 .dashboard-layout {
   min-height: 100vh;
-  background: #f8fafc;
-  color: #0f172a;
+  background:
+    radial-gradient(circle at top left, rgba(167, 139, 250, 0.16), transparent 32%),
+    radial-gradient(circle at bottom right, rgba(250, 204, 21, 0.08), transparent 30%),
+    linear-gradient(180deg, #111116 0%, #0b0b11 46%, #050507 100%);
+  color: #f8fafc;
 }
 
 .app-header,
 .dashboard-header {
   align-items: center;
-  background: rgba(255, 255, 255, 0.92);
-  border-bottom: 1px solid #e2e8f0;
+  background: rgba(15, 15, 20, 0.92);
+  border-bottom: 1px solid rgba(167, 139, 250, 0.18);
   display: flex;
   justify-content: space-between;
   padding: 14px 24px;
 }
 
 .app-brand {
-  color: #111827;
+  color: #ffffff;
   font-size: 18px;
   font-weight: 800;
   text-decoration: none;
@@ -31,7 +34,7 @@
 .app-nav a,
 .dashboard-nav a {
   border-radius: 10px;
-  color: #475569;
+  color: rgba(255, 255, 255, 0.72);
   font-size: 15px;
   font-weight: 600;
   padding: 8px 10px;
@@ -41,8 +44,8 @@
 .app-nav a:hover,
 .dashboard-nav a:hover,
 .dashboard-nav a.active {
-  background: #e0f2fe;
-  color: #0369a1;
+  background: rgba(250, 204, 21, 0.14);
+  color: #facc15;
 }
 
 .public-main {
@@ -52,8 +55,8 @@
 }
 
 .app-footer {
-  border-top: 1px solid #e2e8f0;
-  color: #64748b;
+  border-top: 1px solid rgba(167, 139, 250, 0.16);
+  color: rgba(255, 255, 255, 0.5);
   padding: 14px 24px;
   text-align: center;
 }
@@ -64,9 +67,10 @@
 }
 
 .dashboard-sidebar {
-  background: #0f172a;
+  background: rgba(8, 8, 12, 0.96);
   min-height: 100vh;
   padding: 20px 16px;
+  border-right: 1px solid rgba(167, 139, 250, 0.16);
 }
 
 .dashboard-sidebar .app-brand {
@@ -80,7 +84,7 @@
 }
 
 .dashboard-nav a {
-  color: #cbd5e1;
+  color: rgba(255, 255, 255, 0.68);
 }
 
 .dashboard-shell {
@@ -93,7 +97,7 @@
 }
 
 .dashboard-header span {
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.5);
   font-size: 14px;
 }
 
@@ -104,7 +108,7 @@
 .text-button {
   background: transparent;
   border: 0;
-  color: #0369a1;
+  color: #facc15;
   cursor: pointer;
   font: inherit;
   font-weight: 700;

@@ -28,6 +28,8 @@ import CustomerVehiclesPage from '../pages/CustomerVehiclesPage'
 import ServicePackageListPage from '../pages/ServicePackageListPage'
 import ServicePackageDetailPage from '../pages/ServicePackageDetailPage'
 import AdminServicePackagePage from '../pages/admin/AdminServicePackagePage'
+import AvailableSlotsPickerPage from '../pages/booking/AvailableSlotsPickerPage'
+import WaitlistPage from '../pages/booking/WaitlistPage'
 
 
 function AppRoutes() {
@@ -54,6 +56,8 @@ function AppRoutes() {
           <Route path="customer/garages/:id" element={<GarageDetailPage />} />
           <Route path="customer/service-packages" element={<ServicePackageListPage />} />
           <Route path="customer/service-packages/:id" element={<ServicePackageDetailPage />} />
+          <Route path="/booking" element={<AvailableSlotsPickerPage />} />
+          <Route path="/waitlist" element={<WaitlistPage />} />
         </Route>
       </Route>
 
