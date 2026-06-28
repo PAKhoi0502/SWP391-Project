@@ -53,4 +53,9 @@ public interface BookingService {
                         Long bookingId,
                         Long staffUserId,
                         StartServiceRequest request);
+
+                        // ===================== ISSUE #19 =====================
+BookingResponse cancelBooking(Long bookingId, Long currentUserId, String role, String reason);
+
+BookingResponse markNoShow(Long bookingId, Long staffUserId, String reason);
 }
