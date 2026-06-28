@@ -16,6 +16,7 @@ function PublicLayout() {
         </Link>
 
         <nav className="app-nav" aria-label="Public navigation">
+          <Link to="/booking">Booking</Link>
           <Link to="/">Trang chủ</Link>
           <Link to="/uikit">UI Kit</Link>
 

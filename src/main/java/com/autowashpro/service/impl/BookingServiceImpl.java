@@ -1,5 +1,6 @@
 package com.autowashpro.service.impl;
 
+import com.autowashpro.entity.enums.StaffType;
 import com.autowashpro.dto.request.BookingCreateRequest;
 import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
 import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
@@ -11,7 +12,6 @@ import com.autowashpro.dto.response.BookingServiceStepResponse;
 import com.autowashpro.dto.response.SlotResponse;
 import com.autowashpro.entity.*;
 import com.autowashpro.entity.enums.WashBayStatus;
-import com.autowashpro.entity.enums.StaffType;
 import com.autowashpro.repository.*;
 import com.autowashpro.service.BookingService;
 import lombok.RequiredArgsConstructor;
@@ -76,9 +76,9 @@ public class BookingServiceImpl implements BookingService {
 
                 List<String> supportedVehicleTypes = washBayRepository.findDistinctVehicleTypesByGarageId(garageId);
 
-                String bayType = mapVehicleTypeToBayType(vehicleType);
+                String bayType = resolveGarageBayType(supportedVehicleTypes, vehicleType);
 
-                if (!supportedVehicleTypes.contains(bayType)) {
+                if (bayType == null) {
                         throw new RuntimeException("Garage does not support vehicle type: " + vehicleType);
                 }
 
@@ -126,7 +126,48 @@ public class BookingServiceImpl implements BookingService {
         }
 
         private String mapVehicleTypeToBayType(String vehicleType) {
-                return vehicleType.startsWith("BIKE") ? "BIKE" : "CAR";
+                String normalized = normalizeVehicleType(vehicleType);
+
+                if ("BIKE".equals(normalized)) {
+                        return "BIKE";
+                }
+
+                return "CAR";
+        }
+
+        private String resolveGarageBayType(List<String> supportedVehicleTypes, String vehicleType) {
+                String requestedType = normalizeVehicleType(vehicleType);
+
+                for (String supportedType : supportedVehicleTypes) {
+                        if (normalizeVehicleType(supportedType).equals(requestedType)) {
+                                return supportedType;
+                        }
+                }
+
+                return null;
+        }
+
+        private String normalizeVehicleType(String vehicleType) {
+                if (vehicleType == null || vehicleType.isBlank()) {
+                        return "";
+                }
+
+                String normalized = vehicleType.trim().toUpperCase();
+
+                if (normalized.equals("MOTORBIKE")
+                                || normalized.equals("BIKE")
+                                || normalized.equals("MOTORCYCLE")
+                                || normalized.equals("XE_MAY")) {
+                        return "BIKE";
+                }
+
+                if (normalized.equals("CAR")
+                                || normalized.equals("AUTO")
+                                || normalized.equals("Ô TÔ")) {
+                        return "CAR";
+                }
+
+                return normalized;
         }
 
         private boolean isWashBayAvailable(
@@ -143,7 +184,7 @@ public class BookingServiceImpl implements BookingService {
 
                 long occupied = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
                                 garageId,
-                                vehicleType,
+                                bayType,
                                 start,
                                 end);
 
@@ -216,7 +257,7 @@ public class BookingServiceImpl implements BookingService {
                 String bayType = mapVehicleTypeToBayType(vehicle.getVehicleType());
                 List<String> supportedTypes = washBayRepository
                                 .findDistinctVehicleTypesByGarageId(request.getGarageId());
-                if (!supportedTypes.contains(bayType)) {
+                if (resolveGarageBayType(supportedTypes, vehicle.getVehicleType()) == null) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                                         "Garage does not support vehicle type: " + vehicle.getVehicleType());
                 }
@@ -262,7 +303,7 @@ public class BookingServiceImpl implements BookingService {
                         long availableBays = washBayRepository
                                         .countAvailableByGarageAndVehicleType(request.getGarageId(), bayType);
                         long occupiedBays = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
-                                        request.getGarageId(), vehicle.getVehicleType(), startTime, endTime);
+                                        request.getGarageId(), bayType, startTime, endTime);
                         if (occupiedBays >= availableBays) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                                                 "No wash bay available for this time slot");
@@ -418,7 +459,7 @@ public class BookingServiceImpl implements BookingService {
                 String bayType = mapVehicleTypeToBayType(request.getVehicleType());
                 List<String> supportedTypes = washBayRepository
                                 .findDistinctVehicleTypesByGarageId(request.getGarageId());
-                if (!supportedTypes.contains(bayType)) {
+                if (resolveGarageBayType(supportedTypes, request.getVehicleType()) == null) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                                         "Garage does not support vehicle type: " + request.getVehicleType());
                 }
@@ -1167,23 +1208,25 @@ public class BookingServiceImpl implements BookingService {
                         Vehicle vehicle,
                         ServicePackage servicePackage) {
 
-                if (vehicle == null || servicePackage == null) {
+                if (vehicle == null || servicePackage == null || servicePackage.getVehicleType() == null) {
                         return false;
                 }
 
-                if (!vehicle.getVehicleType()
-                                .equalsIgnoreCase(servicePackage.getVehicleType())) {
+                String vehicleType = normalizeVehicleType(vehicle.getVehicleType());
+                String packageVehicleType = normalizeVehicleType(servicePackage.getVehicleType());
+
+                if (!vehicleType.equals(packageVehicleType)) {
                         return false;
                 }
 
-                if ("CAR".equalsIgnoreCase(vehicle.getVehicleType())) {
+                if ("CAR".equals(vehicleType)) {
                         if (servicePackage.getSeatCount() == null) {
                                 return true;
                         }
                         return Objects.equals(vehicle.getSeatCount(), servicePackage.getSeatCount());
                 }
 
-                if ("BIKE".equalsIgnoreCase(vehicle.getVehicleType())) {
+                if ("BIKE".equals(vehicleType)) {
                         if (servicePackage.getMotorbikeGroup() == null) {
                                 return true;
                         }
@@ -1197,19 +1240,25 @@ public class BookingServiceImpl implements BookingService {
                         WalkInBookingCreateRequest request,
                         ServicePackage servicePackage) {
 
-                if (!request.getVehicleType()
-                                .equalsIgnoreCase(servicePackage.getVehicleType())) {
+                if (request == null || servicePackage == null || servicePackage.getVehicleType() == null) {
                         return false;
                 }
 
-                if ("CAR".equalsIgnoreCase(request.getVehicleType())) {
+                String requestVehicleType = normalizeVehicleType(request.getVehicleType());
+                String packageVehicleType = normalizeVehicleType(servicePackage.getVehicleType());
+
+                if (!requestVehicleType.equals(packageVehicleType)) {
+                        return false;
+                }
+
+                if ("CAR".equals(requestVehicleType)) {
                         if (servicePackage.getSeatCount() == null) {
                                 return true;
                         }
                         return Objects.equals(request.getSeatCount(), servicePackage.getSeatCount());
                 }
 
-                if ("BIKE".equalsIgnoreCase(request.getVehicleType())) {
+                if ("BIKE".equals(requestVehicleType)) {
                         if (servicePackage.getMotorbikeGroup() == null) {
                                 return true;
                         }
@@ -1223,28 +1272,29 @@ public class BookingServiceImpl implements BookingService {
                         String vehicleType,
                         ServicePackage servicePackage) {
 
-                if (vehicleType == null || servicePackage == null) {
+                if (vehicleType == null || servicePackage == null || servicePackage.getVehicleType() == null) {
                         return false;
                 }
 
-                return vehicleType.equalsIgnoreCase(servicePackage.getVehicleType());
+                return normalizeVehicleType(vehicleType)
+                                .equals(normalizeVehicleType(servicePackage.getVehicleType()));
         }
 
-        private BookingServiceStepResponse toServiceStepResponse(
-                        BookingServiceStep step) {
+private BookingServiceStepResponse toServiceStepResponse(
+        BookingServiceStep step) {
 
-                return BookingServiceStepResponse.builder()
-                                .id(step.getId())
-                                .bookingId(step.getBookingId())
-                                .servicePackageId(step.getServicePackageId())
-                                .servicePackageStepId(step.getServicePackageStepId())
-                                .stepOrder(step.getStepOrder())
-                                .name(step.getName())
-                                .description(step.getDescription())
-                                .status(step.getStatus())
-                                .startedAt(step.getStartedAt())
-                                .completedAt(step.getCompletedAt())
-                                .completedByStaffId(step.getCompletedByStaffId())
-                                .build();
-        }
+    return BookingServiceStepResponse.builder()
+            .id(step.getId())
+            .bookingId(step.getBookingId())
+            .servicePackageId(step.getServicePackageId())
+            .servicePackageStepId(step.getServicePackageStepId())
+            .stepOrder(step.getStepOrder())
+            .name(step.getName())
+            .description(step.getDescription())
+            .status(step.getStatus())
+            .startedAt(step.getStartedAt())
+            .completedAt(step.getCompletedAt())
+            .completedByStaffId(step.getCompletedByStaffId())
+            .build();
+}
 }
