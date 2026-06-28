@@ -18,6 +18,8 @@ import com.autowashpro.dto.request.BookingCheckInRequest;
 import java.util.List;
 import com.autowashpro.dto.request.StartServiceRequest;
 import java.time.LocalDate;
+import com.autowashpro.dto.request.CancelBookingRequest;
+import com.autowashpro.dto.request.NoShowBookingRequest;
 
 @RestController
 @RequestMapping("/bookings")
@@ -197,4 +199,39 @@ public class BookingController {
                                                                 request))
                                 .build();
         }
+
+        @PatchMapping("/{id}/cancel")
+@PreAuthorize("hasRole('CUSTOMER') or hasRole('STAFF') or hasRole('ADMIN')")
+public ApiResponse<BookingResponse> cancelBooking(
+        @PathVariable Long id,
+        @RequestBody(required = false) CancelBookingRequest request,
+        @AuthenticationPrincipal UserDetails userDetails) {
+
+    Long currentUserId = Long.valueOf(userDetails.getUsername());
+    String role = userDetails.getAuthorities().iterator().next().getAuthority();
+    String reason = request != null ? request.getReason() : null;
+
+    return ApiResponse.<BookingResponse>builder()
+            .success(true)
+            .message("Booking cancelled successfully")
+            .data(bookingService.cancelBooking(id, currentUserId, role, reason))
+            .build();
+}
+
+@PatchMapping("/{id}/no-show")
+@PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+public ApiResponse<BookingResponse> markNoShow(
+        @PathVariable Long id,
+        @RequestBody(required = false) NoShowBookingRequest request,
+        @AuthenticationPrincipal UserDetails userDetails) {
+
+    Long staffUserId = Long.valueOf(userDetails.getUsername());
+    String reason = request != null ? request.getReason() : null;
+
+    return ApiResponse.<BookingResponse>builder()
+            .success(true)
+            .message("Booking marked as no-show successfully")
+            .data(bookingService.markNoShow(id, staffUserId, reason))
+            .build();
+}
 }

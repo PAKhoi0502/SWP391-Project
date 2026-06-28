@@ -1,5 +1,5 @@
 package com.autowashpro.service.impl;
-
+import com.autowashpro.entity.enums.StaffType;
 import com.autowashpro.dto.request.BookingCreateRequest;
 import com.autowashpro.dto.request.StartServiceRequest;
 import com.autowashpro.dto.request.WalkInBookingCreateRequest;
@@ -68,6 +68,7 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 List<String> supportedVehicleTypes = washBayRepository.findDistinctVehicleTypesByGarageId(garageId);
+
 
                 String bayType = resolveGarageBayType(supportedVehicleTypes, vehicleType);
 
@@ -196,19 +197,19 @@ public class BookingServiceImpl implements BookingService {
                         return true;
                 }
 
-                String staffType = servicePackage.getCareStaffType();
+                StaffType staffType = StaffType.valueOf(servicePackage.getCareStaffType());
 
-                long totalStaff = staffProfileRepository
-                                .countByGarageIdAndStaffTypeAndIsActiveTrue(
-                                                garageId,
-                                                staffType);
+long totalStaff = staffProfileRepository
+                .countByGarageIdAndStaffTypeAndIsActiveTrue(
+                                garageId,
+                                staffType);
 
-                long assigned = bookingAssignedStaffRepository
-                                .countAssignedStaffByGarageAndTypeAndTime(
-                                                garageId,
-                                                staffType,
-                                                start,
-                                                end);
+long assigned = bookingAssignedStaffRepository
+                .countAssignedStaffByGarageAndTypeAndTime(
+                                garageId,
+                                staffType,
+                                start,
+                                end);
 
                 return (totalStaff - assigned) >= servicePackage.getCareStaffRequiredCount();
         }
@@ -304,12 +305,12 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 if (Boolean.TRUE.equals(pkg.getRequiresCareStaff()) && pkg.getCareStaffRequiredCount() > 0) {
-                        String staffType = pkg.getCareStaffType();
+StaffType staffType = StaffType.valueOf(pkg.getCareStaffType());
 
-                        long totalStaff = staffProfileRepository
-                                        .countByGarageIdAndStaffTypeAndIsActiveTrue(
-                                                        request.getGarageId(),
-                                                        staffType);
+long totalStaff = staffProfileRepository
+        .countByGarageIdAndStaffTypeAndIsActiveTrue(
+                request.getGarageId(),
+                staffType);
                         long assignedStaff = bookingAssignedStaffRepository
                                         .countAssignedStaffByGarageAndTypeAndTime(
                                                         request.getGarageId(),
@@ -485,7 +486,7 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 if (Boolean.TRUE.equals(pkg.getRequiresCareStaff()) && pkg.getCareStaffRequiredCount() > 0) {
-                        String staffType = pkg.getCareStaffType();
+StaffType staffType = StaffType.valueOf(pkg.getCareStaffType());
 
                         long totalStaff = staffProfileRepository
                                         .countByGarageIdAndStaffTypeAndIsActiveTrue(
@@ -755,7 +756,7 @@ public class BookingServiceImpl implements BookingService {
 
                 // ================= Assign Care Staff =================
                 if (Boolean.TRUE.equals(servicePackage.getRequiresCareStaff())) {
-                        String staffType = servicePackage.getCareStaffType();
+StaffType staffType = StaffType.valueOf(servicePackage.getCareStaffType());
                         List<StaffProfile> staffs = staffProfileRepository
                                         .findByGarageIdAndStaffTypeAndIsActiveTrue(
                                                         booking.getGarageId(),
