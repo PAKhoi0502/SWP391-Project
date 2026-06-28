@@ -29,6 +29,7 @@ import ServicePackageListPage from '../pages/ServicePackageListPage'
 import ServicePackageDetailPage from '../pages/ServicePackageDetailPage'
 import AdminServicePackagePage from '../pages/admin/AdminServicePackagePage'
 import AvailableSlotsPickerPage from '../pages/booking/AvailableSlotsPickerPage'
+import CustomerWaitlistPage from '../pages/booking/CustomerWaitlistPage'
 import WaitlistPage from '../pages/booking/WaitlistPage'
 
 
@@ -49,6 +50,7 @@ function AppRoutes() {
         <Route element={<CustomerLayout />}>
           <Route path="customer" element={<Navigate to="/" replace />} />
           <Route path="customer/bookings" element={<DashboardPlaceholderPage title="Lich hen khach hang" />} />
+          <Route path="customer/waitlist" element={<CustomerWaitlistPage />} />
           <Route path="customer/vehicles" element={<CustomerVehiclesPage />} />
           <Route path="customer/profile" element={<ProfilePage />} />
           <Route path="customer/vehicles" element={<CustomerVehiclesPage />} />

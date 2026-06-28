@@ -8,6 +8,7 @@ const NAV_ITEMS = {
   { to: '/', label: 'Trang chủ' },
   { to: '/customer/service-packages', label: 'Gói dịch vụ' },
   { to: '/customer/bookings', label: 'Lịch hẹn' },
+  { to: '/customer/waitlist', label: 'Waitlist' },
   { to: '/customer/vehicles', label: 'Xe của tôi' },
   { to: '/customer/profile', label: 'Hồ sơ' },
 ],

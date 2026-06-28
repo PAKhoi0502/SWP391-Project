@@ -1,0 +1,154 @@
+.waitlist-page {
+  padding: 32px;
+  color: #ffffff;
+}
+
+.waitlist-hero {
+  max-width: 780px;
+  padding: 32px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #07111f, #12345a);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+}
+
+.waitlist-eyebrow {
+  margin: 0 0 8px;
+  color: #67e8f9;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.waitlist-hero h1 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 36px;
+  font-weight: 900;
+}
+
+.waitlist-hero > p {
+  margin-top: 12px;
+  color: #dbeafe;
+  line-height: 1.7;
+}
+
+.waitlist-summary,
+.waitlist-success-box {
+  margin-top: 24px;
+  padding: 20px;
+  border-radius: 18px;
+}
+
+.waitlist-summary {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.waitlist-summary h2 {
+  margin: 0 0 8px;
+  color: #ffffff;
+  font-size: 22px;
+}
+
+.waitlist-info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.waitlist-info-row:last-child {
+  border-bottom: 0;
+}
+
+.waitlist-info-row span {
+  color: #bfdbfe;
+  font-weight: 800;
+}
+
+.waitlist-info-row strong {
+  color: #ffffff;
+  text-align: right;
+}
+
+.waitlist-message {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 12px;
+  font-weight: 800;
+}
+
+.waitlist-message-error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.waitlist-success-box {
+  background: rgba(16, 185, 129, 0.16);
+  border: 1px solid rgba(134, 239, 172, 0.5);
+}
+
+.waitlist-success-box strong {
+  display: block;
+  color: #bbf7d0;
+  font-size: 20px;
+}
+
+.waitlist-success-box p {
+  margin: 8px 0 0;
+  color: #dcfce7;
+}
+
+.waitlist-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.waitlist-link-button,
+.waitlist-primary-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 999px;
+  color: #ffffff;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.waitlist-link-button {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.waitlist-primary-link {
+  background: #facc15;
+  color: #111827;
+}
+
+@media (max-width: 640px) {
+  .waitlist-page {
+    padding: 18px;
+  }
+
+  .waitlist-hero {
+    padding: 24px;
+  }
+
+  .waitlist-hero h1 {
+    font-size: 28px;
+  }
+
+  .waitlist-info-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .waitlist-info-row strong {
+    text-align: left;
+  }
+}

@@ -1,5 +1,8 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMemo, useState } from 'react'
+import { waitlistApi } from '../../api/waitlistApi'
+import { Button } from '../../components/common/ui'
+import './WaitlistPage.css'
 
 function formatDate(date) {
   if (!date) return 'Chưa có ngày'
@@ -31,26 +34,23 @@ function getVehicleTypeLabel(vehicleType) {
   return vehicleType || 'Chưa có loại xe'
 }
 
+function getErrorMessage(error, fallback) {
+  return error?.message || error?.data?.message || fallback
+}
+
 function InfoRow({ label, value }) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        gap: 16,
-        padding: '12px 0',
-        borderBottom: '1px solid rgba(255,255,255,0.14)',
-      }}
-    >
-      <span style={{ color: '#bfdbfe', fontWeight: 800 }}>{label}</span>
-      <strong style={{ color: '#ffffff', textAlign: 'right' }}>{value || 'Không có'}</strong>
+    <div className="waitlist-info-row">
+      <span>{label}</span>
+      <strong>{value || 'Không có'}</strong>
     </div>
   )
 }
 
 export default function WaitlistPage() {
   const [searchParams] = useSearchParams()
-  const [joined, setJoined] = useState(false)
+  const [joinedEntry, setJoinedEntry] = useState(null)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const garageId = searchParams.get('garageId') || ''
@@ -66,78 +66,49 @@ export default function WaitlistPage() {
 
   const waitlistPayload = useMemo(() => {
     return {
-      garageId,
-      garageName,
-      servicePackageId,
-      servicePackageName,
+      garageId: Number(garageId),
+      servicePackageId: Number(servicePackageId),
       vehicleType,
       date,
       startTime,
       endTime,
-      status: 'WAITING',
-      createdAt: new Date().toISOString(),
     }
-  }, [garageId, garageName, servicePackageId, servicePackageName, vehicleType, date, startTime, endTime])
+  }, [garageId, servicePackageId, vehicleType, date, startTime, endTime])
 
-  const handleConfirmJoinWaitlist = () => {
+  const handleConfirmJoinWaitlist = async () => {
     if (!garageId || !servicePackageId || !vehicleType || !date) {
       setError('Thiếu thông tin slot. Vui lòng quay lại trang chọn slot và chọn lại.')
       return
     }
 
-    const oldItems = JSON.parse(localStorage.getItem('waitlistItems') || '[]')
-    const nextItems = [waitlistPayload, ...oldItems]
-
-    localStorage.setItem('waitlistItems', JSON.stringify(nextItems))
-    localStorage.setItem('waitlistDraft', JSON.stringify(waitlistPayload))
-
-    setError('')
-    setJoined(true)
+    try {
+      setLoading(true)
+      setError('')
+      const createdEntry = await waitlistApi.join(waitlistPayload)
+      setJoinedEntry(createdEntry || waitlistPayload)
+    } catch (err) {
+      setError(getErrorMessage(err, 'Không thể tham gia waitlist. Vui lòng thử lại.'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
-    <div style={{ padding: 32, color: '#ffffff' }}>
-      <section
-        style={{
-          maxWidth: 760,
-          padding: 32,
-          borderRadius: 24,
-          background: 'linear-gradient(135deg, #07111f, #12345a)',
-          boxShadow: '0 20px 45px rgba(0,0,0,0.25)',
-        }}
-      >
-        <p
-          style={{
-            margin: '0 0 8px',
-            color: '#67e8f9',
-            fontSize: 13,
-            fontWeight: 900,
-            letterSpacing: '0.22em',
-            textTransform: 'uppercase',
-          }}
-        >
-          Waitlist
-        </p>
+    <div className="waitlist-page">
+      <section className="waitlist-hero">
+        <p className="waitlist-eyebrow">Waitlist</p>
 
-        {!joined ? (
+        {!joinedEntry ? (
           <>
-            <h1 style={{ margin: 0, fontSize: 36 }}>Danh sách chờ</h1>
+            <h1>Danh sách chờ</h1>
 
-            <p style={{ marginTop: 12, color: '#dbeafe', lineHeight: 1.7 }}>
-              Slot bạn chọn hiện đã đầy. Xác nhận tham gia danh sách chờ để hệ
-              thống ghi nhận yêu cầu của bạn.
+            <p>
+              Slot bạn chọn hiện đã đầy. Xác nhận tham gia danh sách chờ để hệ thống ghi nhận
+              yêu cầu của bạn.
             </p>
 
-            <div
-              style={{
-                marginTop: 24,
-                padding: 20,
-                borderRadius: 18,
-                background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.14)',
-              }}
-            >
-              <h2 style={{ margin: '0 0 8px', fontSize: 22 }}>Thông tin slot đã chọn</h2>
+            <div className="waitlist-summary">
+              <h2>Thông tin slot đã chọn</h2>
 
               <InfoRow label="Garage" value={garageName || `Garage #${garageId}`} />
               <InfoRow
@@ -149,106 +120,42 @@ export default function WaitlistPage() {
               <InfoRow label="Khung giờ" value={`${formatTime(startTime)} - ${formatTime(endTime)}`} />
             </div>
 
-            {error && (
-              <p
-                style={{
-                  marginTop: 16,
-                  padding: 12,
-                  borderRadius: 12,
-                  background: '#fee2e2',
-                  color: '#991b1b',
-                  fontWeight: 800,
-                }}
-              >
-                {error}
-              </p>
-            )}
+            {error && <p className="waitlist-message waitlist-message-error">{error}</p>}
 
-            <div style={{ marginTop: 24, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={handleConfirmJoinWaitlist}
-                style={{
-                  border: 0,
-                  padding: '12px 18px',
-                  borderRadius: 999,
-                  background: '#facc15',
-                  color: '#111827',
-                  fontWeight: 900,
-                  cursor: 'pointer',
-                }}
-              >
+            <div className="waitlist-actions">
+              <Button onClick={handleConfirmJoinWaitlist} loading={loading}>
                 Xác nhận tham gia waitlist
-              </button>
+              </Button>
 
-              <Link
-                to={backToBookingUrl}
-                style={{
-                  padding: '12px 18px',
-                  borderRadius: 999,
-                  background: 'rgba(255,255,255,0.12)',
-                  color: '#ffffff',
-                  textDecoration: 'none',
-                  fontWeight: 800,
-                }}
-              >
+              <Link className="waitlist-link-button" to={backToBookingUrl}>
                 Quay lại chọn slot
               </Link>
             </div>
           </>
         ) : (
           <>
-            <h1 style={{ margin: 0, fontSize: 36 }}>Đã tham gia danh sách chờ</h1>
+            <h1>Đã tham gia danh sách chờ</h1>
 
-            <p style={{ marginTop: 12, color: '#dbeafe', lineHeight: 1.7 }}>
-              Hệ thống đã ghi nhận yêu cầu của bạn. Khi slot này có khách hủy
-              hoặc garage mở thêm chỗ, bạn sẽ được thông báo ở bước xử lý sau.
+            <p>
+              Hệ thống đã ghi nhận yêu cầu của bạn. Khi slot này có khách hủy hoặc garage mở
+              thêm chỗ, trạng thái sẽ được cập nhật trong waitlist của bạn.
             </p>
 
-            <div
-              style={{
-                marginTop: 24,
-                padding: 18,
-                borderRadius: 18,
-                background: 'rgba(16,185,129,0.16)',
-                border: '1px solid rgba(134,239,172,0.5)',
-              }}
-            >
-              <strong style={{ display: 'block', color: '#bbf7d0', fontSize: 20 }}>
-                Thành công
-              </strong>
-              <p style={{ margin: '8px 0 0', color: '#dcfce7' }}>
-                Bạn đã được thêm vào waitlist cho {formatTime(startTime)} - {formatTime(endTime)} ngày {formatDate(date)}.
+            <div className="waitlist-success-box">
+              <strong>Thành công</strong>
+              <p>
+                Bạn đã được thêm vào waitlist cho {formatTime(startTime)} - {formatTime(endTime)} ngày{' '}
+                {formatDate(date)}.
               </p>
             </div>
 
-            <div style={{ marginTop: 24, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <Link
-                to={backToBookingUrl}
-                style={{
-                  padding: '12px 18px',
-                  borderRadius: 999,
-                  background: '#facc15',
-                  color: '#111827',
-                  textDecoration: 'none',
-                  fontWeight: 900,
-                }}
-              >
-                Quay lại chọn slot
+            <div className="waitlist-actions">
+              <Link className="waitlist-primary-link" to="/customer/waitlist">
+                Xem waitlist của tôi
               </Link>
 
-              <Link
-                to="/customer/bookings"
-                style={{
-                  padding: '12px 18px',
-                  borderRadius: 999,
-                  background: 'rgba(255,255,255,0.12)',
-                  color: '#ffffff',
-                  textDecoration: 'none',
-                  fontWeight: 800,
-                }}
-              >
-                Xem lịch hẹn
+              <Link className="waitlist-link-button" to={backToBookingUrl}>
+                Quay lại chọn slot
               </Link>
             </div>
           </>
