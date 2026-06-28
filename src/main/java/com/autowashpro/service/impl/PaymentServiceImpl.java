@@ -68,10 +68,13 @@ private String checksumKey;
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Booking not found: " + request.getBookingId()));
 
-        if (!"COMPLETED".equals(booking.getStatus())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "PayOS payment can only be created for COMPLETED bookings. Current status: " + booking.getStatus());
-        }
+        if (!"CONFIRMED".equals(booking.getStatus())
+        && !"COMPLETED".equals(booking.getStatus())) {
+    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            "PayOS payment can only be created for CONFIRMED or COMPLETED bookings. Current status: "
+                    + booking.getStatus());
+}
+        
 
         if ("PAID".equals(booking.getPaymentStatus())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,

@@ -25,7 +25,7 @@ public class PaymentController {
     private final PaymentService paymentService;
 
     @PostMapping("/payos/create")
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')or hasRole('CUSTOMER')")
     public ApiResponse<CreatePayOSPaymentResponse> createPayOSPayment(
             @Valid @RequestBody CreatePayOSPaymentRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
