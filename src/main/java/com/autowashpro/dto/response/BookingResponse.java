@@ -35,6 +35,7 @@ public class BookingResponse {
     private Long createdByStaffId;
     private LocalDateTime startedAt;
     private Long washBayId;
+    private LocalDateTime completedAt;
 
     private List<Long> assignedCareStaffIds;
 }
