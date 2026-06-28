@@ -1,0 +1,13 @@
+package com.autowashpro.repository;
+
+import com.autowashpro.entity.PaymentTransaction;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface PaymentTransactionRepository extends JpaRepository<PaymentTransaction, Long> {
+    List<PaymentTransaction> findByBookingIdOrderByCreatedAtDesc(Long bookingId);
+    Optional<PaymentTransaction> findByOrderCode(Long orderCode);
+    Optional<PaymentTransaction> findByBookingIdAndStatus(Long bookingId, String status);
+}
