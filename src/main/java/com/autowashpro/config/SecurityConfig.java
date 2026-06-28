@@ -48,7 +48,8 @@ public class SecurityConfig {
                                 "/auth/refresh-token",
                                 "/auth/logout",
                                 "/auth/forgot-password",
-                                "/auth/reset-password")
+                                "/auth/reset-password",
+                                "/payments/payos/webhook")
                         .permitAll()
 
                         .requestMatchers(

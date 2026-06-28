@@ -1,0 +1,295 @@
+package com.autowashpro.service.impl;
+
+import com.autowashpro.dto.request.CreatePayOSPaymentRequest;
+import com.autowashpro.dto.response.CreatePayOSPaymentResponse;
+import com.autowashpro.dto.response.PaymentTransactionResponse;
+import com.autowashpro.entity.Booking;
+import com.autowashpro.entity.PaymentTransaction;
+import com.autowashpro.repository.BookingRepository;
+import com.autowashpro.repository.CustomerLoyaltyRepository;
+import com.autowashpro.repository.PaymentTransactionRepository;
+import com.autowashpro.service.PaymentService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
+import vn.payos.PayOS;
+import vn.payos.type.Webhook;
+import vn.payos.type.WebhookData;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class PaymentServiceImpl implements PaymentService {
+
+    private final PayOS payOS;
+    private final BookingRepository bookingRepository;
+    private final PaymentTransactionRepository transactionRepository;
+    private final CustomerLoyaltyRepository customerLoyaltyRepository;
+    private final ObjectMapper objectMapper;
+    private final RestTemplate restTemplate;
+
+    @Value("${payos.return-url}")
+    private String returnUrl;
+
+    @Value("${payos.cancel-url}")
+    private String cancelUrl;
+
+    @Value("${payos.client-id}")
+    private String clientId;
+
+    @Value("${payos.api-key}")
+    private String apiKey;
+
+    @Value("${payos.payment-api-url}")
+    private String payosApiUrl;
+
+    @Value("${payos.checksum-key}")
+private String checksumKey;
+
+    @Override
+    @Transactional
+    public CreatePayOSPaymentResponse createPayOSPayment(CreatePayOSPaymentRequest request, Long staffUserId) {
+
+        Booking booking = bookingRepository.findById(request.getBookingId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Booking not found: " + request.getBookingId()));
+
+        if (!"COMPLETED".equals(booking.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "PayOS payment can only be created for COMPLETED bookings. Current status: " + booking.getStatus());
+        }
+
+        if ("PAID".equals(booking.getPaymentStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Booking has already been paid");
+        }
+
+        transactionRepository.findByBookingIdAndStatus(request.getBookingId(), "PENDING")
+                .ifPresent(existing -> {
+                    transactionRepository.delete(existing);
+                    transactionRepository.flush();
+                });
+
+        long orderCode = System.currentTimeMillis() % 1_000_000_000L;
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-client-id", clientId);
+            headers.set("x-api-key", apiKey);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            String sigData = "amount=" + booking.getFinalPrice().intValue() +
+        "&cancelUrl=" + cancelUrl +
+        "&description=DH#" + booking.getId() +
+        "&orderCode=" + orderCode +
+        "&returnUrl=" + returnUrl;
+
+String signature = hmacSHA256(sigData, checksumKey);
+
+Map<String, Object> body = new HashMap<>();
+body.put("orderCode", orderCode);
+body.put("amount", booking.getFinalPrice().intValue());
+body.put("description", "DH#" + booking.getId());
+body.put("returnUrl", returnUrl);
+body.put("cancelUrl", cancelUrl);
+body.put("signature", signature);
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+
+            ResponseEntity<Map> apiResponse = restTemplate.postForEntity(
+                    payosApiUrl,
+                    entity,
+                    Map.class
+            );
+
+            log.info("PayOS response status: {}", apiResponse.getStatusCode());
+            log.info("PayOS response body: {}", apiResponse.getBody());
+
+            Map<String, Object> responseData = (Map<String, Object>) apiResponse.getBody().get("data");
+            String checkoutUrl = (String) responseData.get("checkoutUrl");
+            String qrCode = (String) responseData.get("qrCode");
+
+            PaymentTransaction transaction = new PaymentTransaction();
+            transaction.setBookingId(booking.getId());
+            transaction.setPaymentMethod("PAYOS");
+            transaction.setAmount(booking.getFinalPrice());
+            transaction.setStatus("PENDING");
+            transaction.setOrderCode(orderCode);
+            transaction.setCheckoutUrl(checkoutUrl);
+            transaction.setQrCode(qrCode);
+            transaction.setExpiredAt(LocalDateTime.now().plusMinutes(15));
+
+            PaymentTransaction saved = transactionRepository.save(transaction);
+
+            return CreatePayOSPaymentResponse.builder()
+                    .transactionId(saved.getId())
+                    .orderCode(orderCode)
+                    .checkoutUrl(checkoutUrl)
+                    .qrCode(qrCode)
+                    .status("PENDING")
+                    .build();
+
+        } catch (Exception e) {
+            log.error("PayOS error: {}", e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Failed to create PayOS payment: " + e.getMessage());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void handlePayOSWebhook(Map<String, Object> webhookData) {
+        try {
+            Webhook webhookBody = objectMapper.convertValue(webhookData, Webhook.class);
+            WebhookData data = payOS.verifyPaymentWebhookData(webhookBody);
+
+            Long orderCode = data.getOrderCode();
+            String code = data.getCode();
+
+            Optional<PaymentTransaction> transactionOpt = transactionRepository.findByOrderCode(orderCode);
+            if (transactionOpt.isEmpty()) {
+                log.info("Test webhook received for orderCode: {}, ignoring", orderCode);
+                return;
+            }
+            PaymentTransaction transaction = transactionOpt.get();
+
+            if (!"PENDING".equals(transaction.getStatus())) {
+                log.info("Transaction {} already processed with status {}", orderCode, transaction.getStatus());
+                return;
+            }
+
+            if ("00".equals(code)) {
+                transaction.setStatus("PAID");
+                transaction.setPaidAt(LocalDateTime.now());
+                transaction.setPayosTransactionId(String.valueOf(data.getPaymentLinkId()));
+                transactionRepository.save(transaction);
+
+                Booking booking = bookingRepository.findById(transaction.getBookingId())
+                        .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+                if (!"PAID".equals(booking.getPaymentStatus())) {
+                    booking.setPaymentStatus("PAID");
+                    booking.setPaidAt(LocalDateTime.now());
+
+                    if (!Boolean.TRUE.equals(booking.getRewardProcessed()) && booking.getCustomerId() != null) {
+                        processLoyaltyReward(booking);
+                        booking.setRewardProcessed(true);
+                    }
+
+                    bookingRepository.save(booking);
+                }
+
+            } else {
+                transaction.setStatus("CANCELLED");
+                transaction.setCancelReason("PayOS code: " + code);
+                transactionRepository.save(transaction);
+            }
+
+        } catch (Exception e) {
+            log.error("Webhook processing error: {}", e.getMessage());
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Invalid webhook data: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public PaymentTransactionResponse getTransactionById(Long id) {
+        PaymentTransaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Transaction not found: " + id));
+        return toResponse(transaction);
+    }
+
+    @Override
+    public List<PaymentTransactionResponse> getTransactionsByBooking(Long bookingId) {
+        bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Booking not found: " + bookingId));
+        return transactionRepository.findByBookingIdOrderByCreatedAtDesc(bookingId)
+                .stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public PaymentTransactionResponse cancelTransaction(Long id, Long staffUserId) {
+        PaymentTransaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Transaction not found: " + id));
+
+        if (!"PENDING".equals(transaction.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Only PENDING transaction can be cancelled. Current status: " + transaction.getStatus());
+        }
+
+        try {
+            payOS.cancelPaymentLink(transaction.getOrderCode(), "Cancelled by staff");
+        } catch (Exception e) {
+            log.warn("PayOS cancel failed: {}", e.getMessage());
+        }
+
+        transaction.setStatus("CANCELLED");
+        transaction.setCancelReason("Cancelled by staff");
+        PaymentTransaction saved = transactionRepository.save(transaction);
+        return toResponse(saved);
+    }
+
+    private void processLoyaltyReward(Booking booking) {
+        customerLoyaltyRepository.findByCustomerId(booking.getCustomerId())
+                .ifPresent(loyalty -> {
+                    int earnedPoints = booking.getFinalPrice().divide(BigDecimal.valueOf(10000)).intValue();
+                    if (earnedPoints > 0) {
+                        loyalty.setTotalPoints(loyalty.getTotalPoints() + earnedPoints);
+                        loyalty.setAvailablePoints(loyalty.getAvailablePoints() + earnedPoints);
+                        loyalty.setTotalSpent(loyalty.getTotalSpent().add(booking.getFinalPrice()));
+                        loyalty.setTotalVisits(loyalty.getTotalVisits() + 1);
+                        customerLoyaltyRepository.save(loyalty);
+                    }
+                });
+    }
+
+    private PaymentTransactionResponse toResponse(PaymentTransaction t) {
+        return PaymentTransactionResponse.builder()
+                .id(t.getId())
+                .bookingId(t.getBookingId())
+                .paymentMethod(t.getPaymentMethod())
+                .amount(t.getAmount())
+                .status(t.getStatus())
+                .orderCode(t.getOrderCode())
+                .checkoutUrl(t.getCheckoutUrl())
+                .qrCode(t.getQrCode())
+                .cancelReason(t.getCancelReason())
+                .paidAt(t.getPaidAt())
+                .expiredAt(t.getExpiredAt())
+                .createdAt(t.getCreatedAt())
+                .build();
+    }
+
+    private String hmacSHA256(String data, String key) throws Exception {
+    javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+    javax.crypto.spec.SecretKeySpec secretKey =
+        new javax.crypto.spec.SecretKeySpec(key.getBytes("UTF-8"), "HmacSHA256");
+    mac.init(secretKey);
+    byte[] hash = mac.doFinal(data.getBytes("UTF-8"));
+    StringBuilder hexString = new StringBuilder();
+    for (byte b : hash) {
+        String hex = Integer.toHexString(0xff & b);
+        if (hex.length() == 1) hexString.append('0');
+        hexString.append(hex);
+    }
+    return hexString.toString();
+}
+}

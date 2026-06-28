@@ -78,5 +78,5 @@ public class VehicleInspectionController {
                 .message("Inspection updated successfully")
                 .data(vehicleInspectionService.update(id, request, staffUserId))
                 .build();
-    }
+    } 
 }
