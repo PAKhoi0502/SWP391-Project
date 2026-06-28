@@ -66,4 +66,10 @@ public class ServicePackage {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "seat_count")
+    private Integer seatCount;
+
+    @Column(name = "motorbike_group")
+    private String motorbikeGroup;
 }

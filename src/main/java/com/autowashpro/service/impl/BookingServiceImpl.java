@@ -8,6 +8,7 @@ import com.autowashpro.dto.response.BookingResponse;
 import com.autowashpro.dto.response.SlotResponse;
 import com.autowashpro.entity.*;
 import com.autowashpro.entity.enums.WashBayStatus;
+import com.autowashpro.entity.enums.StaffType;
 import com.autowashpro.repository.*;
 import com.autowashpro.service.BookingService;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.autowashpro.dto.response.BookingSummaryResponse;
-import com.autowashpro.entity.BookingAssignedStaff;
+import java.util.Objects;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -58,48 +59,55 @@ public class BookingServiceImpl implements BookingService {
                 ServicePackage servicePackage = servicePackageRepository.findById(servicePackageId)
                                 .orElseThrow(() -> new RuntimeException("Service package not found"));
 
-                if (!servicePackage.getVehicleType().equals(vehicleType)) {
-                        throw new RuntimeException("Service package does not support vehicle type: " + vehicleType);
+                if (!isVehicleTypeCompatible(
+                                vehicleType,
+                                servicePackage)) {
+
+                        throw new RuntimeException(
+                                        "Service package does not support vehicle type: "
+                                                        + vehicleType);
                 }
 
                 List<String> supportedVehicleTypes = washBayRepository.findDistinctVehicleTypesByGarageId(garageId);
+
                 String bayType = mapVehicleTypeToBayType(vehicleType);
-                long availableBayCount = washBayRepository.countAvailableByGarageAndVehicleType(garageId, bayType);
 
                 if (!supportedVehicleTypes.contains(bayType)) {
                         throw new RuntimeException("Garage does not support vehicle type: " + vehicleType);
                 }
 
                 List<SlotResponse> slots = new ArrayList<>();
-                List<Booking> bookings = bookingRepository.findByGarageIdAndStartTimeBetween(
-                                garageId, date.atStartOfDay(), date.plusDays(1).atStartOfDay());
 
                 LocalTime current = garage.getOpeningTime();
+
                 while (current.plusMinutes(servicePackage.getDurationMinutes()).isBefore(garage.getClosingTime())
                                 || current.plusMinutes(servicePackage.getDurationMinutes())
                                                 .equals(garage.getClosingTime())) {
 
                         LocalDateTime start = LocalDateTime.of(date, current);
                         LocalDateTime end = start.plusMinutes(servicePackage.getDurationMinutes());
-                        boolean available = availableBayCount > 0;
 
-                        for (Booking booking : bookings) {
-                                String status = booking.getStatus();
-                                boolean holdCapacity = "CONFIRMED".equals(status)
-                                                || "CHECKED_IN".equals(status)
-                                                || "IN_PROGRESS".equals(status);
-                                if (!holdCapacity)
-                                        continue;
+                        boolean available = isWashBayAvailable(
+                                        garageId,
+                                        vehicleType,
+                                        start,
+                                        end);
 
-                                boolean overlap = start.isBefore(booking.getEndTime())
-                                                && end.isAfter(booking.getStartTime());
-                                if (overlap) {
-                                        available = false;
-                                        break;
-                                }
+                        if (available) {
+                                available = isCareStaffAvailable(
+                                                garageId,
+                                                servicePackage,
+                                                start,
+                                                end);
                         }
 
-                        slots.add(SlotResponse.builder().startTime(start).endTime(end).available(available).build());
+                        slots.add(
+                                        SlotResponse.builder()
+                                                        .startTime(start)
+                                                        .endTime(end)
+                                                        .available(available)
+                                                        .build());
+
                         current = current.plusMinutes(garage.getSlotIntervalMinutes());
                 }
 
@@ -113,6 +121,56 @@ public class BookingServiceImpl implements BookingService {
 
         private String mapVehicleTypeToBayType(String vehicleType) {
                 return vehicleType.startsWith("BIKE") ? "BIKE" : "CAR";
+        }
+
+        private boolean isWashBayAvailable(
+                        Long garageId,
+                        String vehicleType,
+                        LocalDateTime start,
+                        LocalDateTime end) {
+
+                String bayType = mapVehicleTypeToBayType(vehicleType);
+
+                long availableBays = washBayRepository.countAvailableByGarageAndVehicleType(
+                                garageId,
+                                bayType);
+
+                long occupied = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
+                                garageId,
+                                vehicleType,
+                                start,
+                                end);
+
+                return occupied < availableBays;
+        }
+
+        private boolean isCareStaffAvailable(
+                        Long garageId,
+                        ServicePackage servicePackage,
+                        LocalDateTime start,
+                        LocalDateTime end) {
+
+                if (!Boolean.TRUE.equals(servicePackage.getRequiresCareStaff())
+                                || servicePackage.getCareStaffRequiredCount() <= 0) {
+
+                        return true;
+                }
+
+                StaffType staffType = StaffType.valueOf(servicePackage.getCareStaffType());
+
+                long totalStaff = staffProfileRepository
+                                .countByGarageIdAndStaffTypeAndIsActiveTrue(
+                                                garageId,
+                                                staffType);
+
+                long assigned = bookingAssignedStaffRepository
+                                .countAssignedStaffByGarageAndTypeAndTime(
+                                                garageId,
+                                                staffType,
+                                                start,
+                                                end);
+
+                return (totalStaff - assigned) >= servicePackage.getCareStaffRequiredCount();
         }
 
         // ===================== ISSUE #11 =====================
@@ -157,9 +215,13 @@ public class BookingServiceImpl implements BookingService {
                                         "Garage does not support vehicle type: " + vehicle.getVehicleType());
                 }
 
-                if (!pkg.getVehicleType().startsWith(vehicle.getVehicleType())) {
-                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                        "Service package does not support vehicle type: " + vehicle.getVehicleType());
+                if (!isVehicleTypeCompatible(
+                                vehicle,
+                                pkg)) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Vehicle is not compatible with selected service package");
                 }
 
                 CustomerLoyalty loyalty = customerLoyaltyRepository.findByCustomerId(customerId).orElse(null);
@@ -202,10 +264,18 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 if (Boolean.TRUE.equals(pkg.getRequiresCareStaff()) && pkg.getCareStaffRequiredCount() > 0) {
-                        long totalStaff = staffProfileRepository.countByGarageIdAndStaffTypeAndIsActiveTrue(
-                                        request.getGarageId(), pkg.getCareStaffType());
-                        long assignedStaff = bookingAssignedStaffRepository.countAssignedStaffByGarageAndTypeAndTime(
-                                        request.getGarageId(), pkg.getCareStaffType(), startTime, endTime);
+                        StaffType staffType = StaffType.valueOf(pkg.getCareStaffType());
+
+                        long totalStaff = staffProfileRepository
+                                        .countByGarageIdAndStaffTypeAndIsActiveTrue(
+                                                        request.getGarageId(),
+                                                        staffType);
+                        long assignedStaff = bookingAssignedStaffRepository
+                                        .countAssignedStaffByGarageAndTypeAndTime(
+                                                        request.getGarageId(),
+                                                        staffType,
+                                                        startTime,
+                                                        endTime);
                         if ((totalStaff - assignedStaff) < pkg.getCareStaffRequiredCount()) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                                                 "Not enough care staff available for this time slot");
@@ -347,9 +417,13 @@ public class BookingServiceImpl implements BookingService {
                                         "Garage does not support vehicle type: " + request.getVehicleType());
                 }
 
-                if (!pkg.getVehicleType().startsWith(request.getVehicleType())) {
-                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                        "Service package does not support vehicle type: " + request.getVehicleType());
+                if (!isWalkInVehicleCompatible(
+                                request,
+                                pkg)) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Vehicle is not compatible with selected service package");
                 }
 
                 long plateOverlap = bookingRepository.countOverlappingBookingsByLicensePlate(
@@ -371,10 +445,19 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 if (Boolean.TRUE.equals(pkg.getRequiresCareStaff()) && pkg.getCareStaffRequiredCount() > 0) {
-                        long totalStaff = staffProfileRepository.countByGarageIdAndStaffTypeAndIsActiveTrue(
-                                        request.getGarageId(), pkg.getCareStaffType());
-                        long assignedStaff = bookingAssignedStaffRepository.countAssignedStaffByGarageAndTypeAndTime(
-                                        request.getGarageId(), pkg.getCareStaffType(), startTime, endTime);
+                        StaffType staffType = StaffType.valueOf(pkg.getCareStaffType());
+
+                        long totalStaff = staffProfileRepository
+                                        .countByGarageIdAndStaffTypeAndIsActiveTrue(
+                                                        request.getGarageId(),
+                                                        staffType);
+
+                        long assignedStaff = bookingAssignedStaffRepository
+                                        .countAssignedStaffByGarageAndTypeAndTime(
+                                                        request.getGarageId(),
+                                                        staffType,
+                                                        startTime,
+                                                        endTime);
                         if ((totalStaff - assignedStaff) < pkg.getCareStaffRequiredCount()) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                                                 "Not enough care staff available for this time slot");
@@ -411,55 +494,6 @@ public class BookingServiceImpl implements BookingService {
                 return toResponse(saved);
         }
 
-        // ===================== HELPER =====================
-
-        private BookingResponse toResponse(Booking b) {
-                return BookingResponse.builder()
-                                .id(b.getId())
-                                .customerId(b.getCustomerId())
-                                .vehicleId(b.getVehicleId())
-                                .garageId(b.getGarageId())
-                                .servicePackageId(b.getServicePackageId())
-                                .promotionId(b.getPromotionId())
-                                .startTime(b.getStartTime())
-                                .endTime(b.getEndTime())
-                                .status(b.getStatus())
-                                .paymentStatus(b.getPaymentStatus())
-                                .originalPrice(b.getOriginalPrice())
-                                .discountAmount(b.getDiscountAmount())
-                                .finalPrice(b.getFinalPrice())
-                                .depositAmount(b.getDepositAmount())
-                                .depositStatus(b.getDepositStatus())
-                                .isWalkIn(b.getIsWalkIn())
-                                .usedPoints(b.getUsedPoints())
-                                .note(b.getNote())
-                                .createdAt(b.getCreatedAt())
-                                .guestName(b.getGuestName())
-                                .guestPhone(b.getGuestPhone())
-                                .licensePlate(b.getLicensePlate())
-                                .createdByStaffId(b.getCreatedByStaffId())
-                                .checkedInAt(b.getCheckedInAt())
-                                .startedAt(b.getStartedAt())
-                                .washBayId(b.getWashBayId())
-                                .build();
-        }
-
-        private BookingSummaryResponse toSummaryResponse(Booking b) {
-
-                return BookingSummaryResponse.builder()
-                                .id(b.getId())
-                                .customerId(b.getCustomerId())
-                                .garageId(b.getGarageId())
-                                .vehicleId(b.getVehicleId())
-                                .servicePackageId(b.getServicePackageId())
-                                .startTime(b.getStartTime())
-                                .endTime(b.getEndTime())
-                                .status(b.getStatus())
-                                .paymentStatus(b.getPaymentStatus())
-                                .finalPrice(b.getFinalPrice())
-                                .isWalkIn(b.getIsWalkIn())
-                                .build();
-        }
         // ===================== ISSUE #13 =====================
 
         @Override
@@ -681,11 +715,11 @@ public class BookingServiceImpl implements BookingService {
 
                 // ================= Assign Care Staff =================
                 if (Boolean.TRUE.equals(servicePackage.getRequiresCareStaff())) {
-
+                        StaffType staffType = StaffType.valueOf(servicePackage.getCareStaffType());
                         List<StaffProfile> staffs = staffProfileRepository
                                         .findByGarageIdAndStaffTypeAndIsActiveTrue(
                                                         booking.getGarageId(),
-                                                        servicePackage.getCareStaffType());
+                                                        staffType);
 
                         int assigned = 0;
 
@@ -776,138 +810,239 @@ public class BookingServiceImpl implements BookingService {
 
                 return response;
         }
+// ===================== ISSUE #19 =====================
 
-        // ===================== ISSUE #19 =====================
+        @Override
+        @Transactional
+        public BookingResponse cancelBooking(Long bookingId, Long currentUserId, String role, String reason) {
 
-@Override
-@Transactional
-public BookingResponse cancelBooking(Long bookingId, Long currentUserId, String role, String reason) {
+                Booking booking = bookingRepository.findById(bookingId)
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Booking not found: " + bookingId));
 
-    Booking booking = bookingRepository.findById(bookingId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Booking not found: " + bookingId));
+                String status = booking.getStatus();
 
-    String status = booking.getStatus();
+                if ("ROLE_CUSTOMER".equals(role)) {
+                        if (!currentUserId.equals(booking.getCustomerId())) {
+                                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                                                "You can only cancel your own bookings");
+                        }
+                        if (!"CONFIRMED".equals(status) && !"PENDING_DEPOSIT".equals(status)) {
+                                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                                "Customer can only cancel booking before check-in. Current status: " + status);
+                        }
+                } else {
+                        if ("ROLE_STAFF".equals(role)) {
+                                StaffProfile staffProfile = staffProfileRepository.findByUser_Id(currentUserId)
+                                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
+                                                                "No staff profile found"));
+                                if (!staffProfile.getGarageId().equals(booking.getGarageId())) {
+                                        throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                                                        "Staff can only cancel bookings in their assigned garage");
+                                }
+                        }
+                        if (!"CONFIRMED".equals(status) && !"CHECKED_IN".equals(status)
+                                        && !"PENDING_DEPOSIT".equals(status)) {
+                                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                                "Cannot cancel booking with status: " + status);
+                        }
+                }
 
-    // Validate permission theo role
-    if ("ROLE_CUSTOMER".equals(role)) {
-        // Customer chỉ cancel được booking của mình
-        if (!currentUserId.equals(booking.getCustomerId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "You can only cancel your own bookings");
+                if (booking.getWashBayId() != null) {
+                        washBayRepository.findById(booking.getWashBayId()).ifPresent(washBay -> {
+                                washBay.setStatus(WashBayStatus.AVAILABLE);
+                                washBay.setCurrentBookingId(null);
+                                washBayRepository.save(washBay);
+                        });
+                        booking.setWashBayId(null);
+                }
+
+                List<BookingAssignedStaff> assignedStaffs = bookingAssignedStaffRepository
+                                .findByBookingId(bookingId);
+                for (BookingAssignedStaff assignedStaff : assignedStaffs) {
+                        assignedStaff.setStatus("RELEASED");
+                        bookingAssignedStaffRepository.save(assignedStaff);
+                }
+
+                if (booking.getUsedPoints() != null && booking.getUsedPoints() > 0
+                                && !"CHECKED_IN".equals(status)) {
+                        customerLoyaltyRepository.findByCustomerId(booking.getCustomerId())
+                                        .ifPresent(loyalty -> {
+                                                loyalty.setAvailablePoints(
+                                                                loyalty.getAvailablePoints() + booking.getUsedPoints());
+                                                loyalty.setRedeemedPoints(
+                                                                Math.max(0, loyalty.getRedeemedPoints() - booking.getUsedPoints()));
+                                                customerLoyaltyRepository.save(loyalty);
+                                        });
+                }
+
+                booking.setStatus("CANCELED");
+                booking.setNote(reason != null ? reason : booking.getNote());
+                booking.setRewardProcessed(false);
+
+                Booking saved = bookingRepository.save(booking);
+                return toResponse(saved);
         }
-        // Customer chỉ cancel được khi CONFIRMED (chưa check-in)
-        if (!"CONFIRMED".equals(status) && !"PENDING_DEPOSIT".equals(status)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Customer can only cancel booking before check-in. Current status: " + status);
+
+        @Override
+        @Transactional
+        public BookingResponse markNoShow(Long bookingId, Long staffUserId, String reason) {
+
+                Booking booking = bookingRepository.findById(bookingId)
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Booking not found: " + bookingId));
+
+                StaffProfile staffProfile = staffProfileRepository.findByUser_Id(staffUserId)
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
+                                                "No staff profile found"));
+                if (!staffProfile.getGarageId().equals(booking.getGarageId())) {
+                        throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                                        "Staff can only mark no-show for bookings in their assigned garage");
+                }
+
+                if (!"CONFIRMED".equals(booking.getStatus())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Can only mark no-show for CONFIRMED bookings. Current status: "
+                                                        + booking.getStatus());
+                }
+
+                if (booking.getWashBayId() != null) {
+                        washBayRepository.findById(booking.getWashBayId()).ifPresent(washBay -> {
+                                washBay.setStatus(WashBayStatus.AVAILABLE);
+                                washBay.setCurrentBookingId(null);
+                                washBayRepository.save(washBay);
+                        });
+                        booking.setWashBayId(null);
+                }
+
+                List<BookingAssignedStaff> assignedStaffs = bookingAssignedStaffRepository
+                                .findByBookingId(bookingId);
+                for (BookingAssignedStaff assignedStaff : assignedStaffs) {
+                        assignedStaff.setStatus("RELEASED");
+                        bookingAssignedStaffRepository.save(assignedStaff);
+                }
+
+                booking.setStatus("NO_SHOW");
+                booking.setNote(reason != null ? reason : booking.getNote());
+                booking.setRewardProcessed(false);
+
+                Booking saved = bookingRepository.save(booking);
+                return toResponse(saved);
         }
-    } else {
-        // Staff/Admin: validate garage permission
-        if ("ROLE_STAFF".equals(role)) {
-            StaffProfile staffProfile = staffProfileRepository.findByUser_Id(currentUserId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
-                            "No staff profile found"));
-            if (!staffProfile.getGarageId().equals(booking.getGarageId())) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                        "Staff can only cancel bookings in their assigned garage");
-            }
+
+        // ===================== HELPER =====================
+
+        private BookingResponse toResponse(Booking b) {
+                return BookingResponse.builder()
+                                .id(b.getId())
+                                .customerId(b.getCustomerId())
+                                .vehicleId(b.getVehicleId())
+                                .garageId(b.getGarageId())
+                                .servicePackageId(b.getServicePackageId())
+                                .promotionId(b.getPromotionId())
+                                .startTime(b.getStartTime())
+                                .endTime(b.getEndTime())
+                                .status(b.getStatus())
+                                .paymentStatus(b.getPaymentStatus())
+                                .originalPrice(b.getOriginalPrice())
+                                .discountAmount(b.getDiscountAmount())
+                                .finalPrice(b.getFinalPrice())
+                                .depositAmount(b.getDepositAmount())
+                                .depositStatus(b.getDepositStatus())
+                                .isWalkIn(b.getIsWalkIn())
+                                .usedPoints(b.getUsedPoints())
+                                .note(b.getNote())
+                                .createdAt(b.getCreatedAt())
+                                .guestName(b.getGuestName())
+                                .guestPhone(b.getGuestPhone())
+                                .licensePlate(b.getLicensePlate())
+                                .createdByStaffId(b.getCreatedByStaffId())
+                                .checkedInAt(b.getCheckedInAt())
+                                .startedAt(b.getStartedAt())
+                                .washBayId(b.getWashBayId())
+                                .build();
         }
-        // Staff/Admin có thể cancel CONFIRMED hoặc CHECKED_IN
-        if (!"CONFIRMED".equals(status) && !"CHECKED_IN".equals(status)
-                && !"PENDING_DEPOSIT".equals(status)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Cannot cancel booking with status: " + status);
+
+        private BookingSummaryResponse toSummaryResponse(Booking b) {
+                return BookingSummaryResponse.builder()
+                                .id(b.getId())
+                                .customerId(b.getCustomerId())
+                                .garageId(b.getGarageId())
+                                .vehicleId(b.getVehicleId())
+                                .servicePackageId(b.getServicePackageId())
+                                .startTime(b.getStartTime())
+                                .endTime(b.getEndTime())
+                                .status(b.getStatus())
+                                .paymentStatus(b.getPaymentStatus())
+                                .finalPrice(b.getFinalPrice())
+                                .isWalkIn(b.getIsWalkIn())
+                                .build();
         }
-    }
 
-    // Release wash bay nếu có
-    if (booking.getWashBayId() != null) {
-        washBayRepository.findById(booking.getWashBayId()).ifPresent(washBay -> {
-            washBay.setStatus(com.autowashpro.entity.enums.WashBayStatus.AVAILABLE);
-            washBay.setCurrentBookingId(null);
-            washBayRepository.save(washBay);
-        });
-        booking.setWashBayId(null);
-    }
+        private boolean isVehicleTypeCompatible(
+                        Vehicle vehicle,
+                        ServicePackage servicePackage) {
 
-    // Release care staff nếu có
-    List<BookingAssignedStaff> assignedStaffs = bookingAssignedStaffRepository
-            .findByBookingId(bookingId);
-    for (BookingAssignedStaff assignedStaff : assignedStaffs) {
-        assignedStaff.setStatus("RELEASED");
-        bookingAssignedStaffRepository.save(assignedStaff);
-    }
+                if (vehicle == null || servicePackage == null) {
+                        return false;
+                }
 
-    // Refund used points nếu cancel hợp lệ (chỉ khi CONFIRMED, chưa check-in)
-    if (booking.getUsedPoints() != null && booking.getUsedPoints() > 0
-            && !"CHECKED_IN".equals(status)) {
-        customerLoyaltyRepository.findByCustomerId(booking.getCustomerId())
-                .ifPresent(loyalty -> {
-                    loyalty.setAvailablePoints(
-                            loyalty.getAvailablePoints() + booking.getUsedPoints());
-                    loyalty.setRedeemedPoints(
-                            Math.max(0, loyalty.getRedeemedPoints() - booking.getUsedPoints()));
-                    customerLoyaltyRepository.save(loyalty);
-                });
-    }
+                if (!vehicle.getVehicleType()
+                                .equalsIgnoreCase(servicePackage.getVehicleType())) {
+                        return false;
+                }
 
-    // Update booking status
-    booking.setStatus("CANCELED");
-    booking.setNote(reason != null ? reason : booking.getNote());
-    booking.setRewardProcessed(false);
+                if ("CAR".equalsIgnoreCase(vehicle.getVehicleType())) {
+                        if (servicePackage.getSeatCount() == null) {
+                                return true;
+                        }
+                        return Objects.equals(vehicle.getSeatCount(), servicePackage.getSeatCount());
+                }
 
-    Booking saved = bookingRepository.save(booking);
-    return toResponse(saved);
-}
+                if ("BIKE".equalsIgnoreCase(vehicle.getVehicleType())) {
+                        if (servicePackage.getMotorbikeGroup() == null) {
+                                return true;
+                        }
+                        return Objects.equals(vehicle.getMotorbikeGroup(), servicePackage.getMotorbikeGroup());
+                }
 
-@Override
-@Transactional
-public BookingResponse markNoShow(Long bookingId, Long staffUserId, String reason) {
+                return true;
+        }
 
-    Booking booking = bookingRepository.findById(bookingId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "Booking not found: " + bookingId));
+        private boolean isWalkInVehicleCompatible(
+                        WalkInBookingCreateRequest request,
+                        ServicePackage servicePackage) {
 
-    // Validate staff garage permission
-    StaffProfile staffProfile = staffProfileRepository.findByUser_Id(staffUserId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "No staff profile found"));
-    if (!staffProfile.getGarageId().equals(booking.getGarageId())) {
-        throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                "Staff can only mark no-show for bookings in their assigned garage");
-    }
+                if (!request.getVehicleType()
+                                .equalsIgnoreCase(servicePackage.getVehicleType())) {
+                        return false;
+                }
 
-    // Chỉ CONFIRMED mới được mark no-show
-    if (!"CONFIRMED".equals(booking.getStatus())) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Can only mark no-show for CONFIRMED bookings. Current status: "
-                        + booking.getStatus());
-    }
+                if ("CAR".equalsIgnoreCase(request.getVehicleType())) {
+                        if (servicePackage.getSeatCount() == null) {
+                                return true;
+                        }
+                        return Objects.equals(request.getSeatCount(), servicePackage.getSeatCount());
+                }
 
-    // Release wash bay nếu có
-    if (booking.getWashBayId() != null) {
-        washBayRepository.findById(booking.getWashBayId()).ifPresent(washBay -> {
-            washBay.setStatus(com.autowashpro.entity.enums.WashBayStatus.AVAILABLE);
-            washBay.setCurrentBookingId(null);
-            washBayRepository.save(washBay);
-        });
-        booking.setWashBayId(null);
-    }
+                if ("BIKE".equalsIgnoreCase(request.getVehicleType())) {
+                        if (servicePackage.getMotorbikeGroup() == null) {
+                                return true;
+                        }
+                        return Objects.equals(request.getMotorbikeGroup(), servicePackage.getMotorbikeGroup());
+                }
 
-    // Release care staff nếu có
-    List<BookingAssignedStaff> assignedStaffs = bookingAssignedStaffRepository
-            .findByBookingId(bookingId);
-    for (BookingAssignedStaff assignedStaff : assignedStaffs) {
-        assignedStaff.setStatus("RELEASED");
-        bookingAssignedStaffRepository.save(assignedStaff);
-    }
+                return true;
+        }
 
-    // NO_SHOW không refund points tự động
-    booking.setStatus("NO_SHOW");
-    booking.setNote(reason != null ? reason : booking.getNote());
-    booking.setRewardProcessed(false);
+        private boolean isVehicleTypeCompatible(
+                        String vehicleType,
+                        ServicePackage servicePackage) {
 
-    Booking saved = bookingRepository.save(booking);
-    return toResponse(saved);
-}
+                if (vehicleType == null || servicePackage == null) {
+                        return false;
+                }
+
+                return vehicleType.equalsIgnoreCase(servicePackage.getVehicleType());
+        }
 }
