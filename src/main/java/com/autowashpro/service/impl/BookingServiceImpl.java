@@ -114,9 +114,22 @@ public class BookingServiceImpl implements BookingService {
                                 .build();
         }
 
-        private String mapVehicleTypeToBayType(String vehicleType) {
-                return vehicleType.startsWith("BIKE") ? "BIKE" : "CAR";
+        /*private String mapVehicleTypeToBayType(String vehicleType) {
+                return vehicleType.startsWith("BIKE") ? "BIKE" : "CAR";} */
+                private String mapVehicleTypeToBayType(String vehicleType) {
+        if (vehicleType == null) {
+                return "CAR";
         }
+
+        String normalized = vehicleType.trim().toUpperCase();
+
+        if (normalized.equals("MOTORBIKE") || normalized.equals("BIKE")) {
+                return "MOTORBIKE";
+        }
+
+        return "CAR";
+}
+        
 
         // ===================== ISSUE #11 =====================
 
