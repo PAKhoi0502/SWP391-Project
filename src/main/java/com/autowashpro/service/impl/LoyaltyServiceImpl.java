@@ -116,6 +116,11 @@ public class LoyaltyServiceImpl implements LoyaltyService {
             return;
         }
 
+            // Guest booking — skip
+    if (booking.getCustomerId() == null) {
+        return;
+    }
+
         if (Boolean.TRUE.equals(booking.getRewardProcessed())) {
             return;
         }

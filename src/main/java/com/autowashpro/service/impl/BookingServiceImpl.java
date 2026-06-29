@@ -1,5 +1,7 @@
 package com.autowashpro.service.impl;
 
+
+import com.autowashpro.service.WashHistoryService;
 import com.autowashpro.entity.enums.StaffType;
 import com.autowashpro.dto.request.BookingCreateRequest;
 import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
@@ -50,6 +52,7 @@ public class BookingServiceImpl implements BookingService {
         private final BookingServiceStepRepository bookingServiceStepRepository;
         private final ServicePackageStepRepository servicePackageStepRepository;
         private final LoyaltyService loyaltyService;
+        private final WashHistoryService washHistoryService;
 
         // ===================== ISSUE #10 =====================
 
@@ -1298,6 +1301,7 @@ public class BookingServiceImpl implements BookingService {
                 Booking saved = bookingRepository.save(booking);
                 loyaltyService.updateBookingStatistics(saved.getId());
                 loyaltyService.earnPointsAfterPaidBooking(saved.getId());
+                washHistoryService.createWashHistoryAfterPaidBooking(saved.getId());
                 return toResponse(saved);
         }
         // ===================== HELPER =====================
