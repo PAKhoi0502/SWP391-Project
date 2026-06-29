@@ -1,0 +1,439 @@
+package com.autowashpro.service.impl;
+
+import com.autowashpro.dto.response.LoyaltyOverviewResponse;
+import com.autowashpro.dto.response.LoyaltyTierRuleResponse;
+import com.autowashpro.entity.CustomerLoyalty;
+import com.autowashpro.entity.LoyaltyTierRule;
+import com.autowashpro.repository.BookingRepository;
+import com.autowashpro.repository.CustomerLoyaltyRepository;
+import com.autowashpro.repository.LoyaltyTierRuleRepository;
+import com.autowashpro.repository.PointTransactionRepository;
+import com.autowashpro.repository.ServicePackageRepository;
+import com.autowashpro.service.LoyaltyService;
+import lombok.RequiredArgsConstructor;
+import java.math.BigDecimal;
+import java.util.List;
+import org.springframework.stereotype.Service;
+import com.autowashpro.entity.Booking;
+import java.time.LocalDateTime;
+import com.autowashpro.dto.request.CreateLoyaltyTierRuleRequest;
+import com.autowashpro.dto.request.UpdateLoyaltyTierRuleRequest;
+import com.autowashpro.dto.request.RedeemPreviewRequest;
+import com.autowashpro.dto.response.PointTransactionResponse;
+import com.autowashpro.dto.response.RedeemPreviewResponse;
+import com.autowashpro.entity.PointTransaction;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.annotation.Transactional;
+import java.math.RoundingMode;
+
+@Service
+@RequiredArgsConstructor
+public class LoyaltyServiceImpl implements LoyaltyService {
+    private final CustomerLoyaltyRepository customerLoyaltyRepository;
+    private final LoyaltyTierRuleRepository loyaltyTierRuleRepository;
+    private final BookingRepository bookingRepository;
+    private final PointTransactionRepository pointTransactionRepository;
+    private final ServicePackageRepository servicePackageRepository;
+
+    @Override
+    public CustomerLoyalty getOrCreateCustomerLoyalty(Long customerId) {
+        return customerLoyaltyRepository.findByCustomerId(customerId).orElseGet(() -> {
+            CustomerLoyalty loyalty = new CustomerLoyalty();
+            loyalty.setCustomerId(customerId);
+            loyalty.setCurrentTier("BRONZE");
+            loyalty.setTotalPoints(0);
+            loyalty.setAvailablePoints(0);
+            loyalty.setRedeemedPoints(0);
+            loyalty.setExpiredPoints(0);
+            loyalty.setTotalSpent(BigDecimal.ZERO);
+            loyalty.setTotalVisits(0);
+            loyalty.setCurrentCycleSpent(BigDecimal.ZERO);
+            loyalty.setCurrentCycleVisits(0);
+            return customerLoyaltyRepository.save(loyalty);
+        });
+    }
+
+    @Override
+    public LoyaltyOverviewResponse getMyLoyalty(Long customerId) {
+        CustomerLoyalty loyalty = getOrCreateCustomerLoyalty(customerId);
+        return LoyaltyOverviewResponse.builder().currentTier(loyalty.getCurrentTier())
+                .totalPoints(loyalty.getTotalPoints()).availablePoints(loyalty.getAvailablePoints())
+                .redeemedPoints(loyalty.getRedeemedPoints()).expiredPoints(loyalty.getExpiredPoints())
+                .totalSpent(loyalty.getTotalSpent()).totalVisits(loyalty.getTotalVisits()).build();
+    }
+
+    @Override
+    public List<LoyaltyTierRuleResponse> getTierRules() {
+        return loyaltyTierRuleRepository.findByIsActiveTrueOrderByPriorityLevelAsc().stream()
+                .map(rule -> LoyaltyTierRuleResponse.builder().tier(rule.getTier())
+                        .minTotalSpent(rule.getMinTotalSpent()).minTotalVisits(rule.getMinTotalVisits())
+                        .minTotalPoints(rule.getMinTotalPoints()).bookingWindowDays(rule.getBookingWindowDays())
+                        .maxUpcomingBookings(rule.getMaxUpcomingBookings()).pointMultiplier(rule.getPointMultiplier())
+                        .priorityLevel(rule.getPriorityLevel()).build())
+                .toList();
+    }
+
+    @Override
+    public void reviewCustomerTier(Long customerId) {
+
+        CustomerLoyalty loyalty = getOrCreateCustomerLoyalty(customerId);
+
+        List<LoyaltyTierRule> rules = loyaltyTierRuleRepository.findByIsActiveTrueOrderByPriorityLevelDesc();
+
+        for (LoyaltyTierRule rule : rules) {
+
+            boolean eligible = loyalty.getTotalSpent().compareTo(rule.getMinTotalSpent()) >= 0
+                    && loyalty.getTotalVisits() >= rule.getMinTotalVisits()
+                    && loyalty.getTotalPoints() >= rule.getMinTotalPoints();
+
+            if (eligible) {
+
+                loyalty.setCurrentTier(rule.getTier());
+
+                customerLoyaltyRepository.save(loyalty);
+
+                return;
+            }
+        }
+
+        loyalty.setCurrentTier("BRONZE");
+
+        customerLoyaltyRepository.save(loyalty);
+    }
+
+    @Override
+    public void updateBookingStatistics(Long bookingId) {
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        if (!"COMPLETED".equals(booking.getStatus())) {
+            return;
+        }
+
+        if (!"PAID".equals(booking.getPaymentStatus())) {
+            return;
+        }
+
+            // Guest booking — skip
+    if (booking.getCustomerId() == null) {
+        return;
+    }
+
+        if (Boolean.TRUE.equals(booking.getRewardProcessed())) {
+            return;
+        }
+
+        CustomerLoyalty loyalty = getOrCreateCustomerLoyalty(booking.getCustomerId());
+
+        loyalty.setTotalSpent(
+                loyalty.getTotalSpent().add(booking.getFinalPrice()));
+
+        loyalty.setTotalVisits(
+                loyalty.getTotalVisits() + 1);
+
+        loyalty.setLastVisitAt(LocalDateTime.now());
+
+        customerLoyaltyRepository.save(loyalty);
+
+        reviewCustomerTier(booking.getCustomerId());
+
+        booking.setRewardProcessed(true);
+
+        bookingRepository.save(booking);
+
+    }
+
+    @Override
+    public List<LoyaltyTierRuleResponse> getAdminTierRules() {
+        return getTierRules();
+    }
+
+    @Override
+    public LoyaltyTierRuleResponse createTierRule(
+            CreateLoyaltyTierRuleRequest request) {
+
+        if (loyaltyTierRuleRepository.findByTier(request.getTier()).isPresent()) {
+            throw new RuntimeException("Tier already exists");
+        }
+
+        LoyaltyTierRule rule = new LoyaltyTierRule();
+
+        rule.setTier(request.getTier().toUpperCase());
+
+        rule.setMinTotalSpent(request.getMinTotalSpent());
+
+        rule.setMinTotalVisits(request.getMinTotalVisits());
+
+        rule.setMinTotalPoints(request.getMinTotalPoints());
+
+        rule.setBookingWindowDays(request.getBookingWindowDays());
+
+        rule.setMaxUpcomingBookings(request.getMaxUpcomingBookings());
+
+        rule.setPointMultiplier(request.getPointMultiplier());
+
+        rule.setPriorityLevel(request.getPriorityLevel());
+
+        rule.setIsActive(true);
+
+        loyaltyTierRuleRepository.save(rule);
+
+        return LoyaltyTierRuleResponse.builder()
+                .tier(rule.getTier())
+                .minTotalSpent(rule.getMinTotalSpent())
+                .minTotalVisits(rule.getMinTotalVisits())
+                .minTotalPoints(rule.getMinTotalPoints())
+                .bookingWindowDays(rule.getBookingWindowDays())
+                .maxUpcomingBookings(rule.getMaxUpcomingBookings())
+                .pointMultiplier(rule.getPointMultiplier())
+                .priorityLevel(rule.getPriorityLevel())
+                .build();
+    }
+
+    @Override
+    public LoyaltyTierRuleResponse updateTierRule(
+            Long id,
+            UpdateLoyaltyTierRuleRequest request) {
+
+        LoyaltyTierRule rule = loyaltyTierRuleRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Tier rule not found"));
+
+        rule.setMinTotalSpent(request.getMinTotalSpent());
+        rule.setMinTotalVisits(request.getMinTotalVisits());
+        rule.setMinTotalPoints(request.getMinTotalPoints());
+
+        rule.setBookingWindowDays(request.getBookingWindowDays());
+
+        rule.setMaxUpcomingBookings(request.getMaxUpcomingBookings());
+
+        rule.setPointMultiplier(request.getPointMultiplier());
+
+        rule.setPriorityLevel(request.getPriorityLevel());
+
+        if (request.getIsActive() != null) {
+            rule.setIsActive(request.getIsActive());
+        }
+
+        loyaltyTierRuleRepository.save(rule);
+
+        return LoyaltyTierRuleResponse.builder()
+                .tier(rule.getTier())
+                .minTotalSpent(rule.getMinTotalSpent())
+                .minTotalVisits(rule.getMinTotalVisits())
+                .minTotalPoints(rule.getMinTotalPoints())
+                .bookingWindowDays(rule.getBookingWindowDays())
+                .maxUpcomingBookings(rule.getMaxUpcomingBookings())
+                .pointMultiplier(rule.getPointMultiplier())
+                .priorityLevel(rule.getPriorityLevel())
+                .build();
+    }
+    
+    // ===================== ISSUE #23 =====================
+
+@Override
+@Transactional
+public void earnPointsAfterPaidBooking(Long bookingId) {
+
+    // Idempotent check
+    if (pointTransactionRepository.findByBookingIdAndType(bookingId, "EARN").isPresent()) {
+        return;
+    }
+
+    Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
+
+    if (!"COMPLETED".equals(booking.getStatus()) || !"PAID".equals(booking.getPaymentStatus())) {
+        return;
+    }
+
+    if (booking.getCustomerId() == null) {
+        return;
+    }
+
+    CustomerLoyalty loyalty = getOrCreateCustomerLoyalty(booking.getCustomerId());
+
+    // Lấy tier rule hiện tại
+    LoyaltyTierRule tierRule = loyaltyTierRuleRepository
+            .findByTierAndIsActiveTrue(loyalty.getCurrentTier())
+            .orElse(null);
+
+    double multiplier = tierRule != null ? tierRule.getPointMultiplier().doubleValue() : 1.0;
+
+    // Lấy points_earned từ service package
+    com.autowashpro.entity.ServicePackage pkg = servicePackageRepository
+            .findById(booking.getServicePackageId())
+            .orElseThrow(() -> new RuntimeException("Service package not found"));
+
+    // Tính điểm: floor(points_earned × multiplier × final_price / original_price)
+    double ratio = booking.getFinalPrice().doubleValue() / booking.getOriginalPrice().doubleValue();
+    int earnedPoints = (int) Math.floor(pkg.getPointsEarned() * multiplier * ratio);
+
+    if (earnedPoints <= 0) {
+        return;
+    }
+
+    // Cộng điểm
+    loyalty.setTotalPoints(loyalty.getTotalPoints() + earnedPoints);
+    loyalty.setAvailablePoints(loyalty.getAvailablePoints() + earnedPoints);
+    customerLoyaltyRepository.save(loyalty);
+
+    // Tạo EARN transaction
+    PointTransaction pt = new PointTransaction();
+    pt.setCustomerId(booking.getCustomerId());
+    pt.setBookingId(bookingId);
+    pt.setType("EARN");
+    pt.setPoints(earnedPoints);
+    pt.setRemainingPoints(earnedPoints);
+    pt.setExpiredAt(LocalDateTime.now().plusMonths(12));
+    pt.setSource("BOOKING_EARN");
+    pt.setNote("Earned " + earnedPoints + " points from booking #" + bookingId);
+    pointTransactionRepository.save(pt);
+
+    // Review tier
+    reviewCustomerTier(booking.getCustomerId());
+}
+
+@Override
+@Transactional
+public void refundPointsForCanceledBooking(Long bookingId) {
+
+    // Idempotent check
+    if (pointTransactionRepository.findByBookingIdAndType(bookingId, "REFUND").isPresent()) {
+        return;
+    }
+
+    Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
+
+    if (booking.getCustomerId() == null || booking.getUsedPoints() == null || booking.getUsedPoints() <= 0) {
+        return;
+    }
+
+    // Chỉ hoàn điểm khi hủy trước CHECKED_IN
+    if ("NO_SHOW".equals(booking.getStatus())) {
+        return;
+    }
+
+    CustomerLoyalty loyalty = getOrCreateCustomerLoyalty(booking.getCustomerId());
+
+    int refundPoints = booking.getUsedPoints();
+    loyalty.setAvailablePoints(loyalty.getAvailablePoints() + refundPoints);
+    loyalty.setRedeemedPoints(Math.max(0, loyalty.getRedeemedPoints() - refundPoints));
+    customerLoyaltyRepository.save(loyalty);
+
+    // Tạo REFUND transaction
+    PointTransaction pt = new PointTransaction();
+    pt.setCustomerId(booking.getCustomerId());
+    pt.setBookingId(bookingId);
+    pt.setType("REFUND");
+    pt.setPoints(refundPoints);
+    pt.setRemainingPoints(refundPoints);
+    pt.setExpiredAt(LocalDateTime.now().plusMonths(12));
+    pt.setSource("BOOKING_REFUND");
+    pt.setNote("Refunded " + refundPoints + " points from canceled booking #" + bookingId);
+    pointTransactionRepository.save(pt);
+}
+
+@Override
+@Transactional
+public void adjustPoints(Long customerId, Integer points, String type, String reason) {
+
+    CustomerLoyalty loyalty = getOrCreateCustomerLoyalty(customerId);
+
+    if (points > 0) {
+        loyalty.setTotalPoints(loyalty.getTotalPoints() + points);
+        loyalty.setAvailablePoints(loyalty.getAvailablePoints() + points);
+    } else {
+        int deduct = Math.abs(points);
+        if (loyalty.getAvailablePoints() < deduct) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "Insufficient points");
+        }
+        loyalty.setAvailablePoints(loyalty.getAvailablePoints() - deduct);
+    }
+
+    customerLoyaltyRepository.save(loyalty);
+
+    PointTransaction pt = new PointTransaction();
+    pt.setCustomerId(customerId);
+    pt.setType(type);
+    pt.setPoints(points);
+    pt.setRemainingPoints(Math.max(0, points));
+    pt.setSource("ADMIN_ADJUST");
+    pt.setNote(reason);
+    pointTransactionRepository.save(pt);
+}
+
+@Override
+public Page<PointTransactionResponse> getMyTransactions(Long customerId, int page, int limit, String type) {
+
+    PageRequest pageable = PageRequest.of(page - 1, limit);
+
+    Page<PointTransaction> transactions;
+
+    if (type != null && !type.isBlank()) {
+        transactions = pointTransactionRepository
+                .findByCustomerIdAndTypeOrderByCreatedAtDesc(customerId, type, pageable);
+    } else {
+        transactions = pointTransactionRepository
+                .findByCustomerIdOrderByCreatedAtDesc(customerId, pageable);
+    }
+
+    return transactions.map(t -> PointTransactionResponse.builder()
+            .id(t.getId())
+            .customerId(t.getCustomerId())
+            .bookingId(t.getBookingId())
+            .type(t.getType())
+            .points(t.getPoints())
+            .remainingPoints(t.getRemainingPoints())
+            .expiredAt(t.getExpiredAt())
+            .source(t.getSource())
+            .note(t.getNote())
+            .createdAt(t.getCreatedAt())
+            .build());
+}
+
+@Override
+public RedeemPreviewResponse redeemPreview(Long customerId, RedeemPreviewRequest request) {
+
+    CustomerLoyalty loyalty = getOrCreateCustomerLoyalty(customerId);
+
+    com.autowashpro.entity.ServicePackage pkg = servicePackageRepository
+            .findById(request.getServicePackageId())
+            .orElseThrow(() -> new RuntimeException("Service package not found"));
+
+    int availablePoints = loyalty.getAvailablePoints();
+    int requestedPoints = request.getPoints();
+
+    // Chỉ đổi theo bước 10
+    int validPoints = Math.min(requestedPoints, availablePoints);
+    validPoints = (validPoints / 10) * 10;
+    validPoints = Math.max(0, validPoints);
+
+    // 1 điểm = 1,000đ
+    BigDecimal discountAmount = BigDecimal.valueOf(validPoints * 1000L);
+
+    // Không được giảm quá original price
+    BigDecimal originalPrice = pkg.getBasePrice();
+    if (discountAmount.compareTo(originalPrice) > 0) {
+        discountAmount = originalPrice;
+        validPoints = originalPrice.divide(BigDecimal.valueOf(1000), RoundingMode.DOWN).intValue();
+        validPoints = (validPoints / 10) * 10;
+        discountAmount = BigDecimal.valueOf(validPoints * 1000L);
+    }
+
+    BigDecimal estimatedFinalPrice = originalPrice.subtract(discountAmount);
+
+    return RedeemPreviewResponse.builder()
+            .requestedPoints(requestedPoints)
+            .validPoints(validPoints)
+            .discountAmount(discountAmount)
+            .originalPrice(originalPrice)
+            .estimatedFinalPrice(estimatedFinalPrice)
+            .build();
+}
+
+}

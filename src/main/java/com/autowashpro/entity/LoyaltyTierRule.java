@@ -31,9 +31,15 @@ public class LoyaltyTierRule {
     @Column(name = "max_upcoming_bookings", nullable = false)
     private Integer maxUpcomingBookings;
 
-    @Column(name = "earn_rate", nullable = false)
-    private BigDecimal earnRate;
+    @Column(name = "point_multiplier", nullable = false)
+    private BigDecimal pointMultiplier;
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
+
+    @Column(name = "priority_level", nullable = false)
+    private Integer priorityLevel;
+
+    @Column(name = "min_total_points", nullable = false)
+    private Integer minTotalPoints;
 }
