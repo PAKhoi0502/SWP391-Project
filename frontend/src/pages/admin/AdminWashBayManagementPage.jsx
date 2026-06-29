@@ -83,9 +83,9 @@ export default function AdminWashBayManagementPage() {
 
   const isEditing = Boolean(editingId);
 
-const totalAvailable = useMemo(() => {
-  return washBays.filter((bay) => bay.status === "AVAILABLE").length;
-}, [washBays]);
+  const totalAvailable = useMemo(() => {
+    return washBays.filter((bay) => bay.status === "AVAILABLE").length;
+  }, [washBays]);
 
   const totalMaintenance = useMemo(() => {
     return washBays.filter((bay) => bay.status === "MAINTENANCE").length;
@@ -95,8 +95,8 @@ const totalAvailable = useMemo(() => {
     return washBays.filter((bay) => bay.status === "INACTIVE").length;
   }, [washBays]);
   const totalInUse = useMemo(() => {
-  return washBays.filter((bay) => bay.status === "IN_USE").length;
-}, [washBays]);
+    return washBays.filter((bay) => bay.status === "IN_USE").length;
+  }, [washBays]);
 
   async function loadWashBays() {
     try {
@@ -352,9 +352,9 @@ const totalAvailable = useMemo(() => {
             <strong>{totalMaintenance}</strong>
           </div>
           <div className="wash-bay-stat-card in-use">
-  <span>In Use</span>
-  <strong>{totalInUse}</strong>
-</div>
+            <span>In Use</span>
+            <strong>{totalInUse}</strong>
+          </div>
           <div className="wash-bay-stat-card inactive">
             <span>Inactive</span>
             <strong>{totalInactive}</strong>
@@ -427,15 +427,15 @@ const totalAvailable = useMemo(() => {
               <label>
                 Trạng thái
                 <select
-  name="status"
-  value={form.status}
-  onChange={handleChangeForm}
->
-  <option value="AVAILABLE">Sẵn sàng</option>
-  <option value="IN_USE">Đang sử dụng</option>
-  <option value="MAINTENANCE">Bảo trì</option>
-  <option value="INACTIVE">Tạm ngưng</option>
-</select>
+                  name="status"
+                  value={form.status}
+                  onChange={handleChangeForm}
+                >
+                  <option value="AVAILABLE">Sẵn sàng</option>
+                  <option value="IN_USE">Đang sử dụng</option>
+                  <option value="MAINTENANCE">Bảo trì</option>
+                  <option value="INACTIVE">Tạm ngưng</option>
+                </select>
               </label>
             </div>
 
@@ -472,8 +472,8 @@ const totalAvailable = useMemo(() => {
                 {saving
                   ? "Đang lưu..."
                   : isEditing
-                  ? "Lưu cập nhật"
-                  : "Tạo wash bay"}
+                    ? "Lưu cập nhật"
+                    : "Tạo wash bay"}
               </button>
 
               {isEditing && (
@@ -669,9 +669,8 @@ const totalAvailable = useMemo(() => {
                     <td>1 bay</td>
                     <td>
                       <span
-                        className={`wash-bay-status ${
-                          bay.status || "UNKNOWN"
-                        }`}
+                        className={`wash-bay-status ${bay.status || "UNKNOWN"
+                          }`}
                       >
                         {bay.status || "UNKNOWN"}
                       </span>
@@ -683,16 +682,16 @@ const totalAvailable = useMemo(() => {
                         </button>
 
                         <select
-  value={bay.status || "AVAILABLE"}
-  onChange={(e) =>
-    handleChangeStatus(bay, e.target.value)
-  }
->
-  <option value="AVAILABLE">Available</option>
-  <option value="IN_USE">In Use</option>
-  <option value="MAINTENANCE">Maintenance</option>
-  <option value="INACTIVE">Inactive</option>
-</select>
+                          value={bay.status || "AVAILABLE"}
+                          onChange={(e) =>
+                            handleChangeStatus(bay, e.target.value)
+                          }
+                        >
+                          <option value="AVAILABLE">Available</option>
+                          <option value="IN_USE">In Use</option>
+                          <option value="MAINTENANCE">Maintenance</option>
+                          <option value="INACTIVE">Inactive</option>
+                        </select>
                       </div>
                     </td>
                   </tr>

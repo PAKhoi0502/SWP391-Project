@@ -58,10 +58,10 @@ const getVehicleType = (vehicle) => {
 const getPackagePrice = (servicePackage) => {
   return Number(
     servicePackage?.price ??
-      servicePackage?.basePrice ??
-      servicePackage?.totalPrice ??
-      servicePackage?.amount ??
-      0,
+    servicePackage?.basePrice ??
+    servicePackage?.totalPrice ??
+    servicePackage?.amount ??
+    0,
   )
 }
 
@@ -70,10 +70,10 @@ const getDiscountAmount = (result) => {
 
   return Number(
     payload?.discountAmount ??
-      payload?.discount ??
-      payload?.amount ??
-      payload?.data?.discountAmount ??
-      0,
+    payload?.discount ??
+    payload?.amount ??
+    payload?.data?.discountAmount ??
+    0,
   )
 }
 
@@ -187,19 +187,19 @@ export const customerBookingFlowApi = {
   },
 
   async createBooking(payload) {
-  const response = await api.post('/bookings', payload)
-  return unwrap(response)
-},
+    const response = await api.post('/bookings', payload)
+    return unwrap(response)
+  },
 
-async getCustomerBookings() {
-  const response = await api.get('/bookings')
-  return toArray(response)
-},
+  async getCustomerBookings() {
+    const response = await api.get('/bookings')
+    return toArray(response)
+  },
 
-async cancelBooking(bookingId) {
-  const response = await api.patch(`/bookings/${bookingId}/cancel`)
-  return unwrap(response)
-},
+  async cancelBooking(bookingId) {
+    const response = await api.patch(`/bookings/${bookingId}/cancel`)
+    return unwrap(response)
+  },
 }
 
 export const bookingFlowUtils = {

@@ -32,8 +32,8 @@ import AvailableSlotsPickerPage from '../pages/booking/AvailableSlotsPickerPage'
 import CustomerWaitlistPage from '../pages/booking/CustomerWaitlistPage'
 import CustomerCreateBookingPage from '../pages/booking/CustomerCreateBookingPage'
 import WaitlistPage from '../pages/booking/WaitlistPage'
-import BookingHistoryPage from '../pages/booking/BookingHistoryPage'
 import StaffWaitlistPage from '../pages/booking/StaffWaitlistPage'
+import BookingHistoryPage from '../pages/booking/BookingHistoryPage'
 
 
 function AppRoutes() {
@@ -76,6 +76,7 @@ function AppRoutes() {
           <Route path="staff/waitlist" element={<StaffWaitlistPage />} />
           <Route path="staff/inspections" element={<DashboardPlaceholderPage title="Kiem tra xe" />} />
           <Route path="staff/profile" element={<StaffProfilePage />} />
+          <Route path="staff/waitlist" element={<StaffWaitlistPage />} />
         </Route>
       </Route>
 
