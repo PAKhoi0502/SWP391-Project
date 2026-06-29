@@ -1,5 +1,8 @@
 package com.autowashpro.service.impl;
 
+
+
+import com.autowashpro.service.WashHistoryService;
 import com.autowashpro.dto.request.CreatePayOSPaymentRequest;
 import com.autowashpro.dto.response.CreatePayOSPaymentResponse;
 import com.autowashpro.dto.response.PaymentTransactionResponse;
@@ -40,6 +43,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final LoyaltyService loyaltyService;  // thay CustomerLoyaltyRepository
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate;
+    private final WashHistoryService washHistoryService;
 
     @Value("${payos.return-url}")
     private String returnUrl;
@@ -189,6 +193,7 @@ public class PaymentServiceImpl implements PaymentService {
                     // rewardProcessed check đã có trong earnPointsAfterPaidBooking (idempotent)
                     loyaltyService.updateBookingStatistics(booking.getId());
                     loyaltyService.earnPointsAfterPaidBooking(booking.getId());
+                    washHistoryService.createWashHistoryAfterPaidBooking(booking.getId());
                 }
 
             } else {
