@@ -15,6 +15,8 @@ import com.autowashpro.entity.*;
 import com.autowashpro.entity.enums.WashBayStatus;
 import com.autowashpro.repository.*;
 import com.autowashpro.service.BookingService;
+import com.autowashpro.service.LoyaltyService;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -50,6 +52,7 @@ public class BookingServiceImpl implements BookingService {
         private final UserRepository userRepository;
         private final BookingServiceStepRepository bookingServiceStepRepository;
         private final ServicePackageStepRepository servicePackageStepRepository;
+        private final LoyaltyService loyaltyService;
 
         // ===================== ISSUE #10 =====================
 
@@ -413,8 +416,11 @@ public class BookingServiceImpl implements BookingService {
                 booking.setUsedPoints(usedPoints);
                 booking.setNote(request.getNote());
 
-                Booking saved = bookingRepository.save(booking);
-                return toResponse(saved);
+                bookingRepository.save(booking);
+
+                loyaltyService.updateBookingStatistics(booking.getId());
+
+                return toResponse(booking);
         }
 
         // ===================== ISSUE #12 =====================
@@ -1282,7 +1288,7 @@ public class BookingServiceImpl implements BookingService {
 
                 booking.setPaidAt(LocalDateTime.now());
 
-                booking.setRewardProcessed(true);
+                
 
                 if (request.getNote() != null
                                 && !request.getNote().isBlank()) {
@@ -1291,7 +1297,7 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 Booking saved = bookingRepository.save(booking);
-
+                loyaltyService.updateBookingStatistics(saved.getId());
                 return toResponse(saved);
         }
         // ===================== HELPER =====================
