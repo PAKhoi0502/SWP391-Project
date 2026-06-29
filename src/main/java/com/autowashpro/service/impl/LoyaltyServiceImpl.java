@@ -7,6 +7,8 @@ import com.autowashpro.entity.LoyaltyTierRule;
 import com.autowashpro.repository.BookingRepository;
 import com.autowashpro.repository.CustomerLoyaltyRepository;
 import com.autowashpro.repository.LoyaltyTierRuleRepository;
+import com.autowashpro.repository.PointTransactionRepository;
+import com.autowashpro.repository.ServicePackageRepository;
 import com.autowashpro.service.LoyaltyService;
 import lombok.RequiredArgsConstructor;
 import java.math.BigDecimal;
@@ -16,6 +18,14 @@ import com.autowashpro.entity.Booking;
 import java.time.LocalDateTime;
 import com.autowashpro.dto.request.CreateLoyaltyTierRuleRequest;
 import com.autowashpro.dto.request.UpdateLoyaltyTierRuleRequest;
+import com.autowashpro.dto.request.RedeemPreviewRequest;
+import com.autowashpro.dto.response.PointTransactionResponse;
+import com.autowashpro.dto.response.RedeemPreviewResponse;
+import com.autowashpro.entity.PointTransaction;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.annotation.Transactional;
+import java.math.RoundingMode;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +33,8 @@ public class LoyaltyServiceImpl implements LoyaltyService {
     private final CustomerLoyaltyRepository customerLoyaltyRepository;
     private final LoyaltyTierRuleRepository loyaltyTierRuleRepository;
     private final BookingRepository bookingRepository;
+    private final PointTransactionRepository pointTransactionRepository;
+    private final ServicePackageRepository servicePackageRepository;
 
     @Override
     public CustomerLoyalty getOrCreateCustomerLoyalty(Long customerId) {
@@ -212,4 +224,211 @@ public class LoyaltyServiceImpl implements LoyaltyService {
                 .priorityLevel(rule.getPriorityLevel())
                 .build();
     }
+    
+    // ===================== ISSUE #23 =====================
+
+@Override
+@Transactional
+public void earnPointsAfterPaidBooking(Long bookingId) {
+
+    // Idempotent check
+    if (pointTransactionRepository.findByBookingIdAndType(bookingId, "EARN").isPresent()) {
+        return;
+    }
+
+    Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
+
+    if (!"COMPLETED".equals(booking.getStatus()) || !"PAID".equals(booking.getPaymentStatus())) {
+        return;
+    }
+
+    if (booking.getCustomerId() == null) {
+        return;
+    }
+
+    CustomerLoyalty loyalty = getOrCreateCustomerLoyalty(booking.getCustomerId());
+
+    // Lấy tier rule hiện tại
+    LoyaltyTierRule tierRule = loyaltyTierRuleRepository
+            .findByTierAndIsActiveTrue(loyalty.getCurrentTier())
+            .orElse(null);
+
+    double multiplier = tierRule != null ? tierRule.getPointMultiplier().doubleValue() : 1.0;
+
+    // Lấy points_earned từ service package
+    com.autowashpro.entity.ServicePackage pkg = servicePackageRepository
+            .findById(booking.getServicePackageId())
+            .orElseThrow(() -> new RuntimeException("Service package not found"));
+
+    // Tính điểm: floor(points_earned × multiplier × final_price / original_price)
+    double ratio = booking.getFinalPrice().doubleValue() / booking.getOriginalPrice().doubleValue();
+    int earnedPoints = (int) Math.floor(pkg.getPointsEarned() * multiplier * ratio);
+
+    if (earnedPoints <= 0) {
+        return;
+    }
+
+    // Cộng điểm
+    loyalty.setTotalPoints(loyalty.getTotalPoints() + earnedPoints);
+    loyalty.setAvailablePoints(loyalty.getAvailablePoints() + earnedPoints);
+    customerLoyaltyRepository.save(loyalty);
+
+    // Tạo EARN transaction
+    PointTransaction pt = new PointTransaction();
+    pt.setCustomerId(booking.getCustomerId());
+    pt.setBookingId(bookingId);
+    pt.setType("EARN");
+    pt.setPoints(earnedPoints);
+    pt.setRemainingPoints(earnedPoints);
+    pt.setExpiredAt(LocalDateTime.now().plusMonths(12));
+    pt.setSource("BOOKING_EARN");
+    pt.setNote("Earned " + earnedPoints + " points from booking #" + bookingId);
+    pointTransactionRepository.save(pt);
+
+    // Review tier
+    reviewCustomerTier(booking.getCustomerId());
+}
+
+@Override
+@Transactional
+public void refundPointsForCanceledBooking(Long bookingId) {
+
+    // Idempotent check
+    if (pointTransactionRepository.findByBookingIdAndType(bookingId, "REFUND").isPresent()) {
+        return;
+    }
+
+    Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
+
+    if (booking.getCustomerId() == null || booking.getUsedPoints() == null || booking.getUsedPoints() <= 0) {
+        return;
+    }
+
+    // Chỉ hoàn điểm khi hủy trước CHECKED_IN
+    if ("NO_SHOW".equals(booking.getStatus())) {
+        return;
+    }
+
+    CustomerLoyalty loyalty = getOrCreateCustomerLoyalty(booking.getCustomerId());
+
+    int refundPoints = booking.getUsedPoints();
+    loyalty.setAvailablePoints(loyalty.getAvailablePoints() + refundPoints);
+    loyalty.setRedeemedPoints(Math.max(0, loyalty.getRedeemedPoints() - refundPoints));
+    customerLoyaltyRepository.save(loyalty);
+
+    // Tạo REFUND transaction
+    PointTransaction pt = new PointTransaction();
+    pt.setCustomerId(booking.getCustomerId());
+    pt.setBookingId(bookingId);
+    pt.setType("REFUND");
+    pt.setPoints(refundPoints);
+    pt.setRemainingPoints(refundPoints);
+    pt.setExpiredAt(LocalDateTime.now().plusMonths(12));
+    pt.setSource("BOOKING_REFUND");
+    pt.setNote("Refunded " + refundPoints + " points from canceled booking #" + bookingId);
+    pointTransactionRepository.save(pt);
+}
+
+@Override
+@Transactional
+public void adjustPoints(Long customerId, Integer points, String type, String reason) {
+
+    CustomerLoyalty loyalty = getOrCreateCustomerLoyalty(customerId);
+
+    if (points > 0) {
+        loyalty.setTotalPoints(loyalty.getTotalPoints() + points);
+        loyalty.setAvailablePoints(loyalty.getAvailablePoints() + points);
+    } else {
+        int deduct = Math.abs(points);
+        if (loyalty.getAvailablePoints() < deduct) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "Insufficient points");
+        }
+        loyalty.setAvailablePoints(loyalty.getAvailablePoints() - deduct);
+    }
+
+    customerLoyaltyRepository.save(loyalty);
+
+    PointTransaction pt = new PointTransaction();
+    pt.setCustomerId(customerId);
+    pt.setType(type);
+    pt.setPoints(points);
+    pt.setRemainingPoints(Math.max(0, points));
+    pt.setSource("ADMIN_ADJUST");
+    pt.setNote(reason);
+    pointTransactionRepository.save(pt);
+}
+
+@Override
+public Page<PointTransactionResponse> getMyTransactions(Long customerId, int page, int limit, String type) {
+
+    PageRequest pageable = PageRequest.of(page - 1, limit);
+
+    Page<PointTransaction> transactions;
+
+    if (type != null && !type.isBlank()) {
+        transactions = pointTransactionRepository
+                .findByCustomerIdAndTypeOrderByCreatedAtDesc(customerId, type, pageable);
+    } else {
+        transactions = pointTransactionRepository
+                .findByCustomerIdOrderByCreatedAtDesc(customerId, pageable);
+    }
+
+    return transactions.map(t -> PointTransactionResponse.builder()
+            .id(t.getId())
+            .customerId(t.getCustomerId())
+            .bookingId(t.getBookingId())
+            .type(t.getType())
+            .points(t.getPoints())
+            .remainingPoints(t.getRemainingPoints())
+            .expiredAt(t.getExpiredAt())
+            .source(t.getSource())
+            .note(t.getNote())
+            .createdAt(t.getCreatedAt())
+            .build());
+}
+
+@Override
+public RedeemPreviewResponse redeemPreview(Long customerId, RedeemPreviewRequest request) {
+
+    CustomerLoyalty loyalty = getOrCreateCustomerLoyalty(customerId);
+
+    com.autowashpro.entity.ServicePackage pkg = servicePackageRepository
+            .findById(request.getServicePackageId())
+            .orElseThrow(() -> new RuntimeException("Service package not found"));
+
+    int availablePoints = loyalty.getAvailablePoints();
+    int requestedPoints = request.getPoints();
+
+    // Chỉ đổi theo bước 10
+    int validPoints = Math.min(requestedPoints, availablePoints);
+    validPoints = (validPoints / 10) * 10;
+    validPoints = Math.max(0, validPoints);
+
+    // 1 điểm = 1,000đ
+    BigDecimal discountAmount = BigDecimal.valueOf(validPoints * 1000L);
+
+    // Không được giảm quá original price
+    BigDecimal originalPrice = pkg.getBasePrice();
+    if (discountAmount.compareTo(originalPrice) > 0) {
+        discountAmount = originalPrice;
+        validPoints = originalPrice.divide(BigDecimal.valueOf(1000), RoundingMode.DOWN).intValue();
+        validPoints = (validPoints / 10) * 10;
+        discountAmount = BigDecimal.valueOf(validPoints * 1000L);
+    }
+
+    BigDecimal estimatedFinalPrice = originalPrice.subtract(discountAmount);
+
+    return RedeemPreviewResponse.builder()
+            .requestedPoints(requestedPoints)
+            .validPoints(validPoints)
+            .discountAmount(discountAmount)
+            .originalPrice(originalPrice)
+            .estimatedFinalPrice(estimatedFinalPrice)
+            .build();
+}
+
 }

@@ -23,9 +23,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.autowashpro.dto.response.BookingSummaryResponse;
-import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
-import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
-import com.autowashpro.dto.response.BookingServiceStepResponse;
 import java.util.Objects;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -937,6 +934,8 @@ public class BookingServiceImpl implements BookingService {
                 booking.setRewardProcessed(false);
 
                 Booking saved = bookingRepository.save(booking);
+                // Hoàn điểm nếu có
+                loyaltyService.refundPointsForCanceledBooking(saved.getId());
                 return toResponse(saved);
         }
 
@@ -1298,6 +1297,7 @@ public class BookingServiceImpl implements BookingService {
 
                 Booking saved = bookingRepository.save(booking);
                 loyaltyService.updateBookingStatistics(saved.getId());
+                loyaltyService.earnPointsAfterPaidBooking(saved.getId());
                 return toResponse(saved);
         }
         // ===================== HELPER =====================
