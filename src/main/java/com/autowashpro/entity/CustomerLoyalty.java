@@ -3,7 +3,8 @@ package com.autowashpro.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -32,6 +33,9 @@ public class CustomerLoyalty {
     @Column(name = "redeemed_points", nullable = false)
     private Integer redeemedPoints = 0;
 
+    @Column(name = "expired_points", nullable = false)
+    private Integer expiredPoints = 0;
+
     @Column(name = "total_spent", nullable = false)
     private BigDecimal totalSpent = BigDecimal.ZERO;
 
@@ -47,12 +51,26 @@ public class CustomerLoyalty {
     @Column(name = "tier_valid_until")
     private LocalDateTime tierValidUntil;
 
-    @Column(name = "last_review_at")
-    private LocalDateTime lastReviewAt;
+    @Column(name = "last_tier_review_at")
+    private LocalDateTime lastTierReviewAt;
 
+    @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "last_visit_at")
+    private LocalDateTime lastVisitAt;
+
+    @Column(name = "last_point_expiry_check_at")
+    private LocalDateTime lastPointExpiryCheckAt;
+
+    @Column(name = "last_tier_downgrade_at")
+    private LocalDateTime lastTierDowngradeAt;
+
+    @Column(name = "tier_recovery_started_at")
+    private LocalDateTime tierRecoveryStartedAt;
 }
