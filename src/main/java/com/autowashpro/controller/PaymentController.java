@@ -24,19 +24,19 @@ public class PaymentController {
 
     private final PaymentService paymentService;
 
-    @PostMapping("/payos/create")
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
-    public ApiResponse<CreatePayOSPaymentResponse> createPayOSPayment(
-            @Valid @RequestBody CreatePayOSPaymentRequest request,
-            @AuthenticationPrincipal UserDetails userDetails) {
+  @PostMapping("/payos/create")
+@PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+public ApiResponse<CreatePayOSPaymentResponse> createPayOSPayment(
+        @Valid @RequestBody CreatePayOSPaymentRequest request,
+        @AuthenticationPrincipal UserDetails userDetails) {
 
-        Long staffUserId = Long.valueOf(userDetails.getUsername());
-        return ApiResponse.<CreatePayOSPaymentResponse>builder()
-                .success(true)
-                .message("PayOS payment link created successfully")
-                .data(paymentService.createPayOSPayment(request, staffUserId))
-                .build();
-    }
+    Long staffUserId = Long.valueOf(userDetails.getUsername());
+    return ApiResponse.<CreatePayOSPaymentResponse>builder()
+            .success(true)
+            .message("PayOS payment link created successfully")
+            .data(paymentService.createPayOSPayment(request, staffUserId))
+            .build();
+}
 
 @PostMapping("/payos/webhook")
 public ApiResponse<Void> handleWebhook(@RequestBody Map<String, Object> webhookData) {

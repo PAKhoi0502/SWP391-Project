@@ -7,6 +7,7 @@ import {
   updateWashBay,
   updateWashBayStatus,
 } from "../../services/washBayApi";
+import { getGarages } from "../../api/GarageApi";
 import "./AdminWashBayManagementPage.css";
 
 const DEFAULT_FORM = {
@@ -22,7 +23,7 @@ const DEFAULT_FORM = {
 const VEHICLE_TYPES = [
   { value: "", label: "Tất cả loại xe" },
   { value: "CAR", label: "Ô tô" },
-  { value: "MOTORBIKE", label: "Xe máy" },
+  { value: "BIKE", label: "Xe máy" },
 ];
 
 const STATUS_OPTIONS = [
@@ -33,8 +34,35 @@ const STATUS_OPTIONS = [
   { value: "INACTIVE", label: "Tạm ngưng" },
 ];
 
+const WASH_BAY_NAMES_KEY = "washBayNamesById";
+
+function normalizeWashBayVehicleType(vehicleType) {
+  return vehicleType === "MOTORBIKE" ? "BIKE" : vehicleType;
+}
+
+function looksLikeBayCode(value) {
+  return /^BAY[\w-]*$/i.test(String(value || "").trim());
+}
+
+function readWashBayNames() {
+  try {
+    return JSON.parse(localStorage.getItem(WASH_BAY_NAMES_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function writeWashBayName(id, name) {
+  if (!id) return;
+  const names = readWashBayNames();
+  names[id] = name;
+  localStorage.setItem(WASH_BAY_NAMES_KEY, JSON.stringify(names));
+}
+
 export default function AdminWashBayManagementPage() {
   const [washBays, setWashBays] = useState([]);
+  const [garages, setGarages] = useState([]);
+  const [washBayNames, setWashBayNames] = useState(() => readWashBayNames());
   const [filters, setFilters] = useState({
     garageId: "",
     vehicleType: "",
@@ -93,8 +121,19 @@ const totalAvailable = useMemo(() => {
     }
   }
 
+  async function loadGarages() {
+    try {
+      const data = await getGarages({ page: 1, limit: 100 });
+      const list = Array.isArray(data) ? data : data?.content || data?.data || data?.data?.content || [];
+      setGarages(list);
+    } catch {
+      setGarages([]);
+    }
+  }
+
   useEffect(() => {
     loadWashBays();
+    loadGarages();
   }, []);
 
   async function handleApplyFilter() {
@@ -155,12 +194,14 @@ const totalAvailable = useMemo(() => {
 
   function handleEdit(bay) {
     setEditingId(bay.washBayId || bay.id);
+    const rawBayCode = bay.bayCode || bay.code || "";
+    const savedName = bay.name || bay.bayName || washBayNames[bay.washBayId || bay.id] || "";
 
     setForm({
       garageId: bay.garageId || bay.garage?.garageId || "",
-      name: bay.name || bay.bayName || "",
-      bayCode: bay.bayCode || bay.code || "",
-      vehicleType: bay.vehicleType || "CAR",
+      name: savedName || (looksLikeBayCode(rawBayCode) ? "" : rawBayCode),
+      bayCode: looksLikeBayCode(rawBayCode) ? rawBayCode : "",
+      vehicleType: normalizeWashBayVehicleType(bay.vehicleType || "CAR"),
       status: bay.status || "AVAILABLE",
       capacity: bay.capacity || 1,
       description: bay.description || "",
@@ -204,19 +245,23 @@ const totalAvailable = useMemo(() => {
 
       const payload = {
         garageId: Number(form.garageId),
-        name: form.name.trim(),
+        name: form.bayCode.trim(),
         bayCode: form.bayCode.trim(),
-        vehicleType: form.vehicleType,
+        vehicleType: normalizeWashBayVehicleType(form.vehicleType),
         status: form.status,
-        capacity: Number(form.capacity),
         description: form.description.trim(),
       };
 
       if (isEditing) {
         await updateWashBay(editingId, payload);
+        writeWashBayName(editingId, form.name.trim());
+        setWashBayNames(readWashBayNames());
         setSuccess("Cập nhật wash bay thành công");
       } else {
-        await createWashBay(payload);
+        const created = await createWashBay(payload);
+        const createdId = created?.id || created?.washBayId || created?.data?.id || created?.data?.washBayId;
+        writeWashBayName(createdId, form.name.trim());
+        setWashBayNames(readWashBayNames());
         setSuccess("Tạo wash bay thành công");
       }
 
@@ -249,13 +294,38 @@ const totalAvailable = useMemo(() => {
     return bay.washBayId || bay.id;
   }
 
+  function getBayName(bay) {
+    const id = getBayId(bay);
+    const rawBayCode = bay.bayCode || bay.code || "";
+    return bay.name || bay.bayName || washBayNames[id] || (looksLikeBayCode(rawBayCode) ? "-" : rawBayCode);
+  }
+
+  function getBayCode(bay) {
+    const rawBayCode = bay.bayCode || bay.code || "";
+    return looksLikeBayCode(rawBayCode) ? rawBayCode : "-";
+  }
+
   function getGarageName(bay) {
-    return bay.garageName || bay.garage?.name || bay.garage?.garageName || "-";
+    const garageId = bay.garageId || bay.garage?.garageId || bay.garage?.id;
+    const garage = garages.find((item) => String(item.id || item.garageId) === String(garageId));
+
+    return bay.garageName || bay.garage?.name || bay.garage?.garageName || garage?.name || garage?.garageName || "-";
   }
 
   function getGarageId(bay) {
     return bay.garageId || bay.garage?.garageId || "-";
   }
+
+  const sortedWashBays = useMemo(() => {
+    return [...washBays].sort((a, b) => {
+      const garageA = Number(a.garageId || a.garage?.garageId || 0);
+      const garageB = Number(b.garageId || b.garage?.garageId || 0);
+
+      if (garageA !== garageB) return garageA - garageB;
+
+      return Number(getBayId(a) || 0) - Number(getBayId(b) || 0);
+    });
+  }, [washBays]);
 
   return (
     <div className="wash-bay-page">
@@ -350,7 +420,7 @@ const totalAvailable = useMemo(() => {
                   onChange={handleChangeForm}
                 >
                   <option value="CAR">Ô tô</option>
-                  <option value="MOTORBIKE">Xe máy</option>
+                  <option value="BIKE">Xe máy</option>
                 </select>
               </label>
 
@@ -377,7 +447,13 @@ const totalAvailable = useMemo(() => {
                 onChange={handleChangeForm}
                 type="number"
                 min="1"
+                disabled={isEditing}
               />
+              {isEditing && (
+                <small>
+                  Sức chứa garage được tính bằng số wash bay. Muốn tăng sức chứa, hãy tạo thêm wash bay mới.
+                </small>
+              )}
             </label>
 
             <label>
@@ -567,14 +643,14 @@ const totalAvailable = useMemo(() => {
                     Đang tải danh sách wash bay...
                   </td>
                 </tr>
-              ) : washBays.length === 0 ? (
+              ) : sortedWashBays.length === 0 ? (
                 <tr>
                   <td colSpan="8" className="wash-bay-empty">
                     Chưa có wash bay nào.
                   </td>
                 </tr>
               ) : (
-                washBays.map((bay) => (
+                sortedWashBays.map((bay) => (
                   <tr key={getBayId(bay)}>
                     <td>#{getBayId(bay)}</td>
                     <td>
@@ -583,14 +659,14 @@ const totalAvailable = useMemo(() => {
                         <span>Garage ID: {getGarageId(bay)}</span>
                       </div>
                     </td>
-                    <td>{bay.bayCode || bay.code || "-"}</td>
-                    <td>{bay.name || bay.bayName || "-"}</td>
+                    <td>{getBayCode(bay)}</td>
+                    <td>{getBayName(bay)}</td>
                     <td>
                       <span className="wash-bay-type-pill">
-                        {bay.vehicleType === "MOTORBIKE" ? "Xe máy" : "Ô tô"}
+                        {bay.vehicleType === "BIKE" || bay.vehicleType === "MOTORBIKE" ? "Xe máy" : "Ô tô"}
                       </span>
                     </td>
-                    <td>{bay.capacity || 1}</td>
+                    <td>1 bay</td>
                     <td>
                       <span
                         className={`wash-bay-status ${

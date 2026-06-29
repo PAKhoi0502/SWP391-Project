@@ -60,18 +60,19 @@ public class PaymentServiceImpl implements PaymentService {
     @Value("${payos.checksum-key}")
 private String checksumKey;
 
-    @Override
-    @Transactional
-    public CreatePayOSPaymentResponse createPayOSPayment(CreatePayOSPaymentRequest request, Long staffUserId) {
+   @Override
+@Transactional
+public CreatePayOSPaymentResponse createPayOSPayment(CreatePayOSPaymentRequest request, Long staffUserId) {
 
-        Booking booking = bookingRepository.findById(request.getBookingId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Booking not found: " + request.getBookingId()));
+    Booking booking = bookingRepository.findById(request.getBookingId())
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "Booking not found: " + request.getBookingId()));
 
-        if (!"COMPLETED".equals(booking.getStatus())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "PayOS payment can only be created for COMPLETED bookings. Current status: " + booking.getStatus());
-        }
+    if (!"COMPLETED".equals(booking.getStatus())) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "PayOS payment can only be created for COMPLETED bookings. Current status: " + booking.getStatus());
+    }
+        
 
         if ("PAID".equals(booking.getPaymentStatus())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,

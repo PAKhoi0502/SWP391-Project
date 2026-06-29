@@ -7,8 +7,10 @@ const NAV_ITEMS = {
   [ROLES.CUSTOMER]: [
   { to: '/', label: 'Trang chủ' },
   { to: '/customer/service-packages', label: 'Gói dịch vụ' },
+  { to: '/booking', label: 'Booking' },
   { to: '/customer/bookings', label: 'Lịch hẹn' },
   { to: '/customer/waitlist', label: 'Waitlist' },
+  { to: '/customer/booking-history', label: 'Booking History' },
   { to: '/customer/vehicles', label: 'Xe của tôi' },
   { to: '/customer/profile', label: 'Hồ sơ' },
 ],
@@ -16,6 +18,7 @@ const NAV_ITEMS = {
   [ROLES.STAFF]: [
     { to: '/staff', label: 'Ca làm' },
     { to: '/staff/bookings', label: 'Booking' },
+    { to: '/staff/waitlist', label: 'Waitlist' },
     { to: '/staff/inspections', label: 'Kiểm tra xe' },
     { to: '/staff/profile', label: 'Hồ sơ' },
   ],

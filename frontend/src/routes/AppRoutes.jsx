@@ -30,7 +30,10 @@ import ServicePackageDetailPage from '../pages/ServicePackageDetailPage'
 import AdminServicePackagePage from '../pages/admin/AdminServicePackagePage'
 import AvailableSlotsPickerPage from '../pages/booking/AvailableSlotsPickerPage'
 import CustomerWaitlistPage from '../pages/booking/CustomerWaitlistPage'
+import CustomerCreateBookingPage from '../pages/booking/CustomerCreateBookingPage'
 import WaitlistPage from '../pages/booking/WaitlistPage'
+import BookingHistoryPage from '../pages/booking/BookingHistoryPage'
+import StaffWaitlistPage from '../pages/booking/StaffWaitlistPage'
 
 
 function AppRoutes() {
@@ -58,8 +61,11 @@ function AppRoutes() {
           <Route path="customer/garages/:id" element={<GarageDetailPage />} />
           <Route path="customer/service-packages" element={<ServicePackageListPage />} />
           <Route path="customer/service-packages/:id" element={<ServicePackageDetailPage />} />
-          <Route path="/booking" element={<AvailableSlotsPickerPage />} />
+          <Route path="/booking" element={<CustomerCreateBookingPage />} />
+          <Route path="/booking/available-slots" element={<AvailableSlotsPickerPage />} />
           <Route path="/waitlist" element={<WaitlistPage />} />
+          <Route path="/customer/bookings" element={<BookingHistoryPage />} />
+<Route path="/customer/booking-history" element={<BookingHistoryPage />} />
         </Route>
       </Route>
 
@@ -67,6 +73,7 @@ function AppRoutes() {
         <Route element={<StaffLayout />}>
           <Route path="staff" element={<DashboardPlaceholderPage title="Staff Dashboard" />} />
           <Route path="staff/bookings" element={<DashboardPlaceholderPage title="Booking can xu ly" />} />
+          <Route path="staff/waitlist" element={<StaffWaitlistPage />} />
           <Route path="staff/inspections" element={<DashboardPlaceholderPage title="Kiem tra xe" />} />
           <Route path="staff/profile" element={<StaffProfilePage />} />
         </Route>
