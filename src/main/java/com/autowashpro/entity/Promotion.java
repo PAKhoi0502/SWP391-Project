@@ -3,6 +3,8 @@ package com.autowashpro.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -17,14 +19,17 @@ public class Promotion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "code", nullable = false, unique = true, length = 50)
+    @Column(name = "code", nullable = false, unique = true)
     private String code;
 
-    @Column(name = "name", nullable = false, length = 100)
+    @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "discount_type", nullable = false, length = 30)
-    private String discountType; // PERCENT hoặc AMOUNT
+    @Column(name = "description")
+    private String description;
+
+    @Column(name = "discount_type", nullable = false)
+    private String discountType;
 
     @Column(name = "discount_value", nullable = false)
     private BigDecimal discountValue;
@@ -52,4 +57,12 @@ public class Promotion {
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 }
