@@ -1,7 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { bookingApi } from '../../api/bookingApi'
 import customerBookingFlowApi from '../../api/customerBookingFlowApi'
 import './BookingHistoryPage.css'
+
+const BOOKING_CACHE_PREFIX = 'booking-detail-cache-'
+const PAYOS_PAID_CACHE_PREFIX = 'booking-payos-paid-'
+
+const STATUS_FILTERS = ['ALL', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELED']
 
 const formatMoney = (value) =>
   new Intl.NumberFormat('vi-VN', {
@@ -14,10 +20,7 @@ const formatDateTime = (value) => {
   if (!value) return 'Chưa cập nhật'
 
   const date = new Date(value)
-
-  if (Number.isNaN(date.getTime())) {
-    return String(value)
-  }
+  if (Number.isNaN(date.getTime())) return String(value)
 
   return date.toLocaleString('vi-VN', {
     dateStyle: 'medium',
@@ -27,10 +30,120 @@ const formatDateTime = (value) => {
 
 const getBookingId = (booking) => booking?.bookingId ?? booking?.id
 
+const normalizeText = (value) =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+
+const readCachedBooking = (bookingId) => {
+  try {
+    return JSON.parse(localStorage.getItem(`${BOOKING_CACHE_PREFIX}${bookingId}`) || '{}')
+  } catch {
+    return {}
+  }
+}
+
+const readCachedPayOSPaidAt = (bookingId) => {
+  if (!bookingId) return ''
+  return localStorage.getItem(`${PAYOS_PAID_CACHE_PREFIX}${bookingId}`) || ''
+}
+
+const mergeBookingWithCache = (booking) => {
+  const bookingId = getBookingId(booking)
+  const cached = readCachedBooking(bookingId)
+  const paidAt = readCachedPayOSPaidAt(bookingId)
+  const merged = { ...booking, ...cached }
+
+  if (paidAt) {
+    merged.paymentStatus = 'PAID'
+    merged.paidAt = merged.paidAt || paidAt
+  }
+
+  return merged
+}
+
+const getStoredUserName = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    return user?.fullName || user?.name || user?.username || user?.email || ''
+  } catch {
+    return ''
+  }
+}
+
+const inferPaymentMethod = (booking) => {
+  const method = String(booking?.paymentMethod || '').toUpperCase()
+  const note = normalizeText(booking?.note)
+
+  if (method === 'BANK_TRANSFER' || method === 'PAYOS' || note.includes('chuyen khoan')) {
+    return method || 'BANK_TRANSFER'
+  }
+
+  if (method === 'CASH' || note.includes('tien mat')) {
+    return 'CASH'
+  }
+
+  return ''
+}
+
+const cacheBookingDetail = (booking) => {
+  const bookingId = getBookingId(booking)
+  if (!bookingId) return
+
+  try {
+    const key = `${BOOKING_CACHE_PREFIX}${bookingId}`
+    const cached = readCachedBooking(bookingId)
+    const customerName = cached.customerName || booking.customerName || getStoredUserName()
+    const customerId = booking.customerId || cached.customerId
+    const paymentMethod = inferPaymentMethod(booking) || inferPaymentMethod(cached)
+
+    if (customerId && customerName) {
+      localStorage.setItem(`booking-customer-name-${customerId}`, customerName)
+    }
+
+    if (paymentMethod) {
+      localStorage.setItem(`booking-payment-method-${bookingId}`, paymentMethod)
+    }
+
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        ...cached,
+        ...booking,
+        customerName,
+        paymentMethod: booking.paymentMethod || cached.paymentMethod || paymentMethod,
+      }),
+    )
+  } catch {
+    // localStorage can be unavailable in restricted browser modes.
+  }
+}
+
+const enrichBookingsWithDetail = async (items) => {
+  if (!Array.isArray(items)) return []
+
+  const results = await Promise.allSettled(
+    items.map(async (booking) => {
+      const bookingId = getBookingId(booking)
+      if (!bookingId) return booking
+
+      const detail = await bookingApi.getCustomerBookingDetail(bookingId)
+      const enrichedBooking = mergeBookingWithCache({ ...booking, ...detail })
+      cacheBookingDetail(enrichedBooking)
+      return enrichedBooking
+    }),
+  )
+
+  return results.map((result, index) =>
+    result.status === 'fulfilled' ? result.value : mergeBookingWithCache(items[index]),
+  )
+}
+
 const getStatusText = (status) => {
   const value = String(status || '').toUpperCase()
 
-  if (value === 'CONFIRMED') return 'Đã xác nhận'
+  if (value === 'CONFIRMED') return 'Chưa thực hiện'
   if (value === 'CHECKED_IN') return 'Đã check-in'
   if (value === 'IN_PROGRESS') return 'Đang thực hiện'
   if (value === 'COMPLETED') return 'Hoàn thành'
@@ -56,6 +169,79 @@ const isCanceledStatus = (status) => {
   return value === 'CANCELED' || value === 'CANCELLED'
 }
 
+const isNoShowStatus = (status) => String(status || '').toUpperCase() === 'NO_SHOW'
+
+const buildCustomerBookingNumberMap = (items) => {
+  const map = new Map()
+
+  ;[...items]
+    .sort((left, right) => Number(getBookingId(left) || 0) - Number(getBookingId(right) || 0))
+    .forEach((booking, index) => {
+      map.set(String(getBookingId(booking)), index + 1)
+    })
+
+  return map
+}
+
+const getPaymentMethodText = (booking) => {
+  const method = String(booking?.paymentMethod || '').toUpperCase()
+  const note = normalizeText(booking?.note)
+
+  if (method === 'BANK_TRANSFER' || method === 'PAYOS' || note.includes('chuyen khoan')) {
+    return 'Chuyển khoản'
+  }
+
+  if (method === 'CASH' || note.includes('tien mat')) {
+    return 'Tiền mặt'
+  }
+
+  return 'Chưa cập nhật'
+}
+
+const getHistoryTimelineItems = (booking) => {
+  const status = String(booking?.status || '').toUpperCase()
+  const paymentStatus = String(booking?.paymentStatus || '').toUpperCase()
+  const checkedInAt = booking?.manualCheckedInAt || booking?.checkedInAt
+
+  if (status === 'NO_SHOW') {
+    return [
+      { label: 'Đặt lịch', active: true, time: booking?.startTime },
+      { label: 'Không đến', active: true, danger: true, time: booking?.updatedAt || booking?.startTime },
+    ]
+  }
+
+  if (status === 'CANCELED' || status === 'CANCELLED') {
+    return [
+      { label: 'Đặt lịch', active: true, time: booking?.startTime },
+      { label: 'Đã hủy', active: true, danger: true, time: booking?.updatedAt || booking?.startTime },
+    ]
+  }
+
+  return [
+    { label: 'Đặt lịch', active: true, time: booking?.startTime },
+    {
+      label: 'Check-in',
+      active: ['CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'].includes(status) || Boolean(checkedInAt),
+      time: checkedInAt,
+    },
+    {
+      label: 'Rửa xe',
+      active: ['IN_PROGRESS', 'COMPLETED'].includes(status),
+      time: booking?.startedAt,
+    },
+    {
+      label: 'Xong',
+      active: status === 'COMPLETED',
+      time: booking?.completedAt,
+    },
+    {
+      label: 'Thanh toán',
+      active: paymentStatus === 'PAID',
+      time: booking?.paidAt,
+    },
+  ]
+}
+
 export default function BookingHistoryPage() {
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
@@ -69,7 +255,8 @@ export default function BookingHistoryPage() {
       setMessage('')
 
       const data = await customerBookingFlowApi.getCustomerBookings()
-      setBookings(Array.isArray(data) ? data : [])
+      const enrichedData = await enrichBookingsWithDetail(Array.isArray(data) ? data : [])
+      setBookings(enrichedData)
     } catch (error) {
       setMessage(error.message || 'Không tải được lịch sử booking.')
       setBookings([])
@@ -87,10 +274,11 @@ export default function BookingHistoryPage() {
         setMessage('')
 
         const data = await customerBookingFlowApi.getCustomerBookings()
+        const enrichedData = await enrichBookingsWithDetail(Array.isArray(data) ? data : [])
 
-        if (!mounted) return
-
-        setBookings(Array.isArray(data) ? data : [])
+        if (mounted) {
+          setBookings(enrichedData)
+        }
       } catch (error) {
         if (mounted) {
           setMessage(error.message || 'Không tải được lịch sử booking.')
@@ -142,31 +330,36 @@ export default function BookingHistoryPage() {
     }
   }
 
-  const filteredBookings = bookings.filter((booking) => {
-  const status = String(booking?.status || '').toUpperCase()
+  const customerBookingNumberMap = useMemo(() => buildCustomerBookingNumberMap(bookings), [bookings])
 
-  // Tất cả: chỉ hiện booking đang còn hiệu lực,
-  // không hiện Đã hủy và Hoàn thành
-  if (filter === 'ALL') {
-    return (
-      status !== 'CANCELED' &&
-      status !== 'CANCELLED' &&
-      status !== 'COMPLETED'
-    )
-  }
+  const filteredBookings = useMemo(
+    () =>
+      bookings
+        .filter((booking) => {
+          const status = String(booking?.status || '').toUpperCase()
 
-  // Tab Đã hủy: hiện cả CANCELED và CANCELLED
-  if (filter === 'CANCELED') {
-    return status === 'CANCELED' || status === 'CANCELLED'
-  }
+          if (filter === 'ALL') {
+            return (
+              status !== 'CANCELED' &&
+              status !== 'CANCELLED' &&
+              status !== 'COMPLETED' &&
+              status !== 'NO_SHOW'
+            )
+          }
 
-  // Tab Hoàn thành: chỉ hiện completed
-  if (filter === 'COMPLETED') {
-    return status === 'COMPLETED'
-  }
+          if (filter === 'CANCELED') {
+            return status === 'CANCELED' || status === 'CANCELLED' || status === 'NO_SHOW'
+          }
 
-  return status === filter
-})
+          if (filter === 'COMPLETED') {
+            return status === 'COMPLETED'
+          }
+
+          return status === filter
+        })
+        .sort((left, right) => Number(getBookingId(right) || 0) - Number(getBookingId(left) || 0)),
+    [bookings, filter],
+  )
 
   return (
     <main className="booking-history-page">
@@ -181,27 +374,23 @@ export default function BookingHistoryPage() {
       </section>
 
       <section className="booking-history-toolbar">
-  <div className="booking-history-filter-group">
-    {['ALL', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELED'].map((item) => (
-      <button
-        key={item}
-        type="button"
-        className={filter === item ? 'active' : ''}
-        onClick={() => setFilter(item)}
-      >
-        {item === 'ALL' ? 'Tất cả' : getStatusText(item)}
-      </button>
-    ))}
-  </div>
+        <div className="booking-history-filter-group">
+          {STATUS_FILTERS.map((item) => (
+            <button
+              key={item}
+              type="button"
+              className={filter === item ? 'active' : ''}
+              onClick={() => setFilter(item)}
+            >
+              {item === 'ALL' ? 'Tất cả' : getStatusText(item)}
+            </button>
+          ))}
+        </div>
 
-  <button
-    type="button"
-    className="booking-history-refresh-btn"
-    onClick={loadBookings}
-  >
-    Làm mới
-  </button>
-</section>
+        <button type="button" className="booking-history-refresh-btn" onClick={loadBookings}>
+          Làm mới
+        </button>
+      </section>
 
       {message && <div className="booking-history-message">{message}</div>}
 
@@ -217,25 +406,27 @@ export default function BookingHistoryPage() {
         <section className="booking-history-list">
           {filteredBookings.map((booking) => {
             const bookingId = getBookingId(booking)
+            const customerBookingNo = customerBookingNumberMap.get(String(bookingId)) || bookingId
             const paymentStatus = String(booking?.paymentStatus || '').toUpperCase()
             const status = String(booking?.status || '').toUpperCase()
             const canCancel =
               paymentStatus !== 'PAID' &&
               !isCanceledStatus(status) &&
+              !isNoShowStatus(status) &&
               status !== 'COMPLETED'
 
             return (
               <article className="booking-history-card" key={bookingId}>
+                {isNoShowStatus(status) && <div className="booking-no-show-seal">NO SHOW</div>}
+
                 <div className="booking-history-card-top">
                   <div>
                     <p>Mã booking</p>
-                    <h2>#{bookingId}</h2>
+                    <h2>#{customerBookingNo}</h2>
                   </div>
 
                   <div className="booking-history-badges">
-                    <span className={`status ${status.toLowerCase()}`}>
-                      {getStatusText(status)}
-                    </span>
+                    <span className={`status ${status.toLowerCase()}`}>{getStatusText(status)}</span>
                     <span className={`payment ${paymentStatus.toLowerCase()}`}>
                       {getPaymentText(paymentStatus)}
                     </span>
@@ -255,11 +446,7 @@ export default function BookingHistoryPage() {
 
                   <div>
                     <span>Gói dịch vụ</span>
-                    <strong>
-                      {booking?.servicePackageName ||
-                        booking?.servicePackageId ||
-                        'Chưa cập nhật'}
-                    </strong>
+                    <strong>{booking?.servicePackageName || booking?.servicePackageId || 'Chưa cập nhật'}</strong>
                   </div>
 
                   <div>
@@ -268,20 +455,34 @@ export default function BookingHistoryPage() {
                   </div>
 
                   <div>
-  <span>Tổng tiền</span>
-  <strong>{formatMoney(booking?.finalPrice)}</strong>
-</div>
+                    <span>Tổng tiền</span>
+                    <strong>{formatMoney(booking?.finalPrice)}</strong>
+                  </div>
 
-<div>
-  <span>Phương thức</span>
-  <strong>
-    {booking?.paymentMethod === 'BANK_TRANSFER'
-      ? 'Chuyển khoản'
-      : booking?.paymentMethod === 'CASH'
-        ? 'Tiền mặt'
-        : 'Chưa cập nhật'}
-  </strong>
-</div>
+                  <div>
+                    <span>Phương thức</span>
+                    <strong>{getPaymentMethodText(booking)}</strong>
+                  </div>
+
+                  <div className="booking-history-mini-timeline-card">
+                    <span>Tiến trình</span>
+                    <div className="booking-history-mini-timeline">
+                      {getHistoryTimelineItems(booking).map((item, index) => (
+                        <div
+                          key={`${bookingId}-${item.label}`}
+                          className={[
+                            'booking-history-mini-step',
+                            item.active ? 'active' : '',
+                            item.danger ? 'danger' : '',
+                          ].join(' ')}
+                          title={`${item.label}: ${item.time ? formatDateTime(item.time) : 'Chưa cập nhật'}`}
+                        >
+                          <i>{index + 1}</i>
+                          <small>{item.label}</small>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="booking-history-actions">
