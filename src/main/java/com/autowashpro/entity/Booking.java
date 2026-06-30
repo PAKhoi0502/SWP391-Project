@@ -77,6 +77,9 @@ public class Booking {
     @Column(name = "discount_amount")
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
+    @Column(name = "promotion_discount_amount")
+    private BigDecimal promotionDiscountAmount = BigDecimal.ZERO;
+
     @Column(name = "final_price")
     private BigDecimal finalPrice;
 

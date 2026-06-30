@@ -1,11 +1,11 @@
 package com.autowashpro.service.impl;
 
-
 import com.autowashpro.service.WashHistoryService;
 import com.autowashpro.entity.enums.StaffType;
 import com.autowashpro.dto.request.BookingCreateRequest;
 import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
 import com.autowashpro.dto.request.MarkBookingPaidRequest;
+import com.autowashpro.dto.request.PromotionValidateRequest;
 import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
 import com.autowashpro.dto.request.StartServiceRequest;
 import com.autowashpro.dto.request.WalkInBookingCreateRequest;
@@ -18,6 +18,7 @@ import com.autowashpro.entity.enums.WashBayStatus;
 import com.autowashpro.repository.*;
 import com.autowashpro.service.BookingService;
 import com.autowashpro.service.LoyaltyService;
+import com.autowashpro.service.PromotionService;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,6 +26,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.autowashpro.dto.response.BookingSummaryResponse;
+import com.autowashpro.dto.response.PromotionValidateResponse;
+
 import java.util.Objects;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -53,6 +56,7 @@ public class BookingServiceImpl implements BookingService {
         private final ServicePackageStepRepository servicePackageStepRepository;
         private final LoyaltyService loyaltyService;
         private final WashHistoryService washHistoryService;
+        private final PromotionService promotionService;
 
         // ===================== ISSUE #10 =====================
 
@@ -335,46 +339,25 @@ public class BookingServiceImpl implements BookingService {
 
                 BigDecimal originalPrice = pkg.getBasePrice();
                 BigDecimal discountAmount = BigDecimal.ZERO;
+                BigDecimal promotionDiscountAmount = BigDecimal.ZERO;
                 Long promotionId = null;
 
                 if (request.getPromotionCode() != null && !request.getPromotionCode().isBlank()) {
-                        Promotion promotion = promotionRepository.findByCodeAndIsActiveTrue(request.getPromotionCode())
-                                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                                        "Invalid or expired promotion code: "
-                                                                        + request.getPromotionCode()));
 
-                        LocalDateTime now = LocalDateTime.now();
-                        if (now.isBefore(promotion.getStartAt()) || now.isAfter(promotion.getEndAt())) {
-                                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion is not active");
-                        }
-                        if (promotion.getMinOrderAmount() != null
-                                        && originalPrice.compareTo(promotion.getMinOrderAmount()) < 0) {
-                                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                                "Order amount does not meet minimum requirement for this promotion");
-                        }
-                        if (promotion.getUsageLimit() != null
-                                        && promotion.getUsedCount() >= promotion.getUsageLimit()) {
-                                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                                "Promotion usage limit reached");
-                        }
+                        PromotionValidateRequest validateRequest = new PromotionValidateRequest();
 
-                        BigDecimal promoDiscount;
-                        if ("PERCENT".equalsIgnoreCase(promotion.getDiscountType())) {
-                                promoDiscount = originalPrice.multiply(promotion.getDiscountValue())
-                                                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-                                if (promotion.getMaxDiscountAmount() != null) {
-                                        promoDiscount = promoDiscount.min(promotion.getMaxDiscountAmount());
-                                }
-                        } else {
-                                promoDiscount = promotion.getDiscountValue();
-                        }
+                        validateRequest.setPromotionCode(request.getPromotionCode());
+                        validateRequest.setServicePackageId(request.getServicePackageId());
+                        validateRequest.setOrderAmount(originalPrice);
 
-                        discountAmount = discountAmount.add(promoDiscount);
-                        promotionId = promotion.getId();
-                        promotion.setUsedCount(promotion.getUsedCount() + 1);
-                        promotionRepository.save(promotion);
+                        PromotionValidateResponse response = promotionService.validatePromotion(customerId,
+                                        validateRequest);
+
+                        promotionId = response.getPromotionId();
+                        promotionDiscountAmount = response.getDiscountAmount();
+                        discountAmount = discountAmount.add(promotionDiscountAmount);
+
                 }
-
                 int usedPoints = request.getUsedPoints() != null ? request.getUsedPoints() : 0;
                 if (usedPoints > 0) {
                         if (loyalty == null || loyalty.getAvailablePoints() < usedPoints) {
@@ -407,6 +390,8 @@ public class BookingServiceImpl implements BookingService {
                 booking.setOriginalPrice(originalPrice);
                 booking.setSurchargeAmount(BigDecimal.ZERO);
                 booking.setDiscountAmount(discountAmount);
+                booking.setPromotionDiscountAmount(
+                                promotionDiscountAmount);
                 booking.setFinalPrice(finalPrice);
                 booking.setDepositAmount(depositAmount);
                 booking.setDepositStatus("UNPAID");
@@ -492,6 +477,7 @@ public class BookingServiceImpl implements BookingService {
                                         request.getGarageId(), bayType);
                         long occupiedBays = bookingRepository.countOverlappingBookingsByGarage(
                                         request.getGarageId(), startTime, endTime);
+
                         if (occupiedBays >= availableBays) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                                                 "No wash bay available for this time slot");
@@ -1290,8 +1276,6 @@ public class BookingServiceImpl implements BookingService {
 
                 booking.setPaidAt(LocalDateTime.now());
 
-                
-
                 if (request.getNote() != null
                                 && !request.getNote().isBlank()) {
 
@@ -1299,8 +1283,13 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 Booking saved = bookingRepository.save(booking);
+
                 loyaltyService.updateBookingStatistics(saved.getId());
+
+                promotionService.recordPromotionUsageAfterPaidBooking(saved.getId());
+
                 loyaltyService.earnPointsAfterPaidBooking(saved.getId());
+
                 washHistoryService.createWashHistoryAfterPaidBooking(saved.getId());
                 return toResponse(saved);
         }
