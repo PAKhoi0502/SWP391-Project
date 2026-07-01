@@ -19,6 +19,7 @@ import com.autowashpro.repository.*;
 import com.autowashpro.service.BookingService;
 import com.autowashpro.service.LoyaltyService;
 import com.autowashpro.service.PromotionService;
+import com.autowashpro.service.EmailService;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -59,6 +60,7 @@ public class BookingServiceImpl implements BookingService {
         private final WashHistoryService washHistoryService;
         private final PromotionService promotionService;
         private final NotificationService notificationService;
+        private final EmailService emailService;
 
         // ===================== ISSUE #10 =====================
 
@@ -406,6 +408,8 @@ public class BookingServiceImpl implements BookingService {
                 bookingRepository.save(booking);
                 loyaltyService.updateBookingStatistics(booking.getId());
                 notificationService.notifyBookingConfirmed(booking.getId());
+                emailService.sendBookingConfirmationEmail(booking.getId());
+
                 return toResponse(booking);
         }
 
@@ -1289,6 +1293,7 @@ loyaltyService.updateBookingStatistics(saved.getId());
 promotionService.recordPromotionUsageAfterPaidBooking(saved.getId());
 loyaltyService.earnPointsAfterPaidBooking(saved.getId());
 washHistoryService.createWashHistoryAfterPaidBooking(saved.getId());
+emailService.sendPaymentConfirmedEmail(saved.getId());
 notificationService.notifyPaymentConfirmed(saved.getId());
 notificationService.notifyRewardEarned(saved.getId());
 return toResponse(saved);

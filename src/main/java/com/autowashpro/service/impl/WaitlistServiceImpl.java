@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.autowashpro.service.NotificationService;
+import com.autowashpro.service.EmailService;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -36,6 +37,7 @@ public class WaitlistServiceImpl implements WaitlistService {
     private final CustomerLoyaltyRepository customerLoyaltyRepository;
     private final BookingService bookingService;
     private final NotificationService notificationService;
+    private final EmailService emailService;
 
     @Value("${waitlist.cutoff-hours}")
     private int cutoffHours;
@@ -250,7 +252,7 @@ public class WaitlistServiceImpl implements WaitlistService {
         Waitlist saved = waitlistRepository.save(waitlist);
 
         notificationService.notifyWaitlistOffered(saved.getId());
-
+        emailService.sendWaitlistOfferedEmail(saved.getId());
         return toResponse(saved);
     }
 
