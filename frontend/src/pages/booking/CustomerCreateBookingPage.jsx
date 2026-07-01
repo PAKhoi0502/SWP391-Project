@@ -4,10 +4,42 @@ import {
   bookingFlowUtils,
   customerBookingFlowApi,
 } from '../../api/customerBookingFlowApi'
-import { userService } from '../../services/userService'
+import { loyaltyApi } from '../../api/loyaltyApi'
 import './CustomerCreateBookingPage.css'
 
-const todayIso = () => new Date().toISOString().slice(0, 10)
+const toLocalDateIso = (date = new Date()) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+const todayIso = () => toLocalDateIso()
+
+const minBookingDateIso = () => {
+  const minDate = new Date()
+  minDate.setDate(minDate.getDate() + 1)
+
+  return toLocalDateIso(minDate)
+}
+
+const maxBookingDateIso = (bookingWindowDays = 7) => {
+  const maxDate = new Date()
+  maxDate.setDate(maxDate.getDate() + Number(bookingWindowDays || 7))
+
+  return toLocalDateIso(maxDate)
+}
+
+const clampBookingDate = (value, bookingWindowDays = 7) => {
+  const minDate = minBookingDateIso()
+  const maxDate = maxBookingDateIso(bookingWindowDays)
+
+  if (!value || value < minDate) return minDate
+  if (value > maxDate) return maxDate
+
+  return value
+}
 
 const formatMoney = (value) =>
   new Intl.NumberFormat('vi-VN', {
@@ -89,6 +121,28 @@ const getSlotLabel = (slot) => {
   return slot?.label || slot?.time || 'Khung giờ'
 }
 
+const getSlotStartDateTime = (slot, selectedDate) => {
+  const rawStart = slot?.startTime || slot?.start || slot?.from
+  if (!rawStart) return null
+
+  const value = String(rawStart)
+  const dateTimeValue = value.includes('T')
+    ? value
+    : `${selectedDate}T${value.slice(0, 5)}:00`
+  const parsed = new Date(dateTimeValue)
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+const isPastSlot = (slot, selectedDate) => {
+  if (selectedDate !== todayIso()) return false
+
+  const slotStart = getSlotStartDateTime(slot, selectedDate)
+  if (!slotStart) return false
+
+  return slotStart.getTime() <= Date.now()
+}
+
 export default function CustomerCreateBookingPage() {
   const navigate = useNavigate()
 
@@ -102,8 +156,9 @@ export default function CustomerCreateBookingPage() {
   const [selectedVehicleId, setSelectedVehicleId] = useState('')
   const [selectedGarageId, setSelectedGarageId] = useState('')
   const [selectedPackageId, setSelectedPackageId] = useState('')
-  const [selectedDate, setSelectedDate] = useState(todayIso())
+  const [selectedDate, setSelectedDate] = useState(minBookingDateIso())
   const [selectedSlotId, setSelectedSlotId] = useState('')
+  const [bookingWindowDays, setBookingWindowDays] = useState(7)
 
   const [promotionCode, setPromotionCode] = useState('')
   const [promotionResult, setPromotionResult] = useState(null)
@@ -132,9 +187,14 @@ export default function CustomerCreateBookingPage() {
     [servicePackages, selectedPackageId],
   )
 
+  const visibleSlots = useMemo(
+    () => slots.filter((slot) => !isPastSlot(slot, selectedDate)),
+    [slots, selectedDate],
+  )
+
   const selectedSlot = useMemo(
-    () => slots.find((item) => String(getId(item)) === String(selectedSlotId)),
-    [slots, selectedSlotId],
+    () => visibleSlots.find((item) => String(getId(item)) === String(selectedSlotId)),
+    [visibleSlots, selectedSlotId],
   )
 
   const priceSummary = useMemo(() => {
@@ -159,15 +219,26 @@ export default function CustomerCreateBookingPage() {
         setLoadingInitial(true)
         setMessage('')
 
-        const [vehicleData, garageData] = await Promise.all([
+        const [vehicleData, garageData, loyaltyResult, tierRulesResult] = await Promise.all([
           customerBookingFlowApi.getVehicles(),
           customerBookingFlowApi.getGarages(),
+          loyaltyApi.getMyLoyalty().catch(() => null),
+          loyaltyApi.getTierRules().catch(() => []),
         ])
 
         if (!mounted) return
 
         setVehicles(vehicleData)
         setGarages(garageData)
+
+        const currentTier = String(loyaltyResult?.currentTier || 'BRONZE').toUpperCase()
+        const currentRule = tierRulesResult.find(
+          (rule) => String(rule?.tier || '').toUpperCase() === currentTier,
+        )
+        const nextBookingWindowDays = Number(currentRule?.bookingWindowDays || 7)
+
+        setBookingWindowDays(nextBookingWindowDays)
+        setSelectedDate((current) => clampBookingDate(current, nextBookingWindowDays))
       } catch (error) {
         if (mounted) {
           setMessage(error.message || 'Không tải được dữ liệu đặt lịch.')
@@ -268,6 +339,15 @@ export default function CustomerCreateBookingPage() {
     }
   }, [selectedDate, selectedGarageId, selectedPackageId, selectedVehicle])
 
+  useEffect(() => {
+    if (
+      selectedSlotId &&
+      !visibleSlots.some((slot) => String(getId(slot)) === String(selectedSlotId))
+    ) {
+      setSelectedSlotId('')
+    }
+  }, [selectedSlotId, visibleSlots])
+
   const handleValidatePromotion = async () => {
     if (!promotionCode.trim()) {
       setPromotionResult(null)
@@ -304,23 +384,42 @@ export default function CustomerCreateBookingPage() {
 
     if (points <= 0) {
       setLoyaltyPreview(null)
-      setMessage('Nhập số điểm muốn dùng.')
+      setMessage('Nhập số điểm muốn dùng trước khi tính thử.')
+      return
+    }
+
+    if (!selectedPackage) {
+      setMessage('Chọn gói dịch vụ trước khi tính thử điểm.')
       return
     }
 
     try {
       setMessage('')
+      const packageId =
+        selectedPackage?.servicePackageId ??
+        selectedPackage?.packageId ??
+        selectedPackage?.id
+
       const result = await customerBookingFlowApi.redeemPreview({
+        servicePackageId: Number(packageId),
         points,
-        subtotal: priceSummary.subtotal,
-        promotionCode: promotionCode.trim() || null,
       })
 
       setLoyaltyPreview(result)
-      setMessage(result?.message || 'Đã tính thử điểm loyalty.')
+
+      const validPoints = result?.validPoints ?? 0
+      const discountAmount = result?.discountAmount ?? 0
+
+      if (validPoints < points) {
+        setMessage(
+          `Chỉ áp dụng được ${validPoints} điểm (giảm ${formatMoney(discountAmount)}). Điểm hợp lệ phải là bội số của 10 và không vượt quá điểm khả dụng.`,
+        )
+      } else {
+        setMessage(`Áp dụng ${validPoints} điểm — giảm ${formatMoney(discountAmount)}.`)
+      }
     } catch (error) {
       setLoyaltyPreview(null)
-      setMessage(error.message || 'Không thể dùng điểm loyalty.')
+      setMessage(error?.response?.data?.message || error.message || 'Không thể tính thử điểm loyalty.')
     }
   }
 
@@ -414,6 +513,11 @@ const canSubmit =
       return
     }
 
+    if (Number(loyaltyPoints || 0) > 0 && loyaltyPreview === null) {
+      setMessage('Bạn đã nhập điểm loyalty nhưng chưa bấm "Tính thử". Vui lòng bấm "Tính thử" trước khi xác nhận đặt lịch.')
+      return
+    }
+
     try {
       setSubmitting(true)
       setMessage('')
@@ -434,35 +538,28 @@ const canSubmit =
           : `${selectedDate}T${rawStartTime}:00`
 
       const bookingPayload = {
-  garageId: selectedGarage?.garageId ?? selectedGarage?.id,
-  vehicleId: selectedVehicle?.vehicleId ?? selectedVehicle?.id,
-  servicePackageId: packageId,
-  startTime,
-  promotionCode: promotionCode.trim() || null,
-  usedPoints: Number(loyaltyPoints || 0),
-  paymentMethod,
-  note:
-    paymentMethod === 'BANK_TRANSFER'
-      ? 'Khách chọn chuyển khoản tại garage sau khi hoàn thành dịch vụ.'
-      : 'Khách chọn thanh toán tiền mặt tại garage sau khi hoàn thành dịch vụ.',
-}
+        garageId: selectedGarage?.garageId ?? selectedGarage?.id,
+        vehicleId: selectedVehicle?.vehicleId ?? selectedVehicle?.id,
+        servicePackageId: packageId,
+        startTime,
+        promotionCode: promotionCode.trim() || null,
+        usedPoints: loyaltyPreview?.validPoints ?? 0,
+        paymentMethod,
+        note:
+          paymentMethod === 'BANK_TRANSFER'
+            ? 'Khách chọn chuyển khoản tại garage sau khi hoàn thành dịch vụ.'
+            : 'Khách chọn thanh toán tiền mặt tại garage sau khi hoàn thành dịch vụ.',
+      }
       const createdBooking = await customerBookingFlowApi.createBooking(bookingPayload)
-      if (createdBooking?.id) {
-        try {
-          let customerName = getStoredUserName()
-          try {
-            const currentUser = await userService.getMe()
-            customerName = getUserDisplayName(currentUser) || customerName
-          } catch {
-            // Keep the locally stored user name if /users/me is unavailable.
-          }
 
+      // Cache synchronously with locally available data — no blocking API calls.
+      try {
+        const customerName = getStoredUserName()
+        if (createdBooking?.id) {
           if (createdBooking.customerId && customerName) {
             localStorage.setItem(`booking-customer-name-${createdBooking.customerId}`, customerName)
           }
-
           localStorage.setItem(`booking-payment-method-${createdBooking.id}`, paymentMethod)
-
           localStorage.setItem(
             `booking-detail-cache-${createdBooking.id}`,
             JSON.stringify({
@@ -475,9 +572,9 @@ const canSubmit =
               note: bookingPayload.note,
             }),
           )
-        } catch {
-          // localStorage can be unavailable in restricted browser modes.
         }
+      } catch {
+        // localStorage can be unavailable in restricted browser modes.
       }
 
       navigate('/customer/booking-history', {
@@ -485,7 +582,8 @@ const canSubmit =
         state: { bookingCreated: true },
       })
     } catch (error) {
-      setMessage(error.message || 'Tạo booking thất bại.')
+      const msg = error?.response?.data?.message || error.message || ''
+      setMessage(msg || 'Đặt lịch thất bại. Vui lòng thử lại.')
     } finally {
       setSubmitting(false)
     }
@@ -646,9 +744,10 @@ const canSubmit =
                   Ngày đặt lịch
                   <input
                     type="date"
-                    min={todayIso()}
+                    min={minBookingDateIso()}
+                    max={maxBookingDateIso(bookingWindowDays)}
                     value={selectedDate}
-                    onChange={(event) => setSelectedDate(event.target.value)}
+                    onChange={(event) => setSelectedDate(clampBookingDate(event.target.value, bookingWindowDays))}
                   />
                 </label>
 
@@ -656,7 +755,7 @@ const canSubmit =
                   <p className="booking-muted">Đang tải khung giờ...</p>
                 ) : (
                   <div className="booking-slot-grid">
-                    {slots.map((slot) => {
+                    {visibleSlots.map((slot) => {
                       const full = isSlotFull(slot)
                       const active = String(selectedSlotId) === String(getId(slot))
 
@@ -684,8 +783,10 @@ const canSubmit =
                   </div>
                 )}
 
-                {!loadingSlots && selectedPackage && slots.length === 0 && (
-                  <p className="booking-muted">Không có slot khả dụng cho ngày này.</p>
+                {!loadingSlots && selectedPackage && visibleSlots.length === 0 && (
+                  <p className="booking-muted">
+                    Không có slot khả dụng cho ngày này, hoặc các khung giờ trong hôm nay đã qua.
+                  </p>
                 )}
 
                 <div className="booking-step-actions">
@@ -728,7 +829,10 @@ const canSubmit =
                       min="0"
                       value={loyaltyPoints}
                       placeholder="Ví dụ: 100"
-                      onChange={(event) => setLoyaltyPoints(event.target.value)}
+                      onChange={(event) => {
+                        setLoyaltyPoints(event.target.value)
+                        setLoyaltyPreview(null)
+                      }}
                     />
                   </label>
                   <button type="button" onClick={handleRedeemPreview}>

@@ -1,0 +1,149 @@
+.cbm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+}
+
+.cbm-dialog {
+  background: #111116;
+  border: 1px solid rgba(250, 204, 21, 0.22);
+  border-radius: 20px;
+  box-shadow:
+    0 32px 80px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(250, 204, 21, 0.06) inset;
+  color: #f8fafc;
+  max-width: 440px;
+  width: 100%;
+  padding: 28px;
+}
+
+.cbm-header {
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+.cbm-icon {
+  font-size: 38px;
+  line-height: 1;
+  margin-bottom: 14px;
+  color: #facc15;
+}
+
+.cbm-title {
+  margin: 0 0 10px;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.cbm-warning {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.cbm-body {
+  margin-bottom: 24px;
+}
+
+.cbm-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.cbm-optional {
+  color: rgba(255, 255, 255, 0.38);
+  font-weight: 400;
+}
+
+.cbm-textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(250, 204, 21, 0.18);
+  border-radius: 12px;
+  color: #f8fafc;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 11px 13px;
+  resize: vertical;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 80px;
+  max-height: 200px;
+  transition: border-color 0.15s;
+}
+
+.cbm-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.28);
+}
+
+.cbm-textarea:focus {
+  border-color: rgba(250, 204, 21, 0.5);
+  outline: none;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.cbm-textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cbm-footer {
+  display: flex;
+  gap: 12px;
+}
+
+.cbm-btn {
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  flex: 1;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  padding: 13px;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.cbm-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.cbm-btn--keep {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.cbm-btn--keep:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.cbm-btn--confirm {
+  background: #ef4444;
+  color: #fff;
+}
+
+.cbm-btn--confirm:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+@media (max-width: 480px) {
+  .cbm-dialog {
+    padding: 20px 16px;
+  }
+
+  .cbm-footer {
+    flex-direction: column-reverse;
+  }
+}

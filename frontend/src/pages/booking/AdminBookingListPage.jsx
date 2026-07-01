@@ -210,9 +210,9 @@ const enrichBookingsWithPaymentTransactions = async (items, users = []) => {
         ...booking,
         customerName:
           booking.customerName ||
-          cached.customerName ||
           getUserName(user) ||
-          readCachedCustomerName(booking.customerId),
+          readCachedCustomerName(booking.customerId) ||
+          (booking.customerId ? `Khách hàng #${booking.customerId}` : 'Khách vãng lai'),
         paymentMethod:
           booking.paymentMethod ||
           cached.paymentMethod ||
@@ -222,6 +222,7 @@ const enrichBookingsWithPaymentTransactions = async (items, users = []) => {
         paymentStatus: paidTransaction || cachedPayOSPaidAt ? 'PAID' : booking.paymentStatus,
         paidAt: booking.paidAt || paidTransaction?.paidAt || cachedPayOSPaidAt,
         note: booking.note || cached.note,
+        vehicleName: booking.vehicleName || booking.licensePlate || cached.vehicleName || cached.licensePlate,
       }
 
       return mergeFrontendOverride(enrichedBooking, cached)
@@ -446,6 +447,10 @@ function AdminBookingListPage() {
                 <div>
                   <span>{TEXT.customer}</span>
                   {formatNamedValue(booking.customerName, booking.customerId, booking.customerId ? TEXT.customer : TEXT.guest)}
+                </div>
+                <div>
+                  <span>Xe</span>
+                  {formatNamedValue(booking.vehicleName || booking.licensePlate, booking.vehicleId, 'Xe')}
                 </div>
                 <div>
                   <span>Garage</span>

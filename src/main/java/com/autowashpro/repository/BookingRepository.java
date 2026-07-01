@@ -110,4 +110,19 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime
     );
+
+    @Query("""
+        SELECT COUNT(b) FROM Booking b
+        WHERE b.customerId = :customerId
+        AND b.garageId = :garageId
+        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+        AND b.startTime < :endTime
+        AND b.endTime > :startTime
+        """)
+    long countOverlappingBookingsByCustomerAndGarage(
+            @Param("customerId") Long customerId,
+            @Param("garageId") Long garageId,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime
+    );
 }

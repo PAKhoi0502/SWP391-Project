@@ -196,8 +196,8 @@ async getCustomerBookings() {
   return toArray(response)
 },
 
-async cancelBooking(bookingId) {
-  const response = await api.patch(`/bookings/${bookingId}/cancel`)
+async cancelBooking(bookingId, reason) {
+  const response = await api.patch(`/bookings/${bookingId}/cancel`, reason ? { reason } : undefined)
   return unwrap(response)
 },
 }

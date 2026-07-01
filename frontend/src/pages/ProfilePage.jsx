@@ -1,15 +1,41 @@
-import { useEffect, useState } from 'react'
+import { Component, useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { userService } from '../services/userService'
+import LoyaltyPointsCard from '../components/loyalty/LoyaltyPointsCard'
+
+// Error boundary to prevent LoyaltyPointsCard crash from taking down the whole profile
+class LoyaltyBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { failed: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  render() {
+    if (this.state.failed) {
+      return (
+        <div style={loyaltyErrorStyle}>
+          Không tải được thông tin điểm thưởng. Vui lòng thử lại sau.
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 const emptyForm = { fullName: '', email: '', phone: '' }
 
 export default function ProfilePage() {
   const { user, setCurrentUser } = useAuth()
-  const [form, setForm] = useState(emptyForm)
-  const [profile, setProfile] = useState(user)
+  const initialProfile = user || getStoredUser()
+  const [form, setForm] = useState(() => toForm(initialProfile))
+  const [profile, setProfile] = useState(initialProfile)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
@@ -24,7 +50,7 @@ export default function ProfilePage() {
         setCurrentUser(data)
       })
       .catch((err) => {
-        if (!ignore) setError(getErrorMessage(err, 'Không thể tải hồ sơ.'))
+        if (!ignore) setLoadError(getErrorMessage(err, 'Không thể tải hồ sơ.'))
       })
       .finally(() => {
         if (!ignore) setLoading(false)
@@ -69,7 +95,13 @@ export default function ProfilePage() {
     }
   }
 
+  const isCustomer = String(profile?.role || user?.role || '').toUpperCase().replace('ROLE_', '') === 'CUSTOMER'
+  const isActive = profile?.isActive !== false
+  const hasProfileContent = Boolean(form.fullName || form.email || form.phone)
+
   if (loading) return <StateCard message="Đang tải hồ sơ..." />
+
+  if (loadError && !profile) return <StateCard message={loadError} tone="error" />
 
   return (
     <div style={pageStyle}>
@@ -92,34 +124,42 @@ export default function ProfilePage() {
       <div style={heroStyle}>
         <div style={avatarStyle}>{getInitial(profile)}</div>
         <div>
-          <h1 style={{ margin: 0, fontSize: 26 }}>Hồ sơ của tôi</h1>
+          <h1 style={{ margin: 0, fontSize: 26 }}>
+            {profile?.fullName || profile?.email || 'Hồ sơ của tôi'}
+          </h1>
           <p style={{ margin: '6px 0 0', color: '#64748b' }}>Xem và cập nhật thông tin tài khoản hiện tại.</p>
         </div>
       </div>
 
       <div className="profile-grid">
         <section style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Thông tin tài khoản</h2>
-          <form onSubmit={handleSubmit}>
-            <Field label="Họ và tên" name="fullName" value={form.fullName} onChange={handleChange} autoComplete="name" />
-            <Field label="Email" name="email" type="email" value={form.email} onChange={handleChange} autoComplete="email" />
-            <Field label="Số điện thoại" name="phone" value={form.phone} onChange={handleChange} autoComplete="tel" />
+          {/* Status badge top-right */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18 }}>
+            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Thông tin tài khoản</h2>
+            <span style={isActive ? activeBadgeStyle : inactiveBadgeStyle}>
+              {isActive ? 'Đang hoạt động' : 'Không hoạt động'}
+            </span>
+          </div>
 
+          <InfoRow label="Vai trò" value={normalizeRole(profile?.role)} />
+
+          <div style={{ marginTop: 16 }}>
+            <Field label="Họ và tên" name="fullName" value={form.fullName} onChange={handleChange} autoComplete="name" readOnly />
+            <Field label="Email" name="email" type="email" value={form.email} onChange={handleChange} autoComplete="email" readOnly />
+            <Field label="Số điện thoại" name="phone" value={form.phone} onChange={handleChange} autoComplete="tel" readOnly />
+
+            {loadError && !hasProfileContent && <div style={warnStyle}>{loadError}</div>}
             {error && <div style={errorStyle}>{error}</div>}
             {success && <div style={successStyle}>{success}</div>}
-
-            <button type="submit" disabled={saving} style={{ ...buttonStyle, opacity: saving ? 0.7 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}>
-              {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
-            </button>
-          </form>
+          </div>
         </section>
 
-        <aside style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Trạng thái</h2>
-          <InfoRow label="Vai trò" value={normalizeRole(profile?.role)} />
-          <InfoRow label="Tình trạng" value={profile?.isActive === false ? 'Không hoạt động' : 'Đang hoạt động'} tone={profile?.isActive === false ? 'danger' : 'success'} />
-          <InfoRow label="Email" value={profile?.email || '-'} />
-          <InfoRow label="Số điện thoại" value={profile?.phone || '-'} />
+        <aside style={{ display: 'grid', gap: 20, alignContent: 'start' }}>
+          {isCustomer && (
+            <LoyaltyBoundary>
+              <LoyaltyPointsCard />
+            </LoyaltyBoundary>
+          )}
         </aside>
       </div>
     </div>
@@ -135,19 +175,23 @@ function Field({ label, ...props }) {
   )
 }
 
-function InfoRow({ label, value, tone }) {
-  const color = tone === 'success' ? '#15803d' : tone === 'danger' ? '#b91c1c' : '#0f172a'
-
+function InfoRow({ label, value }) {
   return (
     <div style={infoRowStyle}>
       <span style={{ color: '#64748b', fontSize: 13 }}>{label}</span>
-      <strong style={{ color }}>{value}</strong>
+      <strong style={{ color: '#0f172a' }}>{value}</strong>
     </div>
   )
 }
 
-function StateCard({ message }) {
-  return <div style={{ ...cardStyle, margin: 24 }}>{message}</div>
+function StateCard({ message, tone }) {
+  const bg = tone === 'error' ? '#fef2f2' : '#f8fafc'
+  const color = tone === 'error' ? '#b91c1c' : '#0f172a'
+  return (
+    <div style={{ ...cardStyle, margin: 24, background: bg, color }}>
+      {message}
+    </div>
+  )
 }
 
 function toForm(data) {
@@ -155,6 +199,15 @@ function toForm(data) {
     fullName: data?.fullName || '',
     email: data?.email || '',
     phone: data?.phone || '',
+  }
+}
+
+function getStoredUser() {
+  try {
+    const raw = localStorage.getItem('user') || localStorage.getItem('currentUser')
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
   }
 }
 
@@ -207,6 +260,7 @@ const avatarStyle = {
   borderRadius: '50%',
   color: '#fff',
   display: 'flex',
+  flexShrink: 0,
   fontSize: 28,
   fontWeight: 800,
   height: 64,
@@ -264,7 +318,29 @@ const infoRowStyle = {
   display: 'flex',
   justifyContent: 'space-between',
   gap: 16,
-  padding: '13px 0',
+  padding: '11px 0',
+}
+
+const activeBadgeStyle = {
+  background: '#f0fdf4',
+  border: '1px solid #bbf7d0',
+  borderRadius: 999,
+  color: '#15803d',
+  fontSize: 12,
+  fontWeight: 700,
+  padding: '4px 12px',
+  whiteSpace: 'nowrap',
+}
+
+const inactiveBadgeStyle = {
+  background: '#fef2f2',
+  border: '1px solid #fecaca',
+  borderRadius: 999,
+  color: '#b91c1c',
+  fontSize: 12,
+  fontWeight: 700,
+  padding: '4px 12px',
+  whiteSpace: 'nowrap',
 }
 
 const errorStyle = {
@@ -276,6 +352,15 @@ const errorStyle = {
   padding: '10px 12px',
 }
 
+const warnStyle = {
+  background: '#fffbeb',
+  border: '1px solid #fde68a',
+  borderRadius: 12,
+  color: '#92400e',
+  marginBottom: 16,
+  padding: '10px 12px',
+}
+
 const successStyle = {
   background: '#f0fdf4',
   border: '1px solid #bbf7d0',
@@ -283,4 +368,13 @@ const successStyle = {
   color: '#15803d',
   marginBottom: 16,
   padding: '10px 12px',
+}
+
+const loyaltyErrorStyle = {
+  background: '#fef9c3',
+  border: '1px solid #fde68a',
+  borderRadius: 12,
+  color: '#92400e',
+  fontSize: 13,
+  padding: '12px 16px',
 }

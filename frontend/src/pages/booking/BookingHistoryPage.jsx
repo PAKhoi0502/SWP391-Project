@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { bookingApi } from '../../api/bookingApi'
 import customerBookingFlowApi from '../../api/customerBookingFlowApi'
+import { loyaltyApi } from '../../api/loyaltyApi'
+import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import './BookingHistoryPage.css'
 
 const BOOKING_CACHE_PREFIX = 'booking-detail-cache-'
@@ -53,7 +55,9 @@ const mergeBookingWithCache = (booking) => {
   const bookingId = getBookingId(booking)
   const cached = readCachedBooking(bookingId)
   const paidAt = readCachedPayOSPaidAt(bookingId)
-  const merged = { ...booking, ...cached }
+  // Live API data wins for status/note; cache fills in display-only fields
+  // (customerName, vehicleName, garageName, paymentMethod) not returned by list API.
+  const merged = { ...cached, ...booking }
 
   if (paidAt) {
     merged.paymentStatus = 'PAID'
@@ -144,6 +148,7 @@ const getStatusText = (status) => {
   const value = String(status || '').toUpperCase()
 
   if (value === 'CONFIRMED') return 'Chưa thực hiện'
+  if (value === 'PENDING_DEPOSIT') return 'Chờ đặt cọc'
   if (value === 'CHECKED_IN') return 'Đã check-in'
   if (value === 'IN_PROGRESS') return 'Đang thực hiện'
   if (value === 'COMPLETED') return 'Hoàn thành'
@@ -243,16 +248,23 @@ const getHistoryTimelineItems = (booking) => {
 }
 
 export default function BookingHistoryPage() {
+  const location = useLocation()
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState(
+    location.state?.bookingCreated ? 'Đặt lịch thành công! Booking của bạn đã được tạo.' : '',
+  )
   const [filter, setFilter] = useState('ALL')
   const [cancelingId, setCancelingId] = useState(null)
+  const [cancelModalBookingId, setCancelModalBookingId] = useState(null)
+  const [cancelModalBooking, setCancelModalBooking] = useState(null)
 
   const loadBookings = async () => {
     try {
       setLoading(true)
-      setMessage('')
+      if (!location.state?.bookingCreated) {
+        setMessage('')
+      }
 
       const data = await customerBookingFlowApi.getCustomerBookings()
       const enrichedData = await enrichBookingsWithDetail(Array.isArray(data) ? data : [])
@@ -271,7 +283,9 @@ export default function BookingHistoryPage() {
     const load = async () => {
       try {
         setLoading(true)
-        setMessage('')
+        if (!location.state?.bookingCreated) {
+          setMessage('')
+        }
 
         const data = await customerBookingFlowApi.getCustomerBookings()
         const enrichedData = await enrichBookingsWithDetail(Array.isArray(data) ? data : [])
@@ -298,33 +312,61 @@ export default function BookingHistoryPage() {
     }
   }, [])
 
-  const handleCancelBooking = async (bookingId) => {
-    const confirmCancel = window.confirm(
-      `Cảnh báo: Bạn có chắc muốn hủy booking #${bookingId} không? Hành động này không thể hoàn tác.`,
-    )
+  const openCancelModal = (bookingId) => {
+    const booking = bookings.find((b) => String(getBookingId(b)) === String(bookingId))
+    setCancelModalBookingId(bookingId)
+    setCancelModalBooking(booking || null)
+  }
 
-    if (!confirmCancel) return
+  const closeCancelModal = () => {
+    if (cancelingId) return
+    setCancelModalBookingId(null)
+    setCancelModalBooking(null)
+  }
+
+  const handleCancelBooking = async (reason) => {
+    const bookingId = cancelModalBookingId
+    if (!bookingId) return
+
+    const usedPoints = cancelModalBooking?.usedPoints ?? 0
 
     try {
       setCancelingId(bookingId)
       setMessage('')
 
-      await customerBookingFlowApi.cancelBooking(bookingId)
+      await customerBookingFlowApi.cancelBooking(bookingId, reason)
+
+      setCancelModalBookingId(null)
+      setCancelModalBooking(null)
 
       setBookings((prev) =>
         prev.map((booking) =>
           String(getBookingId(booking)) === String(bookingId)
-            ? {
-                ...booking,
-                status: 'CANCELED',
-              }
+            ? { ...booking, status: 'CANCELED', note: reason || booking.note }
             : booking,
         ),
       )
 
-      setMessage(`Đã hủy booking #${bookingId}.`)
+      if (usedPoints > 0) {
+        try {
+          const txPage = await loyaltyApi.getMyTransactions({ type: 'REFUND', page: 1, limit: 5 })
+          const txList = Array.isArray(txPage?.content) ? txPage.content : (Array.isArray(txPage) ? txPage : [])
+          const refundTx = txList.find(
+            (tx) => String(tx?.bookingId) === String(bookingId) && tx?.type === 'REFUND',
+          )
+          if (refundTx) {
+            setMessage(`Booking đã hủy. Đã hoàn ${refundTx.points} điểm vào tài khoản của bạn.`)
+          } else {
+            setMessage(`Booking đã hủy. Nếu điểm đã được trừ, hệ thống sẽ hoàn lại ${usedPoints} điểm.`)
+          }
+        } catch {
+          setMessage(`Booking đã hủy. Nếu điểm đã được trừ, hệ thống sẽ hoàn lại ${usedPoints} điểm.`)
+        }
+      } else {
+        setMessage(`Đã hủy booking #${bookingId}.`)
+      }
     } catch (error) {
-      setMessage(error.message || 'Không thể hủy booking.')
+      setMessage(error?.response?.data?.message || error.message || 'Không thể hủy booking.')
     } finally {
       setCancelingId(null)
     }
@@ -409,11 +451,7 @@ export default function BookingHistoryPage() {
             const customerBookingNo = customerBookingNumberMap.get(String(bookingId)) || bookingId
             const paymentStatus = String(booking?.paymentStatus || '').toUpperCase()
             const status = String(booking?.status || '').toUpperCase()
-            const canCancel =
-              paymentStatus !== 'PAID' &&
-              !isCanceledStatus(status) &&
-              !isNoShowStatus(status) &&
-              status !== 'COMPLETED'
+            const canCancel = status === 'CONFIRMED' || status === 'PENDING_DEPOSIT'
 
             return (
               <article className="booking-history-card" key={bookingId}>
@@ -483,6 +521,13 @@ export default function BookingHistoryPage() {
                       ))}
                     </div>
                   </div>
+
+                  {(isCanceledStatus(status) || isNoShowStatus(status)) && booking?.note && (
+                    <div>
+                      <span>{isNoShowStatus(status) ? 'Lý do no-show' : 'Lý do hủy'}</span>
+                      <strong>{booking.note}</strong>
+                    </div>
+                  )}
                 </div>
 
                 <div className="booking-history-actions">
@@ -490,7 +535,7 @@ export default function BookingHistoryPage() {
                     <button
                       type="button"
                       className="booking-history-cancel-btn"
-                      onClick={() => handleCancelBooking(bookingId)}
+                      onClick={() => openCancelModal(bookingId)}
                       disabled={cancelingId === bookingId}
                     >
                       {cancelingId === bookingId ? 'Đang hủy...' : 'Hủy booking'}
@@ -502,6 +547,14 @@ export default function BookingHistoryPage() {
           })}
         </section>
       )}
+
+      <CancelBookingModal
+        open={cancelModalBookingId !== null}
+        bookingId={cancelModalBookingId}
+        loading={cancelingId === cancelModalBookingId}
+        onClose={closeCancelModal}
+        onConfirm={handleCancelBooking}
+      />
     </main>
   )
 }

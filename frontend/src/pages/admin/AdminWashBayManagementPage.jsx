@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createWashBay,
   getSupportedVehicleTypesByGarage,
@@ -7,6 +7,7 @@ import {
   updateWashBay,
   updateWashBayStatus,
 } from "../../services/washBayApi";
+import { garageService } from "../../services/garageService";
 import "./AdminWashBayManagementPage.css";
 
 const DEFAULT_FORM = {
@@ -50,6 +51,10 @@ export default function AdminWashBayManagementPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [garageMap, setGarageMap] = useState({});
+  const [garageNameInfo, setGarageNameInfo] = useState(null);
+  const garageDebounce = useRef(null);
+
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -76,16 +81,29 @@ const totalAvailable = useMemo(() => {
       setError("");
 
       const data = await getWashBays(filters);
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.content)
+        ? data.content
+        : Array.isArray(data?.data)
+        ? data.data
+        : [];
 
-      if (Array.isArray(data)) {
-        setWashBays(data);
-      } else if (Array.isArray(data?.content)) {
-        setWashBays(data.content);
-      } else if (Array.isArray(data?.data)) {
-        setWashBays(data.data);
-      } else {
-        setWashBays([]);
-      }
+      setWashBays(list);
+
+      const uniqueGarageIds = [...new Set(list.map((b) => b.garageId).filter(Boolean))];
+      const entries = await Promise.all(
+        uniqueGarageIds.map(async (id) => {
+          try {
+            const res = await garageService.getById(id);
+            const g = res?.data || res;
+            return [id, g?.name || g?.garageName || `Garage #${id}`];
+          } catch {
+            return [id, `Garage #${id}`];
+          }
+        })
+      );
+      setGarageMap(Object.fromEntries(entries));
     } catch (err) {
       setError(err.message || "Không tải được danh sách wash bay");
     } finally {
@@ -118,6 +136,20 @@ const totalAvailable = useMemo(() => {
       loadWashBays();
     }
   }, [filters.garageId, filters.vehicleType, filters.status]);
+
+  useEffect(() => {
+    const id = form.garageId;
+    if (!id) { setGarageNameInfo(null); return; }
+    clearTimeout(garageDebounce.current);
+    garageDebounce.current = setTimeout(async () => {
+      try {
+        const res = await garageService.getById(id);
+        const garage = res?.data || res;
+        setGarageNameInfo(garage ? { name: garage.name || garage.garageName || `Garage #${id}`, id } : null);
+      } catch { setGarageNameInfo(null); }
+    }, 400);
+    return () => clearTimeout(garageDebounce.current);
+  }, [form.garageId]);
 
   async function handleCheckGarageInfo() {
     if (!filters.garageId && !form.garageId) {
@@ -175,6 +207,7 @@ const totalAvailable = useMemo(() => {
   function handleCancelEdit() {
     setEditingId(null);
     setForm(DEFAULT_FORM);
+    setGarageNameInfo(null);
     setError("");
     setSuccess("");
   }
@@ -250,7 +283,8 @@ const totalAvailable = useMemo(() => {
   }
 
   function getGarageName(bay) {
-    return bay.garageName || bay.garage?.name || bay.garage?.garageName || "-";
+    const id = bay.garageId || bay.garage?.garageId;
+    return garageMap[id] || bay.garageName || bay.garage?.name || "-";
   }
 
   function getGarageId(bay) {
@@ -318,6 +352,12 @@ const totalAvailable = useMemo(() => {
                   type="number"
                   min="1"
                 />
+                {garageNameInfo && (
+                  <span style={{ fontSize: 12, color: "#a78bfa", marginTop: 4, display: "block" }}>
+                    {garageNameInfo.name}{" "}
+                    <span style={{ fontSize: 10, opacity: 0.6 }}>#{garageNameInfo.id}</span>
+                  </span>
+                )}
               </label>
 
               <label>
@@ -373,10 +413,10 @@ const totalAvailable = useMemo(() => {
               Sức chứa
               <input
                 name="capacity"
-                value={form.capacity}
-                onChange={handleChangeForm}
+                value={1}
+                readOnly
                 type="number"
-                min="1"
+                style={{ opacity: 0.6, cursor: "not-allowed" }}
               />
             </label>
 
@@ -584,10 +624,10 @@ const totalAvailable = useMemo(() => {
                       </div>
                     </td>
                     <td>{bay.bayCode || bay.code || "-"}</td>
-                    <td>{bay.name || bay.bayName || "-"}</td>
+                    <td>{bay.bayCode || "-"}</td>
                     <td>
                       <span className="wash-bay-type-pill">
-                        {bay.vehicleType === "MOTORBIKE" ? "Xe máy" : "Ô tô"}
+                        {(bay.vehicleType === "MOTORBIKE" || bay.vehicleType === "BIKE") ? "Xe máy" : "Ô tô"}
                       </span>
                     </td>
                     <td>{bay.capacity || 1}</td>
