@@ -16,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.autowashpro.service.NotificationService;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -34,6 +35,7 @@ public class WaitlistServiceImpl implements WaitlistService {
     private final StaffProfileRepository staffProfileRepository;
     private final CustomerLoyaltyRepository customerLoyaltyRepository;
     private final BookingService bookingService;
+    private final NotificationService notificationService;
 
     @Value("${waitlist.cutoff-hours}")
     private int cutoffHours;
@@ -247,9 +249,7 @@ public class WaitlistServiceImpl implements WaitlistService {
 
         Waitlist saved = waitlistRepository.save(waitlist);
 
-        // Notification stub — issue #27/#28 will replace with real notification table
-        log.info("[WAITLIST_OFFER_STUB] Notify customer {} about waitlist offer {} for garage {} at {}",
-                waitlist.getCustomerId(), waitlist.getId(), waitlist.getGarageId(), waitlist.getDesiredStartTime());
+        notificationService.notifyWaitlistOffered(saved.getId());
 
         return toResponse(saved);
     }
