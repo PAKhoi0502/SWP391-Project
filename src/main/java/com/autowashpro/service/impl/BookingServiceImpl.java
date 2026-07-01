@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.autowashpro.dto.response.BookingSummaryResponse;
 import com.autowashpro.dto.response.PromotionValidateResponse;
+import com.autowashpro.service.NotificationService;
 
 import java.util.Objects;
 import java.math.BigDecimal;
@@ -57,6 +58,7 @@ public class BookingServiceImpl implements BookingService {
         private final LoyaltyService loyaltyService;
         private final WashHistoryService washHistoryService;
         private final PromotionService promotionService;
+        private final NotificationService notificationService;
 
         // ===================== ISSUE #10 =====================
 
@@ -402,9 +404,8 @@ public class BookingServiceImpl implements BookingService {
                 booking.setNote(request.getNote());
 
                 bookingRepository.save(booking);
-
                 loyaltyService.updateBookingStatistics(booking.getId());
-
+                notificationService.notifyBookingConfirmed(booking.getId());
                 return toResponse(booking);
         }
 
@@ -1284,14 +1285,13 @@ public class BookingServiceImpl implements BookingService {
 
                 Booking saved = bookingRepository.save(booking);
 
-                loyaltyService.updateBookingStatistics(saved.getId());
-
-                promotionService.recordPromotionUsageAfterPaidBooking(saved.getId());
-
-                loyaltyService.earnPointsAfterPaidBooking(saved.getId());
-
-                washHistoryService.createWashHistoryAfterPaidBooking(saved.getId());
-                return toResponse(saved);
+loyaltyService.updateBookingStatistics(saved.getId());
+promotionService.recordPromotionUsageAfterPaidBooking(saved.getId());
+loyaltyService.earnPointsAfterPaidBooking(saved.getId());
+washHistoryService.createWashHistoryAfterPaidBooking(saved.getId());
+notificationService.notifyPaymentConfirmed(saved.getId());
+notificationService.notifyRewardEarned(saved.getId());
+return toResponse(saved);
         }
         // ===================== HELPER =====================
 
