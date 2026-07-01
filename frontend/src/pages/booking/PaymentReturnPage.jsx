@@ -1,0 +1,44 @@
+import { useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+
+function PaymentReturnPage() {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  useEffect(() => {
+    const fallbackPath = '/staff/bookings'
+    const params = new URLSearchParams(location.search)
+    const orderCode = params.get('orderCode') || params.get('order_code')
+    const savedPath =
+      (orderCode ? sessionStorage.getItem(`payosReturnPath-${orderCode}`) : '') ||
+      (orderCode ? localStorage.getItem(`payosReturnPath-${orderCode}`) : '') ||
+      sessionStorage.getItem('payosReturnPath') ||
+      localStorage.getItem('payosReturnPath') ||
+      sessionStorage.getItem('payosLastReturnPath') ||
+      localStorage.getItem('payosLastReturnPath') ||
+      fallbackPath
+    const isSuccess = location.pathname.includes('/success')
+    const bookingId = savedPath.match(/bookings\/(\d+)/)?.[1]
+
+    if (isSuccess && bookingId) {
+      localStorage.setItem(`booking-payos-paid-${bookingId}`, new Date().toISOString())
+      localStorage.setItem(`booking-payment-method-${bookingId}`, 'PAYOS')
+    }
+
+    localStorage.removeItem('payosReturnPath')
+    sessionStorage.removeItem('payosReturnPath')
+    if (orderCode) {
+      localStorage.removeItem(`payosReturnPath-${orderCode}`)
+      sessionStorage.removeItem(`payosReturnPath-${orderCode}`)
+    }
+    navigate(`${savedPath}?payment=${isSuccess ? 'success' : 'cancel'}`, { replace: true })
+  }, [location.pathname, location.search, navigate])
+
+  return (
+    <div className="booking-history-page">
+      <div className="booking-history-empty">Dang quay ve booking...</div>
+    </div>
+  )
+}
+
+export default PaymentReturnPage

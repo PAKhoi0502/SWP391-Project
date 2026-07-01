@@ -4,6 +4,7 @@ import {
   bookingFlowUtils,
   customerBookingFlowApi,
 } from '../../api/customerBookingFlowApi'
+import { userService } from '../../services/userService'
 import './CustomerCreateBookingPage.css'
 
 const todayIso = () => new Date().toISOString().slice(0, 10)
@@ -33,6 +34,35 @@ const getName = (item, fallback = 'Không có tên') =>
   item?.plateNumber ||
   item?.model ||
   fallback
+
+const getStoredUserName = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    return user?.fullName || user?.name || user?.username || user?.email || ''
+  } catch {
+    return ''
+  }
+}
+
+const getUserDisplayName = (user) =>
+  user?.fullName ||
+  user?.name ||
+  user?.username ||
+  user?.email ||
+  ''
+
+const getVehicleDisplayName = (vehicle) => {
+  if (!vehicle) return ''
+
+  const plate =
+    vehicle.rawLicensePlate ||
+    vehicle.normalizedLicensePlate ||
+    vehicle.licensePlate ||
+    vehicle.plateNumber
+  const modelName = [vehicle.brand, vehicle.model].filter(Boolean).join(' ').trim()
+
+  return [plate, modelName].filter(Boolean).join(' - ') || getName(vehicle, 'Xe')
+}
 
 const formatTime = (value) => {
   if (!value) return ''
@@ -416,7 +446,39 @@ const canSubmit =
       ? 'Khách chọn chuyển khoản tại garage sau khi hoàn thành dịch vụ.'
       : 'Khách chọn thanh toán tiền mặt tại garage sau khi hoàn thành dịch vụ.',
 }
-      await customerBookingFlowApi.createBooking(bookingPayload)
+      const createdBooking = await customerBookingFlowApi.createBooking(bookingPayload)
+      if (createdBooking?.id) {
+        try {
+          let customerName = getStoredUserName()
+          try {
+            const currentUser = await userService.getMe()
+            customerName = getUserDisplayName(currentUser) || customerName
+          } catch {
+            // Keep the locally stored user name if /users/me is unavailable.
+          }
+
+          if (createdBooking.customerId && customerName) {
+            localStorage.setItem(`booking-customer-name-${createdBooking.customerId}`, customerName)
+          }
+
+          localStorage.setItem(`booking-payment-method-${createdBooking.id}`, paymentMethod)
+
+          localStorage.setItem(
+            `booking-detail-cache-${createdBooking.id}`,
+            JSON.stringify({
+              ...createdBooking,
+              customerName,
+              vehicleName: getVehicleDisplayName(selectedVehicle),
+              garageName: getName(selectedGarage, 'Garage'),
+              servicePackageName: getName(selectedPackage, 'Gói dịch vụ'),
+              paymentMethod,
+              note: bookingPayload.note,
+            }),
+          )
+        } catch {
+          // localStorage can be unavailable in restricted browser modes.
+        }
+      }
 
       navigate('/customer/booking-history', {
         replace: true,
