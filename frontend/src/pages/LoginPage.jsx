@@ -48,22 +48,22 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-  const loggedUser = await login({
-    phone: form.identifier.trim(),
-    password: form.password,
-  })
+      const loggedUser = await login({
+        phone: form.identifier.trim(),
+        password: form.password,
+      })
 
-  const redirectPath = getRedirectPathByRole(getRole(loggedUser))
+      const redirectPath = getRedirectPathByRole(getRole(loggedUser))
 
-  navigate(redirectPath, {
-    replace: true,
-    state: { loginSuccess: true },
-  })
-} catch (err) {
+      navigate(redirectPath, {
+        replace: true,
+        state: { loginSuccess: true },
+      })
+    } catch (err) {
       setError(
         err.response?.data?.message ||
-          err.response?.data?.error ||
-          'số điện thoại hoặc mật khẩu không đúng'
+        err.response?.data?.error ||
+        'số điện thoại hoặc mật khẩu không đúng'
       )
     } finally {
       setLoading(false)
@@ -140,7 +140,7 @@ export default function LoginPage() {
             color: '#4ade80', fontSize: 13, marginBottom: 20,
             display: 'flex', alignItems: 'center', gap: 8,
           }}>
-            Dang ky thanh cong! Hay dang nhap.
+            Đăng ký thành công! Hãy đăng nhập.
           </div>
         )}
 
@@ -160,12 +160,12 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} style={{ textAlign: 'left' }}>
           <div style={{ marginBottom: 18 }}>
-            <label style={labelStyle}>so dien thoai</label>
+            <label style={labelStyle}>Số điện thoại</label>
             <input
               className="login-input"
               type="text"
               name="identifier"
-              placeholder="nhap so dien thoai da dang ky"
+              placeholder="Nhập số điện thoại đã đăng ký"
               value={form.identifier}
               onChange={handleChange}
               required
@@ -177,7 +177,7 @@ export default function LoginPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
               <label style={labelStyle}>Password</label>
               <Link to="/forgot-password" style={{ color: '#a78bfa', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
-                Quen mat khau?
+                Quên mật khẩu?
               </Link>
             </div>
 

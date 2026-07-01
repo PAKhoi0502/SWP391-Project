@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, ConfirmDialog, Input, Modal, Select, StatusBadge, Table } from '../components/common/ui'
-import { ENGINE_TYPES, VEHICLE_TYPES } from '../constants/vehicleTypes'
+import { ENGINE_TYPES, MOTORBIKE_GROUPS, VEHICLE_TYPES } from '../constants/vehicleTypes'
 import { vehicleService } from '../services/vehicleService'
 
 const emptyForm = {
@@ -120,15 +120,15 @@ export default function CustomerVehiclesPage() {
     <div style={pageStyle}>
       <style>{`
         .vehicle-header { align-items: center; display: flex; gap: 16px; justify-content: space-between; }
-        .vehicle-form { display: grid; gap: 14px; }
-        .vehicle-form-grid { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+        .vehicle-form { display: grid; gap: 16px; }
+        .vehicle-form-grid { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
         @media (max-width: 760px) { .vehicle-header { align-items: flex-start; flex-direction: column; } .vehicle-form-grid { grid-template-columns: 1fr; } }
       `}</style>
 
       <div className="vehicle-header" style={headerStyle}>
         <div>
-          <h1 style={{ margin: 0, color: '#fff' }}>Xe của tôi</h1>
-          <p style={{ margin: '6px 0 0', color: 'rgba(200,220,255,0.58)' }}>Quản lý xe, đặt xe mặc định và kiểm tra biển số chuẩn hóa.</p>
+          <h1 style={{ margin: 0, color: '#fff', marginBottom: '20px' }}>Xe của tôi</h1>
+          <p style={{ margin: 0, color: 'rgba(200,220,255,0.58)' }}>Quản lý xe, đặt xe mặc định và kiểm tra biển số chuẩn hóa.</p>
         </div>
         <Button onClick={openCreate}>Thêm xe</Button>
       </div>
@@ -147,8 +147,25 @@ export default function CustomerVehiclesPage() {
             <Input required label="Dòng xe" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
             <Input label="Màu" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
             <Select label="Động cơ" value={form.engineType} onChange={(e) => setForm({ ...form, engineType: e.target.value })} options={[{ value: '', label: 'Chưa chọn' }, ...ENGINE_TYPES.map((type) => ({ value: type, label: formatVehicleType(type) }))]} />
-            <Input label="Số ghế" type="number" min="1" value={form.seatCount} onChange={(e) => setForm({ ...form, seatCount: e.target.value })} />
-            <Input label="Nhóm xe máy" value={form.motorbikeGroup} onChange={(e) => setForm({ ...form, motorbikeGroup: e.target.value })} />
+            {form.vehicleType === 'CAR' && (
+              <Input
+                required
+                label="Số ghế"
+                type="number"
+                min="1"
+                value={form.seatCount}
+                onChange={(e) => setForm({ ...form, seatCount: e.target.value })}
+              />
+            )}
+            {form.vehicleType === 'BIKE' && (
+              <Select
+                required
+                label="Nhóm xe máy"
+                value={form.motorbikeGroup}
+                onChange={(e) => setForm({ ...form, motorbikeGroup: e.target.value })}
+                options={[{ value: '', label: 'Chọn nhóm xe máy' }, ...MOTORBIKE_GROUPS]}
+              />
+            )}
           </div>
           {!editing && <label style={checkStyle}><input type="checkbox" checked={form.isDefault} onChange={(e) => setForm({ ...form, isDefault: e.target.checked })} /> Đặt làm xe mặc định</label>}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>

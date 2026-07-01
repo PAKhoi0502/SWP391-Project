@@ -38,22 +38,22 @@ const isNoShowStatus = (status) => String(status || '').toUpperCase() === 'NO_SH
 
 const buildCustomerBookingNumberMap = (items) => {
   const map = new Map()
-  ;[...items]
-    .sort((left, right) => Number(left?.id || 0) - Number(right?.id || 0))
-    .forEach((booking, index) => {
-      map.set(String(booking?.id), index + 1)
-    })
+    ;[...items]
+      .sort((left, right) => Number(left?.id || 0) - Number(right?.id || 0))
+      .forEach((booking, index) => {
+        map.set(String(booking?.id), index + 1)
+      })
   return map
 }
 
 const getStatusText = (status) => {
   const value = String(status || '').toUpperCase()
 
-  if (value === 'CONFIRMED') return 'Chua thuc hien'
-  if (value === 'CHECKED_IN') return 'Da check-in'
-  if (value === 'IN_PROGRESS') return 'Dang thuc hien'
-  if (value === 'COMPLETED') return 'Da hoan thanh'
-  if (value === 'CANCELED' || value === 'CANCELLED') return 'Da huy'
+  if (value === 'CONFIRMED') return 'Chưa thực hiện'
+  if (value === 'CHECKED_IN') return 'Đã check-in'
+  if (value === 'IN_PROGRESS') return 'Đang thực hiện'
+  if (value === 'COMPLETED') return 'Đã hoàn thành'
+  if (value === 'CANCELED' || value === 'CANCELLED') return 'Đã hủy'
   if (value === 'NO_SHOW') return 'No-show'
 
   return status || 'N/A'
@@ -62,16 +62,16 @@ const getStatusText = (status) => {
 const getPaymentStatusText = (status) => {
   const value = String(status || '').toUpperCase()
 
-  if (value === 'PAID') return 'Da thanh toan'
-  if (value === 'UNPAID') return 'Chua thanh toan'
-  if (value === 'PENDING') return 'Dang cho'
-  if (value === 'CANCELED' || value === 'CANCELLED') return 'Da huy'
+  if (value === 'PAID') return 'Đã thanh toán'
+  if (value === 'UNPAID') return 'Chưa thanh toán'
+  if (value === 'PENDING') return 'Đang chờ'
+  if (value === 'CANCELED' || value === 'CANCELLED') return 'Đã hủy'
 
-  return status || 'Chua thanh toan'
+  return status || 'Chưa thanh toán'
 }
 
 const formatDateTime = (value) => {
-  if (!value) return 'Chua cap nhat'
+  if (!value) return 'Chưa cập nhật'
   return new Date(value).toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
@@ -96,7 +96,7 @@ function CustomerBookingListPage() {
       setBookings(data.map(mergeBookingWithCache))
     } catch (err) {
       setBookings([])
-      setError(err?.response?.data?.message || err?.message || 'Khong tai duoc danh sach booking.')
+      setError(err?.response?.data?.message || err?.message || 'Không tải được danh sách booking.')
     } finally {
       setLoading(false)
     }
@@ -127,17 +127,17 @@ function CustomerBookingListPage() {
       <section className="booking-history-hero">
         <div>
           <p>Customer</p>
-          <h1>Lich hen cua toi</h1>
-          <span>Theo doi booking va trang thai thanh toan.</span>
+          <h1 style={{ margin: 0, color: '#fff', marginBottom: '20px' }}>Lịch hẹn của tôi</h1>
+          <span>Theo dõi booking và trạng thái thanh toán.</span>
         </div>
-        <Link to="/booking">Dat lich moi</Link>
+        <Link to="/booking">Đặt lịch mới</Link>
       </section>
 
       <section className="booking-history-toolbar">
         <div className="booking-history-filter-group">
           {statuses.map((item) => (
             <button key={item} className={status === item ? 'active' : ''} type="button" onClick={() => setStatus(item)}>
-              {item === 'ALL' ? 'Tat ca' : getStatusText(item)}
+              {item === 'ALL' ? 'Tất cả' : getStatusText(item)}
             </button>
           ))}
         </div>
@@ -145,44 +145,44 @@ function CustomerBookingListPage() {
 
       {error && <div className="booking-history-message">{error}</div>}
       {loading ? (
-        <div className="booking-history-empty">Dang tai booking...</div>
+        <div className="booking-history-empty">Đang tải booking...</div>
       ) : visibleBookings.length === 0 ? (
-        <div className="booking-history-empty">Ban chua co booking phu hop.</div>
+        <div className="booking-history-empty">Bạn chưa có booking nào phù hợp.</div>
       ) : (
         <section className="booking-history-list">
           {visibleBookings.map((booking) => {
             const customerBookingNo = customerBookingNumberMap.get(String(booking.id)) || booking.id
 
             return (
-            <article className="booking-history-card" key={booking.id}>
-              {isNoShowStatus(booking.status) && (
-                <div className="booking-no-show-seal">NO SHOW</div>
-              )}
-              <div className="booking-history-card-top">
-                <div>
-                  <p>Ma booking</p>
-                  <h2>#{customerBookingNo}</h2>
+              <article className="booking-history-card" key={booking.id}>
+                {isNoShowStatus(booking.status) && (
+                  <div className="booking-no-show-seal">NO SHOW</div>
+                )}
+                <div className="booking-history-card-top">
+                  <div>
+                    <p>Mã booking</p>
+                    <h2>#{customerBookingNo}</h2>
+                  </div>
+                  <div className="booking-history-badges">
+                    <span className={`status ${String(booking.status || '').toLowerCase()}`}>
+                      {getStatusText(booking.status)}
+                    </span>
+                    <span className={`payment ${String(booking.paymentStatus || '').toLowerCase()}`}>
+                      {getPaymentStatusText(booking.paymentStatus)}
+                    </span>
+                  </div>
                 </div>
-                <div className="booking-history-badges">
-                  <span className={`status ${String(booking.status || '').toLowerCase()}`}>
-                    {getStatusText(booking.status)}
-                  </span>
-                  <span className={`payment ${String(booking.paymentStatus || '').toLowerCase()}`}>
-                    {getPaymentStatusText(booking.paymentStatus)}
-                  </span>
+                <div className="booking-history-info">
+                  <div><span>Garage</span><strong>{booking.garageName || `#${booking.garageId}`}</strong></div>
+                  <div><span>Xe</span><strong>{booking.vehicleName || booking.vehicleId || 'N/A'}</strong></div>
+                  <div><span>Gói dịch vụ</span><strong>{booking.servicePackageName || `#${booking.servicePackageId}`}</strong></div>
+                  <div><span>Thời gian</span><strong>{formatDateTime(booking.startTime)}</strong></div>
+                  <div><span>Tổng tiền</span><strong>{formatMoney(booking.finalPrice)}</strong></div>
                 </div>
-              </div>
-              <div className="booking-history-info">
-                <div><span>Garage</span><strong>#{booking.garageId}</strong></div>
-                <div><span>Xe</span><strong>#{booking.vehicleId || 'N/A'}</strong></div>
-                <div><span>Goi dich vu</span><strong>#{booking.servicePackageId}</strong></div>
-                <div><span>Thoi gian</span><strong>{formatDateTime(booking.startTime)}</strong></div>
-                <div><span>Tong tien</span><strong>{formatMoney(booking.finalPrice)}</strong></div>
-              </div>
-              <div className="booking-history-actions">
-                <Link to={`/customer/bookings/${booking.id}`}>Xem chi tiet</Link>
-              </div>
-            </article>
+                <div className="booking-history-actions">
+                  <Link to={`/customer/bookings/${booking.id}`}>Xem chi tiết</Link>
+                </div>
+              </article>
             )
           })}
         </section>

@@ -1,5 +1,6 @@
 import { Link, useSearchParams } from 'react-router-dom'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { waitlistApi } from '../../api/waitlistApi'
 
 function formatDate(date) {
   if (!date) return 'Chưa có ngày'
@@ -31,6 +32,17 @@ function getVehicleTypeLabel(vehicleType) {
   return vehicleType || 'Chưa có loại xe'
 }
 
+function getStatusLabel(status) {
+  const value = String(status || 'WAITING').toUpperCase()
+  if (value === 'WAITING') return 'Đang chờ'
+  if (value === 'OFFERED') return 'Có slot trống'
+  if (value === 'ACCEPTED') return 'Đã duyệt'
+  if (value === 'REJECTED') return 'Đã từ chối'
+  if (value === 'CANCELLED' || value === 'CANCELED') return 'Đã hủy'
+  if (value === 'EXPIRED') return 'Hết hạn'
+  return value
+}
+
 function InfoRow({ label, value }) {
   return (
     <div
@@ -52,6 +64,8 @@ export default function WaitlistPage() {
   const [searchParams] = useSearchParams()
   const [joined, setJoined] = useState(false)
   const [error, setError] = useState('')
+  const [items, setItems] = useState([])
+  const [loadingItems, setLoadingItems] = useState(false)
 
   const garageId = searchParams.get('garageId') || ''
   const garageName = searchParams.get('garageName') || ''
@@ -61,10 +75,12 @@ export default function WaitlistPage() {
   const date = searchParams.get('date') || ''
   const startTime = searchParams.get('startTime') || ''
   const endTime = searchParams.get('endTime') || ''
+  const isJoinFlow = Boolean(garageId || servicePackageId || vehicleType || date || startTime || endTime)
 
   const backToBookingUrl = `/booking?garageId=${garageId}&servicePackageId=${servicePackageId}&vehicleType=${vehicleType}&date=${date}`
 
   const waitlistPayload = useMemo(() => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
     return {
       garageId,
       garageName,
@@ -74,25 +90,144 @@ export default function WaitlistPage() {
       date,
       startTime,
       endTime,
-      status: 'WAITING',
-      createdAt: new Date().toISOString(),
+      customerId: user?.id || 'Guest',
+      customerName: user?.fullName || user?.name || 'Khách hàng',
     }
   }, [garageId, garageName, servicePackageId, servicePackageName, vehicleType, date, startTime, endTime])
 
-  const handleConfirmJoinWaitlist = () => {
+  useEffect(() => {
+    if (isJoinFlow) return
+
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    setLoadingItems(true)
+    waitlistApi.getMine()
+      .then((result) => {
+        const mine = result.filter((item) => !user?.id || String(item?.customerId) === String(user.id))
+        setItems(mine.sort((left, right) => new Date(right?.createdAt || 0) - new Date(left?.createdAt || 0)))
+      })
+      .catch(() => setError('Không tải được danh sách chờ.'))
+      .finally(() => setLoadingItems(false))
+  }, [isJoinFlow])
+
+  const handleConfirmJoinWaitlist = async () => {
     if (!garageId || !servicePackageId || !vehicleType || !date) {
       setError('Thiếu thông tin slot. Vui lòng quay lại trang chọn slot và chọn lại.')
       return
     }
 
-    const oldItems = JSON.parse(localStorage.getItem('waitlistItems') || '[]')
-    const nextItems = [waitlistPayload, ...oldItems]
+    // Dùng chung waitlistApi.join() để item luôn có id duy nhất (tránh
+    // nhiều item không có id trùng nhau khi staff duyệt/từ chối) và
+    // được tính đúng vị trí (position) trong hàng chờ của khung giờ đó.
+    const savedEntry = await waitlistApi.join(waitlistPayload)
 
-    localStorage.setItem('waitlistItems', JSON.stringify(nextItems))
-    localStorage.setItem('waitlistDraft', JSON.stringify(waitlistPayload))
+    localStorage.setItem('waitlistDraft', JSON.stringify(savedEntry))
 
     setError('')
     setJoined(true)
+  }
+
+  if (!isJoinFlow) {
+    return (
+      <div style={{ padding: 32, color: '#ffffff' }}>
+        <section
+          style={{
+            maxWidth: 960,
+            padding: 32,
+            borderRadius: 24,
+            background: 'linear-gradient(135deg, #07111f, #12345a)',
+            boxShadow: '0 20px 45px rgba(0,0,0,0.25)',
+          }}
+        >
+          <p
+            style={{
+              margin: '0 0 8px',
+              color: '#67e8f9',
+              fontSize: 13,
+              fontWeight: 900,
+              letterSpacing: '0.22em',
+              textTransform: 'uppercase',
+            }}
+          >
+            Waitlist
+          </p>
+          <h1 style={{ margin: 0, fontSize: 36 }}>Danh sách chờ của tôi</h1>
+          <p style={{ marginTop: 12, color: '#dbeafe', lineHeight: 1.7 }}>
+            Các yêu cầu waitlist sẽ nằm ở đây. Khi được duyệt và tạo booking, lịch hẹn mới xuất hiện ở trang Lịch hẹn.
+          </p>
+
+          {error && <p style={{ color: '#fecaca', fontWeight: 800 }}>{error}</p>}
+          {loadingItems ? (
+            <p style={{ marginTop: 24, color: '#dbeafe' }}>Đang tải danh sách chờ...</p>
+          ) : items.length === 0 ? (
+            <div
+              style={{
+                marginTop: 24,
+                padding: 18,
+                borderRadius: 18,
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.14)',
+              }}
+            >
+              Bạn chưa có yêu cầu waitlist nào.
+            </div>
+          ) : (
+            <div style={{ marginTop: 24, display: 'grid', gap: 14 }}>
+              {items.map((item) => (
+                <article
+                  key={item.id || `${item.garageId}-${item.startTime}`}
+                  style={{
+                    padding: 18,
+                    borderRadius: 18,
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.14)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                    <strong style={{ fontSize: 20 }}>{item.servicePackageName || `Gói #${item.servicePackageId || '-'}`}</strong>
+                    <span style={{ color: '#fde68a', fontWeight: 900 }}>{getStatusLabel(item.status)}</span>
+                  </div>
+                  <div style={{ marginTop: 12, color: '#dbeafe', lineHeight: 1.7 }}>
+                    <div>Garage: {item.garageName || `Garage #${item.garageId || '-'}`}</div>
+                    <div>Ngày: {formatDate(item.date || item.startTime)}</div>
+                    <div>Khung giờ: {formatTime(item.startTime)} - {formatTime(item.endTime)}</div>
+                    <div>Vị trí: #{item.position || '-'}</div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+
+          <div style={{ marginTop: 24, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <Link
+              to="/booking"
+              style={{
+                padding: '12px 18px',
+                borderRadius: 999,
+                background: '#facc15',
+                color: '#111827',
+                textDecoration: 'none',
+                fontWeight: 900,
+              }}
+            >
+              Đặt lịch mới
+            </Link>
+            <Link
+              to="/customer/bookings"
+              style={{
+                padding: '12px 18px',
+                borderRadius: 999,
+                background: 'rgba(255,255,255,0.12)',
+                color: '#ffffff',
+                textDecoration: 'none',
+                fontWeight: 800,
+              }}
+            >
+              Xem lịch hẹn
+            </Link>
+          </div>
+        </section>
+      </div>
+    )
   }
 
   return (
@@ -238,7 +373,7 @@ export default function WaitlistPage() {
               </Link>
 
               <Link
-                to="/customer/bookings"
+                to="/customer/waitlist"
                 style={{
                   padding: '12px 18px',
                   borderRadius: 999,
@@ -248,7 +383,7 @@ export default function WaitlistPage() {
                   fontWeight: 800,
                 }}
               >
-                Xem lịch hẹn
+                Xem danh sách chờ
               </Link>
             </div>
           </>

@@ -174,11 +174,11 @@ const isNoShowStatus = (status) => String(status || '').toUpperCase() === 'NO_SH
 const buildCustomerBookingNumberMap = (items) => {
   const map = new Map()
 
-  ;[...items]
-    .sort((left, right) => Number(getBookingId(left) || 0) - Number(getBookingId(right) || 0))
-    .forEach((booking, index) => {
-      map.set(String(getBookingId(booking)), index + 1)
-    })
+    ;[...items]
+      .sort((left, right) => Number(getBookingId(left) || 0) - Number(getBookingId(right) || 0))
+      .forEach((booking, index) => {
+        map.set(String(getBookingId(booking)), index + 1)
+      })
 
   return map
 }
@@ -315,9 +315,9 @@ export default function BookingHistoryPage() {
         prev.map((booking) =>
           String(getBookingId(booking)) === String(bookingId)
             ? {
-                ...booking,
-                status: 'CANCELED',
-              }
+              ...booking,
+              status: 'CANCELED',
+            }
             : booking,
         ),
       )
@@ -366,7 +366,7 @@ export default function BookingHistoryPage() {
       <section className="booking-history-hero">
         <div>
           <p>AutoWash Pro</p>
-          <h1>Booking History</h1>
+          <h1 style={{ margin: 0, color: '#fff', marginBottom: '20px' }}>Booking History</h1>
           <span>Theo dõi lịch hẹn, trạng thái xử lý và thanh toán của bạn.</span>
         </div>
 

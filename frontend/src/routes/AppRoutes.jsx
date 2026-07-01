@@ -36,7 +36,7 @@ import BookingHistoryPage from '../pages/booking/BookingHistoryPage'
 import CustomerBookingListPage from '../pages/booking/CustomerBookingListPage'
 import BookingDetailPage from '../pages/booking/BookingDetailPage'
 import StaffBookingListPage from '../pages/booking/StaffBookingListPage'
-import AdminBookingListPage from '../pages/admin/AdminBookingListPage'
+import AdminBookingListPage from '../pages/booking/AdminBookingListPage'
 import PaymentReturnPage from '../pages/booking/PaymentReturnPage'
 
 
