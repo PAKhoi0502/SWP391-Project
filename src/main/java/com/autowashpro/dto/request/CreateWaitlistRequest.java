@@ -6,7 +6,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-public class BookingCreateRequest {
+public class CreateWaitlistRequest {
 
     @NotNull
     private Long garageId;
@@ -18,12 +18,8 @@ public class BookingCreateRequest {
     private Long servicePackageId;
 
     @NotNull
-    private LocalDateTime startTime;
+    private LocalDateTime desiredStartTime;
 
-    private String promotionCode;
-
-    private Integer usedPoints = 0;
-
-    private String note;
-
+    @NotNull
+    private String reason; // NO_BAY | NO_CARE_STAFF
 }

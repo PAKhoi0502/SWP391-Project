@@ -4,6 +4,7 @@ import {
   bookingFlowUtils,
   customerBookingFlowApi,
 } from '../../api/customerBookingFlowApi'
+import { userService } from '../../services/userService'
 import './CustomerCreateBookingPage.css'
 
 const todayIso = () => new Date().toISOString().slice(0, 10)
@@ -33,6 +34,35 @@ const getName = (item, fallback = 'Không có tên') =>
   item?.plateNumber ||
   item?.model ||
   fallback
+
+const getStoredUserName = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    return user?.fullName || user?.name || user?.username || user?.email || ''
+  } catch {
+    return ''
+  }
+}
+
+const getUserDisplayName = (user) =>
+  user?.fullName ||
+  user?.name ||
+  user?.username ||
+  user?.email ||
+  ''
+
+const getVehicleDisplayName = (vehicle) => {
+  if (!vehicle) return ''
+
+  const plate =
+    vehicle.rawLicensePlate ||
+    vehicle.normalizedLicensePlate ||
+    vehicle.licensePlate ||
+    vehicle.plateNumber
+  const modelName = [vehicle.brand, vehicle.model].filter(Boolean).join(' ').trim()
+
+  return [plate, modelName].filter(Boolean).join(' - ') || getName(vehicle, 'Xe')
+}
 
 const formatTime = (value) => {
   if (!value) return ''
@@ -338,18 +368,18 @@ export default function CustomerCreateBookingPage() {
       endTime: waitlistDraft.endTime || '',
     })
 
-    navigate(`/waitlist?${params.toString()}`)
+    navigate(`/customer/waitlist?${params.toString()}`)
   }
 
-const canSubmit =
-  currentStep === 5 &&
-  selectedVehicle &&
-  selectedGarage &&
-  selectedPackage &&
-  selectedDate &&
-  selectedSlot &&
-  paymentMethod &&
-  !submitting
+  const canSubmit =
+    currentStep === 5 &&
+    selectedVehicle &&
+    selectedGarage &&
+    selectedPackage &&
+    selectedDate &&
+    selectedSlot &&
+    paymentMethod &&
+    !submitting
 
   const canGoNext = () => {
     if (currentStep === 1) return Boolean(selectedVehicle)
@@ -404,19 +434,51 @@ const canSubmit =
           : `${selectedDate}T${rawStartTime}:00`
 
       const bookingPayload = {
-  garageId: selectedGarage?.garageId ?? selectedGarage?.id,
-  vehicleId: selectedVehicle?.vehicleId ?? selectedVehicle?.id,
-  servicePackageId: packageId,
-  startTime,
-  promotionCode: promotionCode.trim() || null,
-  usedPoints: Number(loyaltyPoints || 0),
-  paymentMethod,
-  note:
-    paymentMethod === 'BANK_TRANSFER'
-      ? 'Khách chọn chuyển khoản tại garage sau khi hoàn thành dịch vụ.'
-      : 'Khách chọn thanh toán tiền mặt tại garage sau khi hoàn thành dịch vụ.',
-}
-      await customerBookingFlowApi.createBooking(bookingPayload)
+        garageId: selectedGarage?.garageId ?? selectedGarage?.id,
+        vehicleId: selectedVehicle?.vehicleId ?? selectedVehicle?.id,
+        servicePackageId: packageId,
+        startTime,
+        promotionCode: promotionCode.trim() || null,
+        usedPoints: Number(loyaltyPoints || 0),
+        paymentMethod,
+        note:
+          paymentMethod === 'BANK_TRANSFER'
+            ? 'Khách chọn chuyển khoản tại garage sau khi hoàn thành dịch vụ.'
+            : 'Khách chọn thanh toán tiền mặt tại garage sau khi hoàn thành dịch vụ.',
+      }
+      const createdBooking = await customerBookingFlowApi.createBooking(bookingPayload)
+      if (createdBooking?.id) {
+        try {
+          let customerName = getStoredUserName()
+          try {
+            const currentUser = await userService.getMe()
+            customerName = getUserDisplayName(currentUser) || customerName
+          } catch {
+            // Keep the locally stored user name if /users/me is unavailable.
+          }
+
+          if (createdBooking.customerId && customerName) {
+            localStorage.setItem(`booking-customer-name-${createdBooking.customerId}`, customerName)
+          }
+
+          localStorage.setItem(`booking-payment-method-${createdBooking.id}`, paymentMethod)
+
+          localStorage.setItem(
+            `booking-detail-cache-${createdBooking.id}`,
+            JSON.stringify({
+              ...createdBooking,
+              customerName,
+              vehicleName: getVehicleDisplayName(selectedVehicle),
+              garageName: getName(selectedGarage, 'Garage'),
+              servicePackageName: getName(selectedPackage, 'Gói dịch vụ'),
+              paymentMethod,
+              note: bookingPayload.note,
+            }),
+          )
+        } catch {
+          // localStorage can be unavailable in restricted browser modes.
+        }
+      }
 
       navigate('/customer/booking-history', {
         replace: true,
@@ -465,9 +527,8 @@ const canSubmit =
                       <button
                         type="button"
                         key={getId(vehicle)}
-                        className={`booking-option-card ${
-                          String(selectedVehicleId) === String(getId(vehicle)) ? 'active' : ''
-                        }`}
+                        className={`booking-option-card ${String(selectedVehicleId) === String(getId(vehicle)) ? 'active' : ''
+                          }`}
                         onClick={() => setSelectedVehicleId(String(getId(vehicle)))}
                       >
                         <strong>{getName(vehicle, 'Xe của bạn')}</strong>
@@ -504,9 +565,8 @@ const canSubmit =
                       <button
                         type="button"
                         key={getId(garage)}
-                        className={`booking-option-card ${
-                          String(selectedGarageId) === String(getId(garage)) ? 'active' : ''
-                        }`}
+                        className={`booking-option-card ${String(selectedGarageId) === String(getId(garage)) ? 'active' : ''
+                          }`}
                         onClick={() => setSelectedGarageId(String(getId(garage)))}
                       >
                         <strong>{getName(garage, 'Garage')}</strong>
@@ -542,11 +602,10 @@ const canSubmit =
                       <button
                         type="button"
                         key={getId(servicePackage)}
-                        className={`booking-option-card ${
-                          String(selectedPackageId) === String(getId(servicePackage))
+                        className={`booking-option-card ${String(selectedPackageId) === String(getId(servicePackage))
                             ? 'active'
                             : ''
-                        }`}
+                          }`}
                         onClick={() => setSelectedPackageId(String(getId(servicePackage)))}
                       >
                         <strong>{getName(servicePackage, 'Gói dịch vụ')}</strong>
@@ -602,9 +661,8 @@ const canSubmit =
                         <button
                           type="button"
                           key={getId(slot)}
-                          className={`booking-slot ${active ? 'active' : ''} ${
-                            full ? 'full' : ''
-                          }`}
+                          className={`booking-slot ${active ? 'active' : ''} ${full ? 'full' : ''
+                            }`}
                           onClick={() => {
                             if (full) {
                               handleJoinWaitlist(slot)
@@ -674,28 +732,28 @@ const canSubmit =
                   </button>
                 </div>
                 <div className="booking-payment-method-box">
-  <h3>Phương thức thanh toán</h3>
+                  <h3>Phương thức thanh toán</h3>
 
-  <div className="booking-payment-method-grid">
-    <button
-      type="button"
-      className={paymentMethod === 'CASH' ? 'active' : ''}
-      onClick={() => setPaymentMethod('CASH')}
-    >
-      <strong>Thanh toán tiền mặt</strong>
-      <span>Khách trả tiền mặt tại garage sau khi rửa xong.</span>
-    </button>
+                  <div className="booking-payment-method-grid">
+                    <button
+                      type="button"
+                      className={paymentMethod === 'CASH' ? 'active' : ''}
+                      onClick={() => setPaymentMethod('CASH')}
+                    >
+                      <strong>Thanh toán tiền mặt</strong>
+                      <span>Khách trả tiền mặt tại garage sau khi rửa xong.</span>
+                    </button>
 
-    <button
-      type="button"
-      className={paymentMethod === 'BANK_TRANSFER' ? 'active' : ''}
-      onClick={() => setPaymentMethod('BANK_TRANSFER')}
-    >
-      <strong>Chuyển khoản</strong>
-      <span>Staff sẽ tạo mã QR đúng số tiền để khách quét sau khi rửa xong.</span>
-    </button>
-  </div>
-</div>
+                    <button
+                      type="button"
+                      className={paymentMethod === 'BANK_TRANSFER' ? 'active' : ''}
+                      onClick={() => setPaymentMethod('BANK_TRANSFER')}
+                    >
+                      <strong>Chuyển khoản</strong>
+                      <span>Staff sẽ tạo mã QR đúng số tiền để khách quét sau khi rửa xong.</span>
+                    </button>
+                  </div>
+                </div>
 
                 <p className="booking-muted">
                   Booking sẽ được lưu với trạng thái chưa thanh toán. Nhân viên sẽ tạo QR

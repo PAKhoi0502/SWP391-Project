@@ -65,7 +65,7 @@ function isSameSlot(a, b) {
   return new Date(a).getTime() === new Date(b).getTime()
 }
 
-function StaffWaitlistCard({ item, actionKey, onApprove, onReject }) {
+function StaffWaitlistCard({ item, position, actionKey, onApprove, onReject }) {
   const id = item?.id || item?.waitlistId
   const status = String(item?.status || 'WAITING').toUpperCase()
   const isWaiting = status === 'WAITING'
@@ -77,7 +77,7 @@ function StaffWaitlistCard({ item, actionKey, onApprove, onReject }) {
       <div className="staff-waitlist-card-header">
         <div>
           <span className="staff-waitlist-label">Customer</span>
-          <h2>{item?.customerName || item?.customerPhone || item?.customerEmail || `Khách #${item?.customerId || '-'}`}</h2>
+          <h2>{item?.customerName || 'Khách hàng'}</h2>
         </div>
 
         <span className={`staff-waitlist-status staff-waitlist-status-${getStatusTone(status)}`}>
@@ -104,7 +104,7 @@ function StaffWaitlistCard({ item, actionKey, onApprove, onReject }) {
         </div>
         <div>
           <dt>Vị trí</dt>
-          <dd>#{item?.position || 1}</dd>
+          <dd>#{position}</dd>
         </div>
         <div>
           <dt>Tạo lúc</dt>
@@ -138,10 +138,24 @@ export default function StaffWaitlistPage() {
   const [actionKey, setActionKey] = useState('')
 
   const sortedItems = useMemo(() => {
-    return [...items].sort((a, b) => {
+    const sorted = [...items].sort((a, b) => {
       const aTime = new Date(a?.createdAt || 0).getTime()
       const bTime = new Date(b?.createdAt || 0).getTime()
       return aTime - bTime
+    })
+
+    // Vị trí trong hàng chờ được tính theo thứ tự tham gia (createdAt),
+    // riêng cho mỗi nhóm garage + khung giờ, chứ không dựa vào field
+    // `position` lưu sẵn (có thể bị thiếu hoặc không tự cập nhật khi
+    // có người bị từ chối/hủy khỏi hàng chờ).
+    const groupCounters = new Map()
+
+    return sorted.map((item) => {
+      const groupKey = `${item?.garageId ?? ''}__${item?.startTime ?? ''}`
+      const nextPosition = (groupCounters.get(groupKey) || 0) + 1
+      groupCounters.set(groupKey, nextPosition)
+
+      return { ...item, computedPosition: nextPosition }
     })
   }, [items])
 
@@ -241,6 +255,7 @@ export default function StaffWaitlistPage() {
             <StaffWaitlistCard
               key={item?.id || JSON.stringify(item)}
               item={item}
+              position={item.computedPosition}
               actionKey={actionKey}
               onApprove={approve}
               onReject={reject}

@@ -1,5 +1,5 @@
 import { Link, useSearchParams } from 'react-router-dom'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { waitlistApi } from '../../api/waitlistApi'
 import { Button } from '../../components/common/ui'
 import './WaitlistPage.css'
@@ -34,6 +34,17 @@ function getVehicleTypeLabel(vehicleType) {
   return vehicleType || 'Chưa có loại xe'
 }
 
+function getStatusLabel(status) {
+  const value = String(status || 'WAITING').toUpperCase()
+  if (value === 'WAITING') return 'Đang chờ'
+  if (value === 'OFFERED') return 'Có slot trống'
+  if (value === 'ACCEPTED') return 'Đã duyệt'
+  if (value === 'REJECTED') return 'Đã từ chối'
+  if (value === 'CANCELLED' || value === 'CANCELED') return 'Đã hủy'
+  if (value === 'EXPIRED') return 'Hết hạn'
+  return value
+}
+
 function getErrorMessage(error, fallback) {
   return error?.message || error?.data?.message || fallback
 }
@@ -52,6 +63,8 @@ export default function WaitlistPage() {
   const [joinedEntry, setJoinedEntry] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [items, setItems] = useState([])
+  const [loadingItems, setLoadingItems] = useState(false)
 
   const garageId = searchParams.get('garageId') || ''
   const garageName = searchParams.get('garageName') || ''
@@ -61,19 +74,39 @@ export default function WaitlistPage() {
   const date = searchParams.get('date') || ''
   const startTime = searchParams.get('startTime') || ''
   const endTime = searchParams.get('endTime') || ''
+  const isJoinFlow = Boolean(garageId || servicePackageId || vehicleType || date || startTime || endTime)
 
   const backToBookingUrl = `/booking?garageId=${garageId}&servicePackageId=${servicePackageId}&vehicleType=${vehicleType}&date=${date}`
 
   const waitlistPayload = useMemo(() => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
     return {
       garageId: Number(garageId),
+      garageName,
       servicePackageId: Number(servicePackageId),
+      servicePackageName,
       vehicleType,
       date,
       startTime,
       endTime,
+      customerId: user?.id || 'Guest',
+      customerName: user?.fullName || user?.name || 'Khách hàng',
     }
-  }, [garageId, servicePackageId, vehicleType, date, startTime, endTime])
+  }, [garageId, garageName, servicePackageId, servicePackageName, vehicleType, date, startTime, endTime])
+
+  useEffect(() => {
+    if (isJoinFlow) return
+
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    setLoadingItems(true)
+    waitlistApi.getMine()
+      .then((result) => {
+        const mine = result.filter((item) => !user?.id || String(item?.customerId) === String(user.id))
+        setItems(mine.sort((left, right) => new Date(right?.createdAt || 0) - new Date(left?.createdAt || 0)))
+      })
+      .catch(() => setError('Không tải được danh sách chờ.'))
+      .finally(() => setLoadingItems(false))
+  }, [isJoinFlow])
 
   const handleConfirmJoinWaitlist = async () => {
     if (!garageId || !servicePackageId || !vehicleType || !date) {
@@ -85,12 +118,61 @@ export default function WaitlistPage() {
       setLoading(true)
       setError('')
       const createdEntry = await waitlistApi.join(waitlistPayload)
+      localStorage.setItem('waitlistDraft', JSON.stringify(createdEntry || waitlistPayload))
       setJoinedEntry(createdEntry || waitlistPayload)
     } catch (err) {
       setError(getErrorMessage(err, 'Không thể tham gia waitlist. Vui lòng thử lại.'))
     } finally {
       setLoading(false)
     }
+  }
+
+  if (!isJoinFlow) {
+    return (
+      <div className="waitlist-page">
+        <section className="waitlist-hero waitlist-hero-wide">
+          <p className="waitlist-eyebrow">Waitlist</p>
+          <h1>Danh sách chờ của tôi</h1>
+          <p>
+            Các yêu cầu waitlist sẽ nằm ở đây. Khi được duyệt và tạo booking, lịch hẹn mới
+            xuất hiện ở trang Lịch hẹn.
+          </p>
+
+          {error && <p className="waitlist-message waitlist-message-error">{error}</p>}
+          {loadingItems ? (
+            <p className="waitlist-empty">Đang tải danh sách chờ...</p>
+          ) : items.length === 0 ? (
+            <div className="waitlist-empty">Bạn chưa có yêu cầu waitlist nào.</div>
+          ) : (
+            <div className="waitlist-list">
+              {items.map((item) => (
+                <article className="waitlist-card" key={item.id || `${item.garageId}-${item.startTime}`}>
+                  <div className="waitlist-card-header">
+                    <strong>{item.servicePackageName || `Gói #${item.servicePackageId || '-'}`}</strong>
+                    <span>{getStatusLabel(item.status)}</span>
+                  </div>
+                  <div className="waitlist-card-details">
+                    <div>Garage: {item.garageName || `Garage #${item.garageId || '-'}`}</div>
+                    <div>Ngày: {formatDate(item.date || item.startTime)}</div>
+                    <div>Khung giờ: {formatTime(item.startTime)} - {formatTime(item.endTime)}</div>
+                    <div>Vị trí: #{item.position || '-'}</div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+
+          <div className="waitlist-actions">
+            <Link className="waitlist-primary-link" to="/booking">
+              Đặt lịch mới
+            </Link>
+            <Link className="waitlist-link-button" to="/customer/bookings">
+              Xem lịch hẹn
+            </Link>
+          </div>
+        </section>
+      </div>
+    )
   }
 
   return (

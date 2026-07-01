@@ -148,8 +148,8 @@ export default function AdminStaffProfilesPage() {
 
       <div className="staff-profile-header" style={headerStyle}>
         <div>
-          <h1 style={{ margin: 0, color: '#fff' }}>Hồ sơ nhân viên</h1>
-          <p style={{ margin: '6px 0 0', color: 'rgba(200,220,255,0.58)' }}>Tạo hồ sơ, gán garage, lọc loại staff và bật/tắt trạng thái.</p>
+          <h1 style={{ margin: 0, color: '#fff', marginBottom: '20px' }}>Hồ sơ nhân viên</h1>
+          <p style={{ margin: 0, color: 'rgba(200,220,255,0.58)' }}>Tạo hồ sơ, gán garage, lọc loại staff và bật/tắt trạng thái.</p>
         </div>
         <Button onClick={openCreate}>Tạo hồ sơ</Button>
       </div>

@@ -29,11 +29,15 @@ import ServicePackageListPage from '../pages/ServicePackageListPage'
 import ServicePackageDetailPage from '../pages/ServicePackageDetailPage'
 import AdminServicePackagePage from '../pages/admin/AdminServicePackagePage'
 import AvailableSlotsPickerPage from '../pages/booking/AvailableSlotsPickerPage'
-import CustomerWaitlistPage from '../pages/booking/CustomerWaitlistPage'
 import CustomerCreateBookingPage from '../pages/booking/CustomerCreateBookingPage'
 import WaitlistPage from '../pages/booking/WaitlistPage'
 import StaffWaitlistPage from '../pages/booking/StaffWaitlistPage'
 import BookingHistoryPage from '../pages/booking/BookingHistoryPage'
+import CustomerBookingListPage from '../pages/booking/CustomerBookingListPage'
+import BookingDetailPage from '../pages/booking/BookingDetailPage'
+import StaffBookingListPage from '../pages/booking/StaffBookingListPage'
+import AdminBookingListPage from '../pages/booking/AdminBookingListPage'
+import PaymentReturnPage from '../pages/booking/PaymentReturnPage'
 
 
 function AppRoutes() {
@@ -44,6 +48,8 @@ function AppRoutes() {
         <Route path="login" element={<LoginPage />} />
         <Route path="forgot-password" element={<ForgotPasswordPage />} />
         <Route path="reset-password" element={<ResetPasswordPage />} />
+        <Route path="payment/success" element={<PaymentReturnPage />} />
+        <Route path="payment/cancel" element={<PaymentReturnPage />} />
         <Route path="register" element={<RegisterPage />} />
         <Route path="uikit" element={<UikitDemo />} />
         <Route path="forbidden" element={<ForbiddenPage />} />
@@ -52,28 +58,26 @@ function AppRoutes() {
       <Route element={<ProtectedRoute allowedRoles={[ROLES.CUSTOMER]} />}>
         <Route element={<CustomerLayout />}>
           <Route path="customer" element={<Navigate to="/" replace />} />
-          <Route path="customer/bookings" element={<DashboardPlaceholderPage title="Lich hen khach hang" />} />
-          <Route path="customer/waitlist" element={<CustomerWaitlistPage />} />
           <Route path="customer/vehicles" element={<CustomerVehiclesPage />} />
           <Route path="customer/profile" element={<ProfilePage />} />
-          <Route path="customer/vehicles" element={<CustomerVehiclesPage />} />
           <Route path="customer/garages" element={<GarageListPage />} />
           <Route path="customer/garages/:id" element={<GarageDetailPage />} />
           <Route path="customer/service-packages" element={<ServicePackageListPage />} />
           <Route path="customer/service-packages/:id" element={<ServicePackageDetailPage />} />
           <Route path="/booking" element={<CustomerCreateBookingPage />} />
           <Route path="/booking/available-slots" element={<AvailableSlotsPickerPage />} />
-          <Route path="/waitlist" element={<WaitlistPage />} />
-          <Route path="/customer/bookings" element={<BookingHistoryPage />} />
-<Route path="/customer/booking-history" element={<BookingHistoryPage />} />
+          <Route path="/customer/waitlist" element={<WaitlistPage />} />
+          <Route path="/customer/bookings" element={<CustomerBookingListPage />} />
+          <Route path="/customer/bookings/:id" element={<BookingDetailPage />} />
+          <Route path="/customer/booking-history" element={<BookingHistoryPage />} />
         </Route>
       </Route>
 
       <Route element={<ProtectedRoute allowedRoles={[ROLES.STAFF]} />}>
         <Route element={<StaffLayout />}>
           <Route path="staff" element={<DashboardPlaceholderPage title="Staff Dashboard" />} />
-          <Route path="staff/bookings" element={<DashboardPlaceholderPage title="Booking can xu ly" />} />
-          <Route path="staff/waitlist" element={<StaffWaitlistPage />} />
+          <Route path="staff/bookings" element={<StaffBookingListPage />} />
+          <Route path="staff/bookings/:id" element={<BookingDetailPage />} />
           <Route path="staff/inspections" element={<DashboardPlaceholderPage title="Kiem tra xe" />} />
           <Route path="staff/profile" element={<StaffProfilePage />} />
           <Route path="staff/waitlist" element={<StaffWaitlistPage />} />
@@ -92,6 +96,8 @@ function AppRoutes() {
           <Route path="admin/garages/:id/edit" element={<AdminGarageFormPage />} />
           <Route path="admin/wash-bays" element={<AdminWashBayManagementPage />} />
           <Route path="admin/service-packages" element={<AdminServicePackagePage />} />
+          <Route path="admin/bookings" element={<AdminBookingListPage />} />
+          <Route path="admin/bookings/:id" element={<BookingDetailPage />} />
         </Route>
       </Route>
 

@@ -30,6 +30,7 @@ const NAV_ITEMS = {
     { to: '/admin/garages', label: 'Garage' },
     { to: '/admin/wash-bays', label: 'Wash Bays' },
     { to: '/admin/service-packages', label: 'Gói dịch vụ' },
+    { to: '/admin/bookings', label: 'Booking' },
   ],
 }
 
