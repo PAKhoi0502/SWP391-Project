@@ -56,11 +56,22 @@ public class LoyaltyServiceImpl implements LoyaltyService {
 
     @Override
     public LoyaltyOverviewResponse getMyLoyalty(Long customerId) {
+        backfillMissingEarnPoints(customerId);
         CustomerLoyalty loyalty = getOrCreateCustomerLoyalty(customerId);
         return LoyaltyOverviewResponse.builder().currentTier(loyalty.getCurrentTier())
                 .totalPoints(loyalty.getTotalPoints()).availablePoints(loyalty.getAvailablePoints())
                 .redeemedPoints(loyalty.getRedeemedPoints()).expiredPoints(loyalty.getExpiredPoints())
                 .totalSpent(loyalty.getTotalSpent()).totalVisits(loyalty.getTotalVisits()).build();
+    }
+
+    private void backfillMissingEarnPoints(Long customerId) {
+        bookingRepository.findByCustomerIdOrderByStartTimeDesc(customerId).stream()
+                .filter(booking -> "COMPLETED".equals(booking.getStatus()))
+                .filter(booking -> "PAID".equals(booking.getPaymentStatus()))
+                .filter(booking -> pointTransactionRepository
+                        .findByBookingIdAndType(booking.getId(), "EARN")
+                        .isEmpty())
+                .forEach(booking -> earnPointsAfterPaidBooking(booking.getId()));
     }
 
     @Override
@@ -267,8 +278,26 @@ public void earnPointsAfterPaidBooking(Long bookingId) {
             .orElseThrow(() -> new RuntimeException("Service package not found"));
 
     // Tính điểm: floor(points_earned × multiplier × final_price / original_price)
-    double ratio = booking.getFinalPrice().doubleValue() / booking.getOriginalPrice().doubleValue();
-    int earnedPoints = (int) Math.floor(pkg.getPointsEarned() * multiplier * ratio);
+    BigDecimal originalPrice = booking.getOriginalPrice() != null && booking.getOriginalPrice().compareTo(BigDecimal.ZERO) > 0
+            ? booking.getOriginalPrice()
+            : booking.getFinalPrice();
+    BigDecimal finalPrice = booking.getFinalPrice() != null
+            ? booking.getFinalPrice()
+            : originalPrice;
+
+    if (originalPrice == null || originalPrice.compareTo(BigDecimal.ZERO) <= 0 || finalPrice == null) {
+        return;
+    }
+
+    Integer basePoints = pkg.getPointsEarned();
+    if (basePoints == null || basePoints <= 0) {
+        basePoints = finalPrice
+                .divide(BigDecimal.valueOf(10000), 0, RoundingMode.DOWN)
+                .intValue();
+    }
+
+    double ratio = finalPrice.doubleValue() / originalPrice.doubleValue();
+    int earnedPoints = (int) Math.floor(basePoints * multiplier * ratio);
 
     if (earnedPoints <= 0) {
         return;

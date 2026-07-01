@@ -32,7 +32,7 @@ function remove(key) {
 
 // --- Access token ---
 function getToken() {
-  return getRaw(STORAGE_KEYS.ACCESS_TOKEN)
+  return getRaw(STORAGE_KEYS.ACCESS_TOKEN) || getRaw('token')
 }
 
 function setToken(token) {
@@ -41,6 +41,7 @@ function setToken(token) {
 
 function removeToken() {
   remove(STORAGE_KEYS.ACCESS_TOKEN)
+  remove('token')
 }
 
 // --- User (lưu dưới dạng JSON) ---
@@ -66,6 +67,9 @@ function removeUser() {
 function clearAuth() {
   removeToken()
   removeUser()
+  remove('refreshToken')
+  remove('currentUser')
+  remove('role')
 }
 
 export const storage = {

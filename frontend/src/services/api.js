@@ -1,5 +1,12 @@
 import axios from "axios";
 
+const clearAuthStorage = () => {
+  ["accessToken", "refreshToken", "token", "user", "currentUser", "role"].forEach((key) => {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  });
+};
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8080",
   headers: {
@@ -43,10 +50,7 @@ api.interceptors.response.use(
       const refreshToken = localStorage.getItem("refreshToken");
 
       if (!refreshToken) {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+        clearAuthStorage();
         return Promise.reject(error);
       }
 
@@ -73,10 +77,7 @@ api.interceptors.response.use(
 
         return Promise.reject(error);
       } catch (refreshError) {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+        clearAuthStorage();
 
         return Promise.reject(refreshError);
       }

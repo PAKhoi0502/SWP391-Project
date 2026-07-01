@@ -49,7 +49,7 @@ public class WashBayServiceImpl implements WashBayService {
         WashBay bay = new WashBay();
         bay.setGarageId(request.getGarageId());
         bay.setBayCode(request.getName());
-        bay.setVehicleType(request.getVehicleType());
+        bay.setVehicleType(normalizeVehicleType(request.getVehicleType()));
         bay.setStatus(WashBayStatus.AVAILABLE);
         bay.setIsActive(true);
 
@@ -67,7 +67,7 @@ public class WashBayServiceImpl implements WashBayService {
         WashBay bay = findOrThrow(id);
 
         if (request.getName() != null) bay.setBayCode(request.getName());
-        if (request.getVehicleType() != null) bay.setVehicleType(request.getVehicleType());
+        if (request.getVehicleType() != null) bay.setVehicleType(normalizeVehicleType(request.getVehicleType()));
 
         return toResponse(washBayRepository.save(bay));
     }
@@ -139,6 +139,13 @@ public class WashBayServiceImpl implements WashBayService {
                 .garageId(garageId)
                 .availableCountByVehicleType(countMap)
                 .build();
+    }
+
+    private String normalizeVehicleType(String vehicleType) {
+        if (vehicleType == null) return null;
+        String v = vehicleType.toUpperCase();
+        if (v.equals("MOTORBIKE") || v.equals("MOTORCYCLE") || v.equals("BIKE")) return "BIKE";
+        return "CAR";
     }
 
     private WashBay findOrThrow(Long id) {

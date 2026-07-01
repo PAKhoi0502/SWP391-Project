@@ -199,7 +199,6 @@ public class PaymentServiceImpl implements PaymentService {
                     loyaltyService.earnPointsAfterPaidBooking(booking.getId());
                     washHistoryService.createWashHistoryAfterPaidBooking(booking.getId());
                     notificationService.notifyPaymentConfirmed(booking.getId());
-                    emailService.sendPaymentConfirmedEmail(booking.getId());
 
                 }
 

@@ -50,7 +50,9 @@ function normalizeUser(user, token) {
       user?.fullName ||
       user?.name ||
       tokenUser?.fullName ||
-      `User ${tokenUser?.id || ""}`,
+      user?.email ||
+      tokenUser?.email ||
+      "",
     email: user?.email || tokenUser?.email || null,
     phone: user?.phone || null,
     role: String(role).toUpperCase(),
@@ -83,18 +85,11 @@ export function AuthProvider({ children }) {
     return authStorage.getAccessToken() || null;
   });
 
-  const [user, setUser] = useState(() => {
-    const savedUser = authStorage.getUser();
-
-    if (savedUser) return savedUser;
-
-    const token = authStorage.getAccessToken();
-    return token ? buildUserFromToken(token) : null;
-  });
+  const [user, setUser] = useState(null);
 
   const [loading, setLoading] = useState(true);
 
-  const isAuthenticated = Boolean(accessToken);
+  const isAuthenticated = Boolean(accessToken && user);
 
   const loadCurrentUser = async () => {
     const token = authStorage.getAccessToken();
@@ -108,13 +103,9 @@ export function AuthProvider({ children }) {
 
     setAccessToken(token);
 
-    const savedUser = authStorage.getUser();
-    const tokenUser = buildUserFromToken(token);
-
     try {
       const currentUser = await authService.getCurrentUser();
-      const rawUser = currentUser || savedUser || tokenUser;
-const finalUser = rawUser ? normalizeUser(rawUser, token) : null;
+      const finalUser = currentUser ? normalizeUser(currentUser, token) : null;
 
 if (finalUser) {
   setUser(finalUser);
@@ -127,22 +118,8 @@ if (finalUser) {
 
       return finalUser;
     } catch {
-      const rawFallbackUser = savedUser || tokenUser;
-const fallbackUser = rawFallbackUser
-  ? normalizeUser(rawFallbackUser, token)
-  : null;
-
-if (fallbackUser) {
-  setUser(fallbackUser);
-
-  authStorage.setAuth({
-    accessToken: token,
-    user: fallbackUser,
-  });
-
-  return fallbackUser;
-}
-
+      authStorage.clearAuth();
+      setAccessToken(null);
       setUser(null);
       return null;
     } finally {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { bookingApi } from '../../api/bookingApi'
+import { userService } from '../../services/userService'
 import './BookingHistoryPage.css'
 
 const statuses = ['ALL', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED', 'CANCELED', 'NO_SHOW']
@@ -160,8 +161,26 @@ const persistPayOSReturnPath = (path, result) => {
   }
 }
 
+const getUserName = (user) =>
+  user?.fullName || user?.name || user?.username || user?.email || ''
+
 const enrichBookingsWithPayment = async (items) => {
   if (!Array.isArray(items)) return []
+
+  // Fetch tên customer cho từng bookingId có customerId
+  const uniqueCustomerIds = [...new Set(items.map((b) => b.customerId).filter(Boolean))]
+  const userMap = {}
+  await Promise.allSettled(
+    uniqueCustomerIds.map(async (customerId) => {
+      try {
+        const user = await userService.getUser(customerId)
+        const name = getUserName(user)
+        if (name) userMap[String(customerId)] = name
+      } catch {
+        // Ignore — fallback to cache
+      }
+    }),
+  )
 
   const results = await Promise.allSettled(
     items.map(async (booking) => {
@@ -180,7 +199,11 @@ const enrichBookingsWithPayment = async (items) => {
       const enrichedBooking = {
         ...cachedValues,
         ...booking,
-        customerName: booking.customerName || cached.customerName || readCachedCustomerName(booking.customerId),
+        customerName:
+          booking.customerName ||
+          userMap[String(booking.customerId)] ||
+          readCachedCustomerName(booking.customerId) ||
+          (booking.customerId ? `Khách hàng #${booking.customerId}` : 'Khách vãng lai'),
         paymentMethod:
           booking.paymentMethod ||
           cached.paymentMethod ||
@@ -190,6 +213,7 @@ const enrichBookingsWithPayment = async (items) => {
         paymentStatus: paidTransaction || cachedPayOSPaidAt ? 'PAID' : booking.paymentStatus,
         paidAt: booking.paidAt || paidTransaction?.paidAt || cachedPayOSPaidAt,
         note: booking.note || cached.note,
+        vehicleName: booking.vehicleName || booking.licensePlate || cached.vehicleName || cached.licensePlate,
       }
 
       return mergeFrontendOverride(enrichedBooking, cached)
@@ -393,6 +417,10 @@ function StaffBookingListPage() {
                   {formatNamedValue(booking.customerName, booking.customerId, booking.customerId ? 'Khách hàng' : 'Khách vãng lai')}
                 </div>
                 <div>
+                  <span>Xe</span>
+                  {formatNamedValue(booking.vehicleName || booking.licensePlate, booking.vehicleId, 'Xe')}
+                </div>
+                <div>
                   <span>Garage</span>
                   {formatNamedValue(booking.garageName, booking.garageId, 'Garage')}
                 </div>
@@ -401,6 +429,12 @@ function StaffBookingListPage() {
                   {formatNamedValue(booking.servicePackageName, booking.servicePackageId, 'Gói dịch vụ')}
                 </div>
                 <div><span>Thời gian</span><strong>{formatDateTime(booking.startTime)}</strong></div>
+                {(['CANCELED', 'CANCELLED', 'NO_SHOW'].includes(String(booking.status || '').toUpperCase())) && booking.note && (
+                  <div>
+                    <span>{String(booking.status || '').toUpperCase() === 'NO_SHOW' ? 'Lý do no-show' : 'Lý do hủy'}</span>
+                    <strong>{booking.note}</strong>
+                  </div>
+                )}
                 <div className="booking-list-total-card">
                   <span>Tổng tiền</span>
                   <div className="booking-list-total-row">

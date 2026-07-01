@@ -11,7 +11,7 @@ import { useAuth } from '../contexts/AuthContext'
 
 function HomePage() {
   const navigate = useNavigate()
-  const { user, isAuthenticated, logout } = useAuth()
+  const { user, isAuthenticated, logout, loading: authLoading } = useAuth()
 
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -55,39 +55,62 @@ function HomePage() {
       <h1>Trang chủ</h1>
       <p>Chào mừng đến với AutoWash Pro.</p>
 
-      {isAuthenticated && (
-        <section style={{ marginTop: 20 }}>
-          <div
-            style={{
-              padding: '14px 18px',
-              borderRadius: 14,
-              background: 'rgba(167,139,250,0.12)',
-              border: '1px solid rgba(167,139,250,0.32)',
-              color: '#a78bfa',
-              fontWeight: 700,
-            }}
-          >
-            Xin chào {user?.fullName || 'khách hàng'}!
-          </div>
+      <section style={{ marginTop: 20 }}>
+        <div
+          style={{
+            padding: '14px 18px',
+            borderRadius: 14,
+            background: 'rgba(167,139,250,0.12)',
+            border: '1px solid rgba(167,139,250,0.32)',
+            color: '#a78bfa',
+            fontWeight: 700,
+          }}
+        >
+          {authLoading
+            ? 'Xin chào!'
+            : isAuthenticated
+              ? `Xin chào ${user?.fullName || user?.email || 'bạn'}!`
+              : 'Xin chào!'}
+        </div>
 
-          <button
-            type="button"
-            onClick={handleLogout}
-            style={{
-              marginTop: 14,
-              padding: '10px 18px',
-              borderRadius: 999,
-              border: '1px solid rgba(250,204,21,0.4)',
-              background: 'rgba(250,204,21,0.12)',
-              color: '#facc15',
-              fontWeight: 800,
-              cursor: 'pointer',
-            }}
-          >
-            Đăng xuất
-          </button>
-        </section>
-      )}
+        {!authLoading && (
+          isAuthenticated ? (
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                marginTop: 14,
+                padding: '10px 18px',
+                borderRadius: 999,
+                border: '1px solid rgba(250,204,21,0.4)',
+                background: 'rgba(250,204,21,0.12)',
+                color: '#facc15',
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              Đăng xuất
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => navigate('/login')}
+              style={{
+                marginTop: 14,
+                padding: '10px 18px',
+                borderRadius: 999,
+                border: '1px solid rgba(99,102,241,0.4)',
+                background: 'rgba(99,102,241,0.12)',
+                color: '#818cf8',
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              Đăng nhập
+            </button>
+          )
+        )}
+      </section>
 
       <section style={{ marginTop: 24 }}>
         <h2 style={{ fontSize: 18 }}>Trạng thái máy chủ</h2>

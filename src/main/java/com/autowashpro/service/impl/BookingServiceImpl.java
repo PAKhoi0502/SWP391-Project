@@ -96,14 +96,30 @@ public class BookingServiceImpl implements BookingService {
 
                 List<SlotResponse> slots = new ArrayList<>();
 
-                LocalTime current = garage.getOpeningTime();
+                if (date.isBefore(LocalDate.now().plusDays(1))) {
+                        return AvailableSlotResponse.builder()
+                                        .garageId(garageId)
+                                        .servicePackageId(servicePackageId)
+                                        .date(date)
+                                        .slots(slots)
+                                        .build();
+                }
 
-                while (current.plusMinutes(servicePackage.getDurationMinutes()).isBefore(garage.getClosingTime())
-                                || current.plusMinutes(servicePackage.getDurationMinutes())
+                LocalTime current = garage.getOpeningTime();
+                LocalDateTime now = LocalDateTime.now();
+                int slotDurationMinutes = resolveSlotDurationMinutes(servicePackage, garage);
+
+                while (current.plusMinutes(slotDurationMinutes).isBefore(garage.getClosingTime())
+                                || current.plusMinutes(slotDurationMinutes)
                                                 .equals(garage.getClosingTime())) {
 
                         LocalDateTime start = LocalDateTime.of(date, current);
-                        LocalDateTime end = start.plusMinutes(servicePackage.getDurationMinutes());
+                        LocalDateTime end = start.plusMinutes(slotDurationMinutes);
+
+                        if (!start.isAfter(now)) {
+                                current = current.plusMinutes(garage.getSlotIntervalMinutes());
+                                continue;
+                        }
 
                         boolean available = isWashBayAvailable(
                                         garageId,
@@ -135,6 +151,17 @@ public class BookingServiceImpl implements BookingService {
                                 .date(date)
                                 .slots(slots)
                                 .build();
+        }
+
+        private int resolveSlotDurationMinutes(ServicePackage servicePackage, Garage garage) {
+                int packageDuration = servicePackage.getDurationMinutes() != null
+                                ? servicePackage.getDurationMinutes()
+                                : 0;
+                int garageInterval = garage.getSlotIntervalMinutes() != null
+                                ? garage.getSlotIntervalMinutes()
+                                : 0;
+
+                return Math.max(packageDuration, garageInterval);
         }
 
         private String mapVehicleTypeToBayType(String vehicleType) {
@@ -264,7 +291,18 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 LocalDateTime startTime = request.getStartTime();
-                LocalDateTime endTime = startTime.plusMinutes(pkg.getDurationMinutes());
+                LocalDateTime endTime = startTime.plusMinutes(resolveSlotDurationMinutes(pkg, garage));
+                LocalDateTime now = LocalDateTime.now();
+
+                if (!startTime.isAfter(now)) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Booking time must be in the future");
+                }
+
+                if (startTime.toLocalDate().isBefore(LocalDate.now().plusDays(1))) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Booking must be made at least 1 day in advance");
+                }
 
                 String bayType = mapVehicleTypeToBayType(vehicle.getVehicleType());
                 List<String> supportedTypes = washBayRepository
@@ -284,20 +322,21 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 CustomerLoyalty loyalty = customerLoyaltyRepository.findByCustomerId(customerId).orElse(null);
-                String tier = loyalty != null ? loyalty.getCurrentTier() : "SILVER";
+                String tier = loyalty != null ? loyalty.getCurrentTier() : "BRONZE";
 
                 LoyaltyTierRule tierRule = loyaltyTierRuleRepository.findByTierAndIsActiveTrue(tier)
                                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                                                 "Loyalty tier rule not found for tier: " + tier));
 
-                LocalDateTime maxBookingTime = LocalDateTime.now().plusDays(tierRule.getBookingWindowDays());
+                int allowedBookingWindowDays = tierRule.getBookingWindowDays();
+                LocalDateTime maxBookingTime = now.plusDays(allowedBookingWindowDays);
                 if (startTime.isAfter(maxBookingTime)) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                        "Booking date exceeds allowed window of " + tierRule.getBookingWindowDays()
+                                        "Booking date exceeds allowed window of " + allowedBookingWindowDays
                                                         + " days for tier " + tier);
                 }
 
-                long upcomingCount = bookingRepository.countUpcomingBookings(customerId, LocalDateTime.now());
+                long upcomingCount = bookingRepository.countUpcomingBookings(customerId, now);
                 if (upcomingCount >= tierRule.getMaxUpcomingBookings()) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                                         "Exceeded maximum upcoming bookings limit of "
@@ -309,6 +348,13 @@ public class BookingServiceImpl implements BookingService {
                 if (vehicleOverlap > 0) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT,
                                         "Vehicle already has an active booking during this time");
+                }
+
+                long customerGarageOverlap = bookingRepository.countOverlappingBookingsByCustomerAndGarage(
+                                customerId, request.getGarageId(), startTime, endTime);
+                if (customerGarageOverlap > 0) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                        "Bạn đã có lịch đặt tại garage này trong khung giờ này");
                 }
 
                 if (Boolean.TRUE.equals(pkg.getRequiresWashBay())) {
@@ -408,7 +454,6 @@ public class BookingServiceImpl implements BookingService {
                 bookingRepository.save(booking);
                 loyaltyService.updateBookingStatistics(booking.getId());
                 notificationService.notifyBookingConfirmed(booking.getId());
-                emailService.sendBookingConfirmationEmail(booking.getId());
 
                 return toResponse(booking);
         }
@@ -451,7 +496,7 @@ public class BookingServiceImpl implements BookingService {
                                 .replaceAll("[^A-Z0-9]", "");
 
                 LocalDateTime startTime = request.getStartTime();
-                LocalDateTime endTime = startTime.plusMinutes(pkg.getDurationMinutes());
+                LocalDateTime endTime = startTime.plusMinutes(resolveSlotDurationMinutes(pkg, garage));
 
                 String bayType = mapVehicleTypeToBayType(request.getVehicleType());
                 List<String> supportedTypes = washBayRepository
@@ -1293,7 +1338,6 @@ loyaltyService.updateBookingStatistics(saved.getId());
 promotionService.recordPromotionUsageAfterPaidBooking(saved.getId());
 loyaltyService.earnPointsAfterPaidBooking(saved.getId());
 washHistoryService.createWashHistoryAfterPaidBooking(saved.getId());
-emailService.sendPaymentConfirmedEmail(saved.getId());
 notificationService.notifyPaymentConfirmed(saved.getId());
 notificationService.notifyRewardEarned(saved.getId());
 return toResponse(saved);
@@ -1324,7 +1368,7 @@ return toResponse(saved);
                                 .createdAt(b.getCreatedAt())
                                 .guestName(b.getGuestName())
                                 .guestPhone(b.getGuestPhone())
-                                .licensePlate(b.getLicensePlate())
+                                .licensePlate(resolveLicensePlate(b))
                                 .createdByStaffId(b.getCreatedByStaffId())
                                 .checkedInAt(b.getCheckedInAt())
                                 .startedAt(b.getStartedAt())
@@ -1332,6 +1376,26 @@ return toResponse(saved);
                                 .completedAt(b.getCompletedAt())
                                 .paidAt(b.getPaidAt())
                                 .build();
+        }
+
+        private String resolveLicensePlate(Booking b) {
+                if (b.getLicensePlate() != null && !b.getLicensePlate().isBlank()) {
+                        return b.getLicensePlate();
+                }
+
+                if (b.getVehicleId() == null) {
+                        return null;
+                }
+
+                return vehicleRepository.findById(b.getVehicleId())
+                                .map(vehicle -> {
+                                        if (vehicle.getRawLicensePlate() != null
+                                                        && !vehicle.getRawLicensePlate().isBlank()) {
+                                                return vehicle.getRawLicensePlate();
+                                        }
+                                        return vehicle.getNormalizedLicensePlate();
+                                })
+                                .orElse(null);
         }
 
         private BookingSummaryResponse toSummaryResponse(Booking b) {
