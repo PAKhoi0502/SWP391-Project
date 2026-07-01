@@ -61,9 +61,9 @@ function AppRoutes() {
           <Route path="customer/service-packages/:id" element={<ServicePackageDetailPage />} />
           <Route path="/booking" element={<CustomerCreateBookingPage />} />
           <Route path="/booking/available-slots" element={<AvailableSlotsPickerPage />} />
-          <Route path="/waitlist" element={<WaitlistPage />} />
+          <Route path="/customer/waitlist" element={<WaitlistPage />} />
           <Route path="/customer/bookings" element={<BookingHistoryPage />} />
-<Route path="/customer/booking-history" element={<BookingHistoryPage />} />
+          <Route path="/customer/booking-history" element={<BookingHistoryPage />} />
         </Route>
       </Route>
 
