@@ -30,4 +30,17 @@ public interface WaitlistRepository extends JpaRepository<Waitlist, Long> {
 
     // Find WAITING entries eligible for cutoff expiry check
     List<Waitlist> findByStatusAndDesiredStartTimeBefore(String status, LocalDateTime cutoffTime);
+
+
+
+
+    List<Waitlist> findByGarageIdAndVehicleTypeAndStatusAndDesiredStartTimeBetweenOrderByCreatedAtAsc(
+        Long garageId,
+        String vehicleType,
+        String status,
+        LocalDateTime from,
+        LocalDateTime to);
+
+
+        List<Waitlist> findByStatusAndOfferExpiresAtBefore(String status, LocalDateTime now);
 }
