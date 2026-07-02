@@ -34,7 +34,13 @@ public class WalkInBookingCreateRequest {
 
     private String note;
 
+    private String paymentMethod;
+
     private Integer seatCount;
 
     private String motorbikeGroup;
+
+    private String vehicleBrand;
+
+    private String vehicleModel;
 }

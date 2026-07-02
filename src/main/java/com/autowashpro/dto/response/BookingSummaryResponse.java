@@ -31,4 +31,12 @@ public class BookingSummaryResponse {
     private BigDecimal finalPrice;
 
     private Boolean isWalkIn;
+
+    private String guestName;
+
+    private String guestPhone;
+
+    private String licensePlate;
+
+    private String vehicleName;
 }

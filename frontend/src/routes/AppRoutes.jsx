@@ -35,6 +35,7 @@ import BookingHistoryPage from '../pages/booking/BookingHistoryPage'
 import CustomerBookingListPage from '../pages/booking/CustomerBookingListPage'
 import BookingDetailPage from '../pages/booking/BookingDetailPage'
 import StaffBookingListPage from '../pages/booking/StaffBookingListPage'
+import StaffWalkInBookingPage from '../pages/booking/StaffWalkInBookingPage'
 import AdminBookingListPage from '../pages/booking/AdminBookingListPage'
 import PaymentReturnPage from '../pages/booking/PaymentReturnPage'
 
@@ -77,6 +78,7 @@ function AppRoutes() {
         <Route element={<StaffLayout />}>
           <Route path="staff" element={<DashboardPlaceholderPage title="Staff Dashboard" />} />
           <Route path="staff/bookings" element={<StaffBookingListPage />} />
+          <Route path="staff/bookings/walk-in" element={<StaffWalkInBookingPage />} />
           <Route path="staff/bookings/:id" element={<BookingDetailPage />} />
           <Route path="staff/inspections" element={<DashboardPlaceholderPage title="Kiem tra xe" />} />
           <Route path="staff/profile" element={<StaffProfilePage />} />

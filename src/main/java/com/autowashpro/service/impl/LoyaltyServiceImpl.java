@@ -71,7 +71,11 @@ public class LoyaltyServiceImpl implements LoyaltyService {
                 .filter(booking -> pointTransactionRepository
                         .findByBookingIdAndType(booking.getId(), "EARN")
                         .isEmpty())
-                .forEach(booking -> earnPointsAfterPaidBooking(booking.getId()));
+                .forEach(booking -> {
+                    // Backfill both statistics (totalSpent, totalVisits) AND earn points
+                    updateBookingStatistics(booking.getId());
+                    earnPointsAfterPaidBooking(booking.getId());
+                });
     }
 
     @Override
@@ -138,11 +142,13 @@ public class LoyaltyServiceImpl implements LoyaltyService {
 
         CustomerLoyalty loyalty = getOrCreateCustomerLoyalty(booking.getCustomerId());
 
-        loyalty.setTotalSpent(
-                loyalty.getTotalSpent().add(booking.getFinalPrice()));
+        BigDecimal currentSpent = loyalty.getTotalSpent() != null
+                ? loyalty.getTotalSpent() : java.math.BigDecimal.ZERO;
+        loyalty.setTotalSpent(currentSpent.add(
+                booking.getFinalPrice() != null ? booking.getFinalPrice() : java.math.BigDecimal.ZERO));
 
-        loyalty.setTotalVisits(
-                loyalty.getTotalVisits() + 1);
+        int currentVisits = loyalty.getTotalVisits() != null ? loyalty.getTotalVisits() : 0;
+        loyalty.setTotalVisits(currentVisits + 1);
 
         loyalty.setLastVisitAt(LocalDateTime.now());
 
