@@ -7,6 +7,7 @@ import { getServicePackageById, getPackageName } from '../../services/servicePac
 import { userService } from '../../services/userService'
 import { vehicleService } from '../../services/vehicleService'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
+import CheckInBookingModal from '../../components/Booking/CheckInBookingModal'
 import './BookingHistoryPage.css'
 
 const BOOKING_CACHE_PREFIX = 'booking-detail-cache-'
@@ -55,6 +56,10 @@ const TEXT = {
   closedBooking: 'Booking \u0111\u00e3 \u0111\u00f3ng n\u00ean kh\u00f4ng th\u1ec3 c\u1eadp nh\u1eadt check-in ho\u1eb7c status.',
   staffProfileMissing: 'T\u00e0i kho\u1ea3n n\u00e0y ch\u01b0a c\u00f3 h\u1ed3 s\u01a1 nh\u00e2n vi\u00ean (StaffProfile), n\u00ean backend kh\u00f4ng cho c\u1eadp nh\u1eadt booking. H\u00e3y g\u1eafn StaffProfile v\u00e0 garage cho user n\u00e0y.',
   updateBooking: 'C\u1eadp nh\u1eadt booking',
+  checkInBooking: 'Check-in booking',
+  confirmCheckIn: 'X\u00e1c nh\u1eadn check-in booking n\u00e0y?',
+  checkInNote: 'Ghi ch\u00fa check-in (t\u00f9y ch\u1ecdn)',
+  checkInSuccess: 'Check-in booking th\u00e0nh c\u00f4ng.',
   cancelBooking: 'H\u1ee7y booking',
   markNoShow: '\u0110\u00e1nh d\u1ea5u no-show',
   createQr: 'T\u1ea1o QR PayOS',
@@ -149,7 +154,6 @@ const mergeBookingWithCache = (bookingId, detail) => {
       'paymentStatus',
       'paymentMethod',
       'checkedInAt',
-      'manualCheckedInAt',
       'startedAt',
       'completedAt',
       'paidAt',
@@ -342,7 +346,7 @@ const getPackageStepSource = (servicePackage) =>
 const getTimelineItems = (booking) => {
   const status = String(booking?.status || '').toUpperCase()
   const paymentStatus = String(booking?.paymentStatus || '').toUpperCase()
-  const checkedInAt = booking?.manualCheckedInAt || booking?.checkedInAt
+  const checkedInAt = booking?.checkedInAt
   const isCanceled = status === 'CANCELED' || status === 'CANCELLED'
   const isNoShow = status === 'NO_SHOW'
 
@@ -389,11 +393,8 @@ const getTimelineItems = (booking) => {
 }
 
 const getCheckInDisplay = (booking) => {
-  if (booking?.manualCheckedInAt) return formatDateTime(booking.manualCheckedInAt)
   if (booking?.checkedInAt) return formatDateTime(booking.checkedInAt)
-
-  const match = String(booking?.note || '').match(/Check-in time:\s*([0-9]{1,2}:[0-9]{2}\s*(?:AM|PM))/i)
-  return match?.[1] || TEXT.notUpdated
+  return TEXT.notUpdated
 }
 
 const persistPayOSReturnPath = (path, result) => {
@@ -409,33 +410,6 @@ const persistPayOSReturnPath = (path, result) => {
   }
 }
 
-const parseTimeInputValue = (value) => {
-  if (!value) return { hour: '', minute: '', period: 'AM' }
-  const [rawHour, minute] = value.split(':')
-  const hour24 = Number(rawHour)
-  const period = hour24 >= 12 ? 'PM' : 'AM'
-  const hour12 = hour24 % 12 || 12
-  return {
-    hour: String(hour12).padStart(2, '0'),
-    minute,
-    period,
-  }
-}
-
-const buildManualCheckedInAt = (booking, hour, minute, period) => {
-  if (!booking?.startTime || !hour || !minute) return ''
-
-  const date = new Date(booking.startTime)
-  if (Number.isNaN(date.getTime())) return ''
-
-  let nextHour = Number(hour)
-  if (period === 'PM' && nextHour < 12) nextHour += 12
-  if (period === 'AM' && nextHour === 12) nextHour = 0
-
-  date.setHours(nextHour, Number(minute), 0, 0)
-  return date.toISOString()
-}
-
 const getCustomerBookingNumber = (items, bookingId) => {
   const sorted = [...toArray(items)].sort((left, right) => Number(left?.id || 0) - Number(right?.id || 0))
   const index = sorted.findIndex((item) => String(item?.id) === String(bookingId))
@@ -447,10 +421,6 @@ function BookingDetailPage() {
   const location = useLocation()
   const [booking, setBooking] = useState(null)
   const [selectedStatus, setSelectedStatus] = useState('CONFIRMED')
-  const [checkInHour, setCheckInHour] = useState('')
-  const [checkInMinute, setCheckInMinute] = useState('')
-  const [checkInPeriod, setCheckInPeriod] = useState('AM')
-  const [timePickerOpen, setTimePickerOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState('')
@@ -458,6 +428,9 @@ function BookingDetailPage() {
   const [customerBookingNo, setCustomerBookingNo] = useState(null)
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
+  const [checkInModalOpen, setCheckInModalOpen] = useState(false)
+  const [checkInLoading, setCheckInLoading] = useState(false)
+  const [checkInError, setCheckInError] = useState('')
 
   const role = location.pathname.startsWith('/admin')
     ? 'admin'
@@ -489,12 +462,8 @@ function BookingDetailPage() {
   const canCreatePayOS = role !== 'customer' && currentStatus === 'COMPLETED' && !isPaid && isBankTransfer
   const canMarkNoShow = canEditBooking && currentStatus === 'CONFIRMED'
   const canCheckIn = canEditBooking && currentStatus === 'CONFIRMED'
-  const canEditCheckInTime =
-    canEditBooking && ['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'].includes(currentStatus)
-  const hasCheckInTime = canEditCheckInTime && Boolean(checkInHour && checkInMinute)
-  const checkInTime = hasCheckInTime ? `${checkInHour}:${checkInMinute} ${checkInPeriod}` : ''
   const statusChanged = canEditBooking && selectedStatus !== workflowStatus
-  const hasPendingUpdate = canEditBooking && (hasCheckInTime || statusChanged)
+  const hasPendingUpdate = canEditBooking && statusChanged
   const workflowStatusOptions = getWorkflowStatusOptions(workflowStatus)
   const displayBookingNo = role === 'customer' ? customerBookingNo || id : id
 
@@ -703,24 +672,6 @@ function BookingDetailPage() {
       let didStartService = currentStatus === 'IN_PROGRESS'
       const now = new Date().toISOString()
 
-      if (hasCheckInTime) {
-        if (currentStatus === 'CONFIRMED') {
-          await runBookingMutation(
-            () => bookingApi.checkInBooking(id, `Check-in time: ${checkInTime}`),
-            {
-              status: 'CHECKED_IN',
-              checkedInAt: buildManualCheckedInAt(booking, checkInHour, checkInMinute, checkInPeriod) || now,
-              note: `Check-in time: ${checkInTime}`,
-            },
-          )
-        }
-        writeCachedBooking(id, {
-          manualCheckedInAt: buildManualCheckedInAt(booking, checkInHour, checkInMinute, checkInPeriod),
-          note: `Check-in time: ${checkInTime}`,
-        })
-        didCheckIn = true
-      }
-
       if (statusChanged) {
         if (selectedStatus === 'CONFIRMED') {
           throw new Error(TEXT.noResetApi)
@@ -798,10 +749,6 @@ function BookingDetailPage() {
         }
       }
 
-      setCheckInHour('')
-      setCheckInMinute('')
-      setCheckInPeriod('AM')
-      setTimePickerOpen(false)
     })
   }
 
@@ -844,6 +791,37 @@ function BookingDetailPage() {
       setActionMessage(getActionErrorMessage(err) || `${TEXT.cancelBooking} ${TEXT.failed}`)
     } finally {
       setCancelLoading(false)
+    }
+  }
+
+  const handleDirectCheckIn = () => {
+    if (!canCheckIn) return
+    setCheckInError('')
+    setCheckInModalOpen(true)
+  }
+
+  const handleCheckInConfirm = async (note) => {
+    setCheckInLoading(true)
+    setCheckInError('')
+    try {
+      const result = await runBookingMutation(
+        () => bookingApi.checkInBooking(id, { note }),
+        {
+          status: 'CHECKED_IN',
+          note: note || booking?.note,
+        },
+      )
+      if (result?.id) {
+        writeCachedBooking(result.id, result)
+      }
+      setSelectedStatus('CHECKED_IN')
+      setCheckInModalOpen(false)
+      setActionMessage(TEXT.checkInSuccess)
+      await loadDetail()
+    } catch (err) {
+      setCheckInError(getActionErrorMessage(err) || `${TEXT.checkInBooking} ${TEXT.failed}`)
+    } finally {
+      setCheckInLoading(false)
     }
   }
 
@@ -895,18 +873,6 @@ function BookingDetailPage() {
 
       return booking
     })
-  }
-
-  const handleCheckInTimeChange = (value) => {
-    const nextTime = parseTimeInputValue(value)
-    setCheckInHour(nextTime.hour)
-    setCheckInMinute(nextTime.minute)
-    setCheckInPeriod(nextTime.period)
-  }
-
-  const handleUseCurrentTime = () => {
-    const now = new Date()
-    handleCheckInTimeChange(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`)
   }
 
   return (
@@ -992,67 +958,6 @@ function BookingDetailPage() {
               <span>Check-in</span>
               <div className="booking-detail-inline-control">
                 <strong>{getCheckInDisplay(booking)}</strong>
-                {canEditCheckInTime && (
-                  <div className={`booking-time-picker-shell ${timePickerOpen ? 'open' : ''}`}>
-                    <button
-                      type="button"
-                      className="booking-time-picker-toggle"
-                      onClick={() => setTimePickerOpen((value) => !value)}
-                      aria-expanded={timePickerOpen}
-                      aria-label={TEXT.chooseCheckIn}
-                    >
-                      {checkInHour && checkInMinute
-                        ? `${checkInHour}:${checkInMinute} ${checkInPeriod}`
-                        : canCheckIn
-                          ? 'Chọn giờ'
-                          : 'Sửa giờ'}
-                    </button>
-                    <div className="booking-detail-time-picker" aria-label={TEXT.chooseCheckIn}>
-                      <div className="booking-time-dropdown-head">
-                        <span>Giờ check-in</span>
-                        <strong>{checkInHour && checkInMinute ? `${checkInHour}:${checkInMinute} ${checkInPeriod}` : '--:--'}</strong>
-                      </div>
-                      <div className="booking-time-select-row">
-                        <select
-                          value={checkInHour}
-                          onChange={(event) => setCheckInHour(event.target.value)}
-                          aria-label="Giờ check-in"
-                        >
-                          <option value="">Giờ</option>
-                          {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0')).map((hour) => (
-                            <option key={hour} value={hour}>{hour}</option>
-                          ))}
-                        </select>
-                        <select
-                          value={checkInMinute}
-                          onChange={(event) => setCheckInMinute(event.target.value)}
-                          aria-label="Phút check-in"
-                        >
-                          <option value="">Phút</option>
-                          {Array.from({ length: 60 }, (_, index) => String(index).padStart(2, '0')).map((minute) => (
-                            <option key={minute} value={minute}>{minute}</option>
-                          ))}
-                        </select>
-                        <select
-                          value={checkInPeriod}
-                          onChange={(event) => setCheckInPeriod(event.target.value)}
-                          aria-label="AM hoặc PM"
-                        >
-                          <option value="AM">AM</option>
-                          <option value="PM">PM</option>
-                        </select>
-                      </div>
-                      <div className="booking-time-dropdown-actions">
-                        <button type="button" onClick={handleUseCurrentTime}>
-                          Bây giờ
-                        </button>
-                        <button type="button" onClick={() => setTimePickerOpen(false)}>
-                          Xong
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
             <div className="booking-detail-control-card">
@@ -1167,6 +1072,16 @@ function BookingDetailPage() {
                   {TEXT.cancel}
                 </button>
               </div>
+              {canCheckIn && (
+                <button
+                  type="button"
+                  className="booking-detail-update-btn"
+                  disabled={actionLoading}
+                  onClick={handleDirectCheckIn}
+                >
+                  {TEXT.checkInBooking}
+                </button>
+              )}
               {hasPendingUpdate && (
                 <button
                   type="button"
@@ -1188,6 +1103,16 @@ function BookingDetailPage() {
         loading={cancelLoading}
         onClose={() => { if (!cancelLoading) setCancelModalOpen(false) }}
         onConfirm={handleCancelConfirm}
+      />
+
+      <CheckInBookingModal
+        open={checkInModalOpen}
+        bookingId={displayBookingNo}
+        booking={booking}
+        loading={checkInLoading}
+        error={checkInError}
+        onClose={() => { if (!checkInLoading) { setCheckInModalOpen(false); setCheckInError('') } }}
+        onConfirm={handleCheckInConfirm}
       />
     </div>
   )

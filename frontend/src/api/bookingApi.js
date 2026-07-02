@@ -86,8 +86,11 @@ export const bookingApi = {
     return toArray(response)
   },
 
-  async checkInBooking(bookingId, note) {
-    const response = await api.patch(`/bookings/${bookingId}/check-in`, { note })
+  async checkInBooking(bookingId, payload = {}) {
+    const body = typeof payload === 'string' ? { note: payload } : { ...payload }
+    const response = await api.patch(`/bookings/${bookingId}/check-in`, {
+      note: body.note?.trim?.() || '',
+    })
     return unwrap(response)
   },
 
