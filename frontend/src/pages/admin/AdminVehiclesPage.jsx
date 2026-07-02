@@ -49,8 +49,8 @@ export default function AdminVehiclesPage() {
       `}</style>
 
       <div style={headerStyle}>
-        <h1 style={{ margin: 0, color: '#fff' }}>Quản lý xe</h1>
-        <p style={{ margin: '6px 0 0', color: 'rgba(200,220,255,0.58)' }}>Tìm kiếm biển số, hãng, model và lọc theo loại xe.</p>
+        <h1 style={{ margin: 0, color: '#fff', marginBottom: '20px' }}>Quản lý xe</h1>
+        <p style={{ margin: 0, color: 'rgba(200,220,255,0.58)' }}>Tìm kiếm biển số, hãng, model và lọc theo loại xe.</p>
       </div>
 
       <div style={panelStyle}>

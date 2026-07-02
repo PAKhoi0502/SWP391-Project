@@ -252,7 +252,7 @@ public class WaitlistServiceImpl implements WaitlistService {
         Waitlist saved = waitlistRepository.save(waitlist);
 
         notificationService.notifyWaitlistOffered(saved.getId());
-        emailService.sendWaitlistOfferedEmail(saved.getId());
+        emailService.sendWaitlistOfferedEmail(saved.getId(), saved.getOfferExpiresAt());
         return toResponse(saved);
     }
 

@@ -467,18 +467,18 @@ export default function CustomerCreateBookingPage() {
       endTime: waitlistDraft.endTime || '',
     })
 
-    navigate(`/waitlist?${params.toString()}`)
+    navigate(`/customer/waitlist?${params.toString()}`)
   }
 
-const canSubmit =
-  currentStep === 5 &&
-  selectedVehicle &&
-  selectedGarage &&
-  selectedPackage &&
-  selectedDate &&
-  selectedSlot &&
-  paymentMethod &&
-  !submitting
+  const canSubmit =
+    currentStep === 5 &&
+    selectedVehicle &&
+    selectedGarage &&
+    selectedPackage &&
+    selectedDate &&
+    selectedSlot &&
+    paymentMethod &&
+    !submitting
 
   const canGoNext = () => {
     if (currentStep === 1) return Boolean(selectedVehicle)
@@ -543,7 +543,7 @@ const canSubmit =
         servicePackageId: packageId,
         startTime,
         promotionCode: promotionCode.trim() || null,
-        usedPoints: loyaltyPreview?.validPoints ?? 0,
+        usedPoints: loyaltyPreview?.validPoints ?? Number(loyaltyPoints || 0),
         paymentMethod,
         note:
           paymentMethod === 'BANK_TRANSFER'
@@ -625,9 +625,8 @@ const canSubmit =
                       <button
                         type="button"
                         key={getId(vehicle)}
-                        className={`booking-option-card ${
-                          String(selectedVehicleId) === String(getId(vehicle)) ? 'active' : ''
-                        }`}
+                        className={`booking-option-card ${String(selectedVehicleId) === String(getId(vehicle)) ? 'active' : ''
+                          }`}
                         onClick={() => setSelectedVehicleId(String(getId(vehicle)))}
                       >
                         <strong>{getName(vehicle, 'Xe của bạn')}</strong>
@@ -664,9 +663,8 @@ const canSubmit =
                       <button
                         type="button"
                         key={getId(garage)}
-                        className={`booking-option-card ${
-                          String(selectedGarageId) === String(getId(garage)) ? 'active' : ''
-                        }`}
+                        className={`booking-option-card ${String(selectedGarageId) === String(getId(garage)) ? 'active' : ''
+                          }`}
                         onClick={() => setSelectedGarageId(String(getId(garage)))}
                       >
                         <strong>{getName(garage, 'Garage')}</strong>
@@ -702,11 +700,10 @@ const canSubmit =
                       <button
                         type="button"
                         key={getId(servicePackage)}
-                        className={`booking-option-card ${
-                          String(selectedPackageId) === String(getId(servicePackage))
+                        className={`booking-option-card ${String(selectedPackageId) === String(getId(servicePackage))
                             ? 'active'
                             : ''
-                        }`}
+                          }`}
                         onClick={() => setSelectedPackageId(String(getId(servicePackage)))}
                       >
                         <strong>{getName(servicePackage, 'Gói dịch vụ')}</strong>
@@ -763,9 +760,8 @@ const canSubmit =
                         <button
                           type="button"
                           key={getId(slot)}
-                          className={`booking-slot ${active ? 'active' : ''} ${
-                            full ? 'full' : ''
-                          }`}
+                          className={`booking-slot ${active ? 'active' : ''} ${full ? 'full' : ''
+                            }`}
                           onClick={() => {
                             if (full) {
                               handleJoinWaitlist(slot)
@@ -840,28 +836,28 @@ const canSubmit =
                   </button>
                 </div>
                 <div className="booking-payment-method-box">
-  <h3>Phương thức thanh toán</h3>
+                  <h3>Phương thức thanh toán</h3>
 
-  <div className="booking-payment-method-grid">
-    <button
-      type="button"
-      className={paymentMethod === 'CASH' ? 'active' : ''}
-      onClick={() => setPaymentMethod('CASH')}
-    >
-      <strong>Thanh toán tiền mặt</strong>
-      <span>Khách trả tiền mặt tại garage sau khi rửa xong.</span>
-    </button>
+                  <div className="booking-payment-method-grid">
+                    <button
+                      type="button"
+                      className={paymentMethod === 'CASH' ? 'active' : ''}
+                      onClick={() => setPaymentMethod('CASH')}
+                    >
+                      <strong>Thanh toán tiền mặt</strong>
+                      <span>Khách trả tiền mặt tại garage sau khi rửa xong.</span>
+                    </button>
 
-    <button
-      type="button"
-      className={paymentMethod === 'BANK_TRANSFER' ? 'active' : ''}
-      onClick={() => setPaymentMethod('BANK_TRANSFER')}
-    >
-      <strong>Chuyển khoản</strong>
-      <span>Staff sẽ tạo mã QR đúng số tiền để khách quét sau khi rửa xong.</span>
-    </button>
-  </div>
-</div>
+                    <button
+                      type="button"
+                      className={paymentMethod === 'BANK_TRANSFER' ? 'active' : ''}
+                      onClick={() => setPaymentMethod('BANK_TRANSFER')}
+                    >
+                      <strong>Chuyển khoản</strong>
+                      <span>Staff sẽ tạo mã QR đúng số tiền để khách quét sau khi rửa xong.</span>
+                    </button>
+                  </div>
+                </div>
 
                 <p className="booking-muted">
                   Booking sẽ được lưu với trạng thái chưa thanh toán. Nhân viên sẽ tạo QR

@@ -5,6 +5,7 @@
     radial-gradient(circle at top left, rgba(91, 124, 250, 0.18), transparent 32%),
     linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
   color: #13213c;
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
 }
 
 .booking-flow-hero,
@@ -144,6 +145,7 @@
 .booking-option-card small,
 .booking-slot small {
   display: block;
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
 }
 
 .booking-option-card small,
@@ -175,6 +177,7 @@
   gap: 8px;
   color: #344263;
   font-weight: 700;
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
 }
 
 .booking-field input {
@@ -186,6 +189,7 @@
   background: #ffffff;
   color: #13213c;
   outline: none;
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
 }
 
 .booking-field input:focus {
@@ -213,6 +217,7 @@
   font-weight: 800;
   text-decoration: none;
   cursor: pointer;
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
 }
 
 .booking-summary-row,
@@ -445,6 +450,7 @@
   color: #0f172a;
   text-align: left;
   transition: 0.18s ease;
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
 }
 
 .booking-payment-method-grid button:hover {

@@ -31,6 +31,7 @@ import AdminServicePackagePage from '../pages/admin/AdminServicePackagePage'
 import AvailableSlotsPickerPage from '../pages/booking/AvailableSlotsPickerPage'
 import CustomerCreateBookingPage from '../pages/booking/CustomerCreateBookingPage'
 import WaitlistPage from '../pages/booking/WaitlistPage'
+import StaffWaitlistPage from '../pages/booking/StaffWaitlistPage'
 import BookingHistoryPage from '../pages/booking/BookingHistoryPage'
 import CustomerBookingListPage from '../pages/booking/CustomerBookingListPage'
 import BookingDetailPage from '../pages/booking/BookingDetailPage'
@@ -60,14 +61,13 @@ function AppRoutes() {
           <Route path="customer" element={<Navigate to="/" replace />} />
           <Route path="customer/vehicles" element={<CustomerVehiclesPage />} />
           <Route path="customer/profile" element={<ProfilePage />} />
-          <Route path="customer/vehicles" element={<CustomerVehiclesPage />} />
           <Route path="customer/garages" element={<GarageListPage />} />
           <Route path="customer/garages/:id" element={<GarageDetailPage />} />
           <Route path="customer/service-packages" element={<ServicePackageListPage />} />
           <Route path="customer/service-packages/:id" element={<ServicePackageDetailPage />} />
           <Route path="/booking" element={<CustomerCreateBookingPage />} />
           <Route path="/booking/available-slots" element={<AvailableSlotsPickerPage />} />
-          <Route path="/waitlist" element={<WaitlistPage />} />
+          <Route path="/customer/waitlist" element={<WaitlistPage />} />
           <Route path="/customer/bookings" element={<CustomerBookingListPage />} />
           <Route path="/customer/bookings/:id" element={<BookingDetailPage />} />
           <Route path="/customer/booking-history" element={<BookingHistoryPage />} />
@@ -82,6 +82,7 @@ function AppRoutes() {
           <Route path="staff/bookings/:id" element={<BookingDetailPage />} />
           <Route path="staff/inspections" element={<DashboardPlaceholderPage title="Kiem tra xe" />} />
           <Route path="staff/profile" element={<StaffProfilePage />} />
+          <Route path="staff/waitlist" element={<StaffWaitlistPage />} />
         </Route>
       </Route>
 

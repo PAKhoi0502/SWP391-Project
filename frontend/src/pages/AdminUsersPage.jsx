@@ -113,8 +113,8 @@ export default function AdminUsersPage() {
 
       <div className="admin-user-header" style={headerStyle}>
         <div>
-          <h1 style={{ margin: 0, color: '#fff' }}>Quản lý người dùng</h1>
-          <p style={{ margin: '6px 0 0', color: 'rgba(200,220,255,0.58)' }}>
+          <h1 style={{ margin: 0, color: '#fff', marginBottom: '20px' }}>Quản lý người dùng</h1>
+          <p style={{ margin: 0, color: 'rgba(200,220,255,0.58)' }}>
             Tìm kiếm, lọc, xem chi tiết và cập nhật trạng thái/vai trò.
           </p>
         </div>
