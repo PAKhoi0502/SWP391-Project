@@ -13,6 +13,11 @@ public interface EmailService {
 
     void sendBookingReminderEmail(Long bookingId);
 
+    // ===================== AUTH =====================
+    void sendWelcomeEmail(String to, String fullName);
+
+    void sendForgotPasswordEmail(String to, String fullName, String token);
+
     // ===================== ADMIN TEST =====================
     void sendTestEmail(String to);
 }

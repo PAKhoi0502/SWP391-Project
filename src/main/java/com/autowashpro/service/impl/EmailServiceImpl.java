@@ -62,6 +62,7 @@ public class EmailServiceImpl implements EmailService {
     // ===================== BOOKING CONFIRMATION =====================
 
     @Override
+    @Async
     public void sendBookingConfirmationEmail(Long bookingId) {
         bookingRepository.findById(bookingId).ifPresent(booking -> {
             String email = getCustomerEmail(booking);
@@ -104,6 +105,7 @@ public class EmailServiceImpl implements EmailService {
     // ===================== PAYMENT CONFIRMED =====================
 
     @Override
+    @Async
     public void sendPaymentConfirmedEmail(Long bookingId) {
         bookingRepository.findById(bookingId).ifPresent(booking -> {
             String email = getCustomerEmail(booking);
@@ -144,6 +146,7 @@ public class EmailServiceImpl implements EmailService {
     // ===================== WAITLIST OFFERED =====================
 
     @Override
+    @Async
     public void sendWaitlistOfferedEmail(Long waitlistId) {
         waitlistRepository.findById(waitlistId).ifPresent(waitlist -> {
             if (waitlist.getCustomerId() == null) {
@@ -189,6 +192,7 @@ public class EmailServiceImpl implements EmailService {
     // ===================== BOOKING REMINDER =====================
 
     @Override
+    @Async
     public void sendBookingReminderEmail(Long bookingId) {
         bookingRepository.findById(bookingId).ifPresent(booking -> {
             String email = getCustomerEmail(booking);
@@ -224,6 +228,49 @@ public class EmailServiceImpl implements EmailService {
                 booking.getStartTime().toLocalTime());
     }
 
+        // ===================== AUTH =====================
+
+@Override
+@Async
+public void sendWelcomeEmail(String to, String fullName) {
+    String subject = "[AutoWash Pro] Welcome to AutoWash Pro!";
+    String html = """
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #2563eb;">🎉 Welcome to AutoWash Pro!</h2>
+                <p>Dear %s,</p>
+                <p>Your account has been created successfully.</p>
+                <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                    <p>You can now book car wash appointments, track your loyalty points, and enjoy exclusive member benefits.</p>
+                </div>
+                <p>Thank you for joining AutoWash Pro!</p>
+                <hr/>
+                <p style="color: #6b7280; font-size: 12px;">AutoWash Pro - Smart Car Wash Management System</p>
+            </div>
+            """.formatted(fullName);
+    sendEmail(to, subject, html);
+}
+
+@Override
+@Async
+public void sendForgotPasswordEmail(String to, String fullName, String token) {
+    String subject = "[AutoWash Pro] Reset Your Password";
+    String html = """
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #dc2626;">🔐 Reset Your Password</h2>
+                <p>Dear %s,</p>
+                <p>We received a request to reset your password.</p>
+                <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                    <p><strong>Your reset token:</strong></p>
+                    <p style="font-size: 18px; font-weight: bold; color: #2563eb; word-break: break-all;">%s</p>
+                    <p style="color: #6b7280; font-size: 12px;">This token expires in 15 minutes.</p>
+                </div>
+                <p>If you did not request this, please ignore this email.</p>
+                <hr/>
+                <p style="color: #6b7280; font-size: 12px;">AutoWash Pro - Smart Car Wash Management System</p>
+            </div>
+            """.formatted(fullName, token);
+    sendEmail(to, subject, html);
+}
     // ===================== ADMIN TEST =====================
 
     @Override

@@ -148,8 +148,6 @@ public class LoyaltyServiceImpl implements LoyaltyService {
 
         customerLoyaltyRepository.save(loyalty);
 
-        reviewCustomerTier(booking.getCustomerId());
-
         booking.setRewardProcessed(true);
 
         bookingRepository.save(booking);
