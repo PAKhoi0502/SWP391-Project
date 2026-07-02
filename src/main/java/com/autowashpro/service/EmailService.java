@@ -1,5 +1,7 @@
 package com.autowashpro.service;
 
+import java.time.LocalDateTime;
+
 public interface EmailService {
 
     // ===================== INTERNAL =====================
@@ -9,7 +11,7 @@ public interface EmailService {
 
     void sendPaymentConfirmedEmail(Long bookingId);
 
-    void sendWaitlistOfferedEmail(Long waitlistId);
+    void sendWaitlistOfferedEmail(Long waitlistId, LocalDateTime offerExpiresAt);
 
     void sendBookingReminderEmail(Long bookingId);
 
