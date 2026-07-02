@@ -18,6 +18,8 @@ public interface NotificationService {
 
     void notifyTierUpgraded(Long customerId, String oldTier, String newTier);
     
+    void notifyVoucherReceived(Long customerId, String promotionCode, String promotionName);
+    
     // ===================== API =====================
     Page<NotificationResponse> getMyNotifications(Long userId, Boolean isRead, int page, int limit);
 

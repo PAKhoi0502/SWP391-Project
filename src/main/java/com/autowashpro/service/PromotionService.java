@@ -2,6 +2,7 @@ package com.autowashpro.service;
 
 import com.autowashpro.dto.request.CreatePromotionRequest;
 import com.autowashpro.dto.request.PromotionValidateRequest;
+import com.autowashpro.dto.request.SendVoucherRequest;
 import com.autowashpro.dto.request.UpdatePromotionRequest;
 import com.autowashpro.dto.response.PromotionDetailResponse;
 import com.autowashpro.dto.response.PromotionResponse;
@@ -39,4 +40,5 @@ public interface PromotionService {
 
         List<PromotionUsageResponse> getMyPromotionUsages(Long customerId);
 
+        int sendVoucher(Long promotionId, SendVoucherRequest request);
 }

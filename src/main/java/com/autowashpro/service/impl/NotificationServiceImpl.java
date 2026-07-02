@@ -134,6 +134,17 @@ public void notifyTierUpgraded(Long customerId, String oldTier, String newTier) 
     );
 }
 
+@Override
+@Transactional
+public void notifyVoucherReceived(Long customerId, String promotionCode, String promotionName) {
+    createInAppNotification(
+            customerId,
+            null,
+            "VOUCHER_RECEIVED",
+            "Voucher Received! 🎁",
+            "You received a voucher: " + promotionName + " (Code: " + promotionCode + "). Use it on your next booking!"
+    );
+}
     // ===================== API =====================
 
     @Override
