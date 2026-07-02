@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { bookingApi } from '../../api/bookingApi'
 import customerBookingFlowApi from '../../api/customerBookingFlowApi'
@@ -464,6 +464,9 @@ export default function BookingHistoryPage() {
                   </div>
 
                   <div className="booking-history-badges">
+                    {booking?.isWalkIn && booking?.customerId && (
+                      <span className="garage-walk-in">Khách đặt tại garage</span>
+                    )}
                     <span className={`status ${status.toLowerCase()}`}>{getStatusText(status)}</span>
                     <span className={`payment ${paymentStatus.toLowerCase()}`}>
                       {getPaymentText(paymentStatus)}
@@ -479,7 +482,11 @@ export default function BookingHistoryPage() {
 
                   <div>
                     <span>Xe</span>
-                    <strong>{booking?.vehicleName || booking?.vehicleId || 'Chưa cập nhật'}</strong>
+                    <strong>
+                      {booking?.vehicleName && booking?.licensePlate
+                        ? `${booking.vehicleName} · ${booking.licensePlate}`
+                        : booking?.vehicleName || booking?.licensePlate || 'Chưa cập nhật'}
+                    </strong>
                   </div>
 
                   <div>

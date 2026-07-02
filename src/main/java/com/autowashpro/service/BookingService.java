@@ -6,6 +6,7 @@ import com.autowashpro.dto.response.AvailableSlotResponse;
 import com.autowashpro.dto.response.BookingResponse;
 import com.autowashpro.dto.response.BookingDetailResponse;
 import com.autowashpro.dto.response.BookingSummaryResponse;
+import com.autowashpro.dto.response.WalkInCustomerLookupResponse;
 import com.autowashpro.dto.request.StartServiceRequest;
 import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
 import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
@@ -21,11 +22,15 @@ public interface BookingService {
                         Long garageId,
                         Long servicePackageId,
                         String vehicleType,
-                        LocalDate date);
+                        LocalDate date,
+                        boolean isWalkIn);
 
         BookingResponse createBooking(BookingCreateRequest request, Long customerId);
 
         BookingResponse createWalkInBooking(WalkInBookingCreateRequest request, Long staffUserId);
+
+        WalkInCustomerLookupResponse lookupWalkInCustomerByPhone(String phone, String licensePlate);
+
         // ===================== ISSUE #13 =====================
 
         List<BookingSummaryResponse> getCustomerBookings(

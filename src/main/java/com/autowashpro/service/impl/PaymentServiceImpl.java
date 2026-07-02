@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
@@ -42,12 +43,13 @@ public class PaymentServiceImpl implements PaymentService {
     private final PayOS payOS;
     private final BookingRepository bookingRepository;
     private final PaymentTransactionRepository transactionRepository;
-    private final LoyaltyService loyaltyService;  // thay CustomerLoyaltyRepository
+    private final LoyaltyService loyaltyService;
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate;
     private final WashHistoryService washHistoryService;
     private final NotificationService notificationService;
     private final EmailService emailService;
+    private final org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     @Value("${payos.return-url}")
     private String returnUrl;
@@ -158,7 +160,6 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    @Transactional
     public void handlePayOSWebhook(Map<String, Object> webhookData) {
         try {
             Webhook webhookBody = objectMapper.convertValue(webhookData, Webhook.class);
@@ -180,32 +181,49 @@ public class PaymentServiceImpl implements PaymentService {
             }
 
             if ("00".equals(code)) {
-                transaction.setStatus("PAID");
-                transaction.setPaidAt(LocalDateTime.now());
-                transaction.setPayosTransactionId(String.valueOf(data.getPaymentLinkId()));
-                transactionRepository.save(transaction);
+                final long[] bookingIdRef = {0};
 
-                Booking booking = bookingRepository.findById(transaction.getBookingId())
-                        .orElseThrow(() -> new RuntimeException("Booking not found"));
+                // Commit payment in its own transaction so a loyalty failure cannot roll it back
+                new org.springframework.transaction.support.TransactionTemplate(transactionManager).execute(status -> {
+                    transaction.setStatus("PAID");
+                    transaction.setPaidAt(LocalDateTime.now());
+                    transaction.setPayosTransactionId(String.valueOf(data.getPaymentLinkId()));
+                    transactionRepository.save(transaction);
 
-                if (!"PAID".equals(booking.getPaymentStatus())) {
-                    booking.setPaymentStatus("PAID");
-                    booking.setPaidAt(LocalDateTime.now());
-                    bookingRepository.save(booking);
+                    Booking booking = bookingRepository.findById(transaction.getBookingId())
+                            .orElseThrow(() -> new RuntimeException("Booking not found"));
 
-                    // Gọi loyaltyService thay vì processLoyaltyReward()
-                    // rewardProcessed check đã có trong earnPointsAfterPaidBooking (idempotent)
-                    loyaltyService.updateBookingStatistics(booking.getId());
-                    loyaltyService.earnPointsAfterPaidBooking(booking.getId());
-                    washHistoryService.createWashHistoryAfterPaidBooking(booking.getId());
-                    notificationService.notifyPaymentConfirmed(booking.getId());
+                    if (!"PAID".equals(booking.getPaymentStatus())) {
+                        booking.setPaymentStatus("PAID");
+                        booking.setPaymentMethod("PAYOS");
+                        booking.setPaidAt(LocalDateTime.now());
+                        bookingRepository.save(booking);
+                        bookingIdRef[0] = booking.getId();
+                    }
+                    return null;
+                });
 
+                // Post-payment chain runs after payment is committed — failures are logged but do not
+                // roll back the payment. Missing points are covered by backfillMissingEarnPoints.
+                long bookingId = bookingIdRef[0];
+                if (bookingId != 0) {
+                    try {
+                        loyaltyService.updateBookingStatistics(bookingId);
+                        loyaltyService.earnPointsAfterPaidBooking(bookingId);
+                        washHistoryService.createWashHistoryAfterPaidBooking(bookingId);
+                        notificationService.notifyPaymentConfirmed(bookingId);
+                        notificationService.notifyRewardEarned(bookingId);
+                    } catch (Exception e) {
+                        log.error("Post-payment processing failed for booking {}: {}", bookingId, e.getMessage());
+                    }
                 }
-
             } else {
-                transaction.setStatus("CANCELLED");
-                transaction.setCancelReason("PayOS code: " + code);
-                transactionRepository.save(transaction);
+                new org.springframework.transaction.support.TransactionTemplate(transactionManager).execute(status -> {
+                    transaction.setStatus("CANCELLED");
+                    transaction.setCancelReason("PayOS code: " + code);
+                    transactionRepository.save(transaction);
+                    return null;
+                });
             }
 
         } catch (Exception e) {

@@ -486,7 +486,7 @@ function BookingDetailPage() {
   const isCashPayment = paymentMethod === 'CASH' || paymentNote.includes('tien mat')
   const paymentMethodText = isBankTransfer ? TEXT.bankTransfer : isCashPayment ? TEXT.cash : TEXT.notUpdated
   const isPaid = String(booking?.paymentStatus || '').toUpperCase() === 'PAID'
-  const canCreatePayOS = role !== 'customer' && currentStatus === 'COMPLETED' && !isPaid
+  const canCreatePayOS = role !== 'customer' && currentStatus === 'COMPLETED' && !isPaid && isBankTransfer
   const canMarkNoShow = canEditBooking && currentStatus === 'CONFIRMED'
   const canCheckIn = canEditBooking && currentStatus === 'CONFIRMED'
   const canEditCheckInTime =
@@ -769,10 +769,17 @@ function BookingDetailPage() {
           }
           await runBookingMutation(
             () => bookingApi.completeService(id, 'Updated from booking detail'),
-            { status: 'COMPLETED', completedAt: now, note: 'Updated from booking detail' },
+            {
+              status: 'COMPLETED',
+              completedAt: now,
+              note: 'Updated from booking detail',
+              ...(isCashPayment ? { paymentStatus: 'PAID', paidAt: now } : {}),
+            },
           )
 
-          if (isCashPayment) {
+          // Walk-in CASH: backend auto-marks PAID in completeService.
+          // Online CASH: paymentMethod is null in DB, so call markBookingPaid here.
+          if (isCashPayment && !booking.isWalkIn) {
             const paidResult = await runBookingMutation(
               () => bookingApi.markBookingPaid(id, {
                 paymentMethod: 'CASH',
@@ -867,6 +874,11 @@ function BookingDetailPage() {
       return
     }
 
+    if (!isBankTransfer) {
+      setActionMessage(TEXT.payosBankOnly)
+      return
+    }
+
     runAction(TEXT.createQr, async () => {
       const result = await bookingApi.createPayOSPayment(id)
       writeCachedBooking(id, {
@@ -925,6 +937,9 @@ function BookingDetailPage() {
               <h2>#{displayBookingNo}</h2>
             </div>
             <div className="booking-history-badges">
+              {booking.isWalkIn && booking.customerId && (
+                <span className="garage-walk-in">Khách đặt tại garage</span>
+              )}
               <span className={`status ${String(booking.status || '').toLowerCase()}`}>{getStatusText(booking.status)}</span>
               <span className={`payment ${String(booking.paymentStatus || '').toLowerCase()}`}>
                 {getPaymentStatusText(booking.paymentStatus)}

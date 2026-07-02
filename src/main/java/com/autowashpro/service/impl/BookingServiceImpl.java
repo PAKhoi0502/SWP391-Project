@@ -13,6 +13,7 @@ import com.autowashpro.dto.response.AvailableSlotResponse;
 import com.autowashpro.dto.response.BookingResponse;
 import com.autowashpro.dto.response.BookingServiceStepResponse;
 import com.autowashpro.dto.response.SlotResponse;
+import com.autowashpro.dto.response.WalkInCustomerLookupResponse;
 import com.autowashpro.entity.*;
 import com.autowashpro.entity.enums.WashBayStatus;
 import com.autowashpro.repository.*;
@@ -69,7 +70,8 @@ public class BookingServiceImpl implements BookingService {
                         Long garageId,
                         Long servicePackageId,
                         String vehicleType,
-                        LocalDate date) {
+                        LocalDate date,
+                        boolean isWalkIn) {
 
                 Garage garage = garageRepository.findById(garageId)
                                 .orElseThrow(() -> new RuntimeException("Garage not found"));
@@ -96,7 +98,9 @@ public class BookingServiceImpl implements BookingService {
 
                 List<SlotResponse> slots = new ArrayList<>();
 
-                if (date.isBefore(LocalDate.now().plusDays(1))) {
+                // Rule 1: online booking phải đặt trước ít nhất 1 ngày.
+                // Rule 2: walk-in được phép đặt trong ngày nếu còn slot trống.
+                if (!isWalkIn && date.isBefore(LocalDate.now().plusDays(1))) {
                         return AvailableSlotResponse.builder()
                                         .garageId(garageId)
                                         .servicePackageId(servicePackageId)
@@ -491,9 +495,7 @@ public class BookingServiceImpl implements BookingService {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Service package is inactive");
                 }
 
-                String normalizedPlate = request.getLicensePlate().toUpperCase()
-                                .replaceAll("[\\s.\\-]", "")
-                                .replaceAll("[^A-Z0-9]", "");
+                String normalizedPlate = normalizeLicensePlate(request.getLicensePlate());
 
                 LocalDateTime startTime = request.getStartTime();
                 LocalDateTime endTime = startTime.plusMinutes(resolveSlotDurationMinutes(pkg, garage));
@@ -554,9 +556,33 @@ public class BookingServiceImpl implements BookingService {
                         }
                 }
 
+                User matchedCustomer = findActiveCustomerByPhone(request.getGuestPhone());
+                Vehicle matchedVehicle = findMatchedCustomerVehicle(matchedCustomer, normalizedPlate);
+
+                // Auto-save new vehicle for known customers when the plate is not in their profile yet
+                if (matchedCustomer != null && matchedVehicle == null && normalizedPlate != null) {
+                        Vehicle newVehicle = new Vehicle();
+                        newVehicle.setCustomer(matchedCustomer);
+                        newVehicle.setRawLicensePlate(request.getLicensePlate().trim().toUpperCase());
+                        newVehicle.setNormalizedLicensePlate(normalizedPlate);
+                        newVehicle.setVehicleType(request.getVehicleType() != null
+                                        ? request.getVehicleType().toUpperCase() : "CAR");
+                        String brand = request.getVehicleBrand() != null && !request.getVehicleBrand().isBlank()
+                                        ? request.getVehicleBrand().trim() : "Không rõ";
+                        String model = request.getVehicleModel() != null && !request.getVehicleModel().isBlank()
+                                        ? request.getVehicleModel().trim() : "Không rõ";
+                        newVehicle.setBrand(brand);
+                        newVehicle.setModel(model);
+                        newVehicle.setIsDefault(false);
+                        newVehicle.setIsActive(true);
+                        matchedVehicle = vehicleRepository.save(newVehicle);
+                }
+
+                String paymentMethod = normalizeWalkInPaymentMethod(request.getPaymentMethod());
+
                 Booking booking = new Booking();
-                booking.setCustomerId(null);
-                booking.setVehicleId(null);
+                booking.setCustomerId(matchedCustomer != null ? matchedCustomer.getId() : null);
+                booking.setVehicleId(matchedVehicle != null ? matchedVehicle.getId() : null);
                 booking.setGarageId(request.getGarageId());
                 booking.setServicePackageId(request.getServicePackageId());
                 booking.setCreatedByStaffId(staffUserId);
@@ -565,6 +591,7 @@ public class BookingServiceImpl implements BookingService {
                 booking.setEndTime(endTime);
                 booking.setStatus("CONFIRMED");
                 booking.setPaymentStatus("UNPAID");
+                booking.setPaymentMethod(paymentMethod);
                 booking.setOriginalPrice(pkg.getBasePrice());
                 booking.setSurchargeAmount(BigDecimal.ZERO);
                 booking.setDiscountAmount(BigDecimal.ZERO);
@@ -573,15 +600,77 @@ public class BookingServiceImpl implements BookingService {
                 booking.setDepositStatus("UNPAID");
                 booking.setRefundAmount(BigDecimal.ZERO);
                 booking.setIsWalkIn(true);
-                booking.setGuestName(request.getGuestName());
-                booking.setGuestPhone(request.getGuestPhone());
+                booking.setGuestName(matchedCustomer != null ? matchedCustomer.getFullName() : request.getGuestName());
+                booking.setGuestPhone(matchedCustomer != null ? matchedCustomer.getPhone() : normalizePhone(request.getGuestPhone()));
                 booking.setLicensePlate(normalizedPlate);
                 booking.setRewardProcessed(false);
                 booking.setUsedPoints(0);
                 booking.setNote(request.getNote());
 
                 Booking saved = bookingRepository.save(booking);
+                loyaltyService.updateBookingStatistics(saved.getId());
+                notificationService.notifyBookingConfirmed(saved.getId());
                 return toResponse(saved);
+        }
+
+        @Override
+        public WalkInCustomerLookupResponse lookupWalkInCustomerByPhone(String phone, String licensePlate) {
+                User customer = findActiveCustomerByPhone(phone);
+                if (customer == null) {
+                        return WalkInCustomerLookupResponse.builder()
+                                        .found(false)
+                                        .build();
+                }
+
+                String normalizedPlate = normalizeLicensePlate(licensePlate);
+                Vehicle matchedVehicle = normalizedPlate == null
+                                ? null
+                                : findMatchedCustomerVehicle(customer, normalizedPlate);
+
+                String matchedVehicleName = buildVehicleName(matchedVehicle);
+
+                List<WalkInCustomerLookupResponse.VehicleSummary> vehicleSummaries =
+                                vehicleRepository.findByCustomer_IdAndIsActiveTrue(customer.getId())
+                                                .stream()
+                                                .map(v -> WalkInCustomerLookupResponse.VehicleSummary.builder()
+                                                                .id(v.getId())
+                                                                .licensePlate(v.getRawLicensePlate() != null
+                                                                                && !v.getRawLicensePlate().isBlank()
+                                                                                                ? v.getRawLicensePlate()
+                                                                                                : v.getNormalizedLicensePlate())
+                                                                .vehicleType(v.getVehicleType())
+                                                                .vehicleName(buildVehicleName(v))
+                                                                .build())
+                                                .collect(java.util.stream.Collectors.toList());
+
+                return WalkInCustomerLookupResponse.builder()
+                                .found(true)
+                                .customerId(customer.getId())
+                                .fullName(customer.getFullName())
+                                .phone(customer.getPhone())
+                                .email(customer.getEmail())
+                                .vehicleId(matchedVehicle != null ? matchedVehicle.getId() : null)
+                                .licensePlate(matchedVehicle != null
+                                                ? (matchedVehicle.getRawLicensePlate() != null
+                                                                && !matchedVehicle.getRawLicensePlate().isBlank()
+                                                                                ? matchedVehicle.getRawLicensePlate()
+                                                                                : matchedVehicle.getNormalizedLicensePlate())
+                                                : null)
+                                .vehicleType(matchedVehicle != null ? matchedVehicle.getVehicleType() : null)
+                                .vehicleName(matchedVehicleName)
+                                .vehicles(vehicleSummaries)
+                                .build();
+        }
+
+        private String buildVehicleName(Vehicle v) {
+                if (v == null) return null;
+                String brand = v.getBrand();
+                String model = v.getModel();
+                if (brand != null && !brand.isBlank() && model != null && !model.isBlank()
+                                && !"Không rõ".equalsIgnoreCase(brand.trim())) {
+                        return brand.trim() + " " + model.trim();
+                }
+                return null;
         }
 
         // ===================== ISSUE #13 =====================
@@ -1136,7 +1225,25 @@ public class BookingServiceImpl implements BookingService {
                         booking.setNote(note);
                 }
 
+                // 7. CASH payments are settled on-the-spot — mark paid immediately
+                if ("CASH".equalsIgnoreCase(booking.getPaymentMethod())
+                                && !"PAID".equals(booking.getPaymentStatus())) {
+                        booking.setPaymentStatus("PAID");
+                        booking.setPaidAt(LocalDateTime.now());
+                }
+
                 Booking saved = bookingRepository.save(booking);
+
+                // 8. Post-payment processing (loyalty, promotions, notifications)
+                if ("PAID".equals(saved.getPaymentStatus())) {
+                        loyaltyService.updateBookingStatistics(saved.getId());
+                        promotionService.recordPromotionUsageAfterPaidBooking(saved.getId());
+                        loyaltyService.earnPointsAfterPaidBooking(saved.getId());
+                        washHistoryService.createWashHistoryAfterPaidBooking(saved.getId());
+                        notificationService.notifyPaymentConfirmed(saved.getId());
+                        notificationService.notifyRewardEarned(saved.getId());
+                }
+
                 return toResponse(saved);
         }
 
@@ -1344,6 +1451,67 @@ return toResponse(saved);
         }
         // ===================== HELPER =====================
 
+        private User findActiveCustomerByPhone(String phone) {
+                String normalizedPhone = normalizePhone(phone);
+                if (normalizedPhone == null) {
+                        return null;
+                }
+
+                return userRepository.findByPhone(normalizedPhone)
+                                .filter(user -> Boolean.TRUE.equals(user.getIsActive()))
+                                .filter(user -> "CUSTOMER".equalsIgnoreCase(user.getRole()))
+                                .orElse(null);
+        }
+
+        private String normalizeWalkInPaymentMethod(String paymentMethod) {
+                if (paymentMethod == null || paymentMethod.isBlank()) {
+                        return null;
+                }
+
+                String normalized = paymentMethod.trim().toUpperCase();
+                if ("BANK_TRANSFER".equals(normalized) || "TRANSFER".equals(normalized) || "QR".equals(normalized)) {
+                        return "PAYOS";
+                }
+                if ("PAYOS".equals(normalized) || "CASH".equals(normalized)) {
+                        return normalized;
+                }
+
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                "Unsupported walk-in payment method: " + paymentMethod);
+        }
+
+        private Vehicle findMatchedCustomerVehicle(User customer, String normalizedPlate) {
+                if (customer == null || normalizedPlate == null) {
+                        return null;
+                }
+
+                return vehicleRepository
+                                .findByCustomer_IdAndNormalizedLicensePlateAndIsActiveTrue(
+                                                customer.getId(),
+                                                normalizedPlate)
+                                .orElse(null);
+        }
+
+        private String normalizePhone(String phone) {
+                if (phone == null) {
+                        return null;
+                }
+
+                String normalized = phone.trim().replaceAll("[\\s.\\-()]", "");
+                return normalized.isBlank() ? null : normalized;
+        }
+
+        private String normalizeLicensePlate(String licensePlate) {
+                if (licensePlate == null) {
+                        return null;
+                }
+
+                String normalized = licensePlate.toUpperCase()
+                                .replaceAll("[\\s.\\-]", "")
+                                .replaceAll("[^A-Z0-9]", "");
+                return normalized.isBlank() ? null : normalized;
+        }
+
         private BookingResponse toResponse(Booking b) {
                 return BookingResponse.builder()
                                 .id(b.getId())
@@ -1399,6 +1567,9 @@ return toResponse(saved);
         }
 
         private BookingSummaryResponse toSummaryResponse(Booking b) {
+                Vehicle vehicle = b.getVehicleId() != null
+                                ? vehicleRepository.findById(b.getVehicleId()).orElse(null)
+                                : null;
                 return BookingSummaryResponse.builder()
                                 .id(b.getId())
                                 .customerId(b.getCustomerId())
@@ -1411,6 +1582,10 @@ return toResponse(saved);
                                 .paymentStatus(b.getPaymentStatus())
                                 .finalPrice(b.getFinalPrice())
                                 .isWalkIn(b.getIsWalkIn())
+                                .guestName(b.getGuestName())
+                                .guestPhone(b.getGuestPhone())
+                                .licensePlate(resolveLicensePlate(b))
+                                .vehicleName(buildVehicleName(vehicle))
                                 .build();
         }
 

@@ -19,6 +19,9 @@ public interface VehicleRepository
 
     Optional<Vehicle> findByIdAndCustomer_Id(Long id, Long customerId);
 
+    Optional<Vehicle> findByCustomer_IdAndNormalizedLicensePlateAndIsActiveTrue(Long customerId,
+            String normalizedLicensePlate);
+
     // Reset tất cả xe của customer về is_default=false trước khi set default mới
     @Modifying
     @Query("UPDATE Vehicle v SET v.isDefault = false WHERE v.customer.id = :customerId")
