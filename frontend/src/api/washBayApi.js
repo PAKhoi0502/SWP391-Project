@@ -57,16 +57,6 @@ export async function updateWashBayStatus(id, status) {
   const res = await fetch(`${API_BASE_URL}/wash-bays/${id}/status`, {
     method: "PATCH",
     headers: getAuthHeaders(),
-    body: JSON.stringify(status),
-  });
-
-  return handleResponse(res);
-}
-
-export async function updateWashBayStatus(id, status) {
-  const res = await fetch(`${API_BASE_URL}/wash-bays/${id}/status`, {
-    method: "PATCH",
-    headers: getAuthHeaders(),
     body: JSON.stringify({ status }),
   });
 

@@ -1,0 +1,224 @@
+.inspection-page {
+  display: grid;
+  gap: 22px;
+}
+
+.inspection-search,
+.inspection-panel {
+  border: 1px solid rgba(250, 204, 21, 0.14);
+  border-radius: 22px;
+  background: rgba(15, 15, 22, 0.94);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.28);
+}
+
+.inspection-search {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  padding: 18px;
+}
+
+.inspection-search label,
+.inspection-form label {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.inspection-search span,
+.inspection-form span,
+.inspection-panel-head p,
+.inspection-detail dt {
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.inspection-search input,
+.inspection-form select,
+.inspection-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid rgba(250, 204, 21, 0.2);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgba(8, 8, 12, 0.86);
+  color: #f8fafc;
+  outline: none;
+}
+
+.inspection-form textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.inspection-search button,
+.inspection-panel-head button,
+.inspection-actions button {
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 16px;
+  background: #facc15;
+  color: #111116;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.inspection-search button:disabled,
+.inspection-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.inspection-message {
+  border-radius: 16px;
+  padding: 14px 16px;
+  font-weight: 800;
+}
+
+.inspection-message.success {
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  background: rgba(34, 197, 94, 0.12);
+  color: #86efac;
+}
+
+.inspection-message.error {
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  background: rgba(248, 113, 113, 0.12);
+  color: #fecaca;
+}
+
+.inspection-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+  gap: 22px;
+}
+
+.inspection-panel {
+  padding: 22px;
+}
+
+.inspection-panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.inspection-panel-head p,
+.inspection-panel-head h2 {
+  margin: 0;
+}
+
+.inspection-panel-head h2 {
+  margin-top: 4px;
+  color: #ffffff;
+}
+
+.inspection-empty {
+  border-radius: 16px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.68);
+  font-weight: 800;
+}
+
+.inspection-list {
+  display: grid;
+  gap: 10px;
+}
+
+.inspection-list button {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #f8fafc;
+  text-align: left;
+  cursor: pointer;
+}
+
+.inspection-list button.active,
+.inspection-list button:hover {
+  border-color: rgba(250, 204, 21, 0.6);
+  background: rgba(250, 204, 21, 0.1);
+}
+
+.inspection-list span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 13px;
+}
+
+.inspection-form {
+  display: grid;
+  gap: 14px;
+}
+
+.inspection-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.inspection-detail {
+  margin-top: 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 18px;
+}
+
+.inspection-detail h3 {
+  margin: 0 0 14px;
+}
+
+.inspection-detail dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.inspection-detail dl div {
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.inspection-detail dd {
+  margin: 6px 0 0;
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.inspection-image-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.inspection-image-list a {
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(250, 204, 21, 0.12);
+  color: #fde68a;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+@media (max-width: 900px) {
+  .inspection-grid,
+  .inspection-detail dl {
+    grid-template-columns: 1fr;
+  }
+
+  .inspection-search,
+  .inspection-panel-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
