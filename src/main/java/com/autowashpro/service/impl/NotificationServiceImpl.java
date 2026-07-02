@@ -122,6 +122,18 @@ public class NotificationServiceImpl implements NotificationService {
         });
     }
 
+    @Override
+@Transactional
+public void notifyTierUpgraded(Long customerId, String oldTier, String newTier) {
+    createInAppNotification(
+            customerId,
+            null,
+            "TIER_UPGRADED",
+            "Tier Upgraded! 🎉",
+            "Congratulations! You have been upgraded from " + oldTier + " to " + newTier + " tier!"
+    );
+}
+
     // ===================== API =====================
 
     @Override
