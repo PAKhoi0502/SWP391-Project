@@ -271,6 +271,26 @@ public void sendForgotPasswordEmail(String to, String fullName, String token) {
             """.formatted(fullName, token);
     sendEmail(to, subject, html);
 }
+@Override
+@Async
+public void sendTierUpgradedEmail(String to, String fullName, String oldTier, String newTier) {
+    String subject = "[AutoWash Pro] Congratulations! You've been upgraded to " + newTier + " tier!";
+    String html = """
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #d97706;">🎉 Tier Upgraded!</h2>
+                <p>Dear %s,</p>
+                <p>Congratulations! You have been upgraded to a higher membership tier.</p>
+                <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                    <p><strong>Previous Tier:</strong> %s</p>
+                    <p><strong>New Tier:</strong> %s 🌟</p>
+                </div>
+                <p>Enjoy your new benefits and keep washing!</p>
+                <hr/>
+                <p style="color: #6b7280; font-size: 12px;">AutoWash Pro - Smart Car Wash Management System</p>
+            </div>
+            """.formatted(fullName, oldTier, newTier);
+    sendEmail(to, subject, html);
+}
     // ===================== ADMIN TEST =====================
 
     @Override

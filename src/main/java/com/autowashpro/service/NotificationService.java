@@ -16,6 +16,8 @@ public interface NotificationService {
 
     void notifyWaitlistOffered(Long waitlistId);
 
+    void notifyTierUpgraded(Long customerId, String oldTier, String newTier);
+    
     // ===================== API =====================
     Page<NotificationResponse> getMyNotifications(Long userId, Boolean isRead, int page, int limit);
 
