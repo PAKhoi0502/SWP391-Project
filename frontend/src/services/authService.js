@@ -40,10 +40,14 @@ export const authStorage = {
   },
 
   clearAuth() {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    localStorage.removeItem("token");
+    [localStorage, sessionStorage].forEach((storage) => {
+      storage.removeItem(TOKEN_KEY);
+      storage.removeItem(REFRESH_TOKEN_KEY);
+      storage.removeItem(USER_KEY);
+      storage.removeItem("token");
+      storage.removeItem("currentUser");
+      storage.removeItem("role");
+    });
   },
 };
 

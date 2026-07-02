@@ -1,0 +1,228 @@
+.lpc-root {
+  background: linear-gradient(135deg, #111116 0%, #1a1a24 100%);
+  border: 1px solid rgba(250, 204, 21, 0.22);
+  border-radius: 20px;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.38),
+    0 0 0 1px rgba(250, 204, 21, 0.06) inset;
+  color: #f8fafc;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.lpc-root::before {
+  content: '';
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(250, 204, 21, 0.12), transparent 70%);
+  pointer-events: none;
+}
+
+.lpc-loading,
+.lpc-error {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  padding: 8px 0;
+}
+
+/* Header */
+.lpc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.lpc-label {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #facc15;
+  margin: 0 0 6px;
+}
+
+.lpc-tier-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(250, 204, 21, 0.12);
+  border: 1px solid rgba(250, 204, 21, 0.28);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #facc15;
+}
+
+.lpc-tier-icon {
+  font-size: 15px;
+}
+
+/* Points */
+.lpc-points-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.lpc-point-block {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.lpc-point-block-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.48);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.lpc-point-block-value {
+  font-size: 20px;
+  font-weight: 900;
+  color: #facc15;
+}
+
+.lpc-point-block-value.dim {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 17px;
+}
+
+/* Stats */
+.lpc-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.lpc-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lpc-stat-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.42);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.lpc-stat-value {
+  font-size: 14px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+/* Divider */
+.lpc-divider {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 0 0 18px;
+}
+
+/* Tier rules */
+.lpc-tiers-title {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  margin: 0 0 12px;
+}
+
+.lpc-tier-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lpc-tier-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lpc-tier-item.current {
+  border-color: rgba(250, 204, 21, 0.28);
+  background: rgba(250, 204, 21, 0.05);
+}
+
+.lpc-tier-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lpc-tier-item-name {
+  font-size: 13px;
+  font-weight: 900;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lpc-tier-item-name.current-label {
+  color: #facc15;
+}
+
+.lpc-tier-current-chip {
+  background: #facc15;
+  color: #111116;
+  font-size: 10px;
+  font-weight: 900;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.06em;
+}
+
+.lpc-tier-multiplier {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(250, 204, 21, 0.8);
+}
+
+.lpc-tier-conditions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lpc-tier-condition {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
+@media (max-width: 480px) {
+  .lpc-points-row {
+    grid-template-columns: 1fr;
+  }
+
+  .lpc-stats {
+    grid-template-columns: 1fr;
+  }
+}

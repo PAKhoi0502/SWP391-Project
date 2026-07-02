@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { bookingApi } from '../../api/bookingApi'
+import { loyaltyApi } from '../../api/loyaltyApi'
 import { garageService } from '../../services/garageService'
 import { getServicePackageById, getPackageName } from '../../services/servicePackageApi'
 import { userService } from '../../services/userService'
 import { vehicleService } from '../../services/vehicleService'
+import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import './BookingHistoryPage.css'
 
 const BOOKING_CACHE_PREFIX = 'booking-detail-cache-'
@@ -454,6 +456,8 @@ function BookingDetailPage() {
   const [error, setError] = useState('')
   const [actionMessage, setActionMessage] = useState('')
   const [customerBookingNo, setCustomerBookingNo] = useState(null)
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [cancelLoading, setCancelLoading] = useState(false)
 
   const role = location.pathname.startsWith('/admin')
     ? 'admin'
@@ -468,6 +472,7 @@ function BookingDetailPage() {
     currentStatus === 'CANCELED' ||
     currentStatus === 'CANCELLED' ||
     currentStatus === 'NO_SHOW'
+  const canCustomerCancel = role === 'customer' && (currentStatus === 'CONFIRMED' || currentStatus === 'PENDING_DEPOSIT')
   const canEditBooking = role !== 'customer' && !isClosedBooking
   const workflowStatus = ['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'].includes(currentStatus)
     ? currentStatus
@@ -653,7 +658,7 @@ function BookingDetailPage() {
   const runAction = async (label, action) => {
     try {
       setActionLoading(true)
-      setActionMessage('')
+      setActionMessage(`${label} đang xử lý...`)
       const result = await action()
       if (result?.id) {
         writeCachedBooking(result.id, result)
@@ -794,11 +799,45 @@ function BookingDetailPage() {
   }
 
   const handleCancel = () => {
-    const confirmed = window.confirm(`${TEXT.confirmCancel} #${id}?`)
-    if (!confirmed) return
+    setCancelModalOpen(true)
+  }
 
-    const reason = window.prompt(TEXT.cancelReason, '') || ''
-    runAction(TEXT.cancelBooking, () => bookingApi.cancelBooking(id, reason))
+  const handleCancelConfirm = async (reason) => {
+    const usedPoints = booking?.usedPoints ?? 0
+    try {
+      setCancelLoading(true)
+      setActionMessage('')
+      const result = await bookingApi.cancelBooking(id, reason)
+      if (result?.id) {
+        writeCachedBooking(result.id, result)
+      }
+      setCancelModalOpen(false)
+
+      if (usedPoints > 0) {
+        try {
+          const txPage = await loyaltyApi.getMyTransactions({ type: 'REFUND', page: 1, limit: 5 })
+          const txList = Array.isArray(txPage?.content) ? txPage.content : (Array.isArray(txPage) ? txPage : [])
+          const refundTx = txList.find(
+            (tx) => String(tx?.bookingId) === String(id) && tx?.type === 'REFUND',
+          )
+          if (refundTx) {
+            setActionMessage(`Booking đã hủy. Đã hoàn ${refundTx.points} điểm vào tài khoản của bạn.`)
+          } else {
+            setActionMessage(`Booking đã hủy. Nếu điểm đã được trừ, hệ thống sẽ hoàn lại ${usedPoints} điểm.`)
+          }
+        } catch {
+          setActionMessage(`Booking đã hủy. Nếu điểm đã được trừ, hệ thống sẽ hoàn lại ${usedPoints} điểm.`)
+        }
+      } else {
+        setActionMessage(`${TEXT.cancelBooking} ${TEXT.success}`)
+      }
+
+      await loadDetail()
+    } catch (err) {
+      setActionMessage(getActionErrorMessage(err) || `${TEXT.cancelBooking} ${TEXT.failed}`)
+    } finally {
+      setCancelLoading(false)
+    }
   }
 
   const handleNoShow = () => {
@@ -1024,6 +1063,21 @@ function BookingDetailPage() {
             <div><span>{TEXT.paidAt}</span><strong>{formatDateTime(booking.paidAt)}</strong></div>
           </div>
 
+          {canCustomerCancel && (
+            <div className="booking-detail-footer-actions">
+              <div className="booking-detail-danger-actions">
+                <button
+                  type="button"
+                  className="booking-history-cancel-btn"
+                  disabled={cancelLoading || actionLoading}
+                  onClick={handleCancel}
+                >
+                  {TEXT.cancel}
+                </button>
+              </div>
+            </div>
+          )}
+
           {role === 'customer' && (
             <section className="booking-detail-progress-section">
               <div className="booking-detail-section-head">
@@ -1105,13 +1159,21 @@ function BookingDetailPage() {
                   disabled={actionLoading}
                   onClick={handleUpdateBooking}
                 >
-                  {TEXT.update}
+                  {actionLoading ? 'Đang cập nhật...' : TEXT.update}
                 </button>
               )}
             </div>
           )}
         </article>
       )}
+
+      <CancelBookingModal
+        open={cancelModalOpen}
+        bookingId={displayBookingNo}
+        loading={cancelLoading}
+        onClose={() => { if (!cancelLoading) setCancelModalOpen(false) }}
+        onConfirm={handleCancelConfirm}
+      />
     </div>
   )
 }

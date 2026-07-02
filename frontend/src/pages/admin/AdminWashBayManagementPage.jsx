@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createWashBay,
   getSupportedVehicleTypesByGarage,
@@ -7,6 +7,7 @@ import {
   updateWashBay,
   updateWashBayStatus,
 } from "../../services/washBayApi";
+import { garageService } from "../../services/garageService";
 import { getGarages } from "../../api/GarageApi";
 import "./AdminWashBayManagementPage.css";
 
@@ -78,6 +79,10 @@ export default function AdminWashBayManagementPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [garageMap, setGarageMap] = useState({});
+  const [garageNameInfo, setGarageNameInfo] = useState(null);
+  const garageDebounce = useRef(null);
+
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -104,16 +109,29 @@ export default function AdminWashBayManagementPage() {
       setError("");
 
       const data = await getWashBays(filters);
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.content)
+        ? data.content
+        : Array.isArray(data?.data)
+        ? data.data
+        : [];
 
-      if (Array.isArray(data)) {
-        setWashBays(data);
-      } else if (Array.isArray(data?.content)) {
-        setWashBays(data.content);
-      } else if (Array.isArray(data?.data)) {
-        setWashBays(data.data);
-      } else {
-        setWashBays([]);
-      }
+      setWashBays(list);
+
+      const uniqueGarageIds = [...new Set(list.map((b) => b.garageId).filter(Boolean))];
+      const entries = await Promise.all(
+        uniqueGarageIds.map(async (id) => {
+          try {
+            const res = await garageService.getById(id);
+            const g = res?.data || res;
+            return [id, g?.name || g?.garageName || `Garage #${id}`];
+          } catch {
+            return [id, `Garage #${id}`];
+          }
+        })
+      );
+      setGarageMap(Object.fromEntries(entries));
     } catch (err) {
       setError(err.message || "Không tải được danh sách wash bay");
     } finally {
@@ -157,6 +175,20 @@ export default function AdminWashBayManagementPage() {
       loadWashBays();
     }
   }, [filters.garageId, filters.vehicleType, filters.status]);
+
+  useEffect(() => {
+    const id = form.garageId;
+    if (!id) { setGarageNameInfo(null); return; }
+    clearTimeout(garageDebounce.current);
+    garageDebounce.current = setTimeout(async () => {
+      try {
+        const res = await garageService.getById(id);
+        const garage = res?.data || res;
+        setGarageNameInfo(garage ? { name: garage.name || garage.garageName || `Garage #${id}`, id } : null);
+      } catch { setGarageNameInfo(null); }
+    }, 400);
+    return () => clearTimeout(garageDebounce.current);
+  }, [form.garageId]);
 
   async function handleCheckGarageInfo() {
     if (!filters.garageId && !form.garageId) {
@@ -216,6 +248,7 @@ export default function AdminWashBayManagementPage() {
   function handleCancelEdit() {
     setEditingId(null);
     setForm(DEFAULT_FORM);
+    setGarageNameInfo(null);
     setError("");
     setSuccess("");
   }
@@ -309,7 +342,7 @@ export default function AdminWashBayManagementPage() {
     const garageId = bay.garageId || bay.garage?.garageId || bay.garage?.id;
     const garage = garages.find((item) => String(item.id || item.garageId) === String(garageId));
 
-    return bay.garageName || bay.garage?.name || bay.garage?.garageName || garage?.name || garage?.garageName || "-";
+    return garageMap[garageId] || bay.garageName || bay.garage?.name || bay.garage?.garageName || garage?.name || garage?.garageName || "-";
   }
 
   function getGarageId(bay) {
@@ -388,6 +421,12 @@ export default function AdminWashBayManagementPage() {
                   type="number"
                   min="1"
                 />
+                {garageNameInfo && (
+                  <span style={{ fontSize: 12, color: "#a78bfa", marginTop: 4, display: "block" }}>
+                    {garageNameInfo.name}{" "}
+                    <span style={{ fontSize: 10, opacity: 0.6 }}>#{garageNameInfo.id}</span>
+                  </span>
+                )}
               </label>
 
               <label>
@@ -443,11 +482,12 @@ export default function AdminWashBayManagementPage() {
               Sức chứa
               <input
                 name="capacity"
-                value={form.capacity}
-                onChange={handleChangeForm}
+                value={1}
+                readOnly
                 type="number"
                 min="1"
                 disabled={isEditing}
+                style={{ opacity: 0.6, cursor: "not-allowed" }}
               />
               {isEditing && (
                 <small>

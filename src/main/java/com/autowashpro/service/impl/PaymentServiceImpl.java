@@ -10,7 +10,9 @@ import com.autowashpro.entity.Booking;
 import com.autowashpro.entity.PaymentTransaction;
 import com.autowashpro.repository.BookingRepository;
 import com.autowashpro.repository.PaymentTransactionRepository;
+import com.autowashpro.service.EmailService;
 import com.autowashpro.service.LoyaltyService;
+import com.autowashpro.service.NotificationService;
 import com.autowashpro.service.PaymentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +46,8 @@ public class PaymentServiceImpl implements PaymentService {
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate;
     private final WashHistoryService washHistoryService;
+    private final NotificationService notificationService;
+    private final EmailService emailService;
 
     @Value("${payos.return-url}")
     private String returnUrl;
@@ -194,6 +198,8 @@ public class PaymentServiceImpl implements PaymentService {
                     loyaltyService.updateBookingStatistics(booking.getId());
                     loyaltyService.earnPointsAfterPaidBooking(booking.getId());
                     washHistoryService.createWashHistoryAfterPaidBooking(booking.getId());
+                    notificationService.notifyPaymentConfirmed(booking.getId());
+
                 }
 
             } else {
