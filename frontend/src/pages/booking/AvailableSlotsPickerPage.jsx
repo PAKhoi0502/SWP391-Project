@@ -361,17 +361,6 @@ export default function AvailableSlotsPickerPage() {
         (option) => String(option.value) === String(servicePackageId)
       )?.label || "";
 
-    const waitlistDraft = {
-      garageId: Number(garageId),
-      garageName: selectedGarageName,
-      servicePackageId: Number(servicePackageId),
-      servicePackageName: selectedServicePackageName,
-      vehicleType,
-      date,
-      startTime: slot?.startTime || "",
-      endTime: slot?.endTime || "",
-    };
-
     const params = new URLSearchParams({
       garageId: String(garageId),
       garageName: selectedGarageName,
@@ -379,11 +368,10 @@ export default function AvailableSlotsPickerPage() {
       servicePackageName: selectedServicePackageName,
       vehicleType: String(vehicleType),
       date: String(date),
-      startTime: waitlistDraft.startTime,
-      endTime: waitlistDraft.endTime,
+      startTime: slot?.startTime || "",
+      endTime: slot?.endTime || "",
     });
 
-    localStorage.setItem("waitlistDraft", JSON.stringify(waitlistDraft));
     navigate(`/waitlist?${params.toString()}`);
   };
 

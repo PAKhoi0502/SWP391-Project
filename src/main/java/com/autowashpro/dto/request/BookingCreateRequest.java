@@ -25,4 +25,5 @@ public class BookingCreateRequest {
     private Integer usedPoints = 0;
 
     private String note;
+
 }
