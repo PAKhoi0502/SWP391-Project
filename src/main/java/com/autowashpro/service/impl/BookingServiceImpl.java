@@ -1619,6 +1619,12 @@ return toResponse(saved);
                                 .guestPhone(b.getGuestPhone())
                                 .licensePlate(resolveLicensePlate(b))
                                 .vehicleName(buildVehicleName(vehicle))
+                                .rewardProcessed(b.getRewardProcessed())
+                                .pointsEarned(Boolean.TRUE.equals(b.getRewardProcessed())
+                                                ? pointTransactionRepository.findByBookingIdAndType(b.getId(), "EARN")
+                                                                .map(PointTransaction::getPoints)
+                                                                .orElse(null)
+                                                : null)
                                 .build();
         }
 

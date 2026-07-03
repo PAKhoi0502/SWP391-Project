@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { bookingApi } from '../../api/bookingApi'
 import customerBookingFlowApi from '../../api/customerBookingFlowApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
+import { getServicePackageById } from '../../services/servicePackageApi'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import './BookingHistoryPage.css'
 
@@ -213,6 +214,39 @@ const getPaymentMethodText = (booking) => {
   return 'Chưa cập nhật'
 }
 
+const pkgStepsCache = {}
+
+const getPackageSteps = async (packageId) => {
+  if (!packageId) return []
+  if (!pkgStepsCache[packageId]) {
+    pkgStepsCache[packageId] = getServicePackageById(packageId).catch(() => null)
+  }
+  const pkg = await pkgStepsCache[packageId]
+  if (!pkg) return []
+  const source =
+    pkg.stepsTemplate || pkg.stepTemplate || pkg.stepTemplates ||
+    pkg.steps || pkg.serviceSteps || null
+  if (Array.isArray(source)) {
+    return source
+      .map((item, index) => ({
+        title: typeof item === 'string'
+          ? item
+          : (item.title || item.name || item.stepName || `Bước ${index + 1}`),
+        order: typeof item === 'object'
+          ? (Number(item.stepOrder || item.order || item.sequence) || index + 1)
+          : index + 1,
+        status: 'PLANNED',
+      }))
+      .filter((s) => s.title)
+      .sort((a, b) => a.order - b.order)
+  }
+  if (typeof source === 'string') {
+    return source.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+      .map((title, index) => ({ title, order: index + 1, status: 'PLANNED' }))
+  }
+  return []
+}
+
 const getHistoryTimelineItems = (booking, serviceSteps = []) => {
   const status = String(booking?.status || '').toUpperCase()
   const paymentStatus = String(booking?.paymentStatus || '').toUpperCase()
@@ -272,7 +306,7 @@ export default function BookingHistoryPage() {
 
     const relevant = bookingList.filter((b) => {
       const s = String(b?.status || '').toUpperCase()
-      return s === 'IN_PROGRESS' || s === 'COMPLETED' || s === 'CHECKED_IN'
+      return !['CANCELED', 'CANCELLED', 'NO_SHOW'].includes(s) && getBookingId(b)
     })
 
     if (relevant.length === 0) return
@@ -281,8 +315,18 @@ export default function BookingHistoryPage() {
       relevant.map(async (booking) => {
         const bookingId = getBookingId(booking)
         if (!bookingId) return { bookingId: null, steps: [] }
-        const steps = await bookingApi.getBookingServiceSteps(bookingId).catch(() => [])
-        return { bookingId, steps: Array.isArray(steps) ? steps : [] }
+
+        const raw = await bookingApi.getBookingServiceSteps(bookingId).catch(() => [])
+        const actualSteps = Array.isArray(raw) ? raw : []
+
+        if (actualSteps.length > 0) {
+          return { bookingId, steps: actualSteps }
+        }
+
+        // No actual steps yet — show template steps from service package so customer
+        // can see what the full workflow looks like before service starts
+        const templateSteps = await getPackageSteps(booking.servicePackageId)
+        return { bookingId, steps: templateSteps }
       }),
     )
 

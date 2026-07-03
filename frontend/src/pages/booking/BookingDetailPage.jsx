@@ -12,6 +12,7 @@ import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import CheckInBookingModal from '../../components/Booking/CheckInBookingModal'
 import CompleteServiceModal from '../../components/Booking/CompleteServiceModal'
 import NoShowBookingModal from '../../components/Booking/NoShowBookingModal'
+import PayOSQrModal from '../../components/Booking/PayOSQrModal'
 import PaymentCollectionModal from '../../components/Booking/PaymentCollectionModal'
 import ServiceStepsProgress from '../../components/Booking/ServiceStepsProgress'
 import StartServiceModal from '../../components/Booking/StartServiceModal'
@@ -544,6 +545,13 @@ function BookingDetailPage() {
   const [cashPayLoading, setCashPayLoading] = useState(false)
   const [cashPayError, setCashPayError] = useState('')
   const [payosLoading, setPayosLoading] = useState(false)
+  const [payosQrOpen, setPayosQrOpen] = useState(false)
+  const [payosTransaction, setPayosTransaction] = useState(null)
+  const [payosCheckoutUrl, setPayosCheckoutUrl] = useState('')
+  const [payosRefreshLoading, setPayosRefreshLoading] = useState(false)
+  const [payosCancelLoading, setPayosCancelLoading] = useState(false)
+  const [payosSuccess, setPayosSuccess] = useState(false)
+  const [payosQrError, setPayosQrError] = useState('')
   const [assignedResources, setAssignedResources] = useState(null)
   const [serviceSteps, setServiceSteps] = useState([])
   const [stepActionLoadingId, setStepActionLoadingId] = useState(null)
@@ -659,8 +667,17 @@ function BookingDetailPage() {
       }
     }
 
-    if (!enriched.paymentMethod && bookingDetailResult.status === 'fulfilled' && bookingDetailResult.value?.paymentMethod) {
-      enriched.paymentMethod = bookingDetailResult.value.paymentMethod
+    if (bookingDetailResult.status === 'fulfilled' && bookingDetailResult.value) {
+      const bookingDetail = bookingDetailResult.value
+      if (!enriched.paymentMethod && bookingDetail.paymentMethod) {
+        enriched.paymentMethod = bookingDetail.paymentMethod
+      }
+      if (bookingDetail.rewardProcessed !== undefined && bookingDetail.rewardProcessed !== null) {
+        enriched.rewardProcessed = bookingDetail.rewardProcessed
+      }
+      if (bookingDetail.pointsEarned !== undefined && bookingDetail.pointsEarned !== null) {
+        enriched.pointsEarned = bookingDetail.pointsEarned
+      }
     }
 
     const inferredPaymentMethod = inferPaymentMethod(enriched)
@@ -787,6 +804,38 @@ function BookingDetailPage() {
 
     return () => window.clearInterval(timer)
   }, [location.search, isPaid])
+
+  useEffect(() => {
+    if (!payosQrOpen || payosSuccess) return undefined
+
+    const txId = payosTransaction?.id
+
+    const poll = async () => {
+      try {
+        if (txId) {
+          const tx = await bookingApi.getPaymentTransaction(txId)
+          if (String(tx?.status || '').toUpperCase() === 'PAID') {
+            setPayosTransaction((prev) => ({ ...prev, ...tx }))
+            setPayosSuccess(true)
+            loadDetail()
+          }
+        } else {
+          const txs = await bookingApi.getPaymentTransactions(id)
+          const paidTx = txs.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
+          if (paidTx) {
+            setPayosTransaction((prev) => ({ ...prev, ...paidTx }))
+            setPayosSuccess(true)
+            loadDetail()
+          }
+        }
+      } catch {
+        // silently ignore
+      }
+    }
+
+    const timer = setInterval(poll, 4000)
+    return () => clearInterval(timer)
+  }, [payosQrOpen, payosSuccess, payosTransaction?.id])
 
   const runAction = async (label, action) => {
     try {
@@ -1064,20 +1113,101 @@ function BookingDetailPage() {
   const handlePayOSInModal = async () => {
     setPayosLoading(true)
     setCashPayError('')
+    setPayosQrError('')
+    setPayosSuccess(false)
     try {
       const result = await bookingApi.createPayOSPayment(id)
       writeCachedPaymentMethod(id, booking?.paymentMethod || 'PAYOS')
       if (result?.checkoutUrl) {
         persistPayOSReturnPath(location.pathname, result)
-        window.location.assign(result.checkoutUrl)
       }
+
+      let txData = {
+        orderCode: result.orderCode,
+        qrCode: result.qrCode,
+        checkoutUrl: result.checkoutUrl,
+        amount: booking?.finalPrice,
+        status: 'PENDING',
+      }
+
+      try {
+        const transactions = await bookingApi.getPaymentTransactions(id)
+        const matchingTx =
+          transactions.find((tx) => String(tx.orderCode) === String(result.orderCode)) ||
+          transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PENDING')
+        if (matchingTx) {
+          txData = { ...matchingTx, qrCode: matchingTx.qrCode || result.qrCode }
+        }
+      } catch {
+        // silently ignore — use data from createPayOSPayment response
+      }
+
+      setPayosTransaction(txData)
+      setPayosCheckoutUrl(result.checkoutUrl || '')
+      setPaymentCollectionOpen(false)
+      setPayosQrOpen(true)
     } catch (err) {
-      setCashPayError(
-        err?.response?.data?.message || err?.message || 'Tạo thanh toán PayOS thất bại.',
-      )
+      setCashPayError(err?.response?.data?.message || err?.message || 'Tạo thanh toán PayOS thất bại.')
     } finally {
       setPayosLoading(false)
     }
+  }
+
+  const handlePayOSRefresh = async () => {
+    setPayosRefreshLoading(true)
+    setPayosQrError('')
+    try {
+      if (payosTransaction?.id) {
+        const tx = await bookingApi.getPaymentTransaction(payosTransaction.id)
+        setPayosTransaction((prev) => ({ ...prev, ...tx }))
+        if (String(tx?.status || '').toUpperCase() === 'PAID') {
+          setPayosSuccess(true)
+          await loadDetail()
+        }
+      } else {
+        const transactions = await bookingApi.getPaymentTransactions(id)
+        const paidTx = transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
+        if (paidTx) {
+          setPayosTransaction((prev) => ({ ...prev, ...paidTx }))
+          setPayosSuccess(true)
+          await loadDetail()
+        } else {
+          const pendingTx = transactions.find(
+            (tx) => String(tx.orderCode) === String(payosTransaction?.orderCode),
+          )
+          if (pendingTx) setPayosTransaction((prev) => ({ ...prev, ...pendingTx }))
+        }
+      }
+    } catch {
+      setPayosQrError('Làm mới thất bại. Vui lòng thử lại.')
+    } finally {
+      setPayosRefreshLoading(false)
+    }
+  }
+
+  const handlePayOSCancelTransaction = async () => {
+    setPayosCancelLoading(true)
+    setPayosQrError('')
+    try {
+      if (payosTransaction?.id) {
+        await bookingApi.cancelPaymentTransaction(payosTransaction.id)
+      }
+      setPayosQrOpen(false)
+      setPayosTransaction(null)
+      setPayosCheckoutUrl('')
+      setPaymentCollectionOpen(true)
+    } catch (err) {
+      setPayosQrError(err?.response?.data?.message || err?.message || 'Hủy giao dịch thất bại.')
+    } finally {
+      setPayosCancelLoading(false)
+    }
+  }
+
+  const handlePayOSQrClose = () => {
+    if (payosRefreshLoading || payosCancelLoading) return
+    setPayosQrOpen(false)
+    setPayosSuccess(false)
+    setPayosQrError('')
   }
 
   const handleCompleteServiceStep = async (stepId, note) => {
@@ -1161,28 +1291,11 @@ function BookingDetailPage() {
       setActionMessage(TEXT.payosCompletedOnly)
       return
     }
-
     if (!isBankTransfer) {
       setActionMessage(TEXT.payosBankOnly)
       return
     }
-
-    runAction(TEXT.createQr, async () => {
-      const result = await bookingApi.createPayOSPayment(id)
-      writeCachedBooking(id, {
-        ...booking,
-        paymentMethod: booking?.paymentMethod || 'PAYOS',
-        paymentStatus: booking?.paymentStatus || 'UNPAID',
-      })
-      writeCachedPaymentMethod(id, booking?.paymentMethod || 'PAYOS')
-
-      if (result?.checkoutUrl) {
-        persistPayOSReturnPath(location.pathname, result)
-        window.location.assign(result.checkoutUrl)
-      }
-
-      return booking
-    })
+    handlePayOSInModal()
   }
 
   const resourceWashBayId = assignedResources?.washBayId || booking?.washBayId
@@ -1298,7 +1411,9 @@ function BookingDetailPage() {
               <div>
                 <span>Điểm thưởng</span>
                 <strong className={booking.rewardProcessed ? 'booking-reward-done' : 'booking-reward-pending'}>
-                  {booking.rewardProcessed ? 'Đã xử lý' : 'Chưa xử lý'}
+                  {booking.rewardProcessed
+                    ? `Đã xử lý${booking.pointsEarned ? ` +${booking.pointsEarned}p` : ''}`
+                    : 'Chưa xử lý'}
                 </strong>
               </div>
             )}
@@ -1559,6 +1674,20 @@ function BookingDetailPage() {
           }
           loadDetail()
         }}
+      />
+
+      <PayOSQrModal
+        open={payosQrOpen}
+        onClose={handlePayOSQrClose}
+        booking={booking}
+        transaction={payosTransaction}
+        checkoutUrl={payosCheckoutUrl}
+        error={payosQrError}
+        onRefresh={handlePayOSRefresh}
+        onCancelTransaction={handlePayOSCancelTransaction}
+        refreshLoading={payosRefreshLoading}
+        cancelLoading={payosCancelLoading}
+        paymentSuccess={payosSuccess}
       />
     </div>
   )
