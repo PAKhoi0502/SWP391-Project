@@ -5,6 +5,7 @@ import com.autowashpro.entity.enums.StaffType;
 import com.autowashpro.dto.request.BookingCreateRequest;
 import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
 import com.autowashpro.dto.request.MarkBookingPaidRequest;
+import com.autowashpro.dto.request.UpdatePaymentMethodRequest;
 import com.autowashpro.dto.request.PromotionValidateRequest;
 import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
 import com.autowashpro.dto.request.StartServiceRequest;
@@ -1221,24 +1222,7 @@ public class BookingServiceImpl implements BookingService {
                         booking.setNote(note);
                 }
 
-                // 7. CASH payments are settled on-the-spot — mark paid immediately
-                if ("CASH".equalsIgnoreCase(booking.getPaymentMethod())
-                                && !"PAID".equals(booking.getPaymentStatus())) {
-                        booking.setPaymentStatus("PAID");
-                        booking.setPaidAt(LocalDateTime.now());
-                }
-
                 Booking saved = bookingRepository.save(booking);
-
-                // 8. Post-payment processing (loyalty, promotions, notifications)
-                if ("PAID".equals(saved.getPaymentStatus())) {
-                        loyaltyService.updateBookingStatistics(saved.getId());
-                        promotionService.recordPromotionUsageAfterPaidBooking(saved.getId());
-                        loyaltyService.earnPointsAfterPaidBooking(saved.getId());
-                        washHistoryService.createWashHistoryAfterPaidBooking(saved.getId());
-                        notificationService.notifyPaymentConfirmed(saved.getId());
-                        notificationService.notifyRewardEarned(saved.getId());
-                }
 
                 return toResponse(saved);
         }
@@ -1445,6 +1429,36 @@ notificationService.notifyPaymentConfirmed(saved.getId());
 notificationService.notifyRewardEarned(saved.getId());
 return toResponse(saved);
         }
+        // ===================== UPDATE PAYMENT METHOD =====================
+
+        @Override
+        @Transactional
+        public BookingResponse updatePaymentMethod(
+                        Long bookingId,
+                        Long staffUserId,
+                        String role,
+                        UpdatePaymentMethodRequest request) {
+
+                Booking booking = bookingRepository
+                                .findById(bookingId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
+
+                String normalized = request.getPaymentMethod().trim().toUpperCase();
+                if (!normalized.equals("CASH") && !normalized.equals("PAYOS") && !normalized.equals("BANK_TRANSFER")) {
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Unsupported payment method: " + request.getPaymentMethod());
+                }
+
+                String stored = normalized.equals("BANK_TRANSFER") ? "PAYOS" : normalized;
+                booking.setPaymentMethod(stored);
+
+                Booking saved = bookingRepository.save(booking);
+                return toResponse(saved);
+        }
+
         // ===================== HELPER =====================
 
         private User findActiveCustomerByPhone(String phone) {
