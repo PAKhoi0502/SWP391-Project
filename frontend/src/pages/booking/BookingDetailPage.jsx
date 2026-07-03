@@ -10,6 +10,8 @@ import { vehicleService } from '../../services/vehicleService'
 import { getWashBayById } from '../../services/washBayApi'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import CheckInBookingModal from '../../components/Booking/CheckInBookingModal'
+import CompleteServiceModal from '../../components/Booking/CompleteServiceModal'
+import PaymentCollectionModal from '../../components/Booking/PaymentCollectionModal'
 import ServiceStepsProgress from '../../components/Booking/ServiceStepsProgress'
 import StartServiceModal from '../../components/Booking/StartServiceModal'
 import './BookingHistoryPage.css'
@@ -246,6 +248,21 @@ const getStartServiceErrorMessage = (err) => {
     return 'Chỉ booking đã check-in mới có thể bắt đầu dịch vụ.'
   }
   return getActionErrorMessage(err) || 'Bắt đầu dịch vụ thất bại.'
+}
+
+const getCompleteServiceErrorMessage = (err) => {
+  const msg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
+  if (msg.includes('in_progress') || msg.includes('only in_progress') || msg.includes('only in progress')) {
+    return 'Chỉ booking đang thực hiện mới có thể hoàn thành dịch vụ.'
+  }
+  if (msg.includes('step') && (msg.includes('not completed') || msg.includes('incomplete') || msg.includes('not all'))) {
+    return 'Vui lòng hoàn thành tất cả bước dịch vụ trước khi hoàn thành booking.'
+  }
+  if (msg.includes('not found') || msg.includes('404')) return 'Không tìm thấy booking.'
+  if (msg.includes('unauthorized') || msg.includes('forbidden') || msg.includes('403')) {
+    return 'Bạn không có quyền thực hiện thao tác này.'
+  }
+  return err?.response?.data?.message || err?.message || 'Hoàn thành dịch vụ thất bại.'
 }
 
 const isStaffProfileError = (err) => {
@@ -515,6 +532,14 @@ function BookingDetailPage() {
   const [startServiceModalOpen, setStartServiceModalOpen] = useState(false)
   const [startServiceLoading, setStartServiceLoading] = useState(false)
   const [startServiceError, setStartServiceError] = useState('')
+  const [completeServiceModalOpen, setCompleteServiceModalOpen] = useState(false)
+  const [completeServiceLoading, setCompleteServiceLoading] = useState(false)
+  const [completeServiceError, setCompleteServiceError] = useState('')
+  const [paymentCollectionOpen, setPaymentCollectionOpen] = useState(false)
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false)
+  const [cashPayLoading, setCashPayLoading] = useState(false)
+  const [cashPayError, setCashPayError] = useState('')
+  const [payosLoading, setPayosLoading] = useState(false)
   const [assignedResources, setAssignedResources] = useState(null)
   const [serviceSteps, setServiceSteps] = useState([])
   const [stepActionLoadingId, setStepActionLoadingId] = useState(null)
@@ -552,6 +577,7 @@ function BookingDetailPage() {
   const canCheckIn = canEditBooking && currentStatus === 'CONFIRMED'
   const canStartService = canEditBooking && currentStatus === 'CHECKED_IN'
   const canCompleteService = canEditBooking && currentStatus === 'IN_PROGRESS'
+  const canOpenPaymentCollection = role !== 'customer' && currentStatus === 'COMPLETED' && !isPaid
   const statusChanged = canEditBooking && selectedStatus !== workflowStatus
   const hasPendingUpdate = canEditBooking && statusChanged
   const workflowStatusOptions = getWorkflowStatusOptions(workflowStatus)
@@ -737,12 +763,15 @@ function BookingDetailPage() {
         : prev,
     )
 
+    // Show payment success modal when returning from PayOS
+    setCashPayError('')
+    setShowPaymentSuccess(true)
+    setPaymentCollectionOpen(true)
+
     if (isPaid) {
-      setActionMessage('\u0110\u00e3 thanh to\u00e1n PayOS th\u00e0nh c\u00f4ng.')
       return undefined
     }
 
-    setActionMessage('\u0110ang ki\u1ec3m tra tr\u1ea1ng th\u00e1i thanh to\u00e1n PayOS...')
     let retryCount = 0
     const timer = window.setInterval(() => {
       retryCount += 1
@@ -985,26 +1014,86 @@ function BookingDetailPage() {
 
   const handleCompleteService = () => {
     if (!canCompleteService) return
-    const now = new Date().toISOString()
-    runAction(TEXT.completeService, async () => {
-      await runBookingMutation(
-        () => bookingApi.completeService(id, ''),
-        {
-          status: 'COMPLETED',
-          completedAt: now,
-          ...(isCashPayment ? { paymentStatus: 'PAID', paidAt: now } : {}),
-        },
+    setCompleteServiceError('')
+    setCompleteServiceModalOpen(true)
+  }
+
+  const handleCompleteServiceConfirm = async (note) => {
+    // Frontend guard: block if any step is still pending
+    const pendingSteps = serviceSteps.filter(
+      (s) => String(s.status || '').toUpperCase() !== 'COMPLETED',
+    )
+    if (serviceSteps.length > 0 && pendingSteps.length > 0) {
+      setCompleteServiceError(
+        `Vui lòng hoàn thành tất cả bước dịch vụ trước khi hoàn thành booking. Còn ${pendingSteps.length} bước chưa hoàn thành.`,
       )
-      if (isCashPayment && !booking.isWalkIn) {
-        const paidResult = await runBookingMutation(
-          () => bookingApi.markBookingPaid(id, { paymentMethod: 'CASH', note: '' }),
-          { paymentStatus: 'PAID', paymentMethod: 'CASH', paidAt: now },
-        )
-        writeCachedPaymentMethod(id, 'CASH')
-        writeCachedBooking(id, paidResult)
+      return
+    }
+
+    setCompleteServiceLoading(true)
+    setCompleteServiceError('')
+    try {
+      const result = await bookingApi.completeService(id, note)
+      setCompleteServiceModalOpen(false)
+      await loadDetail()
+      await loadServiceSteps()
+      const updatedPaymentStatus = String(result?.paymentStatus || '').toUpperCase()
+      if (updatedPaymentStatus === 'PAID') {
+        setActionMessage('Dịch vụ đã hoàn thành.')
+      } else {
+        setActionMessage('Dịch vụ đã hoàn thành. Vui lòng xử lý thanh toán.')
       }
+      setCashPayError('')
+      setPaymentCollectionOpen(true)
       setSelectedStatus('COMPLETED')
-    })
+    } catch (err) {
+      setCompleteServiceError(getCompleteServiceErrorMessage(err))
+    } finally {
+      setCompleteServiceLoading(false)
+    }
+  }
+
+  const handleCashPay = async (paymentMethod = 'CASH') => {
+    setCashPayLoading(true)
+    setCashPayError('')
+    try {
+      await bookingApi.markBookingPaid(id, { paymentMethod, note: '' })
+      writeCachedPaymentMethod(id, paymentMethod)
+    } catch (err) {
+      const errMsg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
+      // If backend already marked paid (auto-complete), treat as success
+      const alreadyPaid =
+        errMsg.includes('already paid') ||
+        errMsg.includes('da thanh toan') ||
+        (err?.response?.status === 400 && isPaid)
+      if (!alreadyPaid) {
+        setCashPayError(err?.response?.data?.message || err?.message || 'Xác nhận thanh toán thất bại.')
+        setCashPayLoading(false)
+        return
+      }
+    }
+    await loadDetail()
+    setShowPaymentSuccess(true)
+    setCashPayLoading(false)
+  }
+
+  const handlePayOSInModal = async () => {
+    setPayosLoading(true)
+    setCashPayError('')
+    try {
+      const result = await bookingApi.createPayOSPayment(id)
+      writeCachedPaymentMethod(id, booking?.paymentMethod || 'PAYOS')
+      if (result?.checkoutUrl) {
+        persistPayOSReturnPath(location.pathname, result)
+        window.location.assign(result.checkoutUrl)
+      }
+    } catch (err) {
+      setCashPayError(
+        err?.response?.data?.message || err?.message || 'Tạo thanh toán PayOS thất bại.',
+      )
+    } finally {
+      setPayosLoading(false)
+    }
   }
 
   const handleCompleteServiceStep = async (stepId, note) => {
@@ -1188,16 +1277,6 @@ function BookingDetailPage() {
               <div className="booking-total-row">
                 <strong>{formatMoney(booking.finalPrice)}</strong>
                 <span>{TEXT.method}: {paymentMethodText}</span>
-                {canCreatePayOS && (
-                  <button
-                    type="button"
-                    className="booking-payos-btn"
-                    disabled={actionLoading}
-                    onClick={handleCreatePayOS}
-                  >
-                    {TEXT.createPayOS}
-                  </button>
-                )}
               </div>
             </div>
 
@@ -1328,6 +1407,18 @@ function BookingDetailPage() {
             <div className="booking-history-message">{TEXT.closedBooking}</div>
           )}
 
+          {canOpenPaymentCollection && (
+            <div className="booking-detail-footer-actions">
+              <button
+                type="button"
+                className="booking-detail-update-btn booking-detail-complete-service-btn"
+                onClick={() => { setCashPayError(''); setPaymentCollectionOpen(true) }}
+              >
+                Xử lý thanh toán
+              </button>
+            </div>
+          )}
+
           {actionMessage && <div className="booking-history-message">{actionMessage}</div>}
 
           {role !== 'customer' && !isClosedBooking && (
@@ -1413,6 +1504,44 @@ function BookingDetailPage() {
         error={startServiceError}
         onClose={() => { if (!startServiceLoading) { setStartServiceModalOpen(false); setStartServiceError('') } }}
         onConfirm={handleStartServiceConfirm}
+      />
+
+      <CompleteServiceModal
+        open={completeServiceModalOpen}
+        bookingId={displayBookingNo}
+        booking={booking}
+        loading={completeServiceLoading}
+        error={completeServiceError}
+        hasIncompleteSteps={serviceSteps.length > 0 && serviceSteps.some((s) => String(s.status || '').toUpperCase() !== 'COMPLETED')}
+        incompleteCount={serviceSteps.filter((s) => String(s.status || '').toUpperCase() !== 'COMPLETED').length}
+        onClose={() => { if (!completeServiceLoading) { setCompleteServiceModalOpen(false); setCompleteServiceError('') } }}
+        onConfirm={handleCompleteServiceConfirm}
+      />
+
+      <PaymentCollectionModal
+        open={paymentCollectionOpen}
+        bookingId={displayBookingNo}
+        booking={booking}
+        cashLoading={cashPayLoading}
+        cashError={cashPayError}
+        payosLoading={payosLoading}
+        showSuccess={showPaymentSuccess}
+        onClose={() => {
+          if (!cashPayLoading && !payosLoading) {
+            setPaymentCollectionOpen(false)
+            setShowPaymentSuccess(false)
+            setCashPayError('')
+          }
+        }}
+        onCashPay={handleCashPay}
+        onPayOS={handlePayOSInModal}
+        onMethodUpdated={(newMethod) => {
+          if (newMethod) {
+            writeCachedPaymentMethod(id, newMethod)
+            writeCachedBooking(id, { paymentMethod: newMethod })
+          }
+          loadDetail()
+        }}
       />
     </div>
   )

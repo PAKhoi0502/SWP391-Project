@@ -124,6 +124,11 @@ export const bookingApi = {
     return unwrap(response)
   },
 
+  async updatePaymentMethod(bookingId, paymentMethod) {
+    const response = await api.patch(`/bookings/${bookingId}/update-payment-method`, { paymentMethod })
+    return unwrap(response)
+  },
+
   async completeBookingServiceStep(stepId, note) {
     const response = await api.patch(`/bookings/booking-service-steps/${stepId}/complete`, { note: note || '' })
     return unwrap(response)

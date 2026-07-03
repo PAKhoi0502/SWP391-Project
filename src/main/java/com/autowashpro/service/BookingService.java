@@ -12,6 +12,7 @@ import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
 import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
 import com.autowashpro.dto.response.BookingServiceStepResponse;
 import com.autowashpro.dto.request.MarkBookingPaidRequest;
+import com.autowashpro.dto.request.UpdatePaymentMethodRequest;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -93,5 +94,11 @@ public interface BookingService {
                         Long staffUserId,
                         String role,
                         MarkBookingPaidRequest request);
+
+        BookingResponse updatePaymentMethod(
+                        Long bookingId,
+                        Long staffUserId,
+                        String role,
+                        UpdatePaymentMethodRequest request);
 
 }

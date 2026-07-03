@@ -23,6 +23,7 @@ import com.autowashpro.dto.request.CancelBookingRequest;
 import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
 import com.autowashpro.dto.request.CompleteServiceRequest;
 import com.autowashpro.dto.request.MarkBookingPaidRequest;
+import com.autowashpro.dto.request.UpdatePaymentMethodRequest;
 import com.autowashpro.dto.request.NoShowBookingRequest;
 import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
 import com.autowashpro.dto.response.BookingServiceStepResponse;
@@ -360,6 +361,32 @@ public class BookingController {
                                 .message("Booking marked as paid successfully")
                                 .data(
                                                 bookingService.markBookingPaid(
+                                                                id,
+                                                                staffUserId,
+                                                                role,
+                                                                request))
+                                .build();
+        }
+
+        @PatchMapping("/{id}/update-payment-method")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> updatePaymentMethod(
+                        @PathVariable Long id,
+                        @Valid @RequestBody UpdatePaymentMethodRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+
+                String role = userDetails.getAuthorities()
+                                .iterator()
+                                .next()
+                                .getAuthority();
+
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true)
+                                .message("Payment method updated successfully")
+                                .data(
+                                                bookingService.updatePaymentMethod(
                                                                 id,
                                                                 staffUserId,
                                                                 role,
