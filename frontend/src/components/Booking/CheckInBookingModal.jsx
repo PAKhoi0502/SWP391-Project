@@ -40,10 +40,10 @@ export default function CheckInBookingModal({ open, onClose, onConfirm, booking,
     return new Date(value).toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' })
   }
 
-  const vehicleDisplay =
-    booking?.vehicleName && booking?.licensePlate
-      ? `${booking.vehicleName} - ${booking.licensePlate}`
-      : booking?.vehicleName || booking?.licensePlate || TEXT.notUpdated
+  const vehicleTypeLabel = booking?.vehicleType
+    ? (String(booking.vehicleType).toUpperCase().includes('BIKE') ? '#Xe máy' : '#Ô tô')
+    : null
+  const vehicleMain = [booking?.licensePlate, booking?.vehicleName].filter(Boolean).join(' · ') || TEXT.notUpdated
 
   return (
     <div className="cim-overlay" onClick={handleClose}>
@@ -63,7 +63,10 @@ export default function CheckInBookingModal({ open, onClose, onConfirm, booking,
           )}
           <div className="cim-info-row">
             <span className="cim-info-label">{TEXT.vehicle}</span>
-            <span className="cim-info-value">{vehicleDisplay}</span>
+            <span className="cim-info-value">
+              {vehicleMain}
+              {vehicleTypeLabel && <small className="cim-vehicle-type"> {vehicleTypeLabel}</small>}
+            </span>
           </div>
           {booking?.garageName && (
             <div className="cim-info-row">

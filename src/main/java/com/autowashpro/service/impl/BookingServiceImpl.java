@@ -44,6 +44,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BookingServiceImpl implements BookingService {
 
+        private static final String ASSIGNED_STAFF_STATUS = "ASSIGNED";
+
         private final GarageRepository garageRepository;
         private final ServicePackageRepository servicePackageRepository;
         private final WashBayRepository washBayRepository;
@@ -979,13 +981,7 @@ public class BookingServiceImpl implements BookingService {
 
                 BookingResponse response = toResponse(saved);
 
-                List<Long> staffIds = bookingAssignedStaffRepository
-                                .findByBookingId(saved.getId())
-                                .stream()
-                                .map(BookingAssignedStaff::getStaffProfileId)
-                                .toList();
-
-                response.setAssignedCareStaffIds(staffIds);
+                response.setAssignedCareStaffIds(resolveAssignedCareStaffIds(saved.getId()));
 
                 return response;
         }
@@ -1543,7 +1539,22 @@ return toResponse(saved);
                                 .washBayId(b.getWashBayId())
                                 .completedAt(b.getCompletedAt())
                                 .paidAt(b.getPaidAt())
+                                .assignedCareStaffIds(resolveAssignedCareStaffIds(b.getId()))
                                 .build();
+        }
+
+        private List<Long> resolveAssignedCareStaffIds(Long bookingId) {
+                if (bookingId == null) {
+                        return List.of();
+                }
+
+                return bookingAssignedStaffRepository.findByBookingId(bookingId)
+                                .stream()
+                                .filter(assignedStaff -> ASSIGNED_STAFF_STATUS.equals(assignedStaff.getStatus()))
+                                .map(BookingAssignedStaff::getStaffProfileId)
+                                .filter(Objects::nonNull)
+                                .distinct()
+                                .toList();
         }
 
         private String resolveLicensePlate(Booking b) {
