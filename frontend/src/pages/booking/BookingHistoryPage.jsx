@@ -8,6 +8,7 @@ import './BookingHistoryPage.css'
 
 const BOOKING_CACHE_PREFIX = 'booking-detail-cache-'
 const PAYOS_PAID_CACHE_PREFIX = 'booking-payos-paid-'
+const PAYMENT_METHOD_CACHE_PREFIX = 'booking-payment-method-'
 
 const STATUS_FILTERS = ['ALL', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELED']
 
@@ -46,6 +47,11 @@ const readCachedBooking = (bookingId) => {
   }
 }
 
+const readCachedPaymentMethod = (bookingId) => {
+  if (!bookingId) return ''
+  return localStorage.getItem(`${PAYMENT_METHOD_CACHE_PREFIX}${bookingId}`) || ''
+}
+
 const readCachedPayOSPaidAt = (bookingId) => {
   if (!bookingId) return ''
   return localStorage.getItem(`${PAYOS_PAID_CACHE_PREFIX}${bookingId}`) || ''
@@ -58,6 +64,10 @@ const mergeBookingWithCache = (booking) => {
   // Live API data wins for status/note; cache fills in display-only fields
   // (customerName, vehicleName, garageName, paymentMethod) not returned by list API.
   const merged = { ...cached, ...booking }
+
+  if (!merged.paymentMethod) {
+    merged.paymentMethod = cached.paymentMethod || readCachedPaymentMethod(bookingId)
+  }
 
   if (paidAt) {
     merged.paymentStatus = 'PAID'

@@ -422,6 +422,9 @@ export default function StaffWalkInBookingPage() {
 
       const result = await bookingApi.createWalkInBooking(payload)
       const id = result?.id ?? result?.bookingId
+      if (id && form.paymentMethod) {
+        localStorage.setItem(`booking-payment-method-${id}`, form.paymentMethod)
+      }
       navigate(id ? `/staff/bookings/${id}` : '/staff/bookings', { replace: true })
     } catch (err) {
       setError(getErrorMessage(err, 'Tạo hồ sơ walk-in thất bại. Vui lòng thử lại.'))

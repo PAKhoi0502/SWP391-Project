@@ -4,10 +4,13 @@ import { bookingApi } from '../../api/bookingApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
 import { garageService } from '../../services/garageService'
 import { getServicePackageById, getPackageName } from '../../services/servicePackageApi'
+import { staffProfileService } from '../../services/staffProfileService'
 import { userService } from '../../services/userService'
 import { vehicleService } from '../../services/vehicleService'
+import { getWashBayById } from '../../services/washBayApi'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import CheckInBookingModal from '../../components/Booking/CheckInBookingModal'
+import StartServiceModal from '../../components/Booking/StartServiceModal'
 import './BookingHistoryPage.css'
 
 const BOOKING_CACHE_PREFIX = 'booking-detail-cache-'
@@ -68,6 +71,16 @@ const TEXT = {
   serviceStepsEmpty: 'G\u00f3i d\u1ecbch v\u1ee5 ch\u01b0a c\u00f3 m\u00f4 t\u1ea3 b\u01b0\u1edbc x\u1eed l\u00fd.',
   booked: '\u0110\u1eb7t l\u1ecbch',
   paid: '\u0110\u00e3 thanh to\u00e1n',
+  startService: 'B\u1eaft \u0111\u1ea7u d\u1ecbch v\u1ee5',
+  startServiceSuccess: 'B\u1eaft \u0111\u1ea7u d\u1ecbch v\u1ee5 th\u00e0nh c\u00f4ng.',
+  completeService: 'Ho\u00e0n th\u00e0nh d\u1ecbch v\u1ee5',
+  completeServiceSuccess: 'D\u1ecbch v\u1ee5 \u0111\u00e3 ho\u00e0n th\u00e0nh.',
+  resources: 'T\u00e0i nguy\u00ean \u0111\u01b0\u1ee3c g\u00e1n',
+  washBay: 'Bay r\u1eeda',
+  washBayType: 'Lo\u1ea1i bay',
+  careStaff: 'Nh\u00e2n vi\u00ean ph\u1ee5 tr\u00e1ch',
+  careStaffNone: 'Kh\u00f4ng y\u00eau c\u1ea7u nh\u00e2n vi\u00ean ph\u1ee5 tr\u00e1ch',
+  careStaffPending: 'Ch\u01b0a \u0111\u01b0\u1ee3c g\u00e1n',
 }
 
 const formatDateTime = (value) => {
@@ -224,6 +237,16 @@ const getActionErrorMessage = (err) => {
   return message
 }
 
+const getStartServiceErrorMessage = (err) => {
+  const msg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
+  if (msg.includes('wash bay')) return 'Không còn wash bay trống.'
+  if (msg.includes('care staff') || msg.includes('not enough staff')) return 'Không đủ nhân viên phụ trách.'
+  if (msg.includes('checked-in') || msg.includes('check-in') || msg.includes('only checked')) {
+    return 'Chỉ booking đã check-in mới có thể bắt đầu dịch vụ.'
+  }
+  return getActionErrorMessage(err) || 'Bắt đầu dịch vụ thất bại.'
+}
+
 const isStaffProfileError = (err) => {
   const message = err?.response?.data?.message || err?.message || ''
   return message.toLowerCase().includes('staff profile')
@@ -271,13 +294,10 @@ const getName = (item) =>
   item?.email ||
   ''
 
-const getVehicleName = (vehicle, booking) => {
-  if (booking?.licensePlate) return booking.licensePlate
-  if (vehicle?.rawLicensePlate) return vehicle.rawLicensePlate
-  if (vehicle?.normalizedLicensePlate) return vehicle.normalizedLicensePlate
-
-  const vehicleName = [vehicle?.brand, vehicle?.model].filter(Boolean).join(' ').trim()
-  return vehicleName
+const getVehicleName = (vehicle) => {
+  const brand = vehicle?.brand && vehicle.brand !== 'Không rõ' ? vehicle.brand.trim() : ''
+  const model = vehicle?.model && vehicle.model !== 'Không rõ' ? vehicle.model.trim() : ''
+  return [brand, model].filter(Boolean).join(' ') || null
 }
 
 const formatNamedValue = (name, id, fallback = 'N/A') => {
@@ -290,6 +310,66 @@ const formatNamedValue = (name, id, fallback = 'N/A') => {
       {safeId && <small>{safeId}</small>}
     </span>
   )
+}
+
+const unwrapResourcePayload = (payload) => payload?.data?.data || payload?.data || payload || null
+
+const getVehicleTypeText = (value) => {
+  const normalized = String(value || '').toUpperCase()
+  if (normalized === 'CAR') return '\u00d4 t\u00f4'
+  if (normalized.includes('BIKE') || normalized.includes('MOTOR')) return 'Xe m\u00e1y'
+  return value || ''
+}
+
+const formatWashBayResource = (payload, id) => {
+  const washBay = unwrapResourcePayload(payload)
+  const label = washBay?.bayCode || washBay?.code || washBay?.name || `Bay #${id}`
+  const typeLabel = getVehicleTypeText(washBay?.vehicleType)
+
+  return {
+    washBayLabel: label,
+    washBayTypeLabel: typeLabel,
+  }
+}
+
+const formatCareStaffResource = (payload, id) => {
+  const staff = unwrapResourcePayload(payload)
+  const name = staff?.userFullName || staff?.fullName || staff?.name || staff?.staffCode || 'Nh\u00e2n vi\u00ean'
+  const code = staff?.staffCode && staff?.staffCode !== name ? ` - ${staff.staffCode}` : ''
+
+  return `${name}${code} #${staff?.id || id}`
+}
+
+const resolveAssignedResources = async (source = {}) => {
+  const washBayId = source?.washBayId
+  const assignedCareStaffIds = Array.isArray(source?.assignedCareStaffIds)
+    ? source.assignedCareStaffIds.filter(Boolean)
+    : []
+  const resources = {}
+
+  if (washBayId) {
+    try {
+      Object.assign(resources, formatWashBayResource(await getWashBayById(washBayId), washBayId))
+    } catch {
+      resources.washBayLabel = `Bay #${washBayId}`
+    }
+    resources.washBayId = washBayId
+  }
+
+  if (assignedCareStaffIds.length > 0) {
+    const staffResults = await Promise.allSettled(
+      assignedCareStaffIds.map((staffId) => staffProfileService.get(staffId)),
+    )
+
+    resources.assignedCareStaffIds = assignedCareStaffIds
+    resources.careStaffLabels = staffResults.map((result, index) =>
+      result.status === 'fulfilled'
+        ? formatCareStaffResource(result.value, assignedCareStaffIds[index])
+        : `Nh\u00e2n vi\u00ean #${assignedCareStaffIds[index]}`,
+    )
+  }
+
+  return resources
 }
 
 const getFirstValue = (item, keys = []) => {
@@ -431,6 +511,10 @@ function BookingDetailPage() {
   const [checkInModalOpen, setCheckInModalOpen] = useState(false)
   const [checkInLoading, setCheckInLoading] = useState(false)
   const [checkInError, setCheckInError] = useState('')
+  const [startServiceModalOpen, setStartServiceModalOpen] = useState(false)
+  const [startServiceLoading, setStartServiceLoading] = useState(false)
+  const [startServiceError, setStartServiceError] = useState('')
+  const [assignedResources, setAssignedResources] = useState(null)
 
   const role = location.pathname.startsWith('/admin')
     ? 'admin'
@@ -462,6 +546,8 @@ function BookingDetailPage() {
   const canCreatePayOS = role !== 'customer' && currentStatus === 'COMPLETED' && !isPaid && isBankTransfer
   const canMarkNoShow = canEditBooking && currentStatus === 'CONFIRMED'
   const canCheckIn = canEditBooking && currentStatus === 'CONFIRMED'
+  const canStartService = canEditBooking && currentStatus === 'CHECKED_IN'
+  const canCompleteService = canEditBooking && currentStatus === 'IN_PROGRESS'
   const statusChanged = canEditBooking && selectedStatus !== workflowStatus
   const hasPendingUpdate = canEditBooking && statusChanged
   const workflowStatusOptions = getWorkflowStatusOptions(workflowStatus)
@@ -472,13 +558,14 @@ function BookingDetailPage() {
 
     const enriched = mergeBookingWithCache(detail.id, detail)
 
-    const [customerResult, vehicleResult, garageResult, packageResult, transactionsResult, serviceStepsResult] = await Promise.allSettled([
+    const [customerResult, vehicleResult, garageResult, packageResult, transactionsResult, serviceStepsResult, bookingDetailResult] = await Promise.allSettled([
       enriched.customerId ? userService.getUser(enriched.customerId) : Promise.resolve(null),
       role === 'admin' && enriched.vehicleId ? vehicleService.adminList({ customerId: enriched.customerId }) : Promise.resolve([]),
       garageService.list(),
       enriched.servicePackageId ? getServicePackageById(enriched.servicePackageId) : Promise.resolve(null),
       bookingApi.getPaymentTransactions(enriched.id),
       bookingApi.getBookingServiceSteps(enriched.id),
+      role !== 'customer' && enriched.id ? bookingApi.getCustomerBookingDetail(enriched.id) : Promise.resolve(null),
     ])
 
     if (customerResult.status === 'fulfilled' && customerResult.value) {
@@ -490,7 +577,9 @@ function BookingDetailPage() {
     if (vehicleResult.status === 'fulfilled') {
       const vehicles = toArray(vehicleResult.value)
       const vehicle = vehicles.find((item) => String(item.id) === String(enriched.vehicleId))
-      enriched.vehicleName = getVehicleName(vehicle, enriched)
+      if (vehicle) {
+        enriched.vehicleName = getVehicleName(vehicle)
+      }
     }
 
     if (garageResult.status === 'fulfilled') {
@@ -503,6 +592,9 @@ function BookingDetailPage() {
       enriched.servicePackageName = getPackageName(packageResult.value)
       enriched.servicePackageDescription = packageResult.value.description || ''
       enriched.servicePackageSteps = normalizeServiceSteps(getPackageStepSource(packageResult.value))
+      enriched.requiresCareStaff = Boolean(packageResult.value.requiresCareStaff)
+      enriched.careStaffRequiredCount = packageResult.value.careStaffRequiredCount || 0
+      enriched.careStaffType = packageResult.value.careStaffType || ''
     }
 
     if (serviceStepsResult.status === 'fulfilled') {
@@ -533,10 +625,19 @@ function BookingDetailPage() {
       }
     }
 
+    if (!enriched.paymentMethod && bookingDetailResult.status === 'fulfilled' && bookingDetailResult.value?.paymentMethod) {
+      enriched.paymentMethod = bookingDetailResult.value.paymentMethod
+    }
+
     const inferredPaymentMethod = inferPaymentMethod(enriched)
     if (inferredPaymentMethod) {
       enriched.paymentMethod = enriched.paymentMethod || inferredPaymentMethod
       writeCachedPaymentMethod(enriched.id, inferredPaymentMethod)
+    }
+
+    const resolvedResources = await resolveAssignedResources(enriched)
+    if (Object.keys(resolvedResources).length > 0) {
+      Object.assign(enriched, resolvedResources)
     }
 
     writeCachedBooking(enriched.id, enriched)
@@ -561,6 +662,17 @@ function BookingDetailPage() {
 
       const enrichedDetail = await enrichBookingDetail(detail)
       setBooking(enrichedDetail || null)
+      setAssignedResources(
+        enrichedDetail?.washBayId || enrichedDetail?.assignedCareStaffIds?.length
+          ? {
+              washBayId: enrichedDetail.washBayId,
+              washBayLabel: enrichedDetail.washBayLabel,
+              washBayTypeLabel: enrichedDetail.washBayTypeLabel,
+              assignedCareStaffIds: enrichedDetail.assignedCareStaffIds || [],
+              careStaffLabels: enrichedDetail.careStaffLabels || [],
+            }
+          : null,
+      )
 
       if (role === 'customer') {
         const customerBookings = await bookingApi.getCustomerBookings().catch(() => [])
@@ -578,6 +690,7 @@ function BookingDetailPage() {
     } catch (err) {
       setBooking(null)
       setCustomerBookingNo(null)
+      setAssignedResources(null)
       setError(err?.response?.data?.message || err?.message || TEXT.loadError)
     } finally {
       setLoading(false)
@@ -825,6 +938,57 @@ function BookingDetailPage() {
     }
   }
 
+  const handleStartService = () => {
+    if (!canStartService) return
+    setStartServiceError('')
+    setStartServiceModalOpen(true)
+  }
+
+  const handleStartServiceConfirm = async (note) => {
+    setStartServiceLoading(true)
+    setStartServiceError('')
+    try {
+      const result = await bookingApi.startService(id, note)
+      if (result) {
+        const resources = await resolveAssignedResources(result)
+        if (Object.keys(resources).length > 0) setAssignedResources(resources)
+        if (result.id) writeCachedBooking(result.id, { ...result, ...resources })
+      }
+      setSelectedStatus('IN_PROGRESS')
+      setStartServiceModalOpen(false)
+      setActionMessage(TEXT.startServiceSuccess)
+      await loadDetail()
+    } catch (err) {
+      setStartServiceError(getStartServiceErrorMessage(err))
+    } finally {
+      setStartServiceLoading(false)
+    }
+  }
+
+  const handleCompleteService = () => {
+    if (!canCompleteService) return
+    const now = new Date().toISOString()
+    runAction(TEXT.completeService, async () => {
+      await runBookingMutation(
+        () => bookingApi.completeService(id, ''),
+        {
+          status: 'COMPLETED',
+          completedAt: now,
+          ...(isCashPayment ? { paymentStatus: 'PAID', paidAt: now } : {}),
+        },
+      )
+      if (isCashPayment && !booking.isWalkIn) {
+        const paidResult = await runBookingMutation(
+          () => bookingApi.markBookingPaid(id, { paymentMethod: 'CASH', note: '' }),
+          { paymentStatus: 'PAID', paymentMethod: 'CASH', paidAt: now },
+        )
+        writeCachedPaymentMethod(id, 'CASH')
+        writeCachedBooking(id, paidResult)
+      }
+      setSelectedStatus('COMPLETED')
+    })
+  }
+
   const handleNoShow = () => {
     if (!canMarkNoShow) {
       setActionMessage('Chỉ có thể đánh dấu no-show cho booking chưa thực hiện.')
@@ -875,6 +1039,26 @@ function BookingDetailPage() {
     })
   }
 
+  const resourceWashBayId = assignedResources?.washBayId || booking?.washBayId
+  const resourceWashBayLabel =
+    assignedResources?.washBayLabel ||
+    booking?.washBayLabel ||
+    (resourceWashBayId ? `Bay #${resourceWashBayId}` : '')
+  const resourceWashBayTypeLabel = assignedResources?.washBayTypeLabel || booking?.washBayTypeLabel || ''
+  const rawCareStaffIds = assignedResources?.assignedCareStaffIds || booking?.assignedCareStaffIds || []
+  const resourceCareStaffLabels =
+    assignedResources?.careStaffLabels?.length > 0
+      ? assignedResources.careStaffLabels
+      : booking?.careStaffLabels?.length > 0
+        ? booking.careStaffLabels
+        : rawCareStaffIds.map((staffId) => `Nh\u00e2n vi\u00ean #${staffId}`)
+  const hasAssignedResources = Boolean(resourceWashBayLabel || resourceCareStaffLabels.length > 0)
+  const resourceCareStaffText = resourceCareStaffLabels.length > 0
+    ? resourceCareStaffLabels.join(', ')
+    : booking?.requiresCareStaff
+      ? TEXT.careStaffPending
+      : TEXT.careStaffNone
+
   return (
     <div className="booking-history-page">
       <section className="booking-history-hero">
@@ -924,7 +1108,14 @@ function BookingDetailPage() {
             </div>
             <div>
               <span>{TEXT.vehicle}</span>
-              {formatNamedValue(booking.vehicleName || booking.licensePlate, booking.vehicleId, TEXT.vehicle)}
+              <span className="booking-named-value">
+                <strong>
+                  {booking.vehicleName && booking.licensePlate
+                    ? `${booking.vehicleName} · ${booking.licensePlate}`
+                    : booking.vehicleName || booking.licensePlate || TEXT.vehicle}
+                </strong>
+                {booking.vehicleId && <small>#{booking.vehicleId}</small>}
+              </span>
             </div>
             <div>
               <span>Garage</span>
@@ -963,24 +1154,36 @@ function BookingDetailPage() {
             <div className="booking-detail-control-card">
               <span>Status</span>
               <div className="booking-detail-inline-control">
-                {role === 'customer' || isClosedBooking ? (
-                  <strong>{getStatusText(booking.status)}</strong>
-                ) : (
-                  <select
-                    className="booking-detail-status-select"
-                    value={selectedStatus}
-                    onChange={(event) => setSelectedStatus(event.target.value)}
-                    disabled={actionLoading}
-                    aria-label={TEXT.chooseStatus}
-                  >
-                    {workflowStatusOptions.map((status) => (
-                      <option key={status} value={status}>{getStatusText(status)}</option>
-                    ))}
-                  </select>
-                )}
+                <strong>{getStatusText(booking.status)}</strong>
               </div>
             </div>
             <div><span>{TEXT.paidAt}</span><strong>{formatDateTime(booking.paidAt)}</strong></div>
+
+            {hasAssignedResources && (
+              <div className="booking-detail-resources-card">
+                <span>{TEXT.resources}</span>
+                <div className="booking-detail-resources-body">
+                  {resourceWashBayLabel && (
+                    <div className="booking-detail-resource-row">
+                      <span>{TEXT.washBay}</span>
+                      <strong>{resourceWashBayLabel}</strong>
+                    </div>
+                  )}
+                  {resourceWashBayTypeLabel && (
+                    <div className="booking-detail-resource-row">
+                      <span>{TEXT.washBayType}</span>
+                      <strong>{resourceWashBayTypeLabel}</strong>
+                    </div>
+                  )}
+                  {resourceWashBayLabel && (
+                    <div className="booking-detail-resource-row">
+                      <span>{TEXT.careStaff}</span>
+                      <strong>{resourceCareStaffText}</strong>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {canCustomerCancel && (
@@ -1082,6 +1285,26 @@ function BookingDetailPage() {
                   {TEXT.checkInBooking}
                 </button>
               )}
+              {canStartService && (
+                <button
+                  type="button"
+                  className="booking-detail-update-btn booking-detail-start-service-btn"
+                  disabled={actionLoading}
+                  onClick={handleStartService}
+                >
+                  {TEXT.startService}
+                </button>
+              )}
+              {canCompleteService && (
+                <button
+                  type="button"
+                  className="booking-detail-update-btn booking-detail-complete-service-btn"
+                  disabled={actionLoading}
+                  onClick={handleCompleteService}
+                >
+                  {actionLoading ? 'Đang hoàn thành...' : TEXT.completeService}
+                </button>
+              )}
               {hasPendingUpdate && (
                 <button
                   type="button"
@@ -1113,6 +1336,16 @@ function BookingDetailPage() {
         error={checkInError}
         onClose={() => { if (!checkInLoading) { setCheckInModalOpen(false); setCheckInError('') } }}
         onConfirm={handleCheckInConfirm}
+      />
+
+      <StartServiceModal
+        open={startServiceModalOpen}
+        bookingId={displayBookingNo}
+        booking={booking}
+        loading={startServiceLoading}
+        error={startServiceError}
+        onClose={() => { if (!startServiceLoading) { setStartServiceModalOpen(false); setStartServiceError('') } }}
+        onConfirm={handleStartServiceConfirm}
       />
     </div>
   )
