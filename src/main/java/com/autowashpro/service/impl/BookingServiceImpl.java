@@ -60,6 +60,7 @@ public class BookingServiceImpl implements BookingService {
         private final UserRepository userRepository;
         private final BookingServiceStepRepository bookingServiceStepRepository;
         private final ServicePackageStepRepository servicePackageStepRepository;
+        private final PointTransactionRepository pointTransactionRepository;
         private final LoyaltyService loyaltyService;
         private final WashHistoryService washHistoryService;
         private final PromotionService promotionService;
@@ -1553,6 +1554,13 @@ return toResponse(saved);
                                 .washBayId(b.getWashBayId())
                                 .completedAt(b.getCompletedAt())
                                 .paidAt(b.getPaidAt())
+                                .rewardProcessed(b.getRewardProcessed())
+                                .pointsEarned(Boolean.TRUE.equals(b.getRewardProcessed())
+                                        ? pointTransactionRepository
+                                                .findByBookingIdAndType(b.getId(), "EARN")
+                                                .map(PointTransaction::getPoints)
+                                                .orElse(null)
+                                        : null)
                                 .assignedCareStaffIds(resolveAssignedCareStaffIds(b.getId()))
                                 .build();
         }

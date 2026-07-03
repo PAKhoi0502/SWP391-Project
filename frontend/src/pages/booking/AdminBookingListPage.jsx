@@ -431,6 +431,9 @@ function AdminBookingListPage() {
         <section className="booking-history-list">
           {visibleBookings.map((booking) => (
             <article className="booking-history-card" key={booking.id}>
+              {String(booking.status || '').toUpperCase() === 'NO_SHOW' && (
+                <div className="booking-no-show-seal">NO SHOW</div>
+              )}
               <div className="booking-history-card-top">
                 <div>
                   <p>{TEXT.code}</p>

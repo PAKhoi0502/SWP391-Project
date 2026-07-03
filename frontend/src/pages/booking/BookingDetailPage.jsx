@@ -11,6 +11,7 @@ import { getWashBayById } from '../../services/washBayApi'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import CheckInBookingModal from '../../components/Booking/CheckInBookingModal'
 import CompleteServiceModal from '../../components/Booking/CompleteServiceModal'
+import NoShowBookingModal from '../../components/Booking/NoShowBookingModal'
 import PaymentCollectionModal from '../../components/Booking/PaymentCollectionModal'
 import ServiceStepsProgress from '../../components/Booking/ServiceStepsProgress'
 import StartServiceModal from '../../components/Booking/StartServiceModal'
@@ -535,6 +536,9 @@ function BookingDetailPage() {
   const [completeServiceModalOpen, setCompleteServiceModalOpen] = useState(false)
   const [completeServiceLoading, setCompleteServiceLoading] = useState(false)
   const [completeServiceError, setCompleteServiceError] = useState('')
+  const [noShowModalOpen, setNoShowModalOpen] = useState(false)
+  const [noShowLoading, setNoShowLoading] = useState(false)
+  const [noShowError, setNoShowError] = useState('')
   const [paymentCollectionOpen, setPaymentCollectionOpen] = useState(false)
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false)
   const [cashPayLoading, setCashPayLoading] = useState(false)
@@ -884,28 +888,8 @@ function BookingDetailPage() {
               status: 'COMPLETED',
               completedAt: now,
               note: 'Updated from booking detail',
-              ...(isCashPayment ? { paymentStatus: 'PAID', paidAt: now } : {}),
             },
           )
-
-          // Walk-in CASH: backend auto-marks PAID in completeService.
-          // Online CASH: paymentMethod is null in DB, so call markBookingPaid here.
-          if (isCashPayment && !booking.isWalkIn) {
-            const paidResult = await runBookingMutation(
-              () => bookingApi.markBookingPaid(id, {
-                paymentMethod: 'CASH',
-                note: 'Auto marked paid after service completed',
-              }),
-              {
-                paymentStatus: 'PAID',
-                paymentMethod: 'CASH',
-                paidAt: now,
-                note: 'Auto marked paid after service completed',
-              },
-            )
-            writeCachedPaymentMethod(id, 'CASH')
-            writeCachedBooking(id, paidResult)
-          }
         }
       }
 
@@ -1053,11 +1037,11 @@ function BookingDetailPage() {
     }
   }
 
-  const handleCashPay = async (paymentMethod = 'CASH') => {
+  const handleCashPay = async (paymentMethod = 'CASH', note = '') => {
     setCashPayLoading(true)
     setCashPayError('')
     try {
-      await bookingApi.markBookingPaid(id, { paymentMethod, note: '' })
+      await bookingApi.markBookingPaid(id, { paymentMethod, note: note || '' })
       writeCachedPaymentMethod(id, paymentMethod)
     } catch (err) {
       const errMsg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
@@ -1137,24 +1121,39 @@ function BookingDetailPage() {
   }
 
   const handleNoShow = () => {
-    if (!canMarkNoShow) {
-      setActionMessage('Chỉ có thể đánh dấu no-show cho booking chưa thực hiện.')
-      return
+    if (!canMarkNoShow) return
+    setNoShowError('')
+    setNoShowModalOpen(true)
+  }
+
+  const handleNoShowConfirm = async (note) => {
+    setNoShowLoading(true)
+    setNoShowError('')
+    const reason = note.trim() || 'Khách không đến đúng giờ hẹn'
+    try {
+      await bookingApi.markNoShow(id, reason)
+      setNoShowModalOpen(false)
+      setActionMessage('Đã đánh dấu no-show.')
+      await loadDetail()
+    } catch (err) {
+      const msg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
+      const status = err?.response?.status
+      let errorText
+      if (status === 401 || status === 403) {
+        errorText = 'Bạn không có quyền thực hiện thao tác này.'
+      } else if (msg.includes('can only mark no-show for confirmed')) {
+        errorText = 'Chỉ booking chưa check-in mới có thể đánh dấu no-show.'
+      } else if (msg.includes('staff can only mark no-show') || msg.includes('assigned garage')) {
+        errorText = 'Bạn chỉ có thể đánh dấu no-show cho booking thuộc garage được phân công.'
+      } else if (msg.includes('booking not found')) {
+        errorText = 'Không tìm thấy booking.'
+      } else {
+        errorText = err?.response?.data?.message || err?.message || 'Đánh dấu no-show thất bại.'
+      }
+      setNoShowError(errorText)
+    } finally {
+      setNoShowLoading(false)
     }
-
-    const confirmed = window.confirm(TEXT.confirmNoShow)
-    if (!confirmed) return
-
-    const reason = window.prompt(TEXT.noShowReason, '') || ''
-    runAction(TEXT.markNoShow, () =>
-      runBookingMutation(
-        () => bookingApi.markNoShow(id, reason),
-        {
-          status: 'NO_SHOW',
-          note: reason || booking?.note,
-        },
-      ),
-    )
   }
 
   const handleCreatePayOS = () => {
@@ -1295,6 +1294,14 @@ function BookingDetailPage() {
               </div>
             </div>
             <div><span>{TEXT.paidAt}</span><strong>{formatDateTime(booking.paidAt)}</strong></div>
+            {booking.rewardProcessed !== undefined && booking.rewardProcessed !== null && isPaid && (
+              <div>
+                <span>Điểm thưởng</span>
+                <strong className={booking.rewardProcessed ? 'booking-reward-done' : 'booking-reward-pending'}>
+                  {booking.rewardProcessed ? 'Đã xử lý' : 'Chưa xử lý'}
+                </strong>
+              </div>
+            )}
 
             {hasAssignedResources && (
               <div className="booking-detail-resources-card">
@@ -1516,6 +1523,16 @@ function BookingDetailPage() {
         incompleteCount={serviceSteps.filter((s) => String(s.status || '').toUpperCase() !== 'COMPLETED').length}
         onClose={() => { if (!completeServiceLoading) { setCompleteServiceModalOpen(false); setCompleteServiceError('') } }}
         onConfirm={handleCompleteServiceConfirm}
+      />
+
+      <NoShowBookingModal
+        open={noShowModalOpen}
+        bookingId={displayBookingNo}
+        booking={booking}
+        loading={noShowLoading}
+        error={noShowError}
+        onClose={() => { if (!noShowLoading) { setNoShowModalOpen(false); setNoShowError('') } }}
+        onConfirm={handleNoShowConfirm}
       />
 
       <PaymentCollectionModal
