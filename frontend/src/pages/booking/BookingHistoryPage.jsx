@@ -213,10 +213,10 @@ const getPaymentMethodText = (booking) => {
   return 'Chưa cập nhật'
 }
 
-const getHistoryTimelineItems = (booking) => {
+const getHistoryTimelineItems = (booking, serviceSteps = []) => {
   const status = String(booking?.status || '').toUpperCase()
   const paymentStatus = String(booking?.paymentStatus || '').toUpperCase()
-  const checkedInAt = booking?.manualCheckedInAt || booking?.checkedInAt
+  const checkedInAt = booking?.checkedInAt
 
   if (status === 'NO_SHOW') {
     return [
@@ -232,28 +232,25 @@ const getHistoryTimelineItems = (booking) => {
     ]
   }
 
+  const checkinActive = ['CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'].includes(status) || Boolean(checkedInAt)
+
+  const stepItems = Array.isArray(serviceSteps) && serviceSteps.length > 0
+    ? serviceSteps
+        .map((step, index) => ({
+          label: step.title || step.name || step.stepName || `Bước ${index + 1}`,
+          active: String(step.status || '').toUpperCase() === 'COMPLETED',
+          time: step.completedAt || null,
+          order: Number(step.stepOrder || step.order || step.sequence || index + 1),
+        }))
+        .sort((a, b) => a.order - b.order)
+    : []
+
   return [
     { label: 'Đặt lịch', active: true, time: booking?.startTime },
-    {
-      label: 'Check-in',
-      active: ['CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'].includes(status) || Boolean(checkedInAt),
-      time: checkedInAt,
-    },
-    {
-      label: 'Rửa xe',
-      active: ['IN_PROGRESS', 'COMPLETED'].includes(status),
-      time: booking?.startedAt,
-    },
-    {
-      label: 'Xong',
-      active: status === 'COMPLETED',
-      time: booking?.completedAt,
-    },
-    {
-      label: 'Thanh toán',
-      active: paymentStatus === 'PAID',
-      time: booking?.paidAt,
-    },
+    { label: 'Check-in', active: checkinActive, time: checkedInAt },
+    ...stepItems,
+    { label: 'Hoàn thành', active: status === 'COMPLETED', time: booking?.completedAt },
+    { label: 'Thanh toán', active: paymentStatus === 'PAID', time: booking?.paidAt },
   ]
 }
 
@@ -268,6 +265,37 @@ export default function BookingHistoryPage() {
   const [cancelingId, setCancelingId] = useState(null)
   const [cancelModalBookingId, setCancelModalBookingId] = useState(null)
   const [cancelModalBooking, setCancelModalBooking] = useState(null)
+  const [serviceStepsByBookingId, setServiceStepsByBookingId] = useState({})
+
+  const fetchServiceStepsForBookings = async (bookingList) => {
+    if (!Array.isArray(bookingList) || bookingList.length === 0) return
+
+    const relevant = bookingList.filter((b) => {
+      const s = String(b?.status || '').toUpperCase()
+      return s === 'IN_PROGRESS' || s === 'COMPLETED' || s === 'CHECKED_IN'
+    })
+
+    if (relevant.length === 0) return
+
+    const results = await Promise.allSettled(
+      relevant.map(async (booking) => {
+        const bookingId = getBookingId(booking)
+        if (!bookingId) return { bookingId: null, steps: [] }
+        const steps = await bookingApi.getBookingServiceSteps(bookingId).catch(() => [])
+        return { bookingId, steps: Array.isArray(steps) ? steps : [] }
+      }),
+    )
+
+    setServiceStepsByBookingId((prev) => {
+      const next = { ...prev }
+      results.forEach((r) => {
+        if (r.status === 'fulfilled' && r.value?.bookingId) {
+          next[String(r.value.bookingId)] = r.value.steps
+        }
+      })
+      return next
+    })
+  }
 
   const loadBookings = async () => {
     try {
@@ -279,6 +307,8 @@ export default function BookingHistoryPage() {
       const data = await customerBookingFlowApi.getCustomerBookings()
       const enrichedData = await enrichBookingsWithDetail(Array.isArray(data) ? data : [])
       setBookings(enrichedData)
+      setServiceStepsByBookingId({})
+      fetchServiceStepsForBookings(enrichedData)
     } catch (error) {
       setMessage(error.message || 'Không tải được lịch sử booking.')
       setBookings([])
@@ -302,6 +332,8 @@ export default function BookingHistoryPage() {
 
         if (mounted) {
           setBookings(enrichedData)
+          setServiceStepsByBookingId({})
+          fetchServiceStepsForBookings(enrichedData)
         }
       } catch (error) {
         if (mounted) {
@@ -522,9 +554,9 @@ export default function BookingHistoryPage() {
                   <div className="booking-history-mini-timeline-card">
                     <span>Tiến trình</span>
                     <div className="booking-history-mini-timeline">
-                      {getHistoryTimelineItems(booking).map((item, index) => (
+                      {getHistoryTimelineItems(booking, serviceStepsByBookingId[String(bookingId)] || []).map((item, index) => (
                         <div
-                          key={`${bookingId}-${item.label}`}
+                          key={`${bookingId}-${index}-${item.label}`}
                           className={[
                             'booking-history-mini-step',
                             item.active ? 'active' : '',
