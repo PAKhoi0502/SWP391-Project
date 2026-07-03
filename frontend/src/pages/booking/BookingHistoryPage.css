@@ -706,6 +706,22 @@
   min-height: 72px;
 }
 
+.booking-reward-done {
+  color: #4ade80;
+}
+
+.booking-reward-pending {
+  color: rgba(250, 204, 21, 0.8);
+}
+
+.booking-points-earned {
+  color: #4ade80;
+  font-size: 0.85em;
+  font-weight: 700;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
 .booking-detail-inline-control {
   display: flex;
   align-items: center;

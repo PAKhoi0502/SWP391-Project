@@ -888,28 +888,8 @@ function BookingDetailPage() {
               status: 'COMPLETED',
               completedAt: now,
               note: 'Updated from booking detail',
-              ...(isCashPayment ? { paymentStatus: 'PAID', paidAt: now } : {}),
             },
           )
-
-          // Walk-in CASH: backend auto-marks PAID in completeService.
-          // Online CASH: paymentMethod is null in DB, so call markBookingPaid here.
-          if (isCashPayment && !booking.isWalkIn) {
-            const paidResult = await runBookingMutation(
-              () => bookingApi.markBookingPaid(id, {
-                paymentMethod: 'CASH',
-                note: 'Auto marked paid after service completed',
-              }),
-              {
-                paymentStatus: 'PAID',
-                paymentMethod: 'CASH',
-                paidAt: now,
-                note: 'Auto marked paid after service completed',
-              },
-            )
-            writeCachedPaymentMethod(id, 'CASH')
-            writeCachedBooking(id, paidResult)
-          }
         }
       }
 
@@ -1057,11 +1037,11 @@ function BookingDetailPage() {
     }
   }
 
-  const handleCashPay = async (paymentMethod = 'CASH') => {
+  const handleCashPay = async (paymentMethod = 'CASH', note = '') => {
     setCashPayLoading(true)
     setCashPayError('')
     try {
-      await bookingApi.markBookingPaid(id, { paymentMethod, note: '' })
+      await bookingApi.markBookingPaid(id, { paymentMethod, note: note || '' })
       writeCachedPaymentMethod(id, paymentMethod)
     } catch (err) {
       const errMsg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
@@ -1314,6 +1294,14 @@ function BookingDetailPage() {
               </div>
             </div>
             <div><span>{TEXT.paidAt}</span><strong>{formatDateTime(booking.paidAt)}</strong></div>
+            {booking.rewardProcessed !== undefined && booking.rewardProcessed !== null && isPaid && (
+              <div>
+                <span>Điểm thưởng</span>
+                <strong className={booking.rewardProcessed ? 'booking-reward-done' : 'booking-reward-pending'}>
+                  {booking.rewardProcessed ? 'Đã xử lý' : 'Chưa xử lý'}
+                </strong>
+              </div>
+            )}
 
             {hasAssignedResources && (
               <div className="booking-detail-resources-card">

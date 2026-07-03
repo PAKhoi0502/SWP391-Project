@@ -202,6 +202,56 @@
   padding: 0 2px;
 }
 
+/* ── Cash note ─────────────────────────── */
+.pcm-cash-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pcm-cash-note-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.pcm-cash-note-optional {
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 400;
+}
+
+.pcm-cash-note-textarea {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: #f8fafc;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 9px 12px;
+  resize: vertical;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 52px;
+  max-height: 120px;
+  transition: border-color 0.15s;
+}
+
+.pcm-cash-note-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.pcm-cash-note-textarea:focus {
+  border-color: rgba(34, 197, 94, 0.4);
+  outline: none;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.pcm-cash-note-textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── Error ─────────────────────────────── */
 .pcm-error {
   margin: 0;

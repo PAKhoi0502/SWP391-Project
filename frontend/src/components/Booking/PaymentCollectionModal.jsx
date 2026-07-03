@@ -35,6 +35,7 @@ export default function PaymentCollectionModal({
   const [changingMethod, setChangingMethod] = useState(false)
   const [methodLoading, setMethodLoading] = useState(false)
   const [methodError, setMethodError] = useState('')
+  const [cashNote, setCashNote] = useState('')
 
   if (!open) return null
 
@@ -54,6 +55,7 @@ export default function PaymentCollectionModal({
     if (anyLoading) return
     setChangingMethod(false)
     setMethodError('')
+    setCashNote('')
     onClose()
   }
 
@@ -196,6 +198,23 @@ export default function PaymentCollectionModal({
 
         {cashError && <p className="pcm-error">{cashError}</p>}
 
+        {!showBank && (
+          <div className="pcm-cash-note">
+            <label className="pcm-cash-note-label" htmlFor="pcm-note">
+              Ghi chú thanh toán <span className="pcm-cash-note-optional">(tuỳ chọn)</span>
+            </label>
+            <textarea
+              id="pcm-note"
+              className="pcm-cash-note-textarea"
+              placeholder="Ví dụ: Đã thu đủ tiền mặt, hoá đơn viết tay..."
+              value={cashNote}
+              onChange={(e) => setCashNote(e.target.value)}
+              disabled={anyLoading}
+              rows={2}
+            />
+          </div>
+        )}
+
         {showBank ? (
           <button
             type="button"
@@ -209,7 +228,7 @@ export default function PaymentCollectionModal({
           <button
             type="button"
             className="pcm-btn pcm-btn--cash"
-            onClick={() => onCashPay(paymentMethod || 'CASH')}
+            onClick={() => onCashPay(paymentMethod || 'CASH', cashNote.trim())}
             disabled={anyLoading}
           >
             {cashLoading ? 'Đang xác nhận...' : 'Xác nhận đã thu tiền'}

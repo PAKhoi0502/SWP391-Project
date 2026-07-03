@@ -543,7 +543,14 @@ export default function BookingHistoryPage() {
 
                   <div>
                     <span>Tổng tiền</span>
-                    <strong>{formatMoney(booking?.finalPrice)}</strong>
+                    <strong>
+                      {formatMoney(booking?.finalPrice)}
+                      {status === 'COMPLETED' &&
+                        paymentStatus === 'PAID' &&
+                        booking?.pointsEarned > 0 && (
+                          <span className="booking-points-earned"> +{booking.pointsEarned}p</span>
+                        )}
+                    </strong>
                   </div>
 
                   <div>
