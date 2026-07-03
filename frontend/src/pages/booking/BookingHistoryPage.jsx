@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { bookingApi } from '../../api/bookingApi'
 import customerBookingFlowApi from '../../api/customerBookingFlowApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
+import { getServicePackageById, getPackageName } from '../../services/servicePackageApi'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import './BookingHistoryPage.css'
 
@@ -124,6 +125,30 @@ const cacheBookingDetail = (booking) => {
   }
 }
 
+const addOnPackageNameCache = new Map()
+
+const resolveAddOnServicePackageNames = async (addOnIds) => {
+  const ids = Array.isArray(addOnIds) ? addOnIds.filter((id) => id !== null && id !== undefined) : []
+  if (ids.length === 0) return []
+
+  const names = await Promise.all(
+    ids.map(async (id) => {
+      if (addOnPackageNameCache.has(id)) return addOnPackageNameCache.get(id)
+
+      try {
+        const pkg = await getServicePackageById(id)
+        const name = getPackageName(pkg)
+        addOnPackageNameCache.set(id, name)
+        return name
+      } catch {
+        return `Gói #${id}`
+      }
+    }),
+  )
+
+  return names
+}
+
 const enrichBookingsWithDetail = async (items) => {
   if (!Array.isArray(items)) return []
 
@@ -134,6 +159,9 @@ const enrichBookingsWithDetail = async (items) => {
 
       const detail = await bookingApi.getCustomerBookingDetail(bookingId)
       const enrichedBooking = mergeBookingWithCache({ ...booking, ...detail })
+      enrichedBooking.addOnServicePackageNames = await resolveAddOnServicePackageNames(
+        enrichedBooking.addOnServicePackageIds,
+      )
       cacheBookingDetail(enrichedBooking)
       return enrichedBooking
     }),
@@ -486,6 +514,13 @@ export default function BookingHistoryPage() {
                     <span>Gói dịch vụ</span>
                     <strong>{booking?.servicePackageName || booking?.servicePackageId || 'Chưa cập nhật'}</strong>
                   </div>
+
+                  {Array.isArray(booking?.addOnServicePackageNames) && booking.addOnServicePackageNames.length > 0 && (
+                    <div>
+                      <span>Dịch vụ thêm</span>
+                      <strong>{booking.addOnServicePackageNames.join(', ')}</strong>
+                    </div>
+                  )}
 
                   <div>
                     <span>Thời gian</span>

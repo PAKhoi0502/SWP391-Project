@@ -38,7 +38,6 @@ import BookingDetailPage from '../pages/booking/BookingDetailPage'
 import StaffBookingListPage from '../pages/booking/StaffBookingListPage'
 import AdminBookingListPage from '../pages/booking/AdminBookingListPage'
 import PaymentReturnPage from '../pages/booking/PaymentReturnPage'
-import StaffInspectionPage from '../pages/inspection/StaffInspectionPage'
 
 
 function AppRoutes() {
@@ -79,7 +78,7 @@ function AppRoutes() {
           <Route path="staff" element={<DashboardPlaceholderPage title="Staff Dashboard" />} />
           <Route path="staff/bookings" element={<StaffBookingListPage />} />
           <Route path="staff/bookings/:id" element={<BookingDetailPage />} />
-          <Route path="staff/inspections" element={<StaffInspectionPage />} />
+          <Route path="staff/inspections" element={<Navigate to="/staff/bookings" replace />} />
           <Route path="staff/profile" element={<StaffProfilePage />} />
           <Route path="staff/waitlist" element={<StaffWaitlistPage />} />
         </Route>
