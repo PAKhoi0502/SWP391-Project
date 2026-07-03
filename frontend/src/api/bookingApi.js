@@ -124,6 +124,16 @@ export const bookingApi = {
     return unwrap(response)
   },
 
+  async getPaymentTransaction(transactionId) {
+    const response = await api.get(`/payments/transactions/${transactionId}`)
+    return unwrap(response)
+  },
+
+  async cancelPaymentTransaction(transactionId) {
+    const response = await api.patch(`/payments/transactions/${transactionId}/cancel`)
+    return unwrap(response)
+  },
+
   async updatePaymentMethod(bookingId, paymentMethod) {
     const response = await api.patch(`/bookings/${bookingId}/update-payment-method`, { paymentMethod })
     return unwrap(response)

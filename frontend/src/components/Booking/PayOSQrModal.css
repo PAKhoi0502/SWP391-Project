@@ -1,0 +1,338 @@
+.pqm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+}
+
+.pqm-dialog {
+  background: #111116;
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  border-radius: 20px;
+  box-shadow:
+    0 32px 80px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(96, 165, 250, 0.06) inset;
+  color: #f8fafc;
+  max-width: 440px;
+  width: 100%;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Header ────────────────────────────── */
+.pqm-header {
+  text-align: center;
+  padding-bottom: 2px;
+}
+
+.pqm-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.pqm-subtitle {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 13px;
+}
+
+/* ── QR section ────────────────────────── */
+.pqm-qr-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.pqm-qr-wrapper {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.pqm-qr-img {
+  width: 220px;
+  height: 220px;
+  display: block;
+}
+
+.pqm-qr-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  width: 248px;
+  height: 248px;
+  box-sizing: border-box;
+}
+
+.pqm-qr-placeholder-icon {
+  font-size: 32px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.pqm-qr-placeholder-text {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 13px;
+}
+
+.pqm-qr-hint {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ── Info card ─────────────────────────── */
+.pqm-info {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pqm-info-row {
+  display: flex;
+  gap: 12px;
+  font-size: 13.5px;
+  align-items: center;
+}
+
+.pqm-info-label {
+  color: rgba(255, 255, 255, 0.45);
+  min-width: 100px;
+  flex-shrink: 0;
+}
+
+.pqm-info-value {
+  color: #f8fafc;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.pqm-amount {
+  font-size: 16px;
+  color: #facc15;
+}
+
+.pqm-status {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 6px;
+}
+
+.pqm-status--pending {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.pqm-status--paid {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.2);
+}
+
+.pqm-status--cancelled {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+}
+
+/* ── Error ─────────────────────────────── */
+.pqm-error {
+  margin: 0;
+  color: #f87171;
+  font-size: 13px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+/* ── Buttons ───────────────────────────── */
+.pqm-btn {
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 13px;
+  width: 100%;
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+  text-align: center;
+  text-decoration: none;
+  display: block;
+  box-sizing: border-box;
+}
+
+.pqm-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pqm-btn--refresh {
+  background: rgba(96, 165, 250, 0.12);
+  border: 1.5px solid rgba(96, 165, 250, 0.4);
+  color: #93c5fd;
+}
+
+.pqm-btn--refresh:hover:not(:disabled) {
+  background: rgba(96, 165, 250, 0.22);
+  border-color: rgba(96, 165, 250, 0.65);
+}
+
+.pqm-btn--link {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pqm-btn--link:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  text-decoration: none;
+}
+
+/* ── Footer row ────────────────────────── */
+.pqm-footer {
+  display: flex;
+  gap: 8px;
+}
+
+.pqm-footer .pqm-btn {
+  flex: 1;
+}
+
+.pqm-btn--cancel-tx {
+  background: rgba(239, 68, 68, 0.07);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  color: #f87171;
+  font-size: 13px;
+}
+
+.pqm-btn--cancel-tx:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.pqm-btn--close {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pqm-btn--close:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.11);
+  color: #f8fafc;
+}
+
+/* ── Success screen ────────────────────── */
+.pqm-dialog--success {
+  border-color: rgba(34, 197, 94, 0.3);
+  box-shadow:
+    0 32px 80px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(34, 197, 94, 0.06) inset;
+}
+
+.pqm-success-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0 4px;
+}
+
+.pqm-success-icon {
+  width: 72px;
+  height: 72px;
+}
+
+.pqm-checkmark {
+  width: 72px;
+  height: 72px;
+}
+
+.pqm-checkmark-circle {
+  stroke: #22c55e;
+  stroke-width: 2;
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  stroke-linecap: round;
+  animation: pqm-stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.pqm-checkmark-check {
+  stroke: #22c55e;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: pqm-stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.55s forwards;
+}
+
+@keyframes pqm-stroke {
+  100% { stroke-dashoffset: 0; }
+}
+
+.pqm-success-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 900;
+  color: #4ade80;
+  letter-spacing: -0.01em;
+}
+
+.pqm-success-sub {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+}
+
+.pqm-btn--close-success {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #4ade80;
+  padding: 12px 40px;
+  width: auto;
+  transition: background 0.15s;
+  display: inline-block;
+}
+
+.pqm-btn--close-success:hover {
+  background: rgba(34, 197, 94, 0.2);
+}
+
+@media (max-width: 480px) {
+  .pqm-dialog {
+    padding: 20px 16px;
+  }
+}
