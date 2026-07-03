@@ -573,7 +573,7 @@ export default function BookingHistoryPage() {
 
                   {(isCanceledStatus(status) || isNoShowStatus(status)) && booking?.note && (
                     <div>
-                      <span>{isNoShowStatus(status) ? 'Lý do no-show' : 'Lý do hủy'}</span>
+                      <span>{isNoShowStatus(status) ? 'Ghi chú no-show' : 'Lý do hủy'}</span>
                       <strong>{booking.note}</strong>
                     </div>
                   )}
