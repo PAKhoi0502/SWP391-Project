@@ -10,6 +10,7 @@ import { vehicleService } from '../../services/vehicleService'
 import { getWashBayById } from '../../services/washBayApi'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import CheckInBookingModal from '../../components/Booking/CheckInBookingModal'
+import ServiceStepsProgress from '../../components/Booking/ServiceStepsProgress'
 import StartServiceModal from '../../components/Booking/StartServiceModal'
 import './BookingHistoryPage.css'
 
@@ -515,6 +516,9 @@ function BookingDetailPage() {
   const [startServiceLoading, setStartServiceLoading] = useState(false)
   const [startServiceError, setStartServiceError] = useState('')
   const [assignedResources, setAssignedResources] = useState(null)
+  const [serviceSteps, setServiceSteps] = useState([])
+  const [stepActionLoadingId, setStepActionLoadingId] = useState(null)
+  const [stepActionError, setStepActionError] = useState('')
 
   const role = location.pathname.startsWith('/admin')
     ? 'admin'
@@ -687,6 +691,11 @@ function BookingDetailPage() {
           ? normalizedStatus
           : 'CONFIRMED',
       )
+
+      const bookingId = detail?.id || id
+      bookingApi.getBookingServiceSteps(bookingId)
+        .then((raw) => setServiceSteps(Array.isArray(raw) ? raw : []))
+        .catch(() => {})
     } catch (err) {
       setBooking(null)
       setCustomerBookingNo(null)
@@ -694,6 +703,15 @@ function BookingDetailPage() {
       setError(err?.response?.data?.message || err?.message || TEXT.loadError)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadServiceSteps = async () => {
+    try {
+      const raw = await bookingApi.getBookingServiceSteps(id)
+      setServiceSteps(Array.isArray(raw) ? raw : [])
+    } catch {
+      // fail silently — steps list just won't update
     }
   }
 
@@ -989,6 +1007,46 @@ function BookingDetailPage() {
     })
   }
 
+  const handleCompleteServiceStep = async (stepId, note) => {
+    setStepActionLoadingId(stepId)
+    setStepActionError('')
+    try {
+      await bookingApi.completeBookingServiceStep(stepId, note)
+      await loadServiceSteps()
+    } catch (err) {
+      const msg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
+      if (msg.includes('in_progress') || msg.includes('in progress')) {
+        setStepActionError('Booking phải đang thực hiện mới cập nhật được bước dịch vụ.')
+      } else if (msg.includes('already completed') || msg.includes('da hoan thanh')) {
+        setStepActionError('Bước này đã hoàn thành rồi.')
+      } else {
+        setStepActionError(err?.response?.data?.message || err?.message || 'Hoàn thành bước thất bại.')
+      }
+    } finally {
+      setStepActionLoadingId(null)
+    }
+  }
+
+  const handleReopenServiceStep = async (stepId, note) => {
+    setStepActionLoadingId(stepId)
+    setStepActionError('')
+    try {
+      await bookingApi.reopenBookingServiceStep(stepId, note)
+      await loadServiceSteps()
+    } catch (err) {
+      const msg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
+      if (msg.includes('in_progress') || msg.includes('in progress')) {
+        setStepActionError('Booking phải đang thực hiện mới mở lại được bước dịch vụ.')
+      } else if (msg.includes('not completed') || msg.includes('chua hoan thanh')) {
+        setStepActionError('Bước này chưa hoàn thành, không cần mở lại.')
+      } else {
+        setStepActionError(err?.response?.data?.message || err?.message || 'Mở lại bước thất bại.')
+      }
+    } finally {
+      setStepActionLoadingId(null)
+    }
+  }
+
   const handleNoShow = () => {
     if (!canMarkNoShow) {
       setActionMessage('Chỉ có thể đánh dấu no-show cho booking chưa thực hiện.')
@@ -1240,7 +1298,16 @@ function BookingDetailPage() {
               </div>
               <small>{booking.servicePackageName || TEXT.servicePackage}</small>
             </div>
-            {booking.servicePackageSteps?.length > 0 ? (
+            {serviceSteps.length > 0 ? (
+              <ServiceStepsProgress
+                steps={serviceSteps}
+                bookingStatus={currentStatus}
+                onCompleteStep={handleCompleteServiceStep}
+                onReopenStep={handleReopenServiceStep}
+                actionLoadingStepId={stepActionLoadingId}
+                error={stepActionError}
+              />
+            ) : booking.servicePackageSteps?.length > 0 ? (
               <ol className="booking-service-step-list">
                 {booking.servicePackageSteps.map((step, index) => (
                   <li key={`${step.title}-${index}`} className="booking-service-step-item">

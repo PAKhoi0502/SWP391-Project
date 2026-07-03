@@ -123,4 +123,14 @@ export const bookingApi = {
     const response = await api.post('/payments/payos/create', { bookingId: Number(bookingId) })
     return unwrap(response)
   },
+
+  async completeBookingServiceStep(stepId, note) {
+    const response = await api.patch(`/bookings/booking-service-steps/${stepId}/complete`, { note: note || '' })
+    return unwrap(response)
+  },
+
+  async reopenBookingServiceStep(stepId, note) {
+    const response = await api.patch(`/bookings/booking-service-steps/${stepId}/reopen`, { note: note || '' })
+    return unwrap(response)
+  },
 }
