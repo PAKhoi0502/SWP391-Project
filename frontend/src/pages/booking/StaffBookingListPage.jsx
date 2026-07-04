@@ -125,13 +125,11 @@ const getPaymentMethodText = (booking) => {
 }
 
 const formatNamedValue = (name, id, fallback) => {
-  const safeName = name || fallback
-  const safeId = id ? `#${id}` : ''
+  const safeName = name || fallback || (id ? `#${id}` : 'Chưa cập nhật')
 
   return (
     <span className="booking-named-value">
       <strong>{safeName}</strong>
-      {safeId && <small>{safeId}</small>}
     </span>
   )
 }

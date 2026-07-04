@@ -22,6 +22,16 @@
   font-size: 12.5px;
 }
 
+.ssp-blocked-hint {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  font-size: 12px;
+}
+
 .ssp-empty {
   margin: 0;
   padding: 16px;

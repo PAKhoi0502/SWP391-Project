@@ -19,7 +19,6 @@ const NAV_ITEMS = {
     { to: '/staff/bookings/walk-in', label: 'Thêm hồ sơ' },
     { to: '/staff/bookings', label: 'Booking' },
     { to: '/staff/waitlist', label: 'Waitlist' },
-    { to: '/staff/inspections', label: 'Kiểm tra xe' },
     { to: '/staff/profile', label: 'Hồ sơ' },
   ],
   [ROLES.ADMIN]: [

@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -20,6 +21,7 @@ public class ServicePackageServiceImpl
     private final ServicePackageIncludeRepository includeRepository;
     private final ServicePackageStepRepository stepRepository;
     private final ServicePackageStepInstructionRepository instructionRepository;
+    private final ComboStepResolver comboStepResolver;
 
     @Override
     public ServicePackageResponse create(
@@ -174,45 +176,43 @@ public class ServicePackageServiceImpl
                                         .getId())
                         .toList();
 
-        List<ServicePackageStepResponse> steps =
-                stepRepository
-                        .findByServicePackage_IdOrderByStepOrder(
-                                id)
-                        .stream()
-                        .map(step -> {
+        List<ServicePackageStep> resolvedSteps = comboStepResolver.resolveSteps(servicePackage);
+        List<ServicePackageStepResponse> steps = new ArrayList<>();
 
-                            List<ServicePackageInstructionResponse>
-                                    instructions =
-                                    instructionRepository
-                                            .findByServicePackageStep_IdOrderByInstructionOrder(
-                                                    step.getId())
-                                            .stream()
-                                            .map(i ->
-                                                    ServicePackageInstructionResponse
-                                                            .builder()
-                                                            .id(i.getId())
-                                                            .instructionOrder(
-                                                                    i.getInstructionOrder())
-                                                            .content(
-                                                                    i.getContent())
-                                                            .build())
-                                            .toList();
+        for (int index = 0; index < resolvedSteps.size(); index++) {
 
-                            return ServicePackageStepResponse
-                                    .builder()
-                                    .id(step.getId())
-                                    .stepOrder(
-                                            step.getStepOrder())
-                                    .name(step.getName())
-                                    .description(
-                                            step.getDescription())
-                                    .isRequired(
-                                            step.getIsRequired())
-                                    .instructions(
-                                            instructions)
-                                    .build();
-                        })
-                        .toList();
+            ServicePackageStep step = resolvedSteps.get(index);
+
+            List<ServicePackageInstructionResponse>
+                    instructions =
+                    instructionRepository
+                            .findByServicePackageStep_IdOrderByInstructionOrder(
+                                    step.getId())
+                            .stream()
+                            .map(i ->
+                                    ServicePackageInstructionResponse
+                                            .builder()
+                                            .id(i.getId())
+                                            .instructionOrder(
+                                                    i.getInstructionOrder())
+                                            .content(
+                                                    i.getContent())
+                                            .build())
+                            .toList();
+
+            steps.add(ServicePackageStepResponse
+                    .builder()
+                    .id(step.getId())
+                    .stepOrder(index + 1)
+                    .name(step.getName())
+                    .description(
+                            step.getDescription())
+                    .isRequired(
+                            step.getIsRequired())
+                    .instructions(
+                            instructions)
+                    .build());
+        }
 
         return ServicePackageResponse.builder()
                 .id(servicePackage.getId())
@@ -222,6 +222,10 @@ public class ServicePackageServiceImpl
                         servicePackage.getVehicleType())
                 .serviceType(
                         servicePackage.getServiceType())
+                .seatCount(
+                        servicePackage.getSeatCount())
+                .motorbikeGroup(
+                        servicePackage.getMotorbikeGroup())
                 .basePrice(
                         servicePackage.getBasePrice())
                 .durationMinutes(
@@ -289,6 +293,94 @@ public class ServicePackageServiceImpl
 
         servicePackageRepository.save(
                 servicePackage);
+
+        if (request.getSteps() != null) {
+
+            List<ServicePackageStep> existingSteps =
+                    stepRepository.findByServicePackage_IdOrderByStepOrder(id);
+
+            for (ServicePackageStep existingStep : existingSteps) {
+                instructionRepository.deleteAll(
+                        instructionRepository.findByServicePackageStep_IdOrderByInstructionOrder(
+                                existingStep.getId()));
+            }
+            stepRepository.deleteAll(existingSteps);
+
+            for (CreateServicePackageStepRequest stepRequest : request.getSteps()) {
+
+                ServicePackageStep step =
+                        stepRepository.save(
+                                ServicePackageStep.builder()
+                                        .servicePackage(
+                                                servicePackage)
+                                        .stepOrder(
+                                                stepRequest.getStepOrder())
+                                        .name(
+                                                stepRequest.getName())
+                                        .description(
+                                                stepRequest.getDescription())
+                                        .isRequired(
+                                                stepRequest.getIsRequired())
+                                        .createdAt(
+                                                LocalDateTime.now())
+                                        .updatedAt(
+                                                LocalDateTime.now())
+                                        .build());
+
+                if (stepRequest.getInstructions() != null) {
+
+                    int order = 1;
+
+                    for (String instruction : stepRequest.getInstructions()) {
+
+                        instructionRepository.save(
+                                ServicePackageStepInstruction
+                                        .builder()
+                                        .servicePackageStep(
+                                                step)
+                                        .instructionOrder(
+                                                order++)
+                                        .content(
+                                                instruction)
+                                        .createdAt(
+                                                LocalDateTime.now())
+                                        .updatedAt(
+                                                LocalDateTime.now())
+                                        .build());
+                    }
+                }
+            }
+        }
+
+        if (request.getIncludedServiceIds() != null) {
+
+            includeRepository.deleteAll(
+                    includeRepository.findByParentServicePackage_Id(id));
+
+            int sortOrder = 1;
+
+            for (Long includedId : request.getIncludedServiceIds()) {
+
+                ServicePackage included =
+                        servicePackageRepository.findById(includedId)
+                                .orElseThrow(() ->
+                                        new RuntimeException(
+                                                "Included package not found"));
+
+                includeRepository.save(
+                        ServicePackageInclude.builder()
+                                .parentServicePackage(
+                                        servicePackage)
+                                .includedServicePackage(
+                                        included)
+                                .sortOrder(sortOrder++)
+                                .createdAt(
+                                        LocalDateTime.now())
+                                .updatedAt(
+                                        LocalDateTime.now())
+                                .build());
+            }
+        }
 
         return getById(id);
     }

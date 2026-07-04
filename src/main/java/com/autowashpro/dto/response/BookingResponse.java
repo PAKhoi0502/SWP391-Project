@@ -14,6 +14,7 @@ public class BookingResponse {
     private Long vehicleId;
     private Long garageId;
     private Long servicePackageId;
+    private List<Long> addOnServicePackageIds;
     private Long promotionId;
     private LocalDateTime startTime;
     private LocalDateTime endTime;

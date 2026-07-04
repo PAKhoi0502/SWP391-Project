@@ -6,6 +6,7 @@ import {
 } from '../../api/customerBookingFlowApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
 import './CustomerCreateBookingPage.css'
+import { getPackageType } from '../../services/servicePackageApi'
 
 const toLocalDateIso = (date = new Date()) => {
   const year = date.getFullYear()
@@ -156,6 +157,7 @@ export default function CustomerCreateBookingPage() {
   const [selectedVehicleId, setSelectedVehicleId] = useState('')
   const [selectedGarageId, setSelectedGarageId] = useState('')
   const [selectedPackageId, setSelectedPackageId] = useState('')
+  const [selectedAddOnIds, setSelectedAddOnIds] = useState([])
   const [selectedDate, setSelectedDate] = useState(minBookingDateIso())
   const [selectedSlotId, setSelectedSlotId] = useState('')
   const [bookingWindowDays, setBookingWindowDays] = useState(7)
@@ -186,6 +188,44 @@ export default function CustomerCreateBookingPage() {
     () => servicePackages.find((item) => String(getId(item)) === String(selectedPackageId)),
     [servicePackages, selectedPackageId],
   )
+  const normalizePackageType = (item) => String(getPackageType(item) || 'MAIN').toUpperCase()
+
+  const mainPackages = useMemo(
+    () => servicePackages.filter((item) => {
+      const type = normalizePackageType(item)
+      return type !== 'ADD_ON' && type !== 'COMBO'
+    }),
+    [servicePackages],
+  )
+
+  const comboPackages = useMemo(
+    () => servicePackages.filter((item) => normalizePackageType(item) === 'COMBO'),
+    [servicePackages],
+  )
+
+  const addOnPackages = useMemo(
+    () => servicePackages.filter((item) => normalizePackageType(item) === 'ADD_ON'),
+    [servicePackages],
+  )
+
+  const getIncludedPackageNames = (comboPkg) => {
+    const ids = comboPkg?.includedServiceIds || []
+    return ids
+      .map((id) => servicePackages.find((item) => String(getId(item)) === String(id)))
+      .filter(Boolean)
+      .map((item) => getName(item))
+      .join(' + ')
+  }
+
+  const isComboSelected = selectedPackage && normalizePackageType(selectedPackage) === 'COMBO'
+
+  const selectedAddOns = useMemo(
+    () =>
+      addOnPackages.filter((item) =>
+        selectedAddOnIds.includes(String(getId(item))),
+      ),
+    [addOnPackages, selectedAddOnIds],
+  )
 
   const visibleSlots = useMemo(
     () => slots.filter((slot) => !isPastSlot(slot, selectedDate)),
@@ -198,18 +238,18 @@ export default function CustomerCreateBookingPage() {
   )
 
   const priceSummary = useMemo(() => {
-    const subtotal = bookingFlowUtils.getPackagePrice(selectedPackage)
+    const mainPrice = bookingFlowUtils.getPackagePrice(selectedPackage)
+    const addOnsPrice = selectedAddOns.reduce(
+      (sum, item) => sum + bookingFlowUtils.getPackagePrice(item),
+      0,
+    )
+    const subtotal = mainPrice + addOnsPrice
     const promotionDiscount = bookingFlowUtils.getDiscountAmount(promotionResult)
     const loyaltyDiscount = bookingFlowUtils.getDiscountAmount(loyaltyPreview)
     const finalPrice = Math.max(subtotal - promotionDiscount - loyaltyDiscount, 0)
 
-    return {
-      subtotal,
-      promotionDiscount,
-      loyaltyDiscount,
-      finalPrice,
-    }
-  }, [promotionResult, loyaltyPreview, selectedPackage])
+    return { subtotal, promotionDiscount, loyaltyDiscount, finalPrice }
+  }, [promotionResult, loyaltyPreview, selectedPackage, selectedAddOns])
 
   useEffect(() => {
     let mounted = true
@@ -262,6 +302,7 @@ export default function CustomerCreateBookingPage() {
       if (!selectedVehicle || !selectedGarageId) {
         setServicePackages([])
         setSelectedPackageId('')
+        setSelectedAddOnIds([])
         setSelectedSlotId('')
         setSlots([])
         return
@@ -271,6 +312,7 @@ export default function CustomerCreateBookingPage() {
         setLoadingPackages(true)
         setMessage('')
         setSelectedPackageId('')
+        setSelectedAddOnIds([])
         setSelectedSlotId('')
         setSlots([])
         setPromotionResult(null)
@@ -509,6 +551,23 @@ export default function CustomerCreateBookingPage() {
     setMessage('')
     setCurrentStep((step) => Math.max(step - 1, 1))
   }
+  const toggleAddOn = (id) => {
+    const key = String(id)
+    setSelectedAddOnIds((current) =>
+      current.includes(key)
+        ? current.filter((item) => item !== key)
+        : [...current, key],
+    )
+  }
+  const handleSelectPackage = (servicePackage) => {
+    const id = String(getId(servicePackage))
+    setSelectedPackageId(id)
+
+    // Combo là gói riêng — chọn combo thì bỏ hết addon đang chọn
+    if (normalizePackageType(servicePackage) === 'COMBO') {
+      setSelectedAddOnIds([])
+    }
+  }
 
   const handleSubmitBooking = async () => {
     if (!canSubmit) {
@@ -551,6 +610,7 @@ export default function CustomerCreateBookingPage() {
         garageId: selectedGarage?.garageId ?? selectedGarage?.id,
         vehicleId: selectedVehicle?.vehicleId ?? selectedVehicle?.id,
         servicePackageId: packageId,
+        addOnServicePackageIds: selectedAddOnIds.map(Number),
         startTime,
         promotionCode: promotionCode.trim() || null,
         usedPoints: loyaltyPreview?.validPoints ?? 0,
@@ -705,22 +765,78 @@ export default function CustomerCreateBookingPage() {
                 {loadingPackages ? (
                   <p className="booking-muted">Đang tải gói dịch vụ...</p>
                 ) : (
-                  <div className="booking-grid">
-                    {servicePackages.map((servicePackage) => (
-                      <button
-                        type="button"
-                        key={getId(servicePackage)}
-                        className={`booking-option-card ${String(selectedPackageId) === String(getId(servicePackage))
-                            ? 'active'
-                            : ''
-                          }`}
-                        onClick={() => setSelectedPackageId(String(getId(servicePackage)))}
-                      >
-                        <strong>{getName(servicePackage, 'Gói dịch vụ')}</strong>
-                        <small>{formatMoney(bookingFlowUtils.getPackagePrice(servicePackage))}</small>
-                      </button>
-                    ))}
-                  </div>
+                  <>
+                    <h3>Gói chính</h3>
+                    <div className="booking-grid">
+                      {mainPackages.map((servicePackage) => (
+                        <button
+                          type="button"
+                          key={getId(servicePackage)}
+                          className={`booking-option-card ${String(selectedPackageId) === String(getId(servicePackage)) ? 'active' : ''
+                            }`}
+                          onClick={() => handleSelectPackage(servicePackage)}
+                        >
+                          <strong>{getName(servicePackage, 'Gói dịch vụ')}</strong>
+                          <small>{formatMoney(bookingFlowUtils.getPackagePrice(servicePackage))}</small>
+                        </button>
+                      ))}
+                    </div>
+
+                    {comboPackages.length > 0 && (
+                      <>
+                        <h3>Gói combo</h3>
+                        <div className="booking-grid">
+                          {comboPackages.map((servicePackage) => {
+                            const includedNames = getIncludedPackageNames(servicePackage)
+
+                            return (
+                              <button
+                                type="button"
+                                key={getId(servicePackage)}
+                                className={`booking-option-card ${String(selectedPackageId) === String(getId(servicePackage)) ? 'active' : ''
+                                  }`}
+                                onClick={() => handleSelectPackage(servicePackage)}
+                              >
+                                <strong>{getName(servicePackage, 'Gói combo')}</strong>
+                                {includedNames && <small className="booking-combo-includes">{includedNames}</small>}
+                                <small>{formatMoney(bookingFlowUtils.getPackagePrice(servicePackage))}</small>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </>
+                    )}
+
+                    {addOnPackages.length > 0 && (
+                      <>
+                        <h3>Dịch vụ thêm (có thể chọn nhiều)</h3>
+                        {isComboSelected && (
+                          <p className="booking-muted">
+                            Gói combo đã bao gồm sẵn dịch vụ, không thể chọn thêm dịch vụ khác.
+                          </p>
+                        )}
+                        <div className="booking-grid">
+                          {addOnPackages.map((servicePackage) => {
+                            const id = String(getId(servicePackage))
+                            const active = selectedAddOnIds.includes(id)
+
+                            return (
+                              <button
+                                type="button"
+                                key={id}
+                                disabled={isComboSelected}
+                                className={`booking-option-card ${active ? 'active' : ''}`}
+                                onClick={() => toggleAddOn(id)}
+                              >
+                                <strong>{getName(servicePackage, 'Dịch vụ thêm')}</strong>
+                                <small>{formatMoney(bookingFlowUtils.getPackagePrice(servicePackage))}</small>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </>
                 )}
 
                 {!loadingPackages && selectedVehicle && selectedGarage && servicePackages.length === 0 && (
@@ -899,6 +1015,12 @@ export default function CustomerCreateBookingPage() {
               <span>Gói</span>
               <strong>{selectedPackage ? getName(selectedPackage, 'Gói') : 'Chưa chọn'}</strong>
             </div>
+            {isComboSelected && getIncludedPackageNames(selectedPackage) && (
+              <div className="booking-summary-row">
+                <span>Bao gồm</span>
+                <strong>{getIncludedPackageNames(selectedPackage)}</strong>
+              </div>
+            )}
             <div className="booking-summary-row">
               <span>Thời gian</span>
               <strong>
