@@ -30,6 +30,7 @@ const NAV_ITEMS = {
     { to: '/admin/wash-bays', label: 'Wash Bays' },
     { to: '/admin/service-packages', label: 'Gói dịch vụ' },
     { to: '/admin/bookings', label: 'Booking' },
+    { to: '/admin/loyalty/tier-rules', label: 'Hạng thành viên' },
   ],
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { bookingApi } from '../../api/bookingApi'
 import { userService } from '../../services/userService'
+import { getServicePackageById } from '../../services/servicePackageApi'
 import './BookingHistoryPage.css'
 
 const statuses = ['ALL', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED', 'CANCELED', 'NO_SHOW']
@@ -162,6 +163,18 @@ const persistPayOSReturnPath = (path, result) => {
 const getUserName = (user) =>
   user?.fullName || user?.name || user?.username || user?.email || ''
 
+const pkgNameCache = {}
+const resolveAddOnNames = async (ids) => {
+  if (!Array.isArray(ids) || ids.length === 0) return []
+  const packages = await Promise.all(
+    ids.map((id) => {
+      if (!pkgNameCache[id]) pkgNameCache[id] = getServicePackageById(id).catch(() => null)
+      return pkgNameCache[id]
+    }),
+  )
+  return packages.filter(Boolean).map((pkg) => pkg?.name || pkg?.packageName || '').filter(Boolean)
+}
+
 const enrichBookingsWithPayment = async (items) => {
   if (!Array.isArray(items)) return []
 
@@ -194,6 +207,8 @@ const enrichBookingsWithPayment = async (items) => {
         Object.entries(cached).filter(([, item]) => item !== undefined && item !== null && item !== ''),
       )
 
+      const addOnNames = await resolveAddOnNames(booking.addOnServicePackageIds)
+
       const enrichedBooking = {
         ...cachedValues,
         ...booking,
@@ -212,6 +227,7 @@ const enrichBookingsWithPayment = async (items) => {
         paidAt: booking.paidAt || paidTransaction?.paidAt || cachedPayOSPaidAt,
         note: booking.note || cached.note,
         vehicleName: booking.vehicleName || cached.vehicleName || null,
+        addOnServicePackageNames: addOnNames,
       }
 
       return mergeFrontendOverride(enrichedBooking, cached)
@@ -436,6 +452,12 @@ function StaffBookingListPage() {
                   <span>Gói dịch vụ</span>
                   {formatNamedValue(booking.servicePackageName, booking.servicePackageId, 'Gói dịch vụ')}
                 </div>
+                {Array.isArray(booking.addOnServicePackageNames) && booking.addOnServicePackageNames.length > 0 && (
+                  <div>
+                    <span>Dịch vụ thêm</span>
+                    <strong>{booking.addOnServicePackageNames.join(', ')}</strong>
+                  </div>
+                )}
                 <div><span>Thời gian</span><strong>{formatDateTime(booking.startTime)}</strong></div>
                 {(['CANCELED', 'CANCELLED', 'NO_SHOW'].includes(String(booking.status || '').toUpperCase())) && booking.note && (
                   <div>

@@ -10,8 +10,6 @@ const TIER_META = {
   PLATINUM: { label: 'Bạch kim', icon: '💎' },
 }
 
-const MAIN_TIERS = ['SILVER', 'GOLD', 'PLATINUM']
-
 const getTierMeta = (tier) => {
   const key = String(tier || '').toUpperCase()
   return TIER_META[key] || { label: key || 'Thành viên', icon: '⭐' }
@@ -61,7 +59,7 @@ export default function LoyaltyPointsCard() {
   const currentTierKey = String(loyalty.currentTier || '').toUpperCase()
   const tierMeta = getTierMeta(currentTierKey)
 
-  const mainTierRules = tierRules.filter((r) => MAIN_TIERS.includes(String(r.tier || '').toUpperCase()))
+  const mainTierRules = [...tierRules].sort((a, b) => (a.priorityLevel ?? 0) - (b.priorityLevel ?? 0))
 
   return (
     <div className="lpc-root">

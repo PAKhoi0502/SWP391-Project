@@ -42,8 +42,6 @@ public class LoyaltyServiceImpl implements LoyaltyService {
     private final UserRepository userRepository;
     private final EmailService emailService;
 
-    private static final List<String> TIER_ORDER = List.of("BRONZE", "SILVER", "GOLD", "PLATINUM");
-
     @Override
     public CustomerLoyalty getOrCreateCustomerLoyalty(Long customerId) {
         return customerLoyaltyRepository.findByCustomerId(customerId).orElseGet(() -> {
@@ -89,11 +87,12 @@ public class LoyaltyServiceImpl implements LoyaltyService {
     @Override
     public List<LoyaltyTierRuleResponse> getTierRules() {
         return loyaltyTierRuleRepository.findByIsActiveTrueOrderByPriorityLevelAsc().stream()
-                .map(rule -> LoyaltyTierRuleResponse.builder().tier(rule.getTier())
+                .map(rule -> LoyaltyTierRuleResponse.builder()
+                        .id(rule.getId()).tier(rule.getTier())
                         .minTotalSpent(rule.getMinTotalSpent()).minTotalVisits(rule.getMinTotalVisits())
                         .minTotalPoints(rule.getMinTotalPoints()).bookingWindowDays(rule.getBookingWindowDays())
                         .maxUpcomingBookings(rule.getMaxUpcomingBookings()).pointMultiplier(rule.getPointMultiplier())
-                        .priorityLevel(rule.getPriorityLevel()).build())
+                        .priorityLevel(rule.getPriorityLevel()).isActive(rule.getIsActive()).build())
                 .toList();
     }
 
@@ -132,7 +131,13 @@ String newTier = newTierHolder[0];
     }
 
     private boolean isTierHigher(String newTier, String oldTier) {
-        return TIER_ORDER.indexOf(newTier) > TIER_ORDER.indexOf(oldTier);
+        int newPriority = loyaltyTierRuleRepository.findByTier(newTier)
+                .map(r -> r.getPriorityLevel() != null ? r.getPriorityLevel() : 0)
+                .orElse(0);
+        int oldPriority = loyaltyTierRuleRepository.findByTier(oldTier)
+                .map(r -> r.getPriorityLevel() != null ? r.getPriorityLevel() : 0)
+                .orElse(0);
+        return newPriority > oldPriority;
     }
 
     @Override
@@ -177,7 +182,14 @@ String newTier = newTierHolder[0];
 
     @Override
     public List<LoyaltyTierRuleResponse> getAdminTierRules() {
-        return getTierRules();
+        return loyaltyTierRuleRepository.findAllByOrderByPriorityLevelAsc().stream()
+                .map(rule -> LoyaltyTierRuleResponse.builder()
+                        .id(rule.getId()).tier(rule.getTier())
+                        .minTotalSpent(rule.getMinTotalSpent()).minTotalVisits(rule.getMinTotalVisits())
+                        .minTotalPoints(rule.getMinTotalPoints()).bookingWindowDays(rule.getBookingWindowDays())
+                        .maxUpcomingBookings(rule.getMaxUpcomingBookings()).pointMultiplier(rule.getPointMultiplier())
+                        .priorityLevel(rule.getPriorityLevel()).isActive(rule.getIsActive()).build())
+                .toList();
     }
 
     @Override
@@ -199,6 +211,7 @@ String newTier = newTierHolder[0];
         loyaltyTierRuleRepository.save(rule);
 
         return LoyaltyTierRuleResponse.builder()
+                .id(rule.getId())
                 .tier(rule.getTier())
                 .minTotalSpent(rule.getMinTotalSpent())
                 .minTotalVisits(rule.getMinTotalVisits())
@@ -207,6 +220,7 @@ String newTier = newTierHolder[0];
                 .maxUpcomingBookings(rule.getMaxUpcomingBookings())
                 .pointMultiplier(rule.getPointMultiplier())
                 .priorityLevel(rule.getPriorityLevel())
+                .isActive(rule.getIsActive())
                 .build();
     }
 
@@ -230,6 +244,7 @@ String newTier = newTierHolder[0];
         loyaltyTierRuleRepository.save(rule);
 
         return LoyaltyTierRuleResponse.builder()
+                .id(rule.getId())
                 .tier(rule.getTier())
                 .minTotalSpent(rule.getMinTotalSpent())
                 .minTotalVisits(rule.getMinTotalVisits())
@@ -238,6 +253,7 @@ String newTier = newTierHolder[0];
                 .maxUpcomingBookings(rule.getMaxUpcomingBookings())
                 .pointMultiplier(rule.getPointMultiplier())
                 .priorityLevel(rule.getPriorityLevel())
+                .isActive(rule.getIsActive())
                 .build();
     }
 

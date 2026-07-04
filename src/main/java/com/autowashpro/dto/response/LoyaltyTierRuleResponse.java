@@ -9,6 +9,8 @@ import java.math.BigDecimal;
 @Builder
 public class LoyaltyTierRuleResponse {
 
+    private Long id;
+
     private String tier;
 
     private BigDecimal minTotalSpent;
@@ -24,4 +26,6 @@ public class LoyaltyTierRuleResponse {
     private BigDecimal pointMultiplier;
 
     private Integer priorityLevel;
+
+    private Boolean isActive;
 }
