@@ -381,7 +381,8 @@ public class BookingServiceImpl implements BookingService {
 
                 String bayType = mapVehicleTypeToBayType(vehicleType);
 
-                long availableBays = washBayRepository.countAvailableByGarageAndVehicleType(
+                // Dùng tổng bay active (bỏ qua status real-time) để kiểm tra slot tương lai
+                long totalBays = washBayRepository.countActiveByGarageAndVehicleType(
                                 garageId,
                                 bayType);
 
@@ -391,7 +392,7 @@ public class BookingServiceImpl implements BookingService {
                                 start,
                                 end);
 
-                return occupied < availableBays;
+                return occupied < totalBays;
         }
 
         private boolean isCareStaffAvailable(
@@ -534,11 +535,11 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 if (requiresWashBay(selectedPackages)) {
-                        long availableBays = washBayRepository
-                                        .countAvailableByGarageAndVehicleType(request.getGarageId(), bayType);
+                        long totalBays = washBayRepository
+                                        .countActiveByGarageAndVehicleType(request.getGarageId(), bayType);
                         long occupiedBays = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
                                         request.getGarageId(), bayType, startTime, endTime);
-                        if (occupiedBays >= availableBays) {
+                        if (occupiedBays >= totalBays) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                                                 "No wash bay available for this time slot");
                         }
@@ -611,6 +612,22 @@ public class BookingServiceImpl implements BookingService {
                 booking.setNote(request.getNote());
 
                 Booking saved = bookingRepository.save(booking);
+
+                if (usedPoints > 0) {
+                        loyalty.setAvailablePoints(loyalty.getAvailablePoints() - usedPoints);
+                        loyalty.setRedeemedPoints(loyalty.getRedeemedPoints() + usedPoints);
+                        customerLoyaltyRepository.save(loyalty);
+
+                        PointTransaction redeemTx = new PointTransaction();
+                        redeemTx.setCustomerId(customerId);
+                        redeemTx.setBookingId(saved.getId());
+                        redeemTx.setType("REDEEM");
+                        redeemTx.setPoints(-usedPoints);
+                        redeemTx.setRemainingPoints(0);
+                        redeemTx.setSource("BOOKING_REDEEM");
+                        redeemTx.setNote("Redeemed " + usedPoints + " points for booking #" + saved.getId());
+                        pointTransactionRepository.save(redeemTx);
+                }
 
                 int sortOrder = 1;
                 for (ServicePackage addOn : addOns) {
@@ -698,12 +715,11 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 if (requiresWashBay(selectedPackages)) {
-                        long availableBays = washBayRepository.countAvailableByGarageAndVehicleType(
+                        long totalBays = washBayRepository.countActiveByGarageAndVehicleType(
                                         request.getGarageId(), bayType);
-                        long occupiedBays = bookingRepository.countOverlappingBookingsByGarage(
-                                        request.getGarageId(), startTime, endTime);
-
-                        if (occupiedBays >= availableBays) {
+                        long occupiedBays = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
+                                        request.getGarageId(), bayType, startTime, endTime);
+                        if (occupiedBays >= totalBays) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                                                 "No wash bay available for this time slot");
                         }
@@ -713,6 +729,15 @@ public class BookingServiceImpl implements BookingService {
 
                 User matchedCustomer = findActiveCustomerByPhone(request.getGuestPhone());
                 Vehicle matchedVehicle = findMatchedCustomerVehicle(matchedCustomer, normalizedPlate);
+
+                if (matchedCustomer != null) {
+                        long customerGarageOverlap = bookingRepository.countOverlappingBookingsByCustomerAndGarage(
+                                        matchedCustomer.getId(), request.getGarageId(), startTime, endTime);
+                        if (customerGarageOverlap > 0) {
+                                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                                "Khách hàng này đã có lịch đặt tại garage trong khung giờ này");
+                        }
+                }
 
                 // Auto-save new vehicle for known customers when the plate is not in their profile yet
                 if (matchedCustomer != null && matchedVehicle == null && normalizedPlate != null) {
@@ -1224,26 +1249,15 @@ public class BookingServiceImpl implements BookingService {
                         bookingAssignedStaffRepository.save(assignedStaff);
                 }
 
-                if (booking.getUsedPoints() != null && booking.getUsedPoints() > 0
-                                && !"CHECKED_IN".equals(status)) {
-                        customerLoyaltyRepository.findByCustomerId(booking.getCustomerId())
-                                        .ifPresent(loyalty -> {
-                                                loyalty.setAvailablePoints(
-                                                                loyalty.getAvailablePoints() + booking.getUsedPoints());
-                                                loyalty.setRedeemedPoints(
-                                                                Math.max(0, loyalty.getRedeemedPoints()
-                                                                                - booking.getUsedPoints()));
-                                                customerLoyaltyRepository.save(loyalty);
-                                        });
-                }
-
                 booking.setStatus("CANCELED");
                 booking.setNote(reason != null ? reason : booking.getNote());
                 booking.setRewardProcessed(false);
 
                 Booking saved = bookingRepository.save(booking);
-                // Hoàn điểm nếu có
-                loyaltyService.refundPointsForCanceledBooking(saved.getId());
+                // Hoàn điểm nếu có — không hoàn khi đã CHECKED_IN (điểm bị giữ làm phí)
+                if (!"CHECKED_IN".equals(status)) {
+                        loyaltyService.refundPointsForCanceledBooking(saved.getId());
+                }
                 return toResponse(saved);
         }
 

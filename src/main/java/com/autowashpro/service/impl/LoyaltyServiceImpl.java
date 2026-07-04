@@ -287,7 +287,8 @@ String newTier = newTierHolder[0];
 
         Integer basePoints = pkg.getPointsEarned();
         if (basePoints == null || basePoints <= 0) {
-            basePoints = finalPrice
+            // fallback dùng originalPrice để tránh double-discount (finalPrice đã trừ loyalty rồi)
+            basePoints = originalPrice
                     .divide(BigDecimal.valueOf(10000), 0, RoundingMode.DOWN)
                     .intValue();
         }
@@ -427,21 +428,45 @@ String newTier = newTierHolder[0];
         int availablePoints = loyalty.getAvailablePoints();
         int requestedPoints = request.getPoints();
 
-        int validPoints = Math.min(requestedPoints, availablePoints);
-        validPoints = (validPoints / 10) * 10;
-        validPoints = Math.max(0, validPoints);
-
-        BigDecimal discountAmount = BigDecimal.valueOf(validPoints * 1000L);
-
-        BigDecimal originalPrice = pkg.getBasePrice();
-        if (discountAmount.compareTo(originalPrice) > 0) {
-            discountAmount = originalPrice;
-            validPoints = originalPrice.divide(BigDecimal.valueOf(1000), RoundingMode.DOWN).intValue();
-            validPoints = (validPoints / 10) * 10;
-            discountAmount = BigDecimal.valueOf(validPoints * 1000L);
+        if (requestedPoints > availablePoints) {
+            throw new RuntimeException("Bạn không đủ điểm khả dụng để đổi.");
         }
 
-        BigDecimal estimatedFinalPrice = originalPrice.subtract(discountAmount);
+        BigDecimal originalPrice = pkg.getBasePrice();
+        BigDecimal eligibleAmount = request.getSubtotalAfterPromotion() != null
+                ? request.getSubtotalAfterPromotion()
+                : originalPrice;
+
+        // max 50% of eligible amount AND final must remain >= 50,000đ
+        BigDecimal maxByPercent = eligibleAmount.multiply(BigDecimal.valueOf(0.5));
+        BigDecimal maxByMinPayable = eligibleAmount.subtract(BigDecimal.valueOf(50000));
+        BigDecimal maxDiscount = maxByPercent.min(maxByMinPayable);
+        if (maxDiscount.compareTo(BigDecimal.ZERO) < 0) maxDiscount = BigDecimal.ZERO;
+
+        int maxPoints = maxDiscount.divide(BigDecimal.valueOf(1000), RoundingMode.DOWN).intValue();
+        maxPoints = (maxPoints / 10) * 10;
+
+        int validPoints = (requestedPoints / 10) * 10;
+        validPoints = Math.max(0, validPoints);
+
+        String message = null;
+        if (validPoints > maxPoints) {
+            validPoints = maxPoints;
+            if (validPoints == 0) {
+                message = String.format(
+                    "Không thể áp dụng điểm loyalty. Giá trị đơn sau khuyến mãi (%.0fđ) quá thấp hoặc không đủ để áp dụng tối thiểu 10 điểm.",
+                    eligibleAmount.doubleValue()
+                );
+            } else {
+                message = String.format(
+                    "Chỉ áp dụng tối đa %d điểm (giảm tối đa 50%% và giữ tổng thanh toán ≥ 50.000đ).",
+                    validPoints
+                );
+            }
+        }
+
+        BigDecimal discountAmount = BigDecimal.valueOf(validPoints * 1000L);
+        BigDecimal estimatedFinalPrice = eligibleAmount.subtract(discountAmount);
 
         return RedeemPreviewResponse.builder()
                 .requestedPoints(requestedPoints)
@@ -449,6 +474,7 @@ String newTier = newTierHolder[0];
                 .discountAmount(discountAmount)
                 .originalPrice(originalPrice)
                 .estimatedFinalPrice(estimatedFinalPrice)
+                .message(message)
                 .build();
     }
 }

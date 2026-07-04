@@ -24,6 +24,15 @@ export const loyaltyApi = {
     })
     return unwrap(response)
   },
+
+  async redeemPreview({ servicePackageId, points, subtotalAfterPromotion }) {
+    const response = await api.post('/loyalty/redeem-preview', {
+      servicePackageId,
+      points,
+      ...(subtotalAfterPromotion != null ? { subtotalAfterPromotion } : {}),
+    })
+    return unwrap(response)
+  },
 }
 
 export default loyaltyApi

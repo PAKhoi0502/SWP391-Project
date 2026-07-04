@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { loyaltyApi } from '../../api/loyaltyApi'
+import LoyaltyTransactionsModal from './LoyaltyTransactionsModal'
 import './LoyaltyPointsCard.css'
 
 const TIER_META = {
@@ -28,6 +29,7 @@ export default function LoyaltyPointsCard() {
   const [tierRules, setTierRules] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [txModalOpen, setTxModalOpen] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -71,6 +73,13 @@ export default function LoyaltyPointsCard() {
             <span>{tierMeta.label}</span>
           </div>
         </div>
+        <button
+          type="button"
+          className="lpc-history-btn"
+          onClick={() => setTxModalOpen(true)}
+        >
+          Xem lịch sử điểm
+        </button>
       </div>
 
       <div className="lpc-points-row">
@@ -141,6 +150,8 @@ export default function LoyaltyPointsCard() {
           </div>
         </>
       )}
+
+      <LoyaltyTransactionsModal open={txModalOpen} onClose={() => setTxModalOpen(false)} />
     </div>
   )
 }
