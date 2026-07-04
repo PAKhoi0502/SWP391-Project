@@ -48,12 +48,13 @@ public class WashHistoryController {
     public ApiResponse<Page<WashHistoryResponse>> getAdminWashHistories(
             @RequestParam(required = false) Long garageId,
             @RequestParam(required = false) Long customerId,
+            @RequestParam(required = false) String customerName,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int limit) {
         return ApiResponse.<Page<WashHistoryResponse>>builder()
                 .success(true)
                 .message("Wash histories retrieved successfully")
-                .data(washHistoryService.getAdminWashHistories(garageId, customerId, page, limit))
+                .data(washHistoryService.getAdminWashHistories(garageId, customerId, customerName, page, limit))
                 .build();
     }
 }

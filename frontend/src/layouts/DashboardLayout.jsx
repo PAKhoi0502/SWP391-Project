@@ -11,6 +11,7 @@ const NAV_ITEMS = {
     { to: '/customer/bookings', label: 'Lịch hẹn' },
     { to: '/customer/waitlist', label: 'Waitlist' },
     { to: '/customer/booking-history', label: 'Booking History' },
+    { to: '/customer/wash-histories', label: 'Lịch sử rửa xe' },
     { to: '/customer/vehicles', label: 'Xe của tôi' },
     { to: '/customer/profile', label: 'Hồ sơ' },
   ],
@@ -30,6 +31,7 @@ const NAV_ITEMS = {
     { to: '/admin/wash-bays', label: 'Wash Bays' },
     { to: '/admin/service-packages', label: 'Gói dịch vụ' },
     { to: '/admin/bookings', label: 'Booking' },
+    { to: '/admin/wash-histories', label: 'Lịch sử rửa xe' },
   ],
 }
 

@@ -11,5 +11,5 @@ public interface WashHistoryService {
 
     WashHistoryResponse getMyWashHistoryDetail(Long id, Long customerId);
 
-    Page<WashHistoryResponse> getAdminWashHistories(Long garageId, Long customerId, int page, int limit);
+    Page<WashHistoryResponse> getAdminWashHistories(Long garageId, Long customerId, String customerName, int page, int limit);
 }
