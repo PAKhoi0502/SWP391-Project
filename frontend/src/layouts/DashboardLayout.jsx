@@ -11,6 +11,7 @@ const NAV_ITEMS = {
     { to: '/customer/bookings', label: 'Lịch hẹn' },
     { to: '/customer/waitlist', label: 'Waitlist' },
     { to: '/customer/booking-history', label: 'Booking History' },
+    { to: '/customer/promotions', label: 'Ưu đãi' },
     { to: '/customer/vehicles', label: 'Xe của tôi' },
     { to: '/customer/profile', label: 'Hồ sơ' },
   ],
