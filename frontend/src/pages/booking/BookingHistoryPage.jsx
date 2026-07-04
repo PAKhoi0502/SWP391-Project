@@ -187,14 +187,27 @@ const isCanceledStatus = (status) => {
 
 const isNoShowStatus = (status) => String(status || '').toUpperCase() === 'NO_SHOW'
 
-const buildCustomerBookingNumberMap = (items) => {
-  const map = new Map()
+const getCurrentUserId = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}')
+    return String(user?.id || user?.userId || user?.customerId || '')
+  } catch {
+    return ''
+  }
+}
 
-    ;[...items]
-      .sort((left, right) => Number(getBookingId(left) || 0) - Number(getBookingId(right) || 0))
-      .forEach((booking, index) => {
-        map.set(String(getBookingId(booking)), index + 1)
-      })
+const buildCustomerBookingNumberMap = (items) => {
+  const currentUserId = getCurrentUserId()
+  const ownItems = currentUserId
+    ? items.filter((b) => String(b?.customerId || '') === currentUserId)
+    : items
+
+  const map = new Map()
+  ;[...ownItems]
+    .sort((left, right) => Number(getBookingId(left) || 0) - Number(getBookingId(right) || 0))
+    .forEach((booking, index) => {
+      map.set(String(getBookingId(booking)), index + 1)
+    })
 
   return map
 }
@@ -449,7 +462,8 @@ export default function BookingHistoryPage() {
           setMessage(`Booking đã hủy. Nếu điểm đã được trừ, hệ thống sẽ hoàn lại ${usedPoints} điểm.`)
         }
       } else {
-        setMessage(`Đã hủy booking #${bookingId}.`)
+        const cancelNo = customerBookingNumberMap.get(String(bookingId)) ?? bookingId
+        setMessage(`Đã hủy lịch hẹn #${cancelNo}.`)
       }
     } catch (error) {
       setMessage(error?.response?.data?.message || error.message || 'Không thể hủy booking.')
@@ -534,7 +548,7 @@ export default function BookingHistoryPage() {
         <section className="booking-history-list">
           {filteredBookings.map((booking) => {
             const bookingId = getBookingId(booking)
-            const customerBookingNo = customerBookingNumberMap.get(String(bookingId)) || bookingId
+            const customerBookingNo = customerBookingNumberMap.get(String(bookingId)) ?? bookingId
             const paymentStatus = String(booking?.paymentStatus || '').toUpperCase()
             const status = String(booking?.status || '').toUpperCase()
             const canCancel = status === 'CONFIRMED' || status === 'PENDING_DEPOSIT'

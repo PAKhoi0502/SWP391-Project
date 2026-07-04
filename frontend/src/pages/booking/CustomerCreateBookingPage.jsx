@@ -400,9 +400,10 @@ export default function CustomerCreateBookingPage() {
         selectedPackage?.packageId ??
         selectedPackage?.id
 
-      const result = await customerBookingFlowApi.redeemPreview({
+      const result = await loyaltyApi.redeemPreview({
         servicePackageId: Number(packageId),
         points,
+        subtotalAfterPromotion: priceSummary.subtotal - priceSummary.promotionDiscount,
       })
 
       setLoyaltyPreview(result)
@@ -410,16 +411,18 @@ export default function CustomerCreateBookingPage() {
       const validPoints = result?.validPoints ?? 0
       const discountAmount = result?.discountAmount ?? 0
 
-      if (validPoints < points) {
-        setMessage(
-          `Chỉ áp dụng được ${validPoints} điểm (giảm ${formatMoney(discountAmount)}). Điểm hợp lệ phải là bội số của 10 và không vượt quá điểm khả dụng.`,
-        )
+      if (result?.message) {
+        setMessage(result.message)
+      } else if (validPoints < points) {
+        setMessage(`Chỉ áp dụng được ${validPoints} điểm (giảm ${formatMoney(discountAmount)}).`)
       } else {
-        setMessage(`Áp dụng ${validPoints} điểm — giảm ${formatMoney(discountAmount)}.`)
+        setMessage(`Áp dụng ${validPoints} điểm, giảm ${formatMoney(discountAmount)}.`)
       }
     } catch (error) {
       setLoyaltyPreview(null)
-      setMessage(error?.response?.data?.message || error.message || 'Không thể tính thử điểm loyalty.')
+      const errMsg = error?.response?.data?.message || error?.message || ''
+      const isInsufficient = /insufficient|not enough|không đủ|khong du/i.test(errMsg)
+      setMessage(isInsufficient ? 'Bạn không đủ điểm khả dụng để đổi.' : (errMsg || 'Không thể tính thử điểm loyalty.'))
     }
   }
 
@@ -513,9 +516,16 @@ export default function CustomerCreateBookingPage() {
       return
     }
 
-    if (Number(loyaltyPoints || 0) > 0 && loyaltyPreview === null) {
-      setMessage('Bạn đã nhập điểm loyalty nhưng chưa bấm "Tính thử". Vui lòng bấm "Tính thử" trước khi xác nhận đặt lịch.')
-      return
+    const enteredPoints = Number(loyaltyPoints || 0)
+    if (enteredPoints > 0) {
+      if (loyaltyPreview === null) {
+        setMessage('Bạn đã nhập điểm loyalty nhưng chưa bấm "Tính thử". Vui lòng bấm "Tính thử" trước khi xác nhận đặt lịch.')
+        return
+      }
+      if ((loyaltyPreview.validPoints ?? 0) <= 0) {
+        setMessage('Không thể áp dụng số điểm này. Vui lòng xóa điểm hoặc nhập lại và bấm "Tính thử".')
+        return
+      }
     }
 
     try {
@@ -543,7 +553,7 @@ export default function CustomerCreateBookingPage() {
         servicePackageId: packageId,
         startTime,
         promotionCode: promotionCode.trim() || null,
-        usedPoints: loyaltyPreview?.validPoints ?? Number(loyaltyPoints || 0),
+        usedPoints: loyaltyPreview?.validPoints ?? 0,
         paymentMethod,
         note:
           paymentMethod === 'BANK_TRANSFER'
