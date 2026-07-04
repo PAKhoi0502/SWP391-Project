@@ -6,6 +6,7 @@ import com.autowashpro.dto.request.WalkInBookingCreateRequest;
 import com.autowashpro.dto.response.AvailableSlotResponse;
 import com.autowashpro.dto.response.BookingResponse;
 import com.autowashpro.dto.response.BookingSummaryResponse;
+import com.autowashpro.dto.response.WalkInCustomerLookupResponse;
 import com.autowashpro.service.BookingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,11 +23,11 @@ import com.autowashpro.dto.request.CancelBookingRequest;
 import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
 import com.autowashpro.dto.request.CompleteServiceRequest;
 import com.autowashpro.dto.request.MarkBookingPaidRequest;
+import com.autowashpro.dto.request.UpdatePaymentMethodRequest;
 import com.autowashpro.dto.request.NoShowBookingRequest;
 import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
 import com.autowashpro.dto.response.BookingServiceStepResponse;
 import org.springframework.security.core.Authentication;
-import com.autowashpro.dto.request.MarkBookingPaidRequest;
 
 @RestController
 @RequestMapping("/bookings")
@@ -40,12 +41,13 @@ public class BookingController {
                         @RequestParam("garage_id") Long garageId,
                         @RequestParam("service_package_id") Long servicePackageId,
                         @RequestParam("vehicle_type") String vehicleType,
-                        @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+                        @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                        @RequestParam(value = "is_walk_in", required = false, defaultValue = "false") boolean isWalkIn) {
 
                 return ApiResponse.<AvailableSlotResponse>builder()
                                 .success(true)
                                 .message("Available slots retrieved")
-                                .data(bookingService.getAvailableSlots(garageId, servicePackageId, vehicleType, date))
+                                .data(bookingService.getAvailableSlots(garageId, servicePackageId, vehicleType, date, isWalkIn))
                                 .build();
         }
 
@@ -74,6 +76,19 @@ public class BookingController {
                                 .success(true)
                                 .message("Walk-in booking created successfully")
                                 .data(bookingService.createWalkInBooking(request, staffUserId))
+                                .build();
+        }
+
+        @GetMapping("/walk-in/customer-lookup")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<WalkInCustomerLookupResponse> lookupWalkInCustomer(
+                        @RequestParam String phone,
+                        @RequestParam(required = false) String licensePlate) {
+
+                return ApiResponse.<WalkInCustomerLookupResponse>builder()
+                                .success(true)
+                                .message("Walk-in customer lookup completed")
+                                .data(bookingService.lookupWalkInCustomerByPhone(phone, licensePlate))
                                 .build();
         }
 
@@ -346,6 +361,32 @@ public class BookingController {
                                 .message("Booking marked as paid successfully")
                                 .data(
                                                 bookingService.markBookingPaid(
+                                                                id,
+                                                                staffUserId,
+                                                                role,
+                                                                request))
+                                .build();
+        }
+
+        @PatchMapping("/{id}/update-payment-method")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> updatePaymentMethod(
+                        @PathVariable Long id,
+                        @Valid @RequestBody UpdatePaymentMethodRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+
+                String role = userDetails.getAuthorities()
+                                .iterator()
+                                .next()
+                                .getAuthority();
+
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true)
+                                .message("Payment method updated successfully")
+                                .data(
+                                                bookingService.updatePaymentMethod(
                                                                 id,
                                                                 staffUserId,
                                                                 role,

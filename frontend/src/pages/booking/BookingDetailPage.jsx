@@ -5,9 +5,16 @@ import { vehicleInspectionApi } from '../../api/vehicleInspectionApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
 import { garageService } from '../../services/garageService'
 import { getServicePackageById, getPackageName } from '../../services/servicePackageApi'
+import { staffProfileService } from '../../services/staffProfileService'
 import { userService } from '../../services/userService'
 import { vehicleService } from '../../services/vehicleService'
+import { getWashBayById } from '../../services/washBayApi'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
+import CheckInBookingModal from '../../components/Booking/CheckInBookingModal'
+import CompleteServiceModal from '../../components/Booking/CompleteServiceModal'
+import PaymentCollectionModal from '../../components/Booking/PaymentCollectionModal'
+import ServiceStepsProgress from '../../components/Booking/ServiceStepsProgress'
+import StartServiceModal from '../../components/Booking/StartServiceModal'
 import './BookingHistoryPage.css'
 
 const BOOKING_CACHE_PREFIX = 'booking-detail-cache-'
@@ -79,20 +86,33 @@ const TEXT = {
   closedBooking: 'Booking \u0111\u00e3 \u0111\u00f3ng n\u00ean kh\u00f4ng th\u1ec3 c\u1eadp nh\u1eadt check-in ho\u1eb7c status.',
   staffProfileMissing: 'T\u00e0i kho\u1ea3n n\u00e0y ch\u01b0a c\u00f3 h\u1ed3 s\u01a1 nh\u00e2n vi\u00ean (StaffProfile), n\u00ean backend kh\u00f4ng cho c\u1eadp nh\u1eadt booking. H\u00e3y g\u1eafn StaffProfile v\u00e0 garage cho user n\u00e0y.',
   updateBooking: 'C\u1eadp nh\u1eadt booking',
+  checkInBooking: 'Check-in booking',
+  confirmCheckIn: 'X\u00e1c nh\u1eadn check-in booking n\u00e0y?',
+  checkInNote: 'Ghi ch\u00fa check-in (t\u00f9y ch\u1ecdn)',
+  checkInSuccess: 'Check-in booking th\u00e0nh c\u00f4ng.',
   cancelBooking: 'H\u1ee7y booking',
   markNoShow: '\u0110\u00e1nh d\u1ea5u no-show',
   createQr: 'T\u1ea1o QR PayOS',
   timeline: 'Ti\u1ebfn tr\u00ecnh booking',
   serviceSteps: 'C\u00e1c b\u01b0\u1edbc d\u1ecbch v\u1ee5',
   serviceStepsEmpty: 'G\u00f3i d\u1ecbch v\u1ee5 ch\u01b0a c\u00f3 m\u00f4 t\u1ea3 b\u01b0\u1edbc x\u1eed l\u00fd.',
-  inspections: 'Ki\u1ec3m tra xe',
   booked: '\u0110\u1eb7t l\u1ecbch',
   paid: '\u0110\u00e3 thanh to\u00e1n',
+  startService: 'B\u1eaft \u0111\u1ea7u d\u1ecbch v\u1ee5',
+  startServiceSuccess: 'B\u1eaft \u0111\u1ea7u d\u1ecbch v\u1ee5 th\u00e0nh c\u00f4ng.',
+  completeService: 'Ho\u00e0n th\u00e0nh d\u1ecbch v\u1ee5',
+  completeServiceSuccess: 'D\u1ecbch v\u1ee5 \u0111\u00e3 ho\u00e0n th\u00e0nh.',
+  resources: 'T\u00e0i nguy\u00ean \u0111\u01b0\u1ee3c g\u00e1n',
+  washBay: 'Bay r\u1eeda',
+  washBayType: 'Lo\u1ea1i bay',
+  careStaff: 'Nh\u00e2n vi\u00ean ph\u1ee5 tr\u00e1ch',
+  careStaffNone: 'Kh\u00f4ng y\u00eau c\u1ea7u nh\u00e2n vi\u00ean ph\u1ee5 tr\u00e1ch',
+  careStaffPending: 'Ch\u01b0a \u0111\u01b0\u1ee3c g\u00e1n',
 }
 
 const INSPECTION_LABELS = {
-  BEFORE_WASH: 'Tr\u01b0\u1edbc khi r\u1eeda',
-  AFTER_WASH: 'Sau khi r\u1eeda',
+  BEFORE_WASH: 'Tr\u01b0\u1edbc khi s\u1eed d\u1ee5ng d\u1ecbch v\u1ee5',
+  AFTER_WASH: 'Sau khi s\u1eed d\u1ee5ng d\u1ecbch v\u1ee5',
 }
 
 const blankInspectionForm = {
@@ -185,7 +205,6 @@ const mergeBookingWithCache = (bookingId, detail) => {
       'paymentStatus',
       'paymentMethod',
       'checkedInAt',
-      'manualCheckedInAt',
       'startedAt',
       'completedAt',
       'paidAt',
@@ -256,6 +275,31 @@ const getActionErrorMessage = (err) => {
   return message
 }
 
+const getStartServiceErrorMessage = (err) => {
+  const msg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
+  if (msg.includes('wash bay')) return 'Không còn wash bay trống.'
+  if (msg.includes('care staff') || msg.includes('not enough staff')) return 'Không đủ nhân viên phụ trách.'
+  if (msg.includes('checked-in') || msg.includes('check-in') || msg.includes('only checked')) {
+    return 'Chỉ booking đã check-in mới có thể bắt đầu dịch vụ.'
+  }
+  return getActionErrorMessage(err) || 'Bắt đầu dịch vụ thất bại.'
+}
+
+const getCompleteServiceErrorMessage = (err) => {
+  const msg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
+  if (msg.includes('in_progress') || msg.includes('only in_progress') || msg.includes('only in progress')) {
+    return 'Chỉ booking đang thực hiện mới có thể hoàn thành dịch vụ.'
+  }
+  if (msg.includes('step') && (msg.includes('not completed') || msg.includes('incomplete') || msg.includes('not all'))) {
+    return 'Vui lòng hoàn thành tất cả bước dịch vụ trước khi hoàn thành booking.'
+  }
+  if (msg.includes('not found') || msg.includes('404')) return 'Không tìm thấy booking.'
+  if (msg.includes('unauthorized') || msg.includes('forbidden') || msg.includes('403')) {
+    return 'Bạn không có quyền thực hiện thao tác này.'
+  }
+  return err?.response?.data?.message || err?.message || 'Hoàn thành dịch vụ thất bại.'
+}
+
 const isStaffProfileError = (err) => {
   const message = err?.response?.data?.message || err?.message || ''
   return message.toLowerCase().includes('staff profile')
@@ -303,13 +347,10 @@ const getName = (item) =>
   item?.email ||
   ''
 
-const getVehicleName = (vehicle, booking) => {
-  if (booking?.licensePlate) return booking.licensePlate
-  if (vehicle?.rawLicensePlate) return vehicle.rawLicensePlate
-  if (vehicle?.normalizedLicensePlate) return vehicle.normalizedLicensePlate
-
-  const vehicleName = [vehicle?.brand, vehicle?.model].filter(Boolean).join(' ').trim()
-  return vehicleName
+const getVehicleName = (vehicle) => {
+  const brand = vehicle?.brand && vehicle.brand !== 'Không rõ' ? vehicle.brand.trim() : ''
+  const model = vehicle?.model && vehicle.model !== 'Không rõ' ? vehicle.model.trim() : ''
+  return [brand, model].filter(Boolean).join(' ') || null
 }
 
 const formatNamedValue = (name, id, fallback = 'N/A') => {
@@ -322,6 +363,66 @@ const formatNamedValue = (name, id, fallback = 'N/A') => {
       {safeId && <small>{safeId}</small>}
     </span>
   )
+}
+
+const unwrapResourcePayload = (payload) => payload?.data?.data || payload?.data || payload || null
+
+const getVehicleTypeText = (value) => {
+  const normalized = String(value || '').toUpperCase()
+  if (normalized === 'CAR') return '\u00d4 t\u00f4'
+  if (normalized.includes('BIKE') || normalized.includes('MOTOR')) return 'Xe m\u00e1y'
+  return value || ''
+}
+
+const formatWashBayResource = (payload, id) => {
+  const washBay = unwrapResourcePayload(payload)
+  const label = washBay?.bayCode || washBay?.code || washBay?.name || `Bay #${id}`
+  const typeLabel = getVehicleTypeText(washBay?.vehicleType)
+
+  return {
+    washBayLabel: label,
+    washBayTypeLabel: typeLabel,
+  }
+}
+
+const formatCareStaffResource = (payload, id) => {
+  const staff = unwrapResourcePayload(payload)
+  const name = staff?.userFullName || staff?.fullName || staff?.name || staff?.staffCode || 'Nh\u00e2n vi\u00ean'
+  const code = staff?.staffCode && staff?.staffCode !== name ? ` - ${staff.staffCode}` : ''
+
+  return `${name}${code} #${staff?.id || id}`
+}
+
+const resolveAssignedResources = async (source = {}) => {
+  const washBayId = source?.washBayId
+  const assignedCareStaffIds = Array.isArray(source?.assignedCareStaffIds)
+    ? source.assignedCareStaffIds.filter(Boolean)
+    : []
+  const resources = {}
+
+  if (washBayId) {
+    try {
+      Object.assign(resources, formatWashBayResource(await getWashBayById(washBayId), washBayId))
+    } catch {
+      resources.washBayLabel = `Bay #${washBayId}`
+    }
+    resources.washBayId = washBayId
+  }
+
+  if (assignedCareStaffIds.length > 0) {
+    const staffResults = await Promise.allSettled(
+      assignedCareStaffIds.map((staffId) => staffProfileService.get(staffId)),
+    )
+
+    resources.assignedCareStaffIds = assignedCareStaffIds
+    resources.careStaffLabels = staffResults.map((result, index) =>
+      result.status === 'fulfilled'
+        ? formatCareStaffResource(result.value, assignedCareStaffIds[index])
+        : `Nh\u00e2n vi\u00ean #${assignedCareStaffIds[index]}`,
+    )
+  }
+
+  return resources
 }
 
 const getFirstValue = (item, keys = []) => {
@@ -388,6 +489,20 @@ const getInspectionTypes = (booking) => {
 
 const getInspectionByType = (items, type) => items.find((item) => String(item?.type || '').toUpperCase() === type)
 
+const getStepInspectionType = (step, allSteps, booking) => {
+  if (!Array.isArray(allSteps) || allSteps.length === 0) return null
+
+  const orders = allSteps.map((item) => Number(item.stepOrder || item.order || 0))
+  const minOrder = Math.min(...orders)
+  const maxOrder = Math.max(...orders)
+  const stepOrder = Number(step.stepOrder || step.order || 0)
+  const types = getInspectionTypes(booking)
+
+  if (stepOrder === minOrder && types.includes('BEFORE_WASH')) return 'BEFORE_WASH'
+  if (stepOrder === maxOrder && maxOrder !== minOrder && types.includes('AFTER_WASH')) return 'AFTER_WASH'
+  return null
+}
+
 const buildInspectionForms = (booking, items) =>
   getInspectionTypes(booking).reduce((forms, type) => {
     const inspection = getInspectionByType(items, type)
@@ -405,7 +520,7 @@ const buildInspectionForms = (booking, items) =>
 const getTimelineItems = (booking) => {
   const status = String(booking?.status || '').toUpperCase()
   const paymentStatus = String(booking?.paymentStatus || '').toUpperCase()
-  const checkedInAt = booking?.manualCheckedInAt || booking?.checkedInAt
+  const checkedInAt = booking?.checkedInAt
   const isCanceled = status === 'CANCELED' || status === 'CANCELLED'
   const isNoShow = status === 'NO_SHOW'
 
@@ -452,11 +567,8 @@ const getTimelineItems = (booking) => {
 }
 
 const getCheckInDisplay = (booking) => {
-  if (booking?.manualCheckedInAt) return formatDateTime(booking.manualCheckedInAt)
   if (booking?.checkedInAt) return formatDateTime(booking.checkedInAt)
-
-  const match = String(booking?.note || '').match(/Check-in time:\s*([0-9]{1,2}:[0-9]{2}\s*(?:AM|PM))/i)
-  return match?.[1] || TEXT.notUpdated
+  return TEXT.notUpdated
 }
 
 const persistPayOSReturnPath = (path, result) => {
@@ -472,33 +584,6 @@ const persistPayOSReturnPath = (path, result) => {
   }
 }
 
-const parseTimeInputValue = (value) => {
-  if (!value) return { hour: '', minute: '', period: 'AM' }
-  const [rawHour, minute] = value.split(':')
-  const hour24 = Number(rawHour)
-  const period = hour24 >= 12 ? 'PM' : 'AM'
-  const hour12 = hour24 % 12 || 12
-  return {
-    hour: String(hour12).padStart(2, '0'),
-    minute,
-    period,
-  }
-}
-
-const buildManualCheckedInAt = (booking, hour, minute, period) => {
-  if (!booking?.startTime || !hour || !minute) return ''
-
-  const date = new Date(booking.startTime)
-  if (Number.isNaN(date.getTime())) return ''
-
-  let nextHour = Number(hour)
-  if (period === 'PM' && nextHour < 12) nextHour += 12
-  if (period === 'AM' && nextHour === 12) nextHour = 0
-
-  date.setHours(nextHour, Number(minute), 0, 0)
-  return date.toISOString()
-}
-
 const getCustomerBookingNumber = (items, bookingId) => {
   const sorted = [...toArray(items)].sort((left, right) => Number(left?.id || 0) - Number(right?.id || 0))
   const index = sorted.findIndex((item) => String(item?.id) === String(bookingId))
@@ -510,23 +595,36 @@ function BookingDetailPage() {
   const location = useLocation()
   const [booking, setBooking] = useState(null)
   const [selectedStatus, setSelectedStatus] = useState('CONFIRMED')
-  const [checkInHour, setCheckInHour] = useState('')
-  const [checkInMinute, setCheckInMinute] = useState('')
-  const [checkInPeriod, setCheckInPeriod] = useState('AM')
-  const [timePickerOpen, setTimePickerOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState('')
   const [actionMessage, setActionMessage] = useState('')
   const [inspections, setInspections] = useState([])
   const [inspectionForms, setInspectionForms] = useState({})
-  const [inspectionLoading, setInspectionLoading] = useState(false)
   const [inspectionSavingType, setInspectionSavingType] = useState('')
   const [inspectionMessage, setInspectionMessage] = useState('')
   const [inspectionError, setInspectionError] = useState('')
   const [customerBookingNo, setCustomerBookingNo] = useState(null)
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
+  const [checkInModalOpen, setCheckInModalOpen] = useState(false)
+  const [checkInLoading, setCheckInLoading] = useState(false)
+  const [checkInError, setCheckInError] = useState('')
+  const [startServiceModalOpen, setStartServiceModalOpen] = useState(false)
+  const [startServiceLoading, setStartServiceLoading] = useState(false)
+  const [startServiceError, setStartServiceError] = useState('')
+  const [completeServiceModalOpen, setCompleteServiceModalOpen] = useState(false)
+  const [completeServiceLoading, setCompleteServiceLoading] = useState(false)
+  const [completeServiceError, setCompleteServiceError] = useState('')
+  const [paymentCollectionOpen, setPaymentCollectionOpen] = useState(false)
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false)
+  const [cashPayLoading, setCashPayLoading] = useState(false)
+  const [cashPayError, setCashPayError] = useState('')
+  const [payosLoading, setPayosLoading] = useState(false)
+  const [assignedResources, setAssignedResources] = useState(null)
+  const [serviceSteps, setServiceSteps] = useState([])
+  const [stepActionLoadingId, setStepActionLoadingId] = useState(null)
+  const [stepActionError, setStepActionError] = useState('')
 
   const role = location.pathname.startsWith('/admin')
     ? 'admin'
@@ -555,15 +653,14 @@ function BookingDetailPage() {
   const isCashPayment = paymentMethod === 'CASH' || paymentNote.includes('tien mat')
   const paymentMethodText = isBankTransfer ? TEXT.bankTransfer : isCashPayment ? TEXT.cash : TEXT.notUpdated
   const isPaid = String(booking?.paymentStatus || '').toUpperCase() === 'PAID'
-  const canCreatePayOS = role !== 'customer' && currentStatus === 'COMPLETED' && !isPaid
+  const canCreatePayOS = role !== 'customer' && currentStatus === 'COMPLETED' && !isPaid && isBankTransfer
   const canMarkNoShow = canEditBooking && currentStatus === 'CONFIRMED'
   const canCheckIn = canEditBooking && currentStatus === 'CONFIRMED'
-  const canEditCheckInTime =
-    canEditBooking && ['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'].includes(currentStatus)
-  const hasCheckInTime = canEditCheckInTime && Boolean(checkInHour && checkInMinute)
-  const checkInTime = hasCheckInTime ? `${checkInHour}:${checkInMinute} ${checkInPeriod}` : ''
+  const canStartService = canEditBooking && currentStatus === 'CHECKED_IN'
+  const canCompleteService = canEditBooking && currentStatus === 'IN_PROGRESS'
+  const canOpenPaymentCollection = role !== 'customer' && currentStatus === 'COMPLETED' && !isPaid
   const statusChanged = canEditBooking && selectedStatus !== workflowStatus
-  const hasPendingUpdate = canEditBooking && (hasCheckInTime || statusChanged)
+  const hasPendingUpdate = canEditBooking && statusChanged
   const workflowStatusOptions = getWorkflowStatusOptions(workflowStatus)
   const displayBookingNo = role === 'customer' ? customerBookingNo || id : id
 
@@ -572,13 +669,14 @@ function BookingDetailPage() {
 
     const enriched = mergeBookingWithCache(detail.id, detail)
 
-    const [customerResult, vehicleResult, garageResult, packageResult, transactionsResult, serviceStepsResult] = await Promise.allSettled([
+    const [customerResult, vehicleResult, garageResult, packageResult, transactionsResult, serviceStepsResult, bookingDetailResult] = await Promise.allSettled([
       enriched.customerId ? userService.getUser(enriched.customerId) : Promise.resolve(null),
       role === 'admin' && enriched.vehicleId ? vehicleService.adminList({ customerId: enriched.customerId }) : Promise.resolve([]),
       garageService.list(),
       enriched.servicePackageId ? getServicePackageById(enriched.servicePackageId) : Promise.resolve(null),
       bookingApi.getPaymentTransactions(enriched.id),
       bookingApi.getBookingServiceSteps(enriched.id),
+      role !== 'customer' && enriched.id ? bookingApi.getCustomerBookingDetail(enriched.id) : Promise.resolve(null),
     ])
 
     if (customerResult.status === 'fulfilled' && customerResult.value) {
@@ -590,7 +688,9 @@ function BookingDetailPage() {
     if (vehicleResult.status === 'fulfilled') {
       const vehicles = toArray(vehicleResult.value)
       const vehicle = vehicles.find((item) => String(item.id) === String(enriched.vehicleId))
-      enriched.vehicleName = getVehicleName(vehicle, enriched)
+      if (vehicle) {
+        enriched.vehicleName = getVehicleName(vehicle)
+      }
     }
 
     if (garageResult.status === 'fulfilled') {
@@ -604,9 +704,31 @@ function BookingDetailPage() {
       enriched.servicePackageType = packageResult.value.serviceType || packageResult.value.packageType || packageResult.value.type
       enriched.servicePackageDescription = packageResult.value.description || ''
       enriched.servicePackageSteps = normalizeServiceSteps(getPackageStepSource(packageResult.value))
+      enriched.requiresCareStaff = Boolean(packageResult.value.requiresCareStaff)
+      enriched.careStaffRequiredCount = packageResult.value.careStaffRequiredCount || 0
+      enriched.careStaffType = packageResult.value.careStaffType || ''
     }
 
     enriched.addOnServicePackageNames = await resolveAddOnServicePackageNames(enriched.addOnServicePackageIds)
+
+    if (Array.isArray(enriched.addOnServicePackageIds) && enriched.addOnServicePackageIds.length > 0) {
+      const addOnPackages = await Promise.all(
+        enriched.addOnServicePackageIds.map((id) => getServicePackageById(id).catch(() => null)),
+      )
+      const addOnSteps = addOnPackages
+        .filter(Boolean)
+        .flatMap((pkg) => normalizeServiceSteps(getPackageStepSource(pkg)))
+
+      if (addOnSteps.length > 0) {
+        const mainSteps = enriched.servicePackageSteps || []
+        // Add-on steps go right before the final main step (handover),
+        // matching how the backend orders BookingServiceStep once service starts.
+        const merged = mainSteps.length > 0
+          ? [...mainSteps.slice(0, -1), ...addOnSteps, mainSteps[mainSteps.length - 1]]
+          : addOnSteps
+        enriched.servicePackageSteps = merged.map((step, index) => ({ ...step, order: index + 1 }))
+      }
+    }
 
     if (serviceStepsResult.status === 'fulfilled') {
       const bookingSteps = normalizeServiceSteps(toArray(serviceStepsResult.value))
@@ -636,10 +758,19 @@ function BookingDetailPage() {
       }
     }
 
+    if (!enriched.paymentMethod && bookingDetailResult.status === 'fulfilled' && bookingDetailResult.value?.paymentMethod) {
+      enriched.paymentMethod = bookingDetailResult.value.paymentMethod
+    }
+
     const inferredPaymentMethod = inferPaymentMethod(enriched)
     if (inferredPaymentMethod) {
       enriched.paymentMethod = enriched.paymentMethod || inferredPaymentMethod
       writeCachedPaymentMethod(enriched.id, inferredPaymentMethod)
+    }
+
+    const resolvedResources = await resolveAssignedResources(enriched)
+    if (Object.keys(resolvedResources).length > 0) {
+      Object.assign(enriched, resolvedResources)
     }
 
     writeCachedBooking(enriched.id, enriched)
@@ -650,7 +781,6 @@ function BookingDetailPage() {
     if (!detail?.id || role !== 'staff') return
 
     try {
-      setInspectionLoading(true)
       setInspectionError('')
       const items = await vehicleInspectionApi.listByBooking(detail.id)
       setInspections(items)
@@ -659,8 +789,6 @@ function BookingDetailPage() {
       setInspections([])
       setInspectionForms(buildInspectionForms(detail, []))
       setInspectionError(err?.response?.data?.message || err?.message || 'Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c inspection.')
-    } finally {
-      setInspectionLoading(false)
     }
   }
 
@@ -683,6 +811,17 @@ function BookingDetailPage() {
       const enrichedDetail = await enrichBookingDetail(detail)
       setBooking(enrichedDetail || null)
       await loadInspections(enrichedDetail)
+      setAssignedResources(
+        enrichedDetail?.washBayId || enrichedDetail?.assignedCareStaffIds?.length
+          ? {
+              washBayId: enrichedDetail.washBayId,
+              washBayLabel: enrichedDetail.washBayLabel,
+              washBayTypeLabel: enrichedDetail.washBayTypeLabel,
+              assignedCareStaffIds: enrichedDetail.assignedCareStaffIds || [],
+              careStaffLabels: enrichedDetail.careStaffLabels || [],
+            }
+          : null,
+      )
 
       if (role === 'customer') {
         const customerBookings = await bookingApi.getCustomerBookings().catch(() => [])
@@ -697,12 +836,27 @@ function BookingDetailPage() {
           ? normalizedStatus
           : 'CONFIRMED',
       )
+
+      const bookingId = detail?.id || id
+      bookingApi.getBookingServiceSteps(bookingId)
+        .then((raw) => setServiceSteps(Array.isArray(raw) ? raw : []))
+        .catch(() => {})
     } catch (err) {
       setBooking(null)
       setCustomerBookingNo(null)
+      setAssignedResources(null)
       setError(err?.response?.data?.message || err?.message || TEXT.loadError)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadServiceSteps = async () => {
+    try {
+      const raw = await bookingApi.getBookingServiceSteps(id)
+      setServiceSteps(Array.isArray(raw) ? raw : [])
+    } catch {
+      // fail silently — steps list just won't update
     }
   }
 
@@ -728,12 +882,15 @@ function BookingDetailPage() {
         : prev,
     )
 
+    // Show payment success modal when returning from PayOS
+    setCashPayError('')
+    setShowPaymentSuccess(true)
+    setPaymentCollectionOpen(true)
+
     if (isPaid) {
-      setActionMessage('\u0110\u00e3 thanh to\u00e1n PayOS th\u00e0nh c\u00f4ng.')
       return undefined
     }
 
-    setActionMessage('\u0110ang ki\u1ec3m tra tr\u1ea1ng th\u00e1i thanh to\u00e1n PayOS...')
     let retryCount = 0
     const timer = window.setInterval(() => {
       retryCount += 1
@@ -794,24 +951,6 @@ function BookingDetailPage() {
       let didStartService = currentStatus === 'IN_PROGRESS'
       const now = new Date().toISOString()
 
-      if (hasCheckInTime) {
-        if (currentStatus === 'CONFIRMED') {
-          await runBookingMutation(
-            () => bookingApi.checkInBooking(id, `Check-in time: ${checkInTime}`),
-            {
-              status: 'CHECKED_IN',
-              checkedInAt: buildManualCheckedInAt(booking, checkInHour, checkInMinute, checkInPeriod) || now,
-              note: `Check-in time: ${checkInTime}`,
-            },
-          )
-        }
-        writeCachedBooking(id, {
-          manualCheckedInAt: buildManualCheckedInAt(booking, checkInHour, checkInMinute, checkInPeriod),
-          note: `Check-in time: ${checkInTime}`,
-        })
-        didCheckIn = true
-      }
-
       if (statusChanged) {
         if (selectedStatus === 'CONFIRMED') {
           throw new Error(TEXT.noResetApi)
@@ -860,10 +999,17 @@ function BookingDetailPage() {
           }
           await runBookingMutation(
             () => bookingApi.completeService(id, 'Updated from booking detail'),
-            { status: 'COMPLETED', completedAt: now, note: 'Updated from booking detail' },
+            {
+              status: 'COMPLETED',
+              completedAt: now,
+              note: 'Updated from booking detail',
+              ...(isCashPayment ? { paymentStatus: 'PAID', paidAt: now } : {}),
+            },
           )
 
-          if (isCashPayment) {
+          // Walk-in CASH: backend auto-marks PAID in completeService.
+          // Online CASH: paymentMethod is null in DB, so call markBookingPaid here.
+          if (isCashPayment && !booking.isWalkIn) {
             const paidResult = await runBookingMutation(
               () => bookingApi.markBookingPaid(id, {
                 paymentMethod: 'CASH',
@@ -882,10 +1028,6 @@ function BookingDetailPage() {
         }
       }
 
-      setCheckInHour('')
-      setCheckInMinute('')
-      setCheckInPeriod('AM')
-      setTimePickerOpen(false)
     })
   }
 
@@ -931,6 +1073,188 @@ function BookingDetailPage() {
     }
   }
 
+  const handleDirectCheckIn = () => {
+    if (!canCheckIn) return
+    setCheckInError('')
+    setCheckInModalOpen(true)
+  }
+
+  const handleCheckInConfirm = async (note) => {
+    setCheckInLoading(true)
+    setCheckInError('')
+    try {
+      const result = await runBookingMutation(
+        () => bookingApi.checkInBooking(id, { note }),
+        {
+          status: 'CHECKED_IN',
+          note: note || booking?.note,
+        },
+      )
+      if (result?.id) {
+        writeCachedBooking(result.id, result)
+      }
+      setSelectedStatus('CHECKED_IN')
+      setCheckInModalOpen(false)
+      setActionMessage(TEXT.checkInSuccess)
+      await loadDetail()
+    } catch (err) {
+      setCheckInError(getActionErrorMessage(err) || `${TEXT.checkInBooking} ${TEXT.failed}`)
+    } finally {
+      setCheckInLoading(false)
+    }
+  }
+
+  const handleStartService = () => {
+    if (!canStartService) return
+    setStartServiceError('')
+    setStartServiceModalOpen(true)
+  }
+
+  const handleStartServiceConfirm = async (note) => {
+    setStartServiceLoading(true)
+    setStartServiceError('')
+    try {
+      const result = await bookingApi.startService(id, note)
+      if (result) {
+        const resources = await resolveAssignedResources(result)
+        if (Object.keys(resources).length > 0) setAssignedResources(resources)
+        if (result.id) writeCachedBooking(result.id, { ...result, ...resources })
+      }
+      setSelectedStatus('IN_PROGRESS')
+      setStartServiceModalOpen(false)
+      setActionMessage(TEXT.startServiceSuccess)
+      await loadDetail()
+    } catch (err) {
+      setStartServiceError(getStartServiceErrorMessage(err))
+    } finally {
+      setStartServiceLoading(false)
+    }
+  }
+
+  const handleCompleteService = () => {
+    if (!canCompleteService) return
+    setCompleteServiceError('')
+    setCompleteServiceModalOpen(true)
+  }
+
+  const handleCompleteServiceConfirm = async (note) => {
+    // Frontend guard: block if any step is still pending
+    const pendingSteps = serviceSteps.filter(
+      (s) => String(s.status || '').toUpperCase() !== 'COMPLETED',
+    )
+    if (serviceSteps.length > 0 && pendingSteps.length > 0) {
+      setCompleteServiceError(
+        `Vui lòng hoàn thành tất cả bước dịch vụ trước khi hoàn thành booking. Còn ${pendingSteps.length} bước chưa hoàn thành.`,
+      )
+      return
+    }
+
+    setCompleteServiceLoading(true)
+    setCompleteServiceError('')
+    try {
+      const result = await bookingApi.completeService(id, note)
+      setCompleteServiceModalOpen(false)
+      await loadDetail()
+      await loadServiceSteps()
+      const updatedPaymentStatus = String(result?.paymentStatus || '').toUpperCase()
+      if (updatedPaymentStatus === 'PAID') {
+        setActionMessage('Dịch vụ đã hoàn thành.')
+      } else {
+        setActionMessage('Dịch vụ đã hoàn thành. Vui lòng xử lý thanh toán.')
+      }
+      setCashPayError('')
+      setPaymentCollectionOpen(true)
+      setSelectedStatus('COMPLETED')
+    } catch (err) {
+      setCompleteServiceError(getCompleteServiceErrorMessage(err))
+    } finally {
+      setCompleteServiceLoading(false)
+    }
+  }
+
+  const handleCashPay = async (paymentMethod = 'CASH') => {
+    setCashPayLoading(true)
+    setCashPayError('')
+    try {
+      await bookingApi.markBookingPaid(id, { paymentMethod, note: '' })
+      writeCachedPaymentMethod(id, paymentMethod)
+    } catch (err) {
+      const errMsg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
+      // If backend already marked paid (auto-complete), treat as success
+      const alreadyPaid =
+        errMsg.includes('already paid') ||
+        errMsg.includes('da thanh toan') ||
+        (err?.response?.status === 400 && isPaid)
+      if (!alreadyPaid) {
+        setCashPayError(err?.response?.data?.message || err?.message || 'Xác nhận thanh toán thất bại.')
+        setCashPayLoading(false)
+        return
+      }
+    }
+    await loadDetail()
+    setShowPaymentSuccess(true)
+    setCashPayLoading(false)
+  }
+
+  const handlePayOSInModal = async () => {
+    setPayosLoading(true)
+    setCashPayError('')
+    try {
+      const result = await bookingApi.createPayOSPayment(id)
+      writeCachedPaymentMethod(id, booking?.paymentMethod || 'PAYOS')
+      if (result?.checkoutUrl) {
+        persistPayOSReturnPath(location.pathname, result)
+        window.location.assign(result.checkoutUrl)
+      }
+    } catch (err) {
+      setCashPayError(
+        err?.response?.data?.message || err?.message || 'Tạo thanh toán PayOS thất bại.',
+      )
+    } finally {
+      setPayosLoading(false)
+    }
+  }
+
+  const handleCompleteServiceStep = async (stepId, note) => {
+    setStepActionLoadingId(stepId)
+    setStepActionError('')
+    try {
+      await bookingApi.completeBookingServiceStep(stepId, note)
+      await loadServiceSteps()
+    } catch (err) {
+      const msg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
+      if (msg.includes('in_progress') || msg.includes('in progress')) {
+        setStepActionError('Booking phải đang thực hiện mới cập nhật được bước dịch vụ.')
+      } else if (msg.includes('already completed') || msg.includes('da hoan thanh')) {
+        setStepActionError('Bước này đã hoàn thành rồi.')
+      } else {
+        setStepActionError(err?.response?.data?.message || err?.message || 'Hoàn thành bước thất bại.')
+      }
+    } finally {
+      setStepActionLoadingId(null)
+    }
+  }
+
+  const handleReopenServiceStep = async (stepId, note) => {
+    setStepActionLoadingId(stepId)
+    setStepActionError('')
+    try {
+      await bookingApi.reopenBookingServiceStep(stepId, note)
+      await loadServiceSteps()
+    } catch (err) {
+      const msg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
+      if (msg.includes('in_progress') || msg.includes('in progress')) {
+        setStepActionError('Booking phải đang thực hiện mới mở lại được bước dịch vụ.')
+      } else if (msg.includes('not completed') || msg.includes('chua hoan thanh')) {
+        setStepActionError('Bước này chưa hoàn thành, không cần mở lại.')
+      } else {
+        setStepActionError(err?.response?.data?.message || err?.message || 'Mở lại bước thất bại.')
+      }
+    } finally {
+      setStepActionLoadingId(null)
+    }
+  }
+
   const handleNoShow = () => {
     if (!canMarkNoShow) {
       setActionMessage('Chỉ có thể đánh dấu no-show cho booking chưa thực hiện.')
@@ -958,6 +1282,11 @@ function BookingDetailPage() {
       return
     }
 
+    if (!isBankTransfer) {
+      setActionMessage(TEXT.payosBankOnly)
+      return
+    }
+
     runAction(TEXT.createQr, async () => {
       const result = await bookingApi.createPayOSPayment(id)
       writeCachedBooking(id, {
@@ -976,17 +1305,25 @@ function BookingDetailPage() {
     })
   }
 
-  const handleCheckInTimeChange = (value) => {
-    const nextTime = parseTimeInputValue(value)
-    setCheckInHour(nextTime.hour)
-    setCheckInMinute(nextTime.minute)
-    setCheckInPeriod(nextTime.period)
-  }
-
-  const handleUseCurrentTime = () => {
-    const now = new Date()
-    handleCheckInTimeChange(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`)
-  }
+  const resourceWashBayId = assignedResources?.washBayId || booking?.washBayId
+  const resourceWashBayLabel =
+    assignedResources?.washBayLabel ||
+    booking?.washBayLabel ||
+    (resourceWashBayId ? `Bay #${resourceWashBayId}` : '')
+  const resourceWashBayTypeLabel = assignedResources?.washBayTypeLabel || booking?.washBayTypeLabel || ''
+  const rawCareStaffIds = assignedResources?.assignedCareStaffIds || booking?.assignedCareStaffIds || []
+  const resourceCareStaffLabels =
+    assignedResources?.careStaffLabels?.length > 0
+      ? assignedResources.careStaffLabels
+      : booking?.careStaffLabels?.length > 0
+        ? booking.careStaffLabels
+        : rawCareStaffIds.map((staffId) => `Nh\u00e2n vi\u00ean #${staffId}`)
+  const hasAssignedResources = Boolean(resourceWashBayLabel || resourceCareStaffLabels.length > 0)
+  const resourceCareStaffText = resourceCareStaffLabels.length > 0
+    ? resourceCareStaffLabels.join(', ')
+    : booking?.requiresCareStaff
+      ? TEXT.careStaffPending
+      : TEXT.careStaffNone
 
   const handleInspectionChange = (type, field, value) => {
     setInspectionForms((current) => ({
@@ -1029,6 +1366,82 @@ function BookingDetailPage() {
     }
   }
 
+  const renderInspectionCard = (type) => {
+    const existingInspection = getInspectionByType(inspections, type)
+    const form = inspectionForms[type] || blankInspectionForm
+    const isLocked = currentStatus === 'COMPLETED'
+
+    return (
+      <article className="booking-inspection-card" key={type}>
+        <div className="booking-inspection-card-head">
+          <div>
+            <span>{existingInspection ? 'Đã tạo' : 'Chưa tạo'}</span>
+            <strong>{INSPECTION_LABELS[type]}</strong>
+          </div>
+          {existingInspection && <small>{formatDateTime(existingInspection.updatedAt || existingInspection.createdAt)}</small>}
+        </div>
+
+        <div className="booking-inspection-columns">
+          <label>
+            <span>Tình trạng ngoại thất</span>
+            <textarea
+              value={form.exteriorCondition}
+              onChange={(event) => handleInspectionChange(type, 'exteriorCondition', event.target.value)}
+              placeholder="Ví dụ: trầy nhẹ cửa phải, kính trước sạch..."
+              disabled={isLocked}
+            />
+          </label>
+
+          <label>
+            <span>Tình trạng nội thất</span>
+            <textarea
+              value={form.interiorCondition}
+              onChange={(event) => handleInspectionChange(type, 'interiorCondition', event.target.value)}
+              placeholder="Ví dụ: ghế sau có bụi, taplo cần vệ sinh..."
+              disabled={isLocked}
+            />
+          </label>
+
+          <label>
+            <span>Ghi chú</span>
+            <textarea
+              value={form.notes}
+              onChange={(event) => handleInspectionChange(type, 'notes', event.target.value)}
+              placeholder="Ghi chú thêm cho inspection"
+              disabled={isLocked}
+            />
+          </label>
+        </div>
+
+        {isLocked ? (
+          <p className="booking-inspection-locked-hint">Dịch vụ đã hoàn thành, không thể chỉnh sửa inspection.</p>
+        ) : (
+          <button type="button" disabled={inspectionSavingType === type} onClick={() => handleSaveInspection(type)}>
+            {inspectionSavingType === type ? 'Đang lưu...' : existingInspection ? 'Cập nhật inspection' : 'Tạo inspection'}
+          </button>
+        )}
+      </article>
+    )
+  }
+
+  const renderStepInspection = (step) => {
+    if (role !== 'staff') return null
+
+    const type = getStepInspectionType(step, serviceSteps, booking)
+    if (!type) return null
+
+    return <div className="booking-step-inspection">{renderInspectionCard(type)}</div>
+  }
+
+  const isStepInspectionBlocked = (step) => {
+    if (role !== 'staff') return false
+
+    const type = getStepInspectionType(step, serviceSteps, booking)
+    if (!type) return false
+
+    return !getInspectionByType(inspections, type)
+  }
+
   return (
     <div className="booking-history-page">
       <section className="booking-history-hero">
@@ -1057,6 +1470,9 @@ function BookingDetailPage() {
               <h2>#{displayBookingNo}</h2>
             </div>
             <div className="booking-history-badges">
+              {booking.isWalkIn && (
+                <span className="garage-walk-in">Khách đặt tại garage</span>
+              )}
               <span className={`status ${String(booking.status || '').toLowerCase()}`}>{getStatusText(booking.status)}</span>
               <span className={`payment ${String(booking.paymentStatus || '').toLowerCase()}`}>
                 {getPaymentStatusText(booking.paymentStatus)}
@@ -1075,7 +1491,14 @@ function BookingDetailPage() {
             </div>
             <div>
               <span>{TEXT.vehicle}</span>
-              {formatNamedValue(booking.vehicleName || booking.licensePlate, booking.vehicleId, TEXT.vehicle)}
+              <span className="booking-named-value">
+                <strong>
+                  {booking.vehicleName && booking.licensePlate
+                    ? `${booking.vehicleName} · ${booking.licensePlate}`
+                    : booking.vehicleName || booking.licensePlate || TEXT.vehicle}
+                </strong>
+                {booking.vehicleId && <small>#{booking.vehicleId}</small>}
+              </span>
             </div>
             <div>
               <span>Garage</span>
@@ -1096,16 +1519,6 @@ function BookingDetailPage() {
               <div className="booking-total-row">
                 <strong>{formatMoney(booking.finalPrice)}</strong>
                 <span>{TEXT.method}: {paymentMethodText}</span>
-                {canCreatePayOS && (
-                  <button
-                    type="button"
-                    className="booking-payos-btn"
-                    disabled={actionLoading}
-                    onClick={handleCreatePayOS}
-                  >
-                    {TEXT.createPayOS}
-                  </button>
-                )}
               </div>
             </div>
 
@@ -1115,90 +1528,41 @@ function BookingDetailPage() {
               <span>Check-in</span>
               <div className="booking-detail-inline-control">
                 <strong>{getCheckInDisplay(booking)}</strong>
-                {canEditCheckInTime && (
-                  <div className={`booking-time-picker-shell ${timePickerOpen ? 'open' : ''}`}>
-                    <button
-                      type="button"
-                      className="booking-time-picker-toggle"
-                      onClick={() => setTimePickerOpen((value) => !value)}
-                      aria-expanded={timePickerOpen}
-                      aria-label={TEXT.chooseCheckIn}
-                    >
-                      {checkInHour && checkInMinute
-                        ? `${checkInHour}:${checkInMinute} ${checkInPeriod}`
-                        : canCheckIn
-                          ? 'Chọn giờ'
-                          : 'Sửa giờ'}
-                    </button>
-                    <div className="booking-detail-time-picker" aria-label={TEXT.chooseCheckIn}>
-                      <div className="booking-time-dropdown-head">
-                        <span>Giờ check-in</span>
-                        <strong>{checkInHour && checkInMinute ? `${checkInHour}:${checkInMinute} ${checkInPeriod}` : '--:--'}</strong>
-                      </div>
-                      <div className="booking-time-select-row">
-                        <select
-                          value={checkInHour}
-                          onChange={(event) => setCheckInHour(event.target.value)}
-                          aria-label="Giờ check-in"
-                        >
-                          <option value="">Giờ</option>
-                          {Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0')).map((hour) => (
-                            <option key={hour} value={hour}>{hour}</option>
-                          ))}
-                        </select>
-                        <select
-                          value={checkInMinute}
-                          onChange={(event) => setCheckInMinute(event.target.value)}
-                          aria-label="Phút check-in"
-                        >
-                          <option value="">Phút</option>
-                          {Array.from({ length: 60 }, (_, index) => String(index).padStart(2, '0')).map((minute) => (
-                            <option key={minute} value={minute}>{minute}</option>
-                          ))}
-                        </select>
-                        <select
-                          value={checkInPeriod}
-                          onChange={(event) => setCheckInPeriod(event.target.value)}
-                          aria-label="AM hoặc PM"
-                        >
-                          <option value="AM">AM</option>
-                          <option value="PM">PM</option>
-                        </select>
-                      </div>
-                      <div className="booking-time-dropdown-actions">
-                        <button type="button" onClick={handleUseCurrentTime}>
-                          Bây giờ
-                        </button>
-                        <button type="button" onClick={() => setTimePickerOpen(false)}>
-                          Xong
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
             <div className="booking-detail-control-card">
               <span>Status</span>
               <div className="booking-detail-inline-control">
-                {role === 'customer' || isClosedBooking ? (
-                  <strong>{getStatusText(booking.status)}</strong>
-                ) : (
-                  <select
-                    className="booking-detail-status-select"
-                    value={selectedStatus}
-                    onChange={(event) => setSelectedStatus(event.target.value)}
-                    disabled={actionLoading}
-                    aria-label={TEXT.chooseStatus}
-                  >
-                    {workflowStatusOptions.map((status) => (
-                      <option key={status} value={status}>{getStatusText(status)}</option>
-                    ))}
-                  </select>
-                )}
+                <strong>{getStatusText(booking.status)}</strong>
               </div>
             </div>
             <div><span>{TEXT.paidAt}</span><strong>{formatDateTime(booking.paidAt)}</strong></div>
+
+            {hasAssignedResources && (
+              <div className="booking-detail-resources-card">
+                <span>{TEXT.resources}</span>
+                <div className="booking-detail-resources-body">
+                  {resourceWashBayLabel && (
+                    <div className="booking-detail-resource-row">
+                      <span>{TEXT.washBay}</span>
+                      <strong>{resourceWashBayLabel}</strong>
+                    </div>
+                  )}
+                  {resourceWashBayTypeLabel && (
+                    <div className="booking-detail-resource-row">
+                      <span>{TEXT.washBayType}</span>
+                      <strong>{resourceWashBayTypeLabel}</strong>
+                    </div>
+                  )}
+                  {resourceWashBayLabel && (
+                    <div className="booking-detail-resource-row">
+                      <span>{TEXT.careStaff}</span>
+                      <strong>{resourceCareStaffText}</strong>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {canCustomerCancel && (
@@ -1255,7 +1619,18 @@ function BookingDetailPage() {
               </div>
               <small>{booking.servicePackageName || TEXT.servicePackage}</small>
             </div>
-            {booking.servicePackageSteps?.length > 0 ? (
+            {serviceSteps.length > 0 ? (
+              <ServiceStepsProgress
+                steps={serviceSteps}
+                bookingStatus={currentStatus}
+                onCompleteStep={role !== 'customer' ? handleCompleteServiceStep : undefined}
+                onReopenStep={role !== 'customer' ? handleReopenServiceStep : undefined}
+                actionLoadingStepId={stepActionLoadingId}
+                error={stepActionError}
+                renderStepExtra={renderStepInspection}
+                isStepBlocked={isStepInspectionBlocked}
+              />
+            ) : booking.servicePackageSteps?.length > 0 ? (
               <ol className="booking-service-step-list">
                 {booking.servicePackageSteps.map((step, index) => (
                   <li key={`${step.title}-${index}`} className="booking-service-step-item">
@@ -1272,77 +1647,27 @@ function BookingDetailPage() {
             )}
           </section>
 
-          {role === 'staff' && (
-            <section className="booking-detail-progress-section booking-inspection-section">
-              <div className="booking-detail-section-head">
-                <div>
-                  <span>Inspection</span>
-                  <strong>{TEXT.inspections}</strong>
-                </div>
-                <small>{booking.servicePackageType || 'MAIN'}</small>
-              </div>
-
-              {inspectionLoading ? (
-                <p className="booking-service-step-empty">\u0110ang t\u1ea3i inspection...</p>
-              ) : (
-                <div className="booking-inspection-grid">
-                  {getInspectionTypes(booking).map((type) => {
-                    const existingInspection = getInspectionByType(inspections, type)
-                    const form = inspectionForms[type] || blankInspectionForm
-
-                    return (
-                      <article className="booking-inspection-card" key={type}>
-                        <div className="booking-inspection-card-head">
-                          <div>
-                            <span>{existingInspection ? 'Đã tạo' : 'Chưa tạo'}</span>
-                            <strong>{INSPECTION_LABELS[type]}</strong>
-                          </div>
-                          {existingInspection && <small>{formatDateTime(existingInspection.updatedAt || existingInspection.createdAt)}</small>}
-                        </div>
-
-                        <label>
-                          <span>Tình trạng ngoại thất</span>
-                          <textarea
-                            value={form.exteriorCondition}
-                            onChange={(event) => handleInspectionChange(type, 'exteriorCondition', event.target.value)}
-                            placeholder="Ví dụ: trầy nhẹ cửa phải, kính trước sạch..."
-                          />
-                        </label>
-
-                        <label>
-                          <span>Tình trạng nội thất</span>
-                          <textarea
-                            value={form.interiorCondition}
-                            onChange={(event) => handleInspectionChange(type, 'interiorCondition', event.target.value)}
-                            placeholder="Ví dụ: ghế sau có bụi, taplo cần vệ sinh..."
-                          />
-                        </label>
-
-                        <label>
-                          <span>Ghi chú</span>
-                          <textarea
-                            value={form.notes}
-                            onChange={(event) => handleInspectionChange(type, 'notes', event.target.value)}
-                            placeholder="Ghi chú thêm cho inspection"
-                          />
-                        </label>
-
-                        <button type="button" disabled={inspectionSavingType === type} onClick={() => handleSaveInspection(type)}>
-                          {inspectionSavingType === type ? 'Đang lưu...' : existingInspection ? 'Cập nhật inspection' : 'Tạo inspection'}
-                        </button>
-                      </article>
-                    )
-                  })}
-                </div>
-              )}
-
+          {role === 'staff' && (inspectionMessage || inspectionError) && (
+            <>
               {inspectionMessage && <div className="booking-history-message">{inspectionMessage}</div>}
               {inspectionError && <div className="booking-history-message">{inspectionError}</div>}
-            </section>
+            </>
           )}
 
           {role !== 'customer' && isClosedBooking && (
             <div className="booking-history-message">{TEXT.closedBooking}</div>
+          )}
+
+          {canOpenPaymentCollection && (
+            <div className="booking-detail-footer-actions">
+              <button
+                type="button"
+                className="booking-detail-update-btn booking-detail-complete-service-btn"
+                onClick={() => { setCashPayError(''); setPaymentCollectionOpen(true) }}
+              >
+                Xử lý thanh toán
+              </button>
+            </div>
           )}
 
           {actionMessage && <div className="booking-history-message">{actionMessage}</div>}
@@ -1359,6 +1684,36 @@ function BookingDetailPage() {
                   {TEXT.cancel}
                 </button>
               </div>
+              {canCheckIn && (
+                <button
+                  type="button"
+                  className="booking-detail-update-btn"
+                  disabled={actionLoading}
+                  onClick={handleDirectCheckIn}
+                >
+                  {TEXT.checkInBooking}
+                </button>
+              )}
+              {canStartService && (
+                <button
+                  type="button"
+                  className="booking-detail-update-btn booking-detail-start-service-btn"
+                  disabled={actionLoading}
+                  onClick={handleStartService}
+                >
+                  {TEXT.startService}
+                </button>
+              )}
+              {canCompleteService && (
+                <button
+                  type="button"
+                  className="booking-detail-update-btn booking-detail-complete-service-btn"
+                  disabled={actionLoading}
+                  onClick={handleCompleteService}
+                >
+                  {actionLoading ? 'Đang hoàn thành...' : TEXT.completeService}
+                </button>
+              )}
               {hasPendingUpdate && (
                 <button
                   type="button"
@@ -1380,6 +1735,64 @@ function BookingDetailPage() {
         loading={cancelLoading}
         onClose={() => { if (!cancelLoading) setCancelModalOpen(false) }}
         onConfirm={handleCancelConfirm}
+      />
+
+      <CheckInBookingModal
+        open={checkInModalOpen}
+        bookingId={displayBookingNo}
+        booking={booking}
+        loading={checkInLoading}
+        error={checkInError}
+        onClose={() => { if (!checkInLoading) { setCheckInModalOpen(false); setCheckInError('') } }}
+        onConfirm={handleCheckInConfirm}
+      />
+
+      <StartServiceModal
+        open={startServiceModalOpen}
+        bookingId={displayBookingNo}
+        booking={booking}
+        loading={startServiceLoading}
+        error={startServiceError}
+        onClose={() => { if (!startServiceLoading) { setStartServiceModalOpen(false); setStartServiceError('') } }}
+        onConfirm={handleStartServiceConfirm}
+      />
+
+      <CompleteServiceModal
+        open={completeServiceModalOpen}
+        bookingId={displayBookingNo}
+        booking={booking}
+        loading={completeServiceLoading}
+        error={completeServiceError}
+        hasIncompleteSteps={serviceSteps.length > 0 && serviceSteps.some((s) => String(s.status || '').toUpperCase() !== 'COMPLETED')}
+        incompleteCount={serviceSteps.filter((s) => String(s.status || '').toUpperCase() !== 'COMPLETED').length}
+        onClose={() => { if (!completeServiceLoading) { setCompleteServiceModalOpen(false); setCompleteServiceError('') } }}
+        onConfirm={handleCompleteServiceConfirm}
+      />
+
+      <PaymentCollectionModal
+        open={paymentCollectionOpen}
+        bookingId={displayBookingNo}
+        booking={booking}
+        cashLoading={cashPayLoading}
+        cashError={cashPayError}
+        payosLoading={payosLoading}
+        showSuccess={showPaymentSuccess}
+        onClose={() => {
+          if (!cashPayLoading && !payosLoading) {
+            setPaymentCollectionOpen(false)
+            setShowPaymentSuccess(false)
+            setCashPayError('')
+          }
+        }}
+        onCashPay={handleCashPay}
+        onPayOS={handlePayOSInModal}
+        onMethodUpdated={(newMethod) => {
+          if (newMethod) {
+            writeCachedPaymentMethod(id, newMethod)
+            writeCachedBooking(id, { paymentMethod: newMethod })
+          }
+          loadDetail()
+        }}
       />
     </div>
   )

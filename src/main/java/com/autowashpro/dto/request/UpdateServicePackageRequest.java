@@ -3,6 +3,7 @@ package com.autowashpro.dto.request;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Getter
 @Setter
@@ -33,4 +34,8 @@ public class UpdateServicePackageRequest {
     private Integer careStaffRequiredCount;
 
     private Integer careStaffDurationMinutes;
+
+    private List<CreateServicePackageStepRequest> steps;
+
+    private List<Long> includedServiceIds;
 }

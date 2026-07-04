@@ -122,6 +122,29 @@ public class NotificationServiceImpl implements NotificationService {
         });
     }
 
+    @Override
+@Transactional
+public void notifyTierUpgraded(Long customerId, String oldTier, String newTier) {
+    createInAppNotification(
+            customerId,
+            null,
+            "TIER_UPGRADED",
+            "Tier Upgraded! 🎉",
+            "Congratulations! You have been upgraded from " + oldTier + " to " + newTier + " tier!"
+    );
+}
+
+@Override
+@Transactional
+public void notifyVoucherReceived(Long customerId, String promotionCode, String promotionName) {
+    createInAppNotification(
+            customerId,
+            null,
+            "VOUCHER_RECEIVED",
+            "Voucher Received! 🎁",
+            "You received a voucher: " + promotionName + " (Code: " + promotionCode + "). Use it on your next booking!"
+    );
+}
     // ===================== API =====================
 
     @Override

@@ -211,7 +211,7 @@ const enrichBookingsWithPayment = async (items) => {
         paymentStatus: paidTransaction || cachedPayOSPaidAt ? 'PAID' : booking.paymentStatus,
         paidAt: booking.paidAt || paidTransaction?.paidAt || cachedPayOSPaidAt,
         note: booking.note || cached.note,
-        vehicleName: booking.vehicleName || booking.licensePlate || cached.vehicleName || cached.licensePlate,
+        vehicleName: booking.vehicleName || cached.vehicleName || null,
       }
 
       return mergeFrontendOverride(enrichedBooking, cached)
@@ -403,6 +403,9 @@ function StaffBookingListPage() {
                   <h2>#{booking.id}</h2>
                 </div>
                 <div className="booking-history-badges">
+                  {booking.isWalkIn && (
+                    <span className="garage-walk-in">Khách đặt tại garage</span>
+                  )}
                   <span className={`status ${String(booking.status || '').toLowerCase()}`}>{getStatusText(booking.status)}</span>
                   <span className={`payment ${String(booking.paymentStatus || '').toLowerCase()}`}>
                     {getPaymentStatusText(booking.paymentStatus)}
@@ -416,7 +419,11 @@ function StaffBookingListPage() {
                 </div>
                 <div>
                   <span>Xe</span>
-                  {formatNamedValue(booking.vehicleName || booking.licensePlate, booking.vehicleId, 'Xe')}
+                  <strong>
+                    {booking.vehicleName && booking.licensePlate
+                      ? `${booking.vehicleName} · ${booking.licensePlate}`
+                      : booking.vehicleName || booking.licensePlate || 'Chưa cập nhật'}
+                  </strong>
                 </div>
                 <div>
                   <span>Garage</span>

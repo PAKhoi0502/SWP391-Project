@@ -18,10 +18,14 @@ import com.autowashpro.repository.CustomerLoyaltyRepository;
 import com.autowashpro.repository.PromotionApplicableTierRepository;
 import com.autowashpro.repository.PromotionRepository;
 import com.autowashpro.repository.PromotionUsageRepository;
+import com.autowashpro.repository.UserRepository;
+import com.autowashpro.service.NotificationService;
 import com.autowashpro.service.PromotionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.autowashpro.dto.request.SendVoucherRequest;
+
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -37,6 +41,9 @@ public class PromotionServiceImpl implements PromotionService {
     private final CustomerLoyaltyRepository customerLoyaltyRepository;
     private final PromotionUsageRepository promotionUsageRepository;
     private final BookingRepository bookingRepository;
+    private final NotificationService notificationService;
+    private final UserRepository userRepository;
+
 
     private PromotionResponse map(Promotion promotion) {
 
@@ -467,4 +474,38 @@ public class PromotionServiceImpl implements PromotionService {
                 .toList();
 
     }
+
+    @Override
+@Transactional
+public int sendVoucher(Long promotionId, SendVoucherRequest request) {
+    Promotion promotion = promotionRepository.findById(promotionId)
+            .orElseThrow(() -> new RuntimeException("Promotion not found"));
+
+    List<CustomerLoyalty> targets;
+
+    switch (request.getFilterType().toUpperCase()) {
+        case "MIN_VISITS" -> targets = customerLoyaltyRepository.findAll().stream()
+                .filter(l -> l.getTotalVisits() >= request.getMinVisits())
+                .toList();
+        case "MIN_SPENT" -> targets = customerLoyaltyRepository.findAll().stream()
+                .filter(l -> l.getTotalSpent().compareTo(request.getMinSpent()) >= 0)
+                .toList();
+        case "TIER" -> targets = customerLoyaltyRepository.findAll().stream()
+                .filter(l -> request.getTier().equalsIgnoreCase(l.getCurrentTier()))
+                .toList();
+        default -> targets = customerLoyaltyRepository.findAll(); // ALL
+    }
+
+    int count = 0;
+    for (CustomerLoyalty loyalty : targets) {
+        notificationService.notifyVoucherReceived(
+                loyalty.getCustomerId(),
+                promotion.getCode(),
+                promotion.getName()
+        );
+        count++;
+    }
+
+    return count;
+}
 }

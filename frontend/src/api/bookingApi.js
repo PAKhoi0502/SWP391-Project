@@ -16,13 +16,14 @@ const toArray = (response) => {
 }
 
 export const bookingApi = {
-  getAvailableSlots: ({ garageId, servicePackageId, vehicleType, date }) => {
+  getAvailableSlots: ({ garageId, servicePackageId, vehicleType, date, isWalkIn = false }) => {
     return api.get('/bookings/available-slots', {
       params: {
         garage_id: garageId,
         service_package_id: servicePackageId,
         vehicle_type: vehicleType,
         date,
+        ...(isWalkIn ? { is_walk_in: true } : {}),
       },
     })
   },
@@ -49,6 +50,21 @@ export const bookingApi = {
     return toArray(response)
   },
 
+  async createWalkInBooking(payload) {
+    const response = await api.post('/bookings/walk-in', payload)
+    return unwrap(response)
+  },
+
+  async lookupWalkInCustomer({ phone, licensePlate } = {}) {
+    const response = await api.get('/bookings/walk-in/customer-lookup', {
+      params: {
+        phone,
+        ...(licensePlate ? { licensePlate } : {}),
+      },
+    })
+    return unwrap(response)
+  },
+
   async getAdminBookings({ garageId, status, paymentStatus } = {}) {
     const response = await api.get('/bookings/admin/bookings', {
       params: {
@@ -70,8 +86,11 @@ export const bookingApi = {
     return toArray(response)
   },
 
-  async checkInBooking(bookingId, note) {
-    const response = await api.patch(`/bookings/${bookingId}/check-in`, { note })
+  async checkInBooking(bookingId, payload = {}) {
+    const body = typeof payload === 'string' ? { note: payload } : { ...payload }
+    const response = await api.patch(`/bookings/${bookingId}/check-in`, {
+      note: body.note?.trim?.() || '',
+    })
     return unwrap(response)
   },
 
@@ -102,6 +121,21 @@ export const bookingApi = {
 
   async createPayOSPayment(bookingId) {
     const response = await api.post('/payments/payos/create', { bookingId: Number(bookingId) })
+    return unwrap(response)
+  },
+
+  async updatePaymentMethod(bookingId, paymentMethod) {
+    const response = await api.patch(`/bookings/${bookingId}/update-payment-method`, { paymentMethod })
+    return unwrap(response)
+  },
+
+  async completeBookingServiceStep(stepId, note) {
+    const response = await api.patch(`/bookings/booking-service-steps/${stepId}/complete`, { note: note || '' })
+    return unwrap(response)
+  },
+
+  async reopenBookingServiceStep(stepId, note) {
+    const response = await api.patch(`/bookings/booking-service-steps/${stepId}/reopen`, { note: note || '' })
     return unwrap(response)
   },
 }

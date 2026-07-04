@@ -1,0 +1,202 @@
+.cim-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+}
+
+.cim-dialog {
+  background: #111116;
+  border: 1px solid rgba(250, 204, 21, 0.22);
+  border-radius: 20px;
+  box-shadow:
+    0 32px 80px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(250, 204, 21, 0.06) inset;
+  color: #f8fafc;
+  max-width: 460px;
+  width: 100%;
+  padding: 28px;
+}
+
+.cim-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.cim-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1.5px solid rgba(34, 197, 94, 0.4);
+  color: #22c55e;
+  font-size: 20px;
+  font-weight: 900;
+  margin-bottom: 14px;
+}
+
+.cim-title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.cim-subtitle {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.cim-info {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cim-info-row {
+  display: flex;
+  gap: 12px;
+  font-size: 13.5px;
+}
+
+.cim-info-label {
+  color: rgba(255, 255, 255, 0.45);
+  min-width: 90px;
+  flex-shrink: 0;
+}
+
+.cim-info-value {
+  color: #f8fafc;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.cim-vehicle-type {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.cim-body {
+  margin-bottom: 16px;
+}
+
+.cim-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.cim-optional {
+  color: rgba(255, 255, 255, 0.38);
+  font-weight: 400;
+}
+
+.cim-textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(250, 204, 21, 0.18);
+  border-radius: 12px;
+  color: #f8fafc;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 11px 13px;
+  resize: vertical;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 72px;
+  max-height: 180px;
+  transition: border-color 0.15s;
+}
+
+.cim-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.28);
+}
+
+.cim-textarea:focus {
+  border-color: rgba(250, 204, 21, 0.5);
+  outline: none;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.cim-textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cim-error {
+  margin: 0 0 14px;
+  color: #f87171;
+  font-size: 13px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.cim-footer {
+  display: flex;
+  gap: 12px;
+}
+
+.cim-btn {
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  flex: 1;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  padding: 13px;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.cim-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.cim-btn--cancel {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.cim-btn--cancel:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.cim-btn--confirm {
+  background: #22c55e;
+  color: #fff;
+}
+
+.cim-btn--confirm:hover:not(:disabled) {
+  background: #16a34a;
+}
+
+@media (max-width: 480px) {
+  .cim-dialog {
+    padding: 20px 16px;
+  }
+
+  .cim-footer {
+    flex-direction: column-reverse;
+  }
+}

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class WalkInBookingCreateRequest {
@@ -29,12 +30,20 @@ public class WalkInBookingCreateRequest {
     @NotNull
     private Long servicePackageId;
 
+    private List<Long> addOnServicePackageIds;
+
     @NotNull
     private LocalDateTime startTime;
 
     private String note;
 
+    private String paymentMethod;
+
     private Integer seatCount;
 
     private String motorbikeGroup;
+
+    private String vehicleBrand;
+
+    private String vehicleModel;
 }

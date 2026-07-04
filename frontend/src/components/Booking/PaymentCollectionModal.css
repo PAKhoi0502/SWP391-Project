@@ -1,0 +1,373 @@
+.pcm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+}
+
+.pcm-dialog {
+  background: #111116;
+  border: 1px solid rgba(250, 204, 21, 0.22);
+  border-radius: 20px;
+  box-shadow:
+    0 32px 80px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(250, 204, 21, 0.06) inset;
+  color: #f8fafc;
+  max-width: 480px;
+  width: 100%;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Header ────────────────────────────── */
+.pcm-header {
+  text-align: center;
+  padding-bottom: 2px;
+}
+
+.pcm-title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.pcm-subtitle {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ── Info card ─────────────────────────── */
+.pcm-info {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pcm-info-row {
+  display: flex;
+  gap: 12px;
+  font-size: 13.5px;
+  align-items: center;
+}
+
+.pcm-info-row--total {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 8px;
+  margin-top: 2px;
+}
+
+.pcm-info-label {
+  color: rgba(255, 255, 255, 0.45);
+  min-width: 100px;
+  flex-shrink: 0;
+}
+
+.pcm-info-value {
+  color: #f8fafc;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.pcm-vehicle-type {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.pcm-total-amount {
+  font-size: 16px;
+  color: #facc15;
+}
+
+/* ── Payment method row ────────────────── */
+.pcm-info-row--method {
+  align-items: flex-start;
+}
+
+.pcm-method-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.pcm-method-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pcm-method-cancel {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 5px 7px;
+  line-height: 1;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.pcm-method-cancel:hover:not(:disabled) {
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.pcm-method-cancel:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pcm-btn-change {
+  background: transparent;
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  border-radius: 6px;
+  color: rgba(250, 204, 21, 0.8);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.pcm-btn-change:hover:not(:disabled) {
+  background: rgba(250, 204, 21, 0.08);
+  border-color: rgba(250, 204, 21, 0.6);
+}
+
+.pcm-btn-change:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pcm-method-opt {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 14px;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.pcm-method-opt:hover:not(:disabled) {
+  border-color: rgba(250, 204, 21, 0.35);
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.pcm-method-opt--active {
+  background: rgba(250, 204, 21, 0.1);
+  border-color: rgba(250, 204, 21, 0.6);
+  color: #facc15;
+}
+
+.pcm-method-opt--active:hover:not(:disabled) {
+  background: rgba(250, 204, 21, 0.15);
+  border-color: rgba(250, 204, 21, 0.8);
+}
+
+.pcm-method-opt:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.pcm-change-error {
+  margin: -4px 0 0;
+  color: rgba(250, 204, 21, 0.8);
+  font-size: 12px;
+  padding: 0 2px;
+}
+
+/* ── Error ─────────────────────────────── */
+.pcm-error {
+  margin: 0;
+  color: #f87171;
+  font-size: 13px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+/* ── Paid badge ────────────────────────── */
+.pcm-paid-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 12px;
+  color: #4ade80;
+  font-size: 15px;
+  font-weight: 800;
+  padding: 14px;
+}
+
+.pcm-paid-check {
+  font-size: 17px;
+}
+
+/* ── Action buttons ────────────────────── */
+.pcm-btn {
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  padding: 14px;
+  width: 100%;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.pcm-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pcm-btn--cash {
+  background: #22c55e;
+  color: #fff;
+}
+
+.pcm-btn--cash:hover:not(:disabled) {
+  background: #16a34a;
+}
+
+.pcm-btn--payos {
+  background: rgba(250, 204, 21, 0.15);
+  border: 1.5px solid rgba(250, 204, 21, 0.55);
+  color: #facc15;
+}
+
+.pcm-btn--payos:hover:not(:disabled) {
+  background: rgba(250, 204, 21, 0.22);
+}
+
+.pcm-btn--close {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 11px;
+}
+
+.pcm-btn--close:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.11);
+  color: #f8fafc;
+}
+
+/* ── Success screen ────────────────────── */
+.pcm-dialog--success {
+  border-color: rgba(34, 197, 94, 0.3);
+  box-shadow:
+    0 32px 80px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(34, 197, 94, 0.06) inset;
+}
+
+.pcm-success-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0 4px;
+}
+
+.pcm-success-icon {
+  width: 72px;
+  height: 72px;
+}
+
+.pcm-checkmark {
+  width: 72px;
+  height: 72px;
+}
+
+.pcm-checkmark-circle {
+  stroke: #22c55e;
+  stroke-width: 2;
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  stroke-linecap: round;
+  animation: pcm-stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.pcm-checkmark-check {
+  stroke: #22c55e;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: pcm-stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.55s forwards;
+}
+
+@keyframes pcm-stroke {
+  100% { stroke-dashoffset: 0; }
+}
+
+.pcm-success-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 900;
+  color: #4ade80;
+  letter-spacing: -0.01em;
+}
+
+.pcm-success-sub {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+}
+
+.pcm-btn--close-success {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #4ade80;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 12px 40px;
+  width: auto;
+  border-radius: 12px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  transition: background 0.15s;
+}
+
+.pcm-btn--close-success:hover {
+  background: rgba(34, 197, 94, 0.2);
+}
+
+@media (max-width: 480px) {
+  .pcm-dialog {
+    padding: 20px 16px;
+  }
+}

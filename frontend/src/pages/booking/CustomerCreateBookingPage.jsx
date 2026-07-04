@@ -208,6 +208,15 @@ export default function CustomerCreateBookingPage() {
     [servicePackages],
   )
 
+  const getIncludedPackageNames = (comboPkg) => {
+    const ids = comboPkg?.includedServiceIds || []
+    return ids
+      .map((id) => servicePackages.find((item) => String(getId(item)) === String(id)))
+      .filter(Boolean)
+      .map((item) => getName(item))
+      .join(' + ')
+  }
+
   const isComboSelected = selectedPackage && normalizePackageType(selectedPackage) === 'COMBO'
 
   const selectedAddOns = useMemo(
@@ -767,18 +776,23 @@ export default function CustomerCreateBookingPage() {
                       <>
                         <h3>Gói combo</h3>
                         <div className="booking-grid">
-                          {comboPackages.map((servicePackage) => (
-                            <button
-                              type="button"
-                              key={getId(servicePackage)}
-                              className={`booking-option-card ${String(selectedPackageId) === String(getId(servicePackage)) ? 'active' : ''
-                                }`}
-                              onClick={() => handleSelectPackage(servicePackage)}
-                            >
-                              <strong>{getName(servicePackage, 'Gói combo')}</strong>
-                              <small>{formatMoney(bookingFlowUtils.getPackagePrice(servicePackage))}</small>
-                            </button>
-                          ))}
+                          {comboPackages.map((servicePackage) => {
+                            const includedNames = getIncludedPackageNames(servicePackage)
+
+                            return (
+                              <button
+                                type="button"
+                                key={getId(servicePackage)}
+                                className={`booking-option-card ${String(selectedPackageId) === String(getId(servicePackage)) ? 'active' : ''
+                                  }`}
+                                onClick={() => handleSelectPackage(servicePackage)}
+                              >
+                                <strong>{getName(servicePackage, 'Gói combo')}</strong>
+                                {includedNames && <small className="booking-combo-includes">{includedNames}</small>}
+                                <small>{formatMoney(bookingFlowUtils.getPackagePrice(servicePackage))}</small>
+                              </button>
+                            )
+                          })}
                         </div>
                       </>
                     )}
@@ -991,6 +1005,12 @@ export default function CustomerCreateBookingPage() {
               <span>Gói</span>
               <strong>{selectedPackage ? getName(selectedPackage, 'Gói') : 'Chưa chọn'}</strong>
             </div>
+            {isComboSelected && getIncludedPackageNames(selectedPackage) && (
+              <div className="booking-summary-row">
+                <span>Bao gồm</span>
+                <strong>{getIncludedPackageNames(selectedPackage)}</strong>
+              </div>
+            )}
             <div className="booking-summary-row">
               <span>Thời gian</span>
               <strong>

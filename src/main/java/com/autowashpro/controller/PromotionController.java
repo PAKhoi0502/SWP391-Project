@@ -3,6 +3,7 @@ package com.autowashpro.controller;
 import com.autowashpro.common.ApiResponse;
 import com.autowashpro.dto.request.CreatePromotionRequest;
 import com.autowashpro.dto.request.PromotionValidateRequest;
+import com.autowashpro.dto.request.SendVoucherRequest;
 import com.autowashpro.dto.request.UpdatePromotionRequest;
 import com.autowashpro.dto.response.PromotionDetailResponse;
 import com.autowashpro.dto.response.PromotionResponse;
@@ -152,6 +153,18 @@ public ApiResponse<List<PromotionUsageResponse>> getMyPromotionUsages(
             .success(true)
             .message("Promotion usages retrieved successfully")
             .data(promotionService.getMyPromotionUsages(customerId))
+            .build();
+}
+@PostMapping("/{id}/send-voucher")
+@PreAuthorize("hasRole('ADMIN')")
+public ApiResponse<Integer> sendVoucher(
+        @PathVariable Long id,
+        @RequestBody SendVoucherRequest request) {
+    int count = promotionService.sendVoucher(id, request);
+    return ApiResponse.<Integer>builder()
+            .success(true)
+            .message("Voucher sent to " + count + " customers")
+            .data(count)
             .build();
 }
 }

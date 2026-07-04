@@ -1,0 +1,288 @@
+.ssp-root {
+  width: 100%;
+}
+
+.ssp-error {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #f87171;
+  font-size: 13px;
+}
+
+.ssp-hint {
+  margin: 0 0 14px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: rgba(250, 204, 21, 0.06);
+  border: 1px solid rgba(250, 204, 21, 0.15);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12.5px;
+}
+
+.ssp-blocked-hint {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  font-size: 12px;
+}
+
+.ssp-empty {
+  margin: 0;
+  padding: 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13.5px;
+}
+
+.ssp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ── Step item ─────────────────────────────── */
+
+.ssp-item {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 14px 16px;
+  transition: border-color 0.15s;
+}
+
+.ssp-item--completed {
+  border-color: rgba(34, 197, 94, 0.22);
+  background: rgba(34, 197, 94, 0.04);
+}
+
+.ssp-item--pending {
+  border-color: rgba(250, 204, 21, 0.14);
+}
+
+/* ── Item header ──────────────────────────── */
+
+.ssp-item-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ssp-dot {
+  flex: 0 0 30px;
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 1000;
+  flex-shrink: 0;
+}
+
+.ssp-item--pending .ssp-dot {
+  background: rgba(250, 204, 21, 0.14);
+  color: #facc15;
+}
+
+.ssp-item--completed .ssp-dot {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.ssp-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Title row ────────────────────────────── */
+
+.ssp-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.ssp-title {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.ssp-badge {
+  flex-shrink: 0;
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.ssp-badge--done {
+  background: rgba(34, 197, 94, 0.16);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.ssp-badge--pending {
+  background: rgba(250, 204, 21, 0.1);
+  color: rgba(250, 204, 21, 0.8);
+  border: 1px solid rgba(250, 204, 21, 0.2);
+}
+
+.ssp-desc {
+  margin: 4px 0 0;
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ssp-meta {
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.ssp-step-note {
+  margin: 5px 0 0;
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* ── Actions ──────────────────────────────── */
+
+.ssp-actions {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ssp-loading-label {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12.5px;
+  font-style: italic;
+}
+
+.ssp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 16px;
+  transition: opacity 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.ssp-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.ssp-btn--complete {
+  background: rgba(34, 197, 94, 0.18);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.ssp-btn--complete:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.28);
+}
+
+.ssp-btn--reopen {
+  background: rgba(250, 204, 21, 0.14);
+  color: #facc15;
+  border: 1px solid rgba(250, 204, 21, 0.25);
+}
+
+.ssp-btn--reopen:hover:not(:disabled) {
+  background: rgba(250, 204, 21, 0.22);
+}
+
+.ssp-btn--secondary {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ssp-btn--secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ── Confirm panel ────────────────────────── */
+
+.ssp-confirm-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ssp-note-textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(250, 204, 21, 0.18);
+  border-radius: 10px;
+  color: #f8fafc;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 9px 12px;
+  resize: vertical;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 54px;
+  transition: border-color 0.15s;
+}
+
+.ssp-note-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.28);
+}
+
+.ssp-note-textarea:focus {
+  border-color: rgba(250, 204, 21, 0.45);
+  outline: none;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.ssp-note-textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ssp-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .ssp-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .ssp-confirm-actions {
+    flex-direction: column-reverse;
+  }
+
+  .ssp-btn {
+    width: 100%;
+  }
+}
