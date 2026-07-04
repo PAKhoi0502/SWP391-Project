@@ -22,6 +22,10 @@ public class ServicePackageResponse {
 
     private String serviceType;
 
+    private Integer seatCount;
+
+    private String motorbikeGroup;
+
     private BigDecimal basePrice;
 
     private Integer durationMinutes;

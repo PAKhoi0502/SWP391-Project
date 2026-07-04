@@ -5,7 +5,10 @@ import com.autowashpro.dto.request.VehicleInspectionUpdateRequest;
 import com.autowashpro.dto.response.VehicleInspectionImageResponse;
 import com.autowashpro.dto.response.VehicleInspectionResponse;
 import com.autowashpro.entity.Booking;
+import com.autowashpro.entity.Garage;
 import com.autowashpro.entity.StaffProfile;
+import com.autowashpro.entity.User;
+import com.autowashpro.entity.Vehicle;
 import com.autowashpro.entity.VehicleInspection;
 import com.autowashpro.entity.VehicleInspectionImage;
 import com.autowashpro.repository.*;
@@ -28,6 +31,9 @@ public class VehicleInspectionServiceImpl implements VehicleInspectionService {
     private final VehicleInspectionImageRepository imageRepository;
     private final BookingRepository bookingRepository;
     private final StaffProfileRepository staffProfileRepository;
+    private final VehicleRepository vehicleRepository;
+    private final GarageRepository garageRepository;
+    private final UserRepository userRepository;
 
     private static final List<String> VALID_TYPES = List.of("BEFORE_WASH", "AFTER_WASH");
 
@@ -179,8 +185,11 @@ public class VehicleInspectionServiceImpl implements VehicleInspectionService {
                 .id(i.getId())
                 .bookingId(i.getBookingId())
                 .vehicleId(i.getVehicleId())
+                .vehicleName(getVehicleName(i.getVehicleId()))
                 .garageId(i.getGarageId())
+                .garageName(getGarageName(i.getGarageId()))
                 .inspectedByStaffId(i.getInspectedByStaffId())
+                .inspectedByStaffName(getUserName(i.getInspectedByStaffId()))
                 .type(i.getType())
                 .exteriorCondition(i.getExteriorCondition())
                 .interiorCondition(i.getInteriorCondition())
@@ -195,5 +204,46 @@ public class VehicleInspectionServiceImpl implements VehicleInspectionService {
                 .createdAt(i.getCreatedAt())
                 .updatedAt(i.getUpdatedAt())
                 .build();
+    }
+
+    private String getVehicleName(Long vehicleId) {
+        if (vehicleId == null) return null;
+
+        return vehicleRepository.findById(vehicleId)
+                .map(this::formatVehicleName)
+                .orElse(null);
+    }
+
+    private String formatVehicleName(Vehicle vehicle) {
+        String licensePlate = vehicle.getRawLicensePlate();
+        String brandModel = List.of(vehicle.getBrand(), vehicle.getModel()).stream()
+                .filter(value -> value != null && !value.isBlank())
+                .collect(Collectors.joining(" "));
+
+        if (licensePlate != null && !licensePlate.isBlank() && !brandModel.isBlank()) {
+            return licensePlate + " - " + brandModel;
+        }
+
+        if (licensePlate != null && !licensePlate.isBlank()) {
+            return licensePlate;
+        }
+
+        return brandModel;
+    }
+
+    private String getGarageName(Long garageId) {
+        if (garageId == null) return null;
+
+        return garageRepository.findById(garageId)
+                .map(Garage::getName)
+                .orElse(null);
+    }
+
+    private String getUserName(Long userId) {
+        if (userId == null) return null;
+
+        return userRepository.findById(userId)
+                .map(User::getFullName)
+                .orElse(null);
     }
 }

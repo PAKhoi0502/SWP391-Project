@@ -80,7 +80,7 @@ function AppRoutes() {
           <Route path="staff/bookings" element={<StaffBookingListPage />} />
           <Route path="staff/bookings/walk-in" element={<StaffWalkInBookingPage />} />
           <Route path="staff/bookings/:id" element={<BookingDetailPage />} />
-          <Route path="staff/inspections" element={<DashboardPlaceholderPage title="Kiem tra xe" />} />
+          <Route path="staff/inspections" element={<Navigate to="/staff/bookings" replace />} />
           <Route path="staff/profile" element={<StaffProfilePage />} />
           <Route path="staff/waitlist" element={<StaffWaitlistPage />} />
         </Route>

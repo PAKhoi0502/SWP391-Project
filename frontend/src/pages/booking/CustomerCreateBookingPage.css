@@ -155,6 +155,12 @@
   color: #6a7893;
 }
 
+.booking-combo-includes {
+  font-size: 12px;
+  font-style: italic;
+  margin-top: 4px !important;
+}
+
 .booking-slot-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));

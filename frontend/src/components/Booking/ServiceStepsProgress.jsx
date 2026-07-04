@@ -16,6 +16,7 @@ const TEXT = {
   completedAt: 'Ho\u00e0n th\u00e0nh l\u00fac',
   completedBy: 'Ng\u01b0\u1eddi c\u1eadp nh\u1eadt',
   processing: '\u0110ang x\u1eed l\u00fd...',
+  blockedHint: 'C\u1ea7n \u0111i\u1ec1n v\u00e0 l\u01b0u inspection tr\u01b0\u1edbc khi ho\u00e0n th\u00e0nh b\u01b0\u1edbc n\u00e0y.',
 }
 
 const formatDateTime = (value) => {
@@ -41,6 +42,8 @@ export default function ServiceStepsProgress({
   onReopenStep,
   actionLoadingStepId,
   error,
+  renderStepExtra,
+  isStepBlocked,
 }) {
   const [expandedStepId, setExpandedStepId] = useState(null)
   const [expandAction, setExpandAction] = useState(null)
@@ -89,7 +92,7 @@ export default function ServiceStepsProgress({
   return (
     <div className="ssp-root">
       {error && <p className="ssp-error">{error}</p>}
-      {!isInProgress && <p className="ssp-hint">{TEXT.notInProgress}</p>}
+      {!isInProgress && onCompleteStep && onReopenStep && <p className="ssp-hint">{TEXT.notInProgress}</p>}
       <ol className="ssp-list">
         {normalizedSteps.map((step) => {
           const isCompleted = step.status === 'COMPLETED'
@@ -97,6 +100,7 @@ export default function ServiceStepsProgress({
           const isExpanded = expandedStepId === step.id
           const hasId = Boolean(step.id)
           const anyLoading = actionLoadingStepId !== null
+          const blocked = !isCompleted && Boolean(isStepBlocked && isStepBlocked(step))
 
           return (
             <li
@@ -127,19 +131,24 @@ export default function ServiceStepsProgress({
                 </div>
               </div>
 
-              {isInProgress && hasId && (
+              {renderStepExtra && renderStepExtra(step)}
+
+              {isInProgress && hasId && onCompleteStep && onReopenStep && (
                 <div className="ssp-actions">
                   {isLoadingThis ? (
                     <span className="ssp-loading-label">{TEXT.processing}</span>
                   ) : !isExpanded ? (
-                    <button
-                      type="button"
-                      className={`ssp-btn${isCompleted ? ' ssp-btn--reopen' : ' ssp-btn--complete'}`}
-                      disabled={anyLoading}
-                      onClick={() => handleExpand(step.id, isCompleted ? 'reopen' : 'complete')}
-                    >
-                      {isCompleted ? TEXT.reopenStep : TEXT.completeStep}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className={`ssp-btn${isCompleted ? ' ssp-btn--reopen' : ' ssp-btn--complete'}`}
+                        disabled={anyLoading || blocked}
+                        onClick={() => handleExpand(step.id, isCompleted ? 'reopen' : 'complete')}
+                      >
+                        {isCompleted ? TEXT.reopenStep : TEXT.completeStep}
+                      </button>
+                      {blocked && <p className="ssp-blocked-hint">{TEXT.blockedHint}</p>}
+                    </>
                   ) : (
                     <div className="ssp-confirm-panel">
                       <textarea

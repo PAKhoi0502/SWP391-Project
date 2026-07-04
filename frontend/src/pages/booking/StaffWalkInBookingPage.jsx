@@ -9,6 +9,7 @@ import {
   getPackageId,
   getPackageName,
   getPackagePrice,
+  getPackageType,
   getServicePackages,
 } from '../../services/servicePackageApi'
 import { staffProfileService } from '../../services/staffProfileService'
@@ -118,6 +119,7 @@ export default function StaffWalkInBookingPage() {
   const lookupDebounce = useRef(null)
 
   const [form, setForm] = useState(INIT_FORM)
+  const [selectedAddOnIds, setSelectedAddOnIds] = useState([])
   const [garages, setGarages] = useState([])
   const [packages, setPackages] = useState([])
   const [slots, setSlots] = useState([])
@@ -182,6 +184,23 @@ export default function StaffWalkInBookingPage() {
     [packages, form.vehicleType],
   )
 
+  const normalizePackageType = (pkg) => String(getPackageType(pkg) || 'MAIN').toUpperCase()
+
+  const mainPackages = useMemo(
+    () => filteredPackages.filter((pkg) => normalizePackageType(pkg) === 'MAIN'),
+    [filteredPackages],
+  )
+
+  const comboPackages = useMemo(
+    () => filteredPackages.filter((pkg) => normalizePackageType(pkg) === 'COMBO'),
+    [filteredPackages],
+  )
+
+  const addOnPackages = useMemo(
+    () => filteredPackages.filter((pkg) => normalizePackageType(pkg) === 'ADD_ON'),
+    [filteredPackages],
+  )
+
   const selectedGarage = useMemo(
     () => garages.find((garage) => String(getGarageId(garage)) === String(form.garageId)) || null,
     [garages, form.garageId],
@@ -190,6 +209,43 @@ export default function StaffWalkInBookingPage() {
   const selectedPackage = useMemo(
     () => filteredPackages.find((pkg) => String(getPackageId(pkg)) === String(form.servicePackageId)) || null,
     [filteredPackages, form.servicePackageId],
+  )
+
+  const isComboSelected = selectedPackage && normalizePackageType(selectedPackage) === 'COMBO'
+
+  const getIncludedPackageNames = (comboPkg) => {
+    const ids = comboPkg?.includedServiceIds || []
+    return ids
+      .map((id) => packages.find((pkg) => String(getPackageId(pkg)) === String(id)))
+      .filter(Boolean)
+      .map((pkg) => getPackageName(pkg))
+      .join(' + ')
+  }
+
+  const selectedAddOns = useMemo(
+    () => addOnPackages.filter((pkg) => selectedAddOnIds.includes(String(getPackageId(pkg)))),
+    [addOnPackages, selectedAddOnIds],
+  )
+
+  const toggleAddOn = (id) => {
+    const key = String(id)
+    setSelectedAddOnIds((current) =>
+      current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
+    )
+  }
+
+  const totalPrice = useMemo(
+    () =>
+      getPackagePrice(selectedPackage) +
+      selectedAddOns.reduce((sum, pkg) => sum + getPackagePrice(pkg), 0),
+    [selectedPackage, selectedAddOns],
+  )
+
+  const totalDuration = useMemo(
+    () =>
+      getPackageDuration(selectedPackage) +
+      selectedAddOns.reduce((sum, pkg) => sum + getPackageDuration(pkg), 0),
+    [selectedPackage, selectedAddOns],
   )
 
   const selectedSlot = useMemo(
@@ -312,6 +368,18 @@ export default function StaffWalkInBookingPage() {
     const { name, value } = event.target
     setError('')
     setFieldErrors((prev) => ({ ...prev, [name]: '' }))
+
+    if (name === 'vehicleType') {
+      setSelectedAddOnIds([])
+    }
+
+    if (name === 'servicePackageId') {
+      const nextPackage = packages.find((pkg) => String(getPackageId(pkg)) === String(value))
+      if (nextPackage && normalizePackageType(nextPackage) === 'COMBO') {
+        setSelectedAddOnIds([])
+      }
+    }
+
     setForm((prev) => {
       const next = { ...prev, [name]: value }
 
@@ -328,6 +396,10 @@ export default function StaffWalkInBookingPage() {
 
       return next
     })
+  }
+
+  const selectServicePackage = (id) => {
+    handleChange({ target: { name: 'servicePackageId', value: String(id) } })
   }
 
   const useMatchedCustomer = () => {
@@ -405,6 +477,7 @@ export default function StaffWalkInBookingPage() {
         licensePlate: form.licensePlate.trim().toUpperCase(),
         vehicleType: toBackendVehicleType(form.vehicleType),
         servicePackageId: Number(form.servicePackageId),
+        addOnServicePackageIds: selectedAddOnIds.map(Number),
         startTime: form.startTime,
         paymentMethod: form.paymentMethod,
         ...(form.vehicleBrand.trim() ? { vehicleBrand: form.vehicleBrand.trim() } : {}),
@@ -658,7 +731,7 @@ export default function StaffWalkInBookingPage() {
                   className={fieldErrors.servicePackageId ? 'swi-input-error' : ''}
                 >
                   <option value="">{loadingInitial ? 'Đang tải...' : 'Chọn gói dịch vụ'}</option>
-                  {filteredPackages.map((pkg) => (
+                  {mainPackages.map((pkg) => (
                     <option key={getPackageId(pkg)} value={getPackageId(pkg)}>
                       {getPackageName(pkg)} - {formatMoney(getPackagePrice(pkg))}
                     </option>
@@ -667,6 +740,60 @@ export default function StaffWalkInBookingPage() {
                 {fieldErrors.servicePackageId && <p className="swi-field-error">{fieldErrors.servicePackageId}</p>}
               </div>
             </div>
+
+            {comboPackages.length > 0 && (
+              <div className="swi-field">
+                <label>Gói combo</label>
+                <div className="swi-addon-grid">
+                  {comboPackages.map((pkg) => {
+                    const id = String(getPackageId(pkg))
+                    const active = String(form.servicePackageId) === id
+                    const includedNames = getIncludedPackageNames(pkg)
+
+                    return (
+                      <button
+                        type="button"
+                        key={id}
+                        className={`swi-addon-card${active ? ' swi-addon-card--active' : ''}`}
+                        onClick={() => selectServicePackage(id)}
+                      >
+                        <strong>{getPackageName(pkg)}</strong>
+                        {includedNames && <small className="swi-combo-includes">{includedNames}</small>}
+                        <small>{formatMoney(getPackagePrice(pkg))}</small>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {addOnPackages.length > 0 && (
+              <div className="swi-field">
+                <label>Dịch vụ thêm (có thể chọn nhiều)</label>
+                {isComboSelected && (
+                  <span className="swi-help">Gói combo đã bao gồm sẵn dịch vụ, không thể chọn thêm.</span>
+                )}
+                <div className="swi-addon-grid">
+                  {addOnPackages.map((pkg) => {
+                    const id = String(getPackageId(pkg))
+                    const active = selectedAddOnIds.includes(id)
+
+                    return (
+                      <button
+                        type="button"
+                        key={id}
+                        disabled={isComboSelected}
+                        className={`swi-addon-card${active ? ' swi-addon-card--active' : ''}`}
+                        onClick={() => toggleAddOn(id)}
+                      >
+                        <strong>{getPackageName(pkg)}</strong>
+                        <small>{formatMoney(getPackagePrice(pkg))}</small>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="swi-section">
@@ -792,6 +919,18 @@ export default function StaffWalkInBookingPage() {
             <span>Gói dịch vụ</span>
             <strong>{selectedPackage ? getPackageName(selectedPackage) : <em>Chưa chọn</em>}</strong>
           </div>
+          {isComboSelected && getIncludedPackageNames(selectedPackage) && (
+            <div className="swi-summary-row">
+              <span>Bao gồm</span>
+              <strong>{getIncludedPackageNames(selectedPackage)}</strong>
+            </div>
+          )}
+          {selectedAddOns.length > 0 && (
+            <div className="swi-summary-row">
+              <span>Dịch vụ thêm</span>
+              <strong>{selectedAddOns.map((pkg) => getPackageName(pkg)).join(', ')}</strong>
+            </div>
+          )}
           <div className="swi-summary-row">
             <span>Thời gian</span>
             <strong>
@@ -810,12 +949,12 @@ export default function StaffWalkInBookingPage() {
               <div className="swi-summary-divider" />
               <div className="swi-summary-row swi-summary-total">
                 <span>Tổng tiền</span>
-                <strong className="swi-summary-price">{formatMoney(getPackagePrice(selectedPackage))}</strong>
+                <strong className="swi-summary-price">{formatMoney(totalPrice)}</strong>
               </div>
-              {getPackageDuration(selectedPackage) > 0 && (
+              {totalDuration > 0 && (
                 <div className="swi-summary-row">
                   <span>Thời lượng</span>
-                  <strong>{getPackageDuration(selectedPackage)} phút</strong>
+                  <strong>{totalDuration} phút</strong>
                 </div>
               )}
             </>

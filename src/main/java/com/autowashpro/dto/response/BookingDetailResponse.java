@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -21,6 +22,8 @@ public class BookingDetailResponse {
     private Long washBayId;
 
     private Long servicePackageId;
+
+    private List<Long> addOnServicePackageIds;
 
     private Long promotionId;
 

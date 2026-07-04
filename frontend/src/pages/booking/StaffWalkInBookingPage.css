@@ -322,6 +322,58 @@
   color: #ffcd17;
 }
 
+.swi-addon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.swi-addon-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, color 0.15s, transform 0.15s;
+}
+
+.swi-addon-card:hover:not(:disabled) {
+  border-color: rgba(255, 205, 23, 0.45);
+  background: rgba(255, 205, 23, 0.08);
+  transform: translateY(-1px);
+}
+
+.swi-addon-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.swi-addon-card--active {
+  border-color: #ffcd17;
+  background: rgba(255, 205, 23, 0.16);
+  color: #ffcd17;
+}
+
+.swi-addon-card strong {
+  font-size: 13px;
+}
+
+.swi-addon-card small {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.swi-combo-includes {
+  font-style: italic;
+  opacity: 0.65;
+}
+
 .swi-slots-loading,
 .swi-slots-empty,
 .swi-slots-hint {

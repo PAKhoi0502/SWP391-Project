@@ -25,6 +25,8 @@ const initialForm = {
   price: '',
   durationMinutes: '',
   includedServiceIds: '',
+  comboMainId: '',
+  comboAddOnIds: [],
   stepsTemplate: '',
   requiresWashBay: true,
   requiresCareStaff: false,
@@ -84,17 +86,43 @@ export default function AdminServicePackagePage() {
     setForm((prev) => ({ ...prev, [name]: value }))
   }
 
-  function buildPayload() {
-    const serviceIds = form.includedServiceIds
-      .split(',')
-      .map((id) => Number(id.trim()))
-      .filter(Boolean)
+  function toggleComboAddOn(id) {
+    const key = String(id)
+    setForm((prev) => ({
+      ...prev,
+      comboAddOnIds: prev.comboAddOnIds.includes(key)
+        ? prev.comboAddOnIds.filter((item) => item !== key)
+        : [...prev.comboAddOnIds, key],
+    }))
+  }
 
-    const steps = form.stepsTemplate
-      .split('\n')
-      .map((line, index) => line.trim())
-      .filter(Boolean)
-      .map((line, index) => ({
+  const mainPackageOptions = useMemo(
+    () => packages.filter((item) => getPackageType(item) === 'MAIN' && item.vehicleType === form.vehicleType),
+    [packages, form.vehicleType],
+  )
+
+  const addOnPackageOptions = useMemo(
+    () => packages.filter((item) => getPackageType(item) === 'ADD_ON' && item.vehicleType === form.vehicleType),
+    [packages, form.vehicleType],
+  )
+
+  function buildPayload() {
+    const isCombo = form.packageType === 'COMBO'
+
+    const serviceIds = isCombo
+      ? [form.comboMainId, ...form.comboAddOnIds].map((id) => Number(id)).filter(Boolean)
+      : form.includedServiceIds
+          .split(',')
+          .map((id) => Number(id.trim()))
+          .filter(Boolean)
+
+    const steps = isCombo
+      ? []
+      : form.stepsTemplate
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .map((line, index) => ({
   stepOrder: index + 1,
   name: line,
   description: line,
@@ -184,6 +212,19 @@ washBayDurationMinutes: Number(form.durationMinutes),
   function handleEdit(item) {
     const includedServices = item.includedServiceIds || item.serviceIds || item.includedServices || item.services || []
     const steps = item.stepsTemplate || item.steps || []
+    const includedIds = Array.isArray(includedServices)
+      ? includedServices.map((service) => service.id || service.serviceId || service).filter(Boolean)
+      : []
+    const comboMainId = includedIds.find((id) => {
+      const pkg = packages.find((p) => String(getPackageId(p)) === String(id))
+      return pkg && getPackageType(pkg) === 'MAIN'
+    })
+    const comboAddOnIds = includedIds
+      .filter((id) => {
+        const pkg = packages.find((p) => String(getPackageId(p)) === String(id))
+        return pkg && getPackageType(pkg) === 'ADD_ON'
+      })
+      .map(String)
 
     setEditingId(getPackageId(item))
     setForm({
@@ -193,12 +234,9 @@ washBayDurationMinutes: Number(form.durationMinutes),
   packageType: getPackageType(item) || 'MAIN',
   price: String(getPackagePrice(item) || ''),
   durationMinutes: String(getPackageDuration(item) || ''),
-  includedServiceIds: Array.isArray(includedServices)
-    ? includedServices
-        .map((service) => service.id || service.serviceId || service)
-        .filter(Boolean)
-        .join(', ')
-    : '',
+  includedServiceIds: includedIds.join(', '),
+  comboMainId: comboMainId ? String(comboMainId) : '',
+  comboAddOnIds,
   stepsTemplate: Array.isArray(steps)
     ? steps
         .map((step) => step.title || step.name || step.description || step)
@@ -343,13 +381,15 @@ washBayDurationMinutes: Number(form.durationMinutes),
               min="1"
             />
 
-            <input
-              className="service-package-input"
-              name="includedServiceIds"
-              value={form.includedServiceIds}
-              onChange={handleChange}
-              placeholder="Included service IDs, ví dụ: 1,2,3"
-            />
+            {form.packageType !== 'COMBO' && (
+              <input
+                className="service-package-input"
+                name="includedServiceIds"
+                value={form.includedServiceIds}
+                onChange={handleChange}
+                placeholder="Included service IDs, ví dụ: 1,2,3"
+              />
+            )}
           </div>
 
           <textarea
@@ -360,14 +400,56 @@ washBayDurationMinutes: Number(form.durationMinutes),
             placeholder="Mô tả gói dịch vụ"
           />
 
-          <textarea
-            className="service-package-textarea"
-            name="stepsTemplate"
-            value={form.stepsTemplate}
-            onChange={handleChange}
-            placeholder={'Steps template, mỗi dòng là 1 bước\nVí dụ:\nKiểm tra xe\nRửa ngoại thất\nLau khô và bàn giao'}
-            style={{ marginTop: 12 }}
-          />
+          {form.packageType === 'COMBO' ? (
+            <div className="service-package-combo-builder" style={{ marginTop: 12 }}>
+              <label>Gói MAIN</label>
+              <select
+                className="service-package-select"
+                name="comboMainId"
+                value={form.comboMainId}
+                onChange={handleChange}
+              >
+                <option value="">Chọn gói MAIN</option>
+                {mainPackageOptions.map((pkg) => (
+                  <option key={getPackageId(pkg)} value={getPackageId(pkg)}>
+                    {getPackageName(pkg)}
+                  </option>
+                ))}
+              </select>
+
+              <label style={{ marginTop: 12, display: 'block' }}>Gói ADD_ON (có thể chọn nhiều)</label>
+              <div className="service-package-combo-addons">
+                {addOnPackageOptions.map((pkg) => {
+                  const id = String(getPackageId(pkg))
+                  const active = form.comboAddOnIds.includes(id)
+
+                  return (
+                    <button
+                      type="button"
+                      key={id}
+                      className={`service-package-pill${active ? ' active' : ''}`}
+                      onClick={() => toggleComboAddOn(id)}
+                    >
+                      {getPackageName(pkg)}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <p style={{ marginTop: 8, color: '#64748b', fontSize: 13 }}>
+                Các bước xử lý của combo sẽ tự động lấy từ gói MAIN + ADD_ON đã chọn, không cần nhập steps template riêng.
+              </p>
+            </div>
+          ) : (
+            <textarea
+              className="service-package-textarea"
+              name="stepsTemplate"
+              value={form.stepsTemplate}
+              onChange={handleChange}
+              placeholder={'Steps template, mỗi dòng là 1 bước\nVí dụ:\nKiểm tra xe\nRửa ngoại thất\nLau khô và bàn giao'}
+              style={{ marginTop: 12 }}
+            />
+          )}
 
           <div className="service-package-actions" style={{ marginTop: 16 }}>
             <button className="service-package-primary-btn" disabled={saving}>

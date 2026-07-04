@@ -12,8 +12,11 @@ public class VehicleInspectionResponse {
     private Long id;
     private Long bookingId;
     private Long vehicleId;
+    private String vehicleName;
     private Long garageId;
+    private String garageName;
     private Long inspectedByStaffId;
+    private String inspectedByStaffName;
     private String type;
     private String exteriorCondition;
     private String interiorCondition;

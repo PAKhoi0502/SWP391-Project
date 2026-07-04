@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { bookingApi } from '../../api/bookingApi'
+import { vehicleInspectionApi } from '../../api/vehicleInspectionApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
 import { garageService } from '../../services/garageService'
 import { getServicePackageById, getPackageName } from '../../services/servicePackageApi'
@@ -22,6 +23,28 @@ const BOOKING_CACHE_PREFIX = 'booking-detail-cache-'
 const PAYMENT_METHOD_CACHE_PREFIX = 'booking-payment-method-'
 const PAYOS_PAID_CACHE_PREFIX = 'booking-payos-paid-'
 
+const addOnPackageNameCache = new Map()
+
+const resolveAddOnServicePackageNames = async (addOnIds) => {
+  const ids = Array.isArray(addOnIds) ? addOnIds.filter((id) => id !== null && id !== undefined) : []
+  if (ids.length === 0) return []
+
+  return Promise.all(
+    ids.map(async (id) => {
+      if (addOnPackageNameCache.has(id)) return addOnPackageNameCache.get(id)
+
+      try {
+        const pkg = await getServicePackageById(id)
+        const name = getPackageName(pkg)
+        addOnPackageNameCache.set(id, name)
+        return name
+      } catch {
+        return `Gói #${id}`
+      }
+    }),
+  )
+}
+
 const TEXT = {
   notUpdated: 'Ch\u01b0a c\u1eadp nh\u1eadt',
   subtitle: 'Th\u00f4ng tin booking, thanh to\u00e1n v\u00e0 ti\u1ebfn tr\u00ecnh x\u1eed l\u00fd.',
@@ -36,6 +59,7 @@ const TEXT = {
   guest: 'Kh\u00e1ch v\u00e3ng lai',
   vehicle: 'Xe',
   servicePackage: 'G\u00f3i d\u1ecbch v\u1ee5',
+  addOnServicePackages: 'D\u1ecbch v\u1ee5 th\u00eam',
   total: 'T\u1ed5ng ti\u1ec1n',
   createPayOS: 'T\u1ea1o QR PayOS',
   method: 'Ph\u01b0\u01a1ng th\u1ee9c',
@@ -86,6 +110,17 @@ const TEXT = {
   careStaff: 'Nh\u00e2n vi\u00ean ph\u1ee5 tr\u00e1ch',
   careStaffNone: 'Kh\u00f4ng y\u00eau c\u1ea7u nh\u00e2n vi\u00ean ph\u1ee5 tr\u00e1ch',
   careStaffPending: 'Ch\u01b0a \u0111\u01b0\u1ee3c g\u00e1n',
+}
+
+const INSPECTION_LABELS = {
+  BEFORE_WASH: 'Tr\u01b0\u1edbc khi s\u1eed d\u1ee5ng d\u1ecbch v\u1ee5',
+  AFTER_WASH: 'Sau khi s\u1eed d\u1ee5ng d\u1ecbch v\u1ee5',
+}
+
+const blankInspectionForm = {
+  exteriorCondition: '',
+  interiorCondition: '',
+  notes: '',
 }
 
 const formatDateTime = (value) => {
@@ -443,6 +478,47 @@ const getPackageStepSource = (servicePackage) =>
     'description',
   ])
 
+const getInspectionTypes = (booking) => {
+  const packageType = String(booking?.servicePackageType || booking?.serviceType || booking?.packageType || 'MAIN').toUpperCase()
+  const hasAddOnPackages = Array.isArray(booking?.addOnServicePackageIds) && booking.addOnServicePackageIds.length > 0
+
+  if (packageType === 'ADD_ON' || packageType === 'ADDON' || packageType === 'COMBO' || hasAddOnPackages) {
+    return ['BEFORE_WASH', 'AFTER_WASH']
+  }
+
+  return ['BEFORE_WASH']
+}
+
+const getInspectionByType = (items, type) => items.find((item) => String(item?.type || '').toUpperCase() === type)
+
+const getStepInspectionType = (step, allSteps, booking) => {
+  if (!Array.isArray(allSteps) || allSteps.length === 0) return null
+
+  const orders = allSteps.map((item) => Number(item.stepOrder || item.order || 0))
+  const minOrder = Math.min(...orders)
+  const maxOrder = Math.max(...orders)
+  const stepOrder = Number(step.stepOrder || step.order || 0)
+  const types = getInspectionTypes(booking)
+
+  if (stepOrder === minOrder && types.includes('BEFORE_WASH')) return 'BEFORE_WASH'
+  if (stepOrder === maxOrder && maxOrder !== minOrder && types.includes('AFTER_WASH')) return 'AFTER_WASH'
+  return null
+}
+
+const buildInspectionForms = (booking, items) =>
+  getInspectionTypes(booking).reduce((forms, type) => {
+    const inspection = getInspectionByType(items, type)
+
+    return {
+      ...forms,
+      [type]: {
+        exteriorCondition: inspection?.exteriorCondition || '',
+        interiorCondition: inspection?.interiorCondition || '',
+        notes: inspection?.notes || '',
+      },
+    }
+  }, {})
+
 const getTimelineItems = (booking) => {
   const status = String(booking?.status || '').toUpperCase()
   const paymentStatus = String(booking?.paymentStatus || '').toUpperCase()
@@ -525,6 +601,11 @@ function BookingDetailPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState('')
   const [actionMessage, setActionMessage] = useState('')
+  const [inspections, setInspections] = useState([])
+  const [inspectionForms, setInspectionForms] = useState({})
+  const [inspectionSavingType, setInspectionSavingType] = useState('')
+  const [inspectionMessage, setInspectionMessage] = useState('')
+  const [inspectionError, setInspectionError] = useState('')
   const [customerBookingNo, setCustomerBookingNo] = useState(null)
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
@@ -632,11 +713,33 @@ function BookingDetailPage() {
 
     if (packageResult.status === 'fulfilled' && packageResult.value) {
       enriched.servicePackageName = getPackageName(packageResult.value)
+      enriched.servicePackageType = packageResult.value.serviceType || packageResult.value.packageType || packageResult.value.type
       enriched.servicePackageDescription = packageResult.value.description || ''
       enriched.servicePackageSteps = normalizeServiceSteps(getPackageStepSource(packageResult.value))
       enriched.requiresCareStaff = Boolean(packageResult.value.requiresCareStaff)
       enriched.careStaffRequiredCount = packageResult.value.careStaffRequiredCount || 0
       enriched.careStaffType = packageResult.value.careStaffType || ''
+    }
+
+    enriched.addOnServicePackageNames = await resolveAddOnServicePackageNames(enriched.addOnServicePackageIds)
+
+    if (Array.isArray(enriched.addOnServicePackageIds) && enriched.addOnServicePackageIds.length > 0) {
+      const addOnPackages = await Promise.all(
+        enriched.addOnServicePackageIds.map((id) => getServicePackageById(id).catch(() => null)),
+      )
+      const addOnSteps = addOnPackages
+        .filter(Boolean)
+        .flatMap((pkg) => normalizeServiceSteps(getPackageStepSource(pkg)))
+
+      if (addOnSteps.length > 0) {
+        const mainSteps = enriched.servicePackageSteps || []
+        // Add-on steps go right before the final main step (handover),
+        // matching how the backend orders BookingServiceStep once service starts.
+        const merged = mainSteps.length > 0
+          ? [...mainSteps.slice(0, -1), ...addOnSteps, mainSteps[mainSteps.length - 1]]
+          : addOnSteps
+        enriched.servicePackageSteps = merged.map((step, index) => ({ ...step, order: index + 1 }))
+      }
     }
 
     if (serviceStepsResult.status === 'fulfilled') {
@@ -695,6 +798,21 @@ function BookingDetailPage() {
     return enriched
   }
 
+  const loadInspections = async (detail) => {
+    if (!detail?.id || role !== 'staff') return
+
+    try {
+      setInspectionError('')
+      const items = await vehicleInspectionApi.listByBooking(detail.id)
+      setInspections(items)
+      setInspectionForms(buildInspectionForms(detail, items))
+    } catch (err) {
+      setInspections([])
+      setInspectionForms(buildInspectionForms(detail, []))
+      setInspectionError(err?.response?.data?.message || err?.message || 'Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c inspection.')
+    }
+  }
+
   const loadDetail = async () => {
     try {
       setLoading(true)
@@ -713,6 +831,7 @@ function BookingDetailPage() {
 
       const enrichedDetail = await enrichBookingDetail(detail)
       setBooking(enrichedDetail || null)
+      await loadInspections(enrichedDetail)
       setAssignedResources(
         enrichedDetail?.washBayId || enrichedDetail?.assignedCareStaffIds?.length
           ? {
@@ -1318,6 +1437,123 @@ function BookingDetailPage() {
       ? TEXT.careStaffPending
       : TEXT.careStaffNone
 
+  const handleInspectionChange = (type, field, value) => {
+    setInspectionForms((current) => ({
+      ...current,
+      [type]: {
+        ...(current[type] || blankInspectionForm),
+        [field]: value,
+      },
+    }))
+  }
+
+  const handleSaveInspection = async (type) => {
+    if (!booking?.id) return
+
+    const existingInspection = getInspectionByType(inspections, type)
+    const form = inspectionForms[type] || blankInspectionForm
+    const payload = {
+      exteriorCondition: form.exteriorCondition.trim(),
+      interiorCondition: form.interiorCondition.trim(),
+      notes: form.notes.trim(),
+    }
+
+    try {
+      setInspectionSavingType(type)
+      setInspectionError('')
+      setInspectionMessage('')
+
+      if (existingInspection) {
+        await vehicleInspectionApi.update(existingInspection.id, payload)
+      } else {
+        await vehicleInspectionApi.create(booking.id, { inspectionType: type, ...payload })
+      }
+
+      setInspectionMessage(`\u0110\u00e3 l\u01b0u ${INSPECTION_LABELS[type].toLowerCase()}.`)
+      await loadInspections(booking)
+    } catch (err) {
+      setInspectionError(err?.response?.data?.message || err?.message || 'Kh\u00f4ng l\u01b0u \u0111\u01b0\u1ee3c inspection.')
+    } finally {
+      setInspectionSavingType('')
+    }
+  }
+
+  const renderInspectionCard = (type) => {
+    const existingInspection = getInspectionByType(inspections, type)
+    const form = inspectionForms[type] || blankInspectionForm
+    const isLocked = currentStatus === 'COMPLETED'
+
+    return (
+      <article className="booking-inspection-card" key={type}>
+        <div className="booking-inspection-card-head">
+          <div>
+            <span>{existingInspection ? 'Đã tạo' : 'Chưa tạo'}</span>
+            <strong>{INSPECTION_LABELS[type]}</strong>
+          </div>
+          {existingInspection && <small>{formatDateTime(existingInspection.updatedAt || existingInspection.createdAt)}</small>}
+        </div>
+
+        <div className="booking-inspection-columns">
+          <label>
+            <span>Tình trạng ngoại thất</span>
+            <textarea
+              value={form.exteriorCondition}
+              onChange={(event) => handleInspectionChange(type, 'exteriorCondition', event.target.value)}
+              placeholder="Ví dụ: trầy nhẹ cửa phải, kính trước sạch..."
+              disabled={isLocked}
+            />
+          </label>
+
+          <label>
+            <span>Tình trạng nội thất</span>
+            <textarea
+              value={form.interiorCondition}
+              onChange={(event) => handleInspectionChange(type, 'interiorCondition', event.target.value)}
+              placeholder="Ví dụ: ghế sau có bụi, taplo cần vệ sinh..."
+              disabled={isLocked}
+            />
+          </label>
+
+          <label>
+            <span>Ghi chú</span>
+            <textarea
+              value={form.notes}
+              onChange={(event) => handleInspectionChange(type, 'notes', event.target.value)}
+              placeholder="Ghi chú thêm cho inspection"
+              disabled={isLocked}
+            />
+          </label>
+        </div>
+
+        {isLocked ? (
+          <p className="booking-inspection-locked-hint">Dịch vụ đã hoàn thành, không thể chỉnh sửa inspection.</p>
+        ) : (
+          <button type="button" disabled={inspectionSavingType === type} onClick={() => handleSaveInspection(type)}>
+            {inspectionSavingType === type ? 'Đang lưu...' : existingInspection ? 'Cập nhật inspection' : 'Tạo inspection'}
+          </button>
+        )}
+      </article>
+    )
+  }
+
+  const renderStepInspection = (step) => {
+    if (role !== 'staff') return null
+
+    const type = getStepInspectionType(step, serviceSteps, booking)
+    if (!type) return null
+
+    return <div className="booking-step-inspection">{renderInspectionCard(type)}</div>
+  }
+
+  const isStepInspectionBlocked = (step) => {
+    if (role !== 'staff') return false
+
+    const type = getStepInspectionType(step, serviceSteps, booking)
+    if (!type) return false
+
+    return !getInspectionByType(inspections, type)
+  }
+
   return (
     <div className="booking-history-page">
       <section className="booking-history-hero">
@@ -1346,7 +1582,7 @@ function BookingDetailPage() {
               <h2>#{displayBookingNo}</h2>
             </div>
             <div className="booking-history-badges">
-              {booking.isWalkIn && booking.customerId && (
+              {booking.isWalkIn && (
                 <span className="garage-walk-in">Khách đặt tại garage</span>
               )}
               <span className={`status ${String(booking.status || '').toLowerCase()}`}>{getStatusText(booking.status)}</span>
@@ -1384,6 +1620,12 @@ function BookingDetailPage() {
               <span>{TEXT.servicePackage}</span>
               {formatNamedValue(booking.servicePackageName, booking.servicePackageId, TEXT.servicePackage)}
             </div>
+            {Array.isArray(booking.addOnServicePackageNames) && booking.addOnServicePackageNames.length > 0 && (
+              <div>
+                <span>{TEXT.addOnServicePackages}</span>
+                <strong>{booking.addOnServicePackageNames.join(', ')}</strong>
+              </div>
+            )}
             <div className="booking-total-card">
               <span>{TEXT.total}</span>
               <div className="booking-total-row">
@@ -1503,10 +1745,12 @@ function BookingDetailPage() {
               <ServiceStepsProgress
                 steps={serviceSteps}
                 bookingStatus={currentStatus}
-                onCompleteStep={handleCompleteServiceStep}
-                onReopenStep={handleReopenServiceStep}
+                onCompleteStep={role !== 'customer' ? handleCompleteServiceStep : undefined}
+                onReopenStep={role !== 'customer' ? handleReopenServiceStep : undefined}
                 actionLoadingStepId={stepActionLoadingId}
                 error={stepActionError}
+                renderStepExtra={renderStepInspection}
+                isStepBlocked={isStepInspectionBlocked}
               />
             ) : booking.servicePackageSteps?.length > 0 ? (
               <ol className="booking-service-step-list">
@@ -1524,6 +1768,13 @@ function BookingDetailPage() {
               <p className="booking-service-step-empty">{TEXT.serviceStepsEmpty}</p>
             )}
           </section>
+
+          {role === 'staff' && (inspectionMessage || inspectionError) && (
+            <>
+              {inspectionMessage && <div className="booking-history-message">{inspectionMessage}</div>}
+              {inspectionError && <div className="booking-history-message">{inspectionError}</div>}
+            </>
+          )}
 
           {role !== 'customer' && isClosedBooking && (
             <div className="booking-history-message">{TEXT.closedBooking}</div>

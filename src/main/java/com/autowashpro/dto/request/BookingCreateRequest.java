@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 public class BookingCreateRequest {
@@ -16,6 +18,8 @@ public class BookingCreateRequest {
 
     @NotNull
     private Long servicePackageId;
+
+    private List<Long> addOnServicePackageIds = new ArrayList<>();
 
     @NotNull
     private LocalDateTime startTime;

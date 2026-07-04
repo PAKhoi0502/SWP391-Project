@@ -205,6 +205,23 @@
   background: #fef3c7;
 }
 
+.service-package-combo-addons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.service-package-combo-addons .service-package-pill {
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.service-package-combo-addons .service-package-pill.active {
+  border-color: #4338ca;
+  background: #4338ca;
+  color: #ffffff;
+}
+
 .service-package-price {
   display: flex;
   justify-content: space-between;
