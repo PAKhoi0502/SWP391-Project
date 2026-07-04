@@ -364,8 +364,20 @@ export default function BookingHistoryPage() {
         }
 
         // No actual steps yet — show template steps from service package so customer
-        // can see what the full workflow looks like before service starts
-        const templateSteps = await getPackageSteps(booking.servicePackageId)
+        // can see what the full workflow looks like before service starts.
+        // For bookings with add-on packages, merge add-on steps before the last main step
+        // (mirrors ComboStepResolver logic in backend).
+        const mainSteps = await getPackageSteps(booking.servicePackageId)
+        const addOnIds = Array.isArray(booking.addOnServicePackageIds) ? booking.addOnServicePackageIds : []
+        const addOnStepArrays = await Promise.all(addOnIds.map((id) => getPackageSteps(id)))
+        const addOnSteps = addOnStepArrays.flat()
+
+        let templateSteps = mainSteps
+        if (addOnSteps.length > 0) {
+          const merged = mainSteps.length > 0 ? [...mainSteps, ...addOnSteps] : addOnSteps
+          templateSteps = merged.map((step, index) => ({ ...step, order: index + 1 }))
+        }
+
         return { bookingId, steps: templateSteps }
       }),
     )

@@ -1142,16 +1142,10 @@ public class BookingServiceImpl implements BookingService {
                                                         addOnId));
                 }
 
-                // Add-on steps are inserted right before the final main step (handover),
-                // so staff still hand over the car last.
+                // Main steps first, then add-on steps after.
                 List<ServicePackageStep> orderedTemplates = new ArrayList<>();
-                if (!mainTemplates.isEmpty()) {
-                        orderedTemplates.addAll(mainTemplates.subList(0, mainTemplates.size() - 1));
-                        orderedTemplates.addAll(addOnTemplates);
-                        orderedTemplates.add(mainTemplates.get(mainTemplates.size() - 1));
-                } else {
-                        orderedTemplates.addAll(addOnTemplates);
-                }
+                orderedTemplates.addAll(mainTemplates);
+                orderedTemplates.addAll(addOnTemplates);
 
                 int stepOrder = 1;
                 for (ServicePackageStep template : orderedTemplates) {
