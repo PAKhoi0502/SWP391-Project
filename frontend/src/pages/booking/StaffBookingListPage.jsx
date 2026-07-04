@@ -397,6 +397,9 @@ function StaffBookingListPage() {
         <section className="booking-history-list">
           {visibleBookings.map((booking) => (
             <article className="booking-history-card" key={booking.id}>
+              {String(booking.status || '').toUpperCase() === 'NO_SHOW' && (
+                <div className="booking-no-show-seal">NO SHOW</div>
+              )}
               <div className="booking-history-card-top">
                 <div>
                   <p>Mã booking</p>
@@ -436,7 +439,7 @@ function StaffBookingListPage() {
                 <div><span>Thời gian</span><strong>{formatDateTime(booking.startTime)}</strong></div>
                 {(['CANCELED', 'CANCELLED', 'NO_SHOW'].includes(String(booking.status || '').toUpperCase())) && booking.note && (
                   <div>
-                    <span>{String(booking.status || '').toUpperCase() === 'NO_SHOW' ? 'Lý do no-show' : 'Lý do hủy'}</span>
+                    <span>{String(booking.status || '').toUpperCase() === 'NO_SHOW' ? 'Ghi chú no-show' : 'Lý do hủy'}</span>
                     <strong>{booking.note}</strong>
                   </div>
                 )}

@@ -12,6 +12,8 @@ import { getWashBayById } from '../../services/washBayApi'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import CheckInBookingModal from '../../components/Booking/CheckInBookingModal'
 import CompleteServiceModal from '../../components/Booking/CompleteServiceModal'
+import NoShowBookingModal from '../../components/Booking/NoShowBookingModal'
+import PayOSQrModal from '../../components/Booking/PayOSQrModal'
 import PaymentCollectionModal from '../../components/Booking/PaymentCollectionModal'
 import ServiceStepsProgress from '../../components/Booking/ServiceStepsProgress'
 import StartServiceModal from '../../components/Booking/StartServiceModal'
@@ -616,11 +618,21 @@ function BookingDetailPage() {
   const [completeServiceModalOpen, setCompleteServiceModalOpen] = useState(false)
   const [completeServiceLoading, setCompleteServiceLoading] = useState(false)
   const [completeServiceError, setCompleteServiceError] = useState('')
+  const [noShowModalOpen, setNoShowModalOpen] = useState(false)
+  const [noShowLoading, setNoShowLoading] = useState(false)
+  const [noShowError, setNoShowError] = useState('')
   const [paymentCollectionOpen, setPaymentCollectionOpen] = useState(false)
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false)
   const [cashPayLoading, setCashPayLoading] = useState(false)
   const [cashPayError, setCashPayError] = useState('')
   const [payosLoading, setPayosLoading] = useState(false)
+  const [payosQrOpen, setPayosQrOpen] = useState(false)
+  const [payosTransaction, setPayosTransaction] = useState(null)
+  const [payosCheckoutUrl, setPayosCheckoutUrl] = useState('')
+  const [payosRefreshLoading, setPayosRefreshLoading] = useState(false)
+  const [payosCancelLoading, setPayosCancelLoading] = useState(false)
+  const [payosSuccess, setPayosSuccess] = useState(false)
+  const [payosQrError, setPayosQrError] = useState('')
   const [assignedResources, setAssignedResources] = useState(null)
   const [serviceSteps, setServiceSteps] = useState([])
   const [stepActionLoadingId, setStepActionLoadingId] = useState(null)
@@ -758,8 +770,17 @@ function BookingDetailPage() {
       }
     }
 
-    if (!enriched.paymentMethod && bookingDetailResult.status === 'fulfilled' && bookingDetailResult.value?.paymentMethod) {
-      enriched.paymentMethod = bookingDetailResult.value.paymentMethod
+    if (bookingDetailResult.status === 'fulfilled' && bookingDetailResult.value) {
+      const bookingDetail = bookingDetailResult.value
+      if (!enriched.paymentMethod && bookingDetail.paymentMethod) {
+        enriched.paymentMethod = bookingDetail.paymentMethod
+      }
+      if (bookingDetail.rewardProcessed !== undefined && bookingDetail.rewardProcessed !== null) {
+        enriched.rewardProcessed = bookingDetail.rewardProcessed
+      }
+      if (bookingDetail.pointsEarned !== undefined && bookingDetail.pointsEarned !== null) {
+        enriched.pointsEarned = bookingDetail.pointsEarned
+      }
     }
 
     const inferredPaymentMethod = inferPaymentMethod(enriched)
@@ -903,6 +924,38 @@ function BookingDetailPage() {
     return () => window.clearInterval(timer)
   }, [location.search, isPaid])
 
+  useEffect(() => {
+    if (!payosQrOpen || payosSuccess) return undefined
+
+    const txId = payosTransaction?.id
+
+    const poll = async () => {
+      try {
+        if (txId) {
+          const tx = await bookingApi.getPaymentTransaction(txId)
+          if (String(tx?.status || '').toUpperCase() === 'PAID') {
+            setPayosTransaction((prev) => ({ ...prev, ...tx }))
+            setPayosSuccess(true)
+            loadDetail()
+          }
+        } else {
+          const txs = await bookingApi.getPaymentTransactions(id)
+          const paidTx = txs.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
+          if (paidTx) {
+            setPayosTransaction((prev) => ({ ...prev, ...paidTx }))
+            setPayosSuccess(true)
+            loadDetail()
+          }
+        }
+      } catch {
+        // silently ignore
+      }
+    }
+
+    const timer = setInterval(poll, 4000)
+    return () => clearInterval(timer)
+  }, [payosQrOpen, payosSuccess, payosTransaction?.id])
+
   const runAction = async (label, action) => {
     try {
       setActionLoading(true)
@@ -1003,28 +1056,8 @@ function BookingDetailPage() {
               status: 'COMPLETED',
               completedAt: now,
               note: 'Updated from booking detail',
-              ...(isCashPayment ? { paymentStatus: 'PAID', paidAt: now } : {}),
             },
           )
-
-          // Walk-in CASH: backend auto-marks PAID in completeService.
-          // Online CASH: paymentMethod is null in DB, so call markBookingPaid here.
-          if (isCashPayment && !booking.isWalkIn) {
-            const paidResult = await runBookingMutation(
-              () => bookingApi.markBookingPaid(id, {
-                paymentMethod: 'CASH',
-                note: 'Auto marked paid after service completed',
-              }),
-              {
-                paymentStatus: 'PAID',
-                paymentMethod: 'CASH',
-                paidAt: now,
-                note: 'Auto marked paid after service completed',
-              },
-            )
-            writeCachedPaymentMethod(id, 'CASH')
-            writeCachedBooking(id, paidResult)
-          }
         }
       }
 
@@ -1172,11 +1205,11 @@ function BookingDetailPage() {
     }
   }
 
-  const handleCashPay = async (paymentMethod = 'CASH') => {
+  const handleCashPay = async (paymentMethod = 'CASH', note = '') => {
     setCashPayLoading(true)
     setCashPayError('')
     try {
-      await bookingApi.markBookingPaid(id, { paymentMethod, note: '' })
+      await bookingApi.markBookingPaid(id, { paymentMethod, note: note || '' })
       writeCachedPaymentMethod(id, paymentMethod)
     } catch (err) {
       const errMsg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
@@ -1199,20 +1232,101 @@ function BookingDetailPage() {
   const handlePayOSInModal = async () => {
     setPayosLoading(true)
     setCashPayError('')
+    setPayosQrError('')
+    setPayosSuccess(false)
     try {
       const result = await bookingApi.createPayOSPayment(id)
       writeCachedPaymentMethod(id, booking?.paymentMethod || 'PAYOS')
       if (result?.checkoutUrl) {
         persistPayOSReturnPath(location.pathname, result)
-        window.location.assign(result.checkoutUrl)
       }
+
+      let txData = {
+        orderCode: result.orderCode,
+        qrCode: result.qrCode,
+        checkoutUrl: result.checkoutUrl,
+        amount: booking?.finalPrice,
+        status: 'PENDING',
+      }
+
+      try {
+        const transactions = await bookingApi.getPaymentTransactions(id)
+        const matchingTx =
+          transactions.find((tx) => String(tx.orderCode) === String(result.orderCode)) ||
+          transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PENDING')
+        if (matchingTx) {
+          txData = { ...matchingTx, qrCode: matchingTx.qrCode || result.qrCode }
+        }
+      } catch {
+        // silently ignore — use data from createPayOSPayment response
+      }
+
+      setPayosTransaction(txData)
+      setPayosCheckoutUrl(result.checkoutUrl || '')
+      setPaymentCollectionOpen(false)
+      setPayosQrOpen(true)
     } catch (err) {
-      setCashPayError(
-        err?.response?.data?.message || err?.message || 'Tạo thanh toán PayOS thất bại.',
-      )
+      setCashPayError(err?.response?.data?.message || err?.message || 'Tạo thanh toán PayOS thất bại.')
     } finally {
       setPayosLoading(false)
     }
+  }
+
+  const handlePayOSRefresh = async () => {
+    setPayosRefreshLoading(true)
+    setPayosQrError('')
+    try {
+      if (payosTransaction?.id) {
+        const tx = await bookingApi.getPaymentTransaction(payosTransaction.id)
+        setPayosTransaction((prev) => ({ ...prev, ...tx }))
+        if (String(tx?.status || '').toUpperCase() === 'PAID') {
+          setPayosSuccess(true)
+          await loadDetail()
+        }
+      } else {
+        const transactions = await bookingApi.getPaymentTransactions(id)
+        const paidTx = transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
+        if (paidTx) {
+          setPayosTransaction((prev) => ({ ...prev, ...paidTx }))
+          setPayosSuccess(true)
+          await loadDetail()
+        } else {
+          const pendingTx = transactions.find(
+            (tx) => String(tx.orderCode) === String(payosTransaction?.orderCode),
+          )
+          if (pendingTx) setPayosTransaction((prev) => ({ ...prev, ...pendingTx }))
+        }
+      }
+    } catch {
+      setPayosQrError('Làm mới thất bại. Vui lòng thử lại.')
+    } finally {
+      setPayosRefreshLoading(false)
+    }
+  }
+
+  const handlePayOSCancelTransaction = async () => {
+    setPayosCancelLoading(true)
+    setPayosQrError('')
+    try {
+      if (payosTransaction?.id) {
+        await bookingApi.cancelPaymentTransaction(payosTransaction.id)
+      }
+      setPayosQrOpen(false)
+      setPayosTransaction(null)
+      setPayosCheckoutUrl('')
+      setPaymentCollectionOpen(true)
+    } catch (err) {
+      setPayosQrError(err?.response?.data?.message || err?.message || 'Hủy giao dịch thất bại.')
+    } finally {
+      setPayosCancelLoading(false)
+    }
+  }
+
+  const handlePayOSQrClose = () => {
+    if (payosRefreshLoading || payosCancelLoading) return
+    setPayosQrOpen(false)
+    setPayosSuccess(false)
+    setPayosQrError('')
   }
 
   const handleCompleteServiceStep = async (stepId, note) => {
@@ -1256,24 +1370,39 @@ function BookingDetailPage() {
   }
 
   const handleNoShow = () => {
-    if (!canMarkNoShow) {
-      setActionMessage('Chỉ có thể đánh dấu no-show cho booking chưa thực hiện.')
-      return
+    if (!canMarkNoShow) return
+    setNoShowError('')
+    setNoShowModalOpen(true)
+  }
+
+  const handleNoShowConfirm = async (note) => {
+    setNoShowLoading(true)
+    setNoShowError('')
+    const reason = note.trim() || 'Khách không đến đúng giờ hẹn'
+    try {
+      await bookingApi.markNoShow(id, reason)
+      setNoShowModalOpen(false)
+      setActionMessage('Đã đánh dấu no-show.')
+      await loadDetail()
+    } catch (err) {
+      const msg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
+      const status = err?.response?.status
+      let errorText
+      if (status === 401 || status === 403) {
+        errorText = 'Bạn không có quyền thực hiện thao tác này.'
+      } else if (msg.includes('can only mark no-show for confirmed')) {
+        errorText = 'Chỉ booking chưa check-in mới có thể đánh dấu no-show.'
+      } else if (msg.includes('staff can only mark no-show') || msg.includes('assigned garage')) {
+        errorText = 'Bạn chỉ có thể đánh dấu no-show cho booking thuộc garage được phân công.'
+      } else if (msg.includes('booking not found')) {
+        errorText = 'Không tìm thấy booking.'
+      } else {
+        errorText = err?.response?.data?.message || err?.message || 'Đánh dấu no-show thất bại.'
+      }
+      setNoShowError(errorText)
+    } finally {
+      setNoShowLoading(false)
     }
-
-    const confirmed = window.confirm(TEXT.confirmNoShow)
-    if (!confirmed) return
-
-    const reason = window.prompt(TEXT.noShowReason, '') || ''
-    runAction(TEXT.markNoShow, () =>
-      runBookingMutation(
-        () => bookingApi.markNoShow(id, reason),
-        {
-          status: 'NO_SHOW',
-          note: reason || booking?.note,
-        },
-      ),
-    )
   }
 
   const handleCreatePayOS = () => {
@@ -1281,28 +1410,11 @@ function BookingDetailPage() {
       setActionMessage(TEXT.payosCompletedOnly)
       return
     }
-
     if (!isBankTransfer) {
       setActionMessage(TEXT.payosBankOnly)
       return
     }
-
-    runAction(TEXT.createQr, async () => {
-      const result = await bookingApi.createPayOSPayment(id)
-      writeCachedBooking(id, {
-        ...booking,
-        paymentMethod: booking?.paymentMethod || 'PAYOS',
-        paymentStatus: booking?.paymentStatus || 'UNPAID',
-      })
-      writeCachedPaymentMethod(id, booking?.paymentMethod || 'PAYOS')
-
-      if (result?.checkoutUrl) {
-        persistPayOSReturnPath(location.pathname, result)
-        window.location.assign(result.checkoutUrl)
-      }
-
-      return booking
-    })
+    handlePayOSInModal()
   }
 
   const resourceWashBayId = assignedResources?.washBayId || booking?.washBayId
@@ -1537,6 +1649,16 @@ function BookingDetailPage() {
               </div>
             </div>
             <div><span>{TEXT.paidAt}</span><strong>{formatDateTime(booking.paidAt)}</strong></div>
+            {booking.rewardProcessed !== undefined && booking.rewardProcessed !== null && isPaid && (
+              <div>
+                <span>Điểm thưởng</span>
+                <strong className={booking.rewardProcessed ? 'booking-reward-done' : 'booking-reward-pending'}>
+                  {booking.rewardProcessed
+                    ? `Đã xử lý${booking.pointsEarned ? ` +${booking.pointsEarned}p` : ''}`
+                    : 'Chưa xử lý'}
+                </strong>
+              </div>
+            )}
 
             {hasAssignedResources && (
               <div className="booking-detail-resources-card">
@@ -1769,6 +1891,16 @@ function BookingDetailPage() {
         onConfirm={handleCompleteServiceConfirm}
       />
 
+      <NoShowBookingModal
+        open={noShowModalOpen}
+        bookingId={displayBookingNo}
+        booking={booking}
+        loading={noShowLoading}
+        error={noShowError}
+        onClose={() => { if (!noShowLoading) { setNoShowModalOpen(false); setNoShowError('') } }}
+        onConfirm={handleNoShowConfirm}
+      />
+
       <PaymentCollectionModal
         open={paymentCollectionOpen}
         bookingId={displayBookingNo}
@@ -1793,6 +1925,20 @@ function BookingDetailPage() {
           }
           loadDetail()
         }}
+      />
+
+      <PayOSQrModal
+        open={payosQrOpen}
+        onClose={handlePayOSQrClose}
+        booking={booking}
+        transaction={payosTransaction}
+        checkoutUrl={payosCheckoutUrl}
+        error={payosQrError}
+        onRefresh={handlePayOSRefresh}
+        onCancelTransaction={handlePayOSCancelTransaction}
+        refreshLoading={payosRefreshLoading}
+        cancelLoading={payosCancelLoading}
+        paymentSuccess={payosSuccess}
       />
     </div>
   )

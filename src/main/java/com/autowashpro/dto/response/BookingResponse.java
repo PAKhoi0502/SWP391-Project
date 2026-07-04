@@ -39,6 +39,8 @@ public class BookingResponse {
     private Long washBayId;
     private LocalDateTime completedAt;
     private LocalDateTime paidAt;
+    private Boolean rewardProcessed;
+    private Integer pointsEarned;
 
     private List<Long> assignedCareStaffIds;
 }

@@ -65,6 +65,7 @@ public class BookingServiceImpl implements BookingService {
         private final ServicePackageStepRepository servicePackageStepRepository;
         private final ComboStepResolver comboStepResolver;
         private final BookingAddOnServicePackageRepository bookingAddOnServicePackageRepository;
+        private final PointTransactionRepository pointTransactionRepository;
         private final LoyaltyService loyaltyService;
         private final WashHistoryService washHistoryService;
         private final PromotionService promotionService;
@@ -1736,6 +1737,13 @@ return toResponse(saved);
                                 .washBayId(b.getWashBayId())
                                 .completedAt(b.getCompletedAt())
                                 .paidAt(b.getPaidAt())
+                                .rewardProcessed(b.getRewardProcessed())
+                                .pointsEarned(Boolean.TRUE.equals(b.getRewardProcessed())
+                                        ? pointTransactionRepository
+                                                .findByBookingIdAndType(b.getId(), "EARN")
+                                                .map(PointTransaction::getPoints)
+                                                .orElse(null)
+                                        : null)
                                 .assignedCareStaffIds(resolveAssignedCareStaffIds(b.getId()))
                                 .build();
         }
@@ -1795,6 +1803,12 @@ return toResponse(saved);
                                 .guestPhone(b.getGuestPhone())
                                 .licensePlate(resolveLicensePlate(b))
                                 .vehicleName(buildVehicleName(vehicle))
+                                .rewardProcessed(b.getRewardProcessed())
+                                .pointsEarned(Boolean.TRUE.equals(b.getRewardProcessed())
+                                                ? pointTransactionRepository.findByBookingIdAndType(b.getId(), "EARN")
+                                                                .map(PointTransaction::getPoints)
+                                                                .orElse(null)
+                                                : null)
                                 .build();
         }
 

@@ -42,4 +42,8 @@ public class BookingSummaryResponse {
     private String licensePlate;
 
     private String vehicleName;
+
+    private Boolean rewardProcessed;
+
+    private Integer pointsEarned;
 }
