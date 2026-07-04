@@ -40,6 +40,8 @@ import StaffWalkInBookingPage from '../pages/booking/StaffWalkInBookingPage'
 import AdminBookingListPage from '../pages/booking/AdminBookingListPage'
 import PaymentReturnPage from '../pages/booking/PaymentReturnPage'
 import AdminTierRulesPage from '../pages/loyalty/AdminTierRulesPage'
+import CustomerPromotionListPage from '../pages/promotion/CustomerPromotionListPage'
+import CustomerPromotionDetailPage from '../pages/promotion/CustomerPromotionDetailPage'
 
 
 function AppRoutes() {
@@ -72,6 +74,8 @@ function AppRoutes() {
           <Route path="/customer/bookings" element={<CustomerBookingListPage />} />
           <Route path="/customer/bookings/:id" element={<BookingDetailPage />} />
           <Route path="/customer/booking-history" element={<BookingHistoryPage />} />
+          <Route path="/customer/promotions" element={<CustomerPromotionListPage />} />
+          <Route path="/customer/promotions/:id" element={<CustomerPromotionDetailPage />} />
         </Route>
       </Route>
 

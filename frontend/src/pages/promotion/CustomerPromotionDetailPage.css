@@ -1,0 +1,209 @@
+.promo-detail-page {
+  min-height: calc(100vh - 64px);
+  padding: 32px;
+  color: #f8fafc;
+  background:
+    radial-gradient(circle at top left, rgba(250, 204, 21, 0.08), transparent 28%),
+    radial-gradient(circle at top right, rgba(79, 70, 229, 0.12), transparent 32%),
+    linear-gradient(180deg, #111116 0%, #08080c 100%);
+}
+
+.promo-detail-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 28px 32px;
+  border: 1px solid rgba(250, 204, 21, 0.16);
+  border-radius: 24px;
+  background: rgba(15, 15, 22, 0.9);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
+  margin-bottom: 24px;
+}
+
+.promo-detail-kicker {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #facc15;
+}
+
+.promo-detail-hero h1 {
+  margin: 0 0 8px;
+  font-size: clamp(26px, 4vw, 44px);
+  line-height: 1.1;
+}
+
+.promo-detail-code-display {
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #facc15;
+  font-family: monospace;
+  background: rgba(250, 204, 21, 0.1);
+  border: 1px solid rgba(250, 204, 21, 0.22);
+  border-radius: 8px;
+  padding: 4px 14px;
+  display: inline-block;
+}
+
+.promo-detail-hero-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.promo-detail-back-btn {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 10px 18px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.promo-detail-back-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.promo-detail-use-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 22px;
+  background: #facc15;
+  color: #111116;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.promo-detail-use-btn:hover {
+  background: #fde047;
+  transform: translateY(-1px);
+}
+
+.promo-detail-use-btn.large {
+  padding: 14px 32px;
+  font-size: 15px;
+  border-radius: 14px;
+}
+
+.promo-detail-loading,
+.promo-detail-error {
+  padding: 60px 24px;
+  text-align: center;
+  font-size: 15px;
+}
+
+.promo-detail-loading { color: rgba(255, 255, 255, 0.45); }
+.promo-detail-error { color: #fca5a5; }
+
+.promo-detail-desc-block {
+  padding: 18px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 24px;
+}
+
+.promo-detail-desc-block p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.promo-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
+  margin-bottom: 32px;
+}
+
+.promo-detail-card {
+  border: 1px solid rgba(250, 204, 21, 0.12);
+  border-radius: 18px;
+  background: rgba(15, 15, 22, 0.88);
+  padding: 20px 22px;
+}
+
+.promo-detail-wide { grid-column: 1 / -1; }
+
+.promo-detail-card h3 {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.promo-detail-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.promo-detail-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.promo-detail-field span {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.promo-detail-field strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f1f5f9;
+  text-align: right;
+}
+
+.promo-detail-field.highlight strong {
+  color: #facc15;
+  font-size: 18px;
+}
+
+.promo-tier-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.promo-tier-chip {
+  font-size: 13px;
+  font-weight: 700;
+  color: #facc15;
+  background: rgba(250, 204, 21, 0.1);
+  border: 1px solid rgba(250, 204, 21, 0.22);
+  border-radius: 8px;
+  padding: 4px 14px;
+}
+
+.promo-detail-footer {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+}
+
+@media (max-width: 640px) {
+  .promo-detail-page { padding: 20px 16px; }
+  .promo-detail-hero { padding: 20px; flex-direction: column; align-items: flex-start; }
+  .promo-detail-hero-actions { width: 100%; flex-direction: column; }
+  .promo-detail-back-btn,
+  .promo-detail-use-btn { width: 100%; text-align: center; }
+  .promo-detail-grid { grid-template-columns: 1fr; }
+}

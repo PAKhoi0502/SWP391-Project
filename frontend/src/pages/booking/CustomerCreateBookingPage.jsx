@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   bookingFlowUtils,
   customerBookingFlowApi,
 } from '../../api/customerBookingFlowApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
+import promotionApi from '../../api/promotionApi'
 import './CustomerCreateBookingPage.css'
 import { getPackageType } from '../../services/servicePackageApi'
 
@@ -48,6 +49,28 @@ const formatMoney = (value) =>
     currency: 'VND',
     maximumFractionDigits: 0,
   }).format(Number(value || 0))
+
+const formatDiscountLabel = (promo) => {
+  const type = String(promo?.discountType || '').toUpperCase()
+  const value = promo?.discountValue
+  if (type === 'PERCENTAGE' && value != null) return `Voucher giảm ${value}%`
+  if ((type === 'FIXED_AMOUNT' || type === 'FIXED') && value != null)
+    return `Voucher giảm ${formatMoney(value)}`
+  return 'Voucher'
+}
+
+const formatEndDate = (value) => {
+  if (!value) return ''
+  try {
+    return new Date(value).toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+  } catch {
+    return String(value)
+  }
+}
 
 const getId = (item) =>
   item?.id ??
@@ -146,6 +169,7 @@ const isPastSlot = (slot, selectedDate) => {
 
 export default function CustomerCreateBookingPage() {
   const navigate = useNavigate()
+  const promoDropdownRef = useRef(null)
 
   const [currentStep, setCurrentStep] = useState(1)
 
@@ -164,6 +188,9 @@ export default function CustomerCreateBookingPage() {
 
   const [promotionCode, setPromotionCode] = useState('')
   const [promotionResult, setPromotionResult] = useState(null)
+  const [showPromoDropdown, setShowPromoDropdown] = useState(false)
+  const [eligiblePromotions, setEligiblePromotions] = useState([])
+  const [loadingEligible, setLoadingEligible] = useState(false)
   const [loyaltyPoints, setLoyaltyPoints] = useState('')
   const [loyaltyPreview, setLoyaltyPreview] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('')
@@ -390,7 +417,52 @@ export default function CustomerCreateBookingPage() {
     }
   }, [selectedSlotId, visibleSlots])
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (promoDropdownRef.current && !promoDropdownRef.current.contains(e.target)) {
+        setShowPromoDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // Reset promotion + eligible list when package or add-ons change
+  useEffect(() => {
+    setPromotionResult(null)
+    setPromotionCode('')
+    setEligiblePromotions([])
+    setShowPromoDropdown(false)
+  }, [selectedPackageId, selectedAddOnIds])
+
+  // Reset loyaltyPreview whenever promotion changes so the preview stays consistent
+  useEffect(() => {
+    setLoyaltyPreview(null)
+  }, [promotionResult])
+
+  // Load eligible promotions when package + subtotal are ready
+  useEffect(() => {
+    if (!selectedPackageId || priceSummary.subtotal <= 0) {
+      setEligiblePromotions([])
+      return
+    }
+    let mounted = true
+    setLoadingEligible(true)
+    promotionApi
+      .getEligiblePromotions({
+        servicePackageId: Number(selectedPackageId),
+        orderAmount: priceSummary.subtotal,
+      })
+      .then((data) => { if (mounted) setEligiblePromotions(data) })
+      .catch(() => { if (mounted) setEligiblePromotions([]) })
+      .finally(() => { if (mounted) setLoadingEligible(false) })
+    return () => { mounted = false }
+  }, [selectedPackageId, priceSummary.subtotal])
+
   const handleValidatePromotion = async () => {
+    setShowPromoDropdown(false)
+
     if (!promotionCode.trim()) {
       setPromotionResult(null)
       setMessage('Nhập mã khuyến mãi trước khi áp dụng.')
@@ -404,20 +476,48 @@ export default function CustomerCreateBookingPage() {
 
     try {
       setMessage('')
-      const result = await customerBookingFlowApi.validatePromotion({
-        code: promotionCode.trim(),
-        garageId: selectedGarageId,
-        vehicleId: getId(selectedVehicle),
-        servicePackageId: selectedPackageId,
-        bookingDate: selectedDate,
-        subtotal: priceSummary.subtotal,
+      const result = await promotionApi.validatePromotion({
+        promotionCode: promotionCode.trim(),
+        servicePackageId: Number(selectedPackageId),
+        orderAmount: priceSummary.subtotal,
       })
 
-      setPromotionResult(result)
-      setMessage(result?.message || 'Áp dụng mã khuyến mãi thành công.')
+      if (result?.valid === false) {
+        setPromotionResult(null)
+        setMessage(result?.message || 'Mã khuyến mãi không hợp lệ hoặc không áp dụng được.')
+      } else {
+        setPromotionResult(result)
+        setMessage(result?.message || 'Áp dụng mã khuyến mãi thành công.')
+      }
     } catch (error) {
       setPromotionResult(null)
-      setMessage(error.message || 'Mã khuyến mãi không hợp lệ.')
+      setMessage(error?.response?.data?.message || error.message || 'Mã khuyến mãi không hợp lệ.')
+    }
+  }
+
+  const handleSelectPromoFromDropdown = async (promo) => {
+    setPromotionCode(promo.code)
+    setShowPromoDropdown(false)
+    setPromotionResult(null)
+
+    try {
+      setMessage('')
+      const result = await promotionApi.validatePromotion({
+        promotionCode: promo.code,
+        servicePackageId: Number(selectedPackageId),
+        orderAmount: priceSummary.subtotal,
+      })
+
+      if (result?.valid === false) {
+        setPromotionResult(null)
+        setMessage(result?.message || 'Mã khuyến mãi không áp dụng được.')
+      } else {
+        setPromotionResult(result)
+        setMessage(result?.message || 'Áp dụng mã khuyến mãi thành công.')
+      }
+    } catch (error) {
+      setPromotionResult(null)
+      setMessage(error?.response?.data?.message || error.message || 'Mã khuyến mãi không hợp lệ.')
     }
   }
 
@@ -572,6 +672,11 @@ export default function CustomerCreateBookingPage() {
   const handleSubmitBooking = async () => {
     if (!canSubmit) {
       setMessage('Bạn cần chọn đủ xe, garage, gói dịch vụ, ngày, khung giờ và phương thức thanh toán.')
+      return
+    }
+
+    if (promotionCode.trim() && !promotionResult?.valid) {
+      setMessage('Mã khuyến mãi chưa được xác thực. Nhấn "Áp dụng" để kiểm tra trước.')
       return
     }
 
@@ -929,18 +1034,95 @@ export default function CustomerCreateBookingPage() {
                   <h2>Ưu đãi và xác nhận</h2>
                 </div>
 
-                <div className="booking-inline-fields">
-                  <label className="booking-field">
-                    Mã khuyến mãi
-                    <input
-                      value={promotionCode}
-                      placeholder="Nhập mã giảm giá"
-                      onChange={(event) => setPromotionCode(event.target.value)}
-                    />
-                  </label>
-                  <button type="button" onClick={handleValidatePromotion}>
-                    Áp dụng
-                  </button>
+                <div className="booking-promo-wrapper" ref={promoDropdownRef}>
+                  {!selectedPackage && (
+                    <p className="booking-muted booking-promo-hint">
+                      Vui lòng chọn gói dịch vụ trước khi chọn mã giảm giá.
+                    </p>
+                  )}
+                  <div className="booking-inline-fields">
+                    <label className="booking-field">
+                      Mã khuyến mãi
+                      <input
+                        value={promotionCode}
+                        placeholder={selectedPackage ? 'Nhập hoặc chọn mã giảm giá' : 'Chọn gói dịch vụ trước'}
+                        disabled={!selectedPackage}
+                        onFocus={() => { if (selectedPackage) setShowPromoDropdown(true) }}
+                        onChange={(event) => {
+                          setPromotionCode(event.target.value)
+                          setPromotionResult(null)
+                          if (selectedPackage) setShowPromoDropdown(true)
+                        }}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleValidatePromotion}
+                      disabled={!selectedPackage}
+                    >
+                      Áp dụng
+                    </button>
+                    {promotionResult?.valid && (
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => {
+                          setPromotionCode('')
+                          setPromotionResult(null)
+                          setShowPromoDropdown(false)
+                        }}
+                      >
+                        Bỏ mã
+                      </button>
+                    )}
+                  </div>
+
+                  {showPromoDropdown && selectedPackage && (
+                    <div className="booking-promo-dropdown">
+                      {loadingEligible ? (
+                        <div className="booking-promo-dd-state">Đang tải mã khuyến mãi...</div>
+                      ) : eligiblePromotions.length === 0 ? (
+                        <div className="booking-promo-dd-state">Không có mã phù hợp với lựa chọn hiện tại.</div>
+                      ) : (
+                        eligiblePromotions.map((promo) => (
+                          <button
+                            key={promo.id}
+                            type="button"
+                            className="booking-promo-dd-item"
+                            onClick={() => handleSelectPromoFromDropdown(promo)}
+                          >
+                            <div className="booking-promo-dd-top">
+                              <span className="booking-promo-dd-code">{promo.code}</span>
+                              <span className="booking-promo-dd-name">
+                                {promo.name || formatDiscountLabel(promo)}
+                              </span>
+                            </div>
+                            {promo.description && (
+                              <div className="booking-promo-dd-desc">{promo.description}</div>
+                            )}
+                            <div className="booking-promo-dd-meta">
+                              {promo.minOrderAmount != null && (
+                                <span>Đơn tối thiểu {formatMoney(promo.minOrderAmount)}</span>
+                              )}
+                              {promo.maxDiscountAmount != null && (
+                                <span>Giảm tối đa {formatMoney(promo.maxDiscountAmount)}</span>
+                              )}
+                              {promo.endAt && (
+                                <span>HSD: {formatEndDate(promo.endAt)}</span>
+                              )}
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {promotionResult?.valid && (
+                    <p className="booking-promo-success">
+                      Mã hợp lệ — giảm {formatMoney(promotionResult.discountAmount ?? 0)}
+                      {promotionResult.message ? `. ${promotionResult.message}` : ''}
+                    </p>
+                  )}
                 </div>
 
                 <div className="booking-inline-fields">
