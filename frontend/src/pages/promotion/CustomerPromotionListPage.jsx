@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { customerBookingFlowApi } from '../../api/customerBookingFlowApi'
+import { loyaltyApi } from '../../api/loyaltyApi'
 import promotionApi from '../../api/promotionApi'
 import PromotionUsageHistoryModal from '../../components/promotion/PromotionUsageHistoryModal'
 import './CustomerPromotionListPage.css'
@@ -38,6 +39,7 @@ export default function CustomerPromotionListPage() {
   const [promotions, setPromotions] = useState([])
   const [usages, setUsages] = useState([])
   const [bookings, setBookings] = useState([])
+  const [customerTier, setCustomerTier] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -96,12 +98,14 @@ export default function CustomerPromotionListPage() {
       promotionApi.getActivePromotions(),
       promotionApi.getMyUsages().catch(() => []),
       customerBookingFlowApi.getCustomerBookings().catch(() => []),
+      loyaltyApi.getMyLoyalty().catch(() => null),
     ])
-      .then(([promos, myUsages, myBookings]) => {
+      .then(([promos, myUsages, myBookings, loyalty]) => {
         if (!mounted) return
         setPromotions(promos)
         setUsages(myUsages)
         setBookings(myBookings)
+        setCustomerTier(loyalty?.currentTier ?? null)
       })
       .catch(() => { if (mounted) setError('Không thể tải danh sách ưu đãi. Vui lòng thử lại.') })
       .finally(() => { if (mounted) setLoading(false) })
@@ -141,9 +145,16 @@ export default function CustomerPromotionListPage() {
     return false
   }
 
+  const isTierEligible = (promo) => {
+    const tiers = promo.applicableTiers
+    if (!Array.isArray(tiers) || tiers.length === 0) return true
+    if (!customerTier) return true
+    return tiers.includes(customerTier)
+  }
+
   const visiblePromotions = useMemo(
-    () => promotions.filter((p) => !isExpired(p) && !isUsedUp(p)),
-    [promotions, activeBookingPromoIds, usageCountMap]
+    () => promotions.filter((p) => !isExpired(p) && !isUsedUp(p) && isTierEligible(p)),
+    [promotions, activeBookingPromoIds, usageCountMap, customerTier]
   )
 
   return (

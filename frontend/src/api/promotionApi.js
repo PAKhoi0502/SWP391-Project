@@ -83,6 +83,19 @@ const promotionApi = {
     return unwrap(response)
   },
 
+  // filterType: 'ALL' | 'TIER' | 'MIN_VISITS' | 'MIN_SPENT'
+  // tier: string (required when filterType === 'TIER')
+  // minVisits / minSpent: number (required for their respective filter types)
+  async sendVoucher(id, { filterType, tier, minVisits, minSpent }) {
+    const response = await api.post(`/promotions/${id}/send-voucher`, {
+      filterType,
+      tier,
+      minVisits,
+      minSpent,
+    })
+    return unwrap(response)
+  },
+
   // Used to enrich usage history rows with customer name/phone
   async getUserById(id) {
     const response = await api.get(`/users/${id}`)
