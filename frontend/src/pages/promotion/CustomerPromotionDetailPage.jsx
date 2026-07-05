@@ -104,6 +104,12 @@ export default function CustomerPromotionDetailPage() {
         </div>
       )}
 
+      {promo.allowLoyaltyStack && (
+        <div className="promo-detail-loyalty-badge">
+          Cho phép dùng kèm điểm loyalty
+        </div>
+      )}
+
       <div className="promo-detail-grid">
         <div className="promo-detail-card">
           <h3>Thông tin giảm giá</h3>

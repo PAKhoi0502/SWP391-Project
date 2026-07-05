@@ -55,6 +55,11 @@ public class PromotionServiceImpl implements PromotionService {
                 .discountType(promotion.getDiscountType())
                 .discountValue(promotion.getDiscountValue())
                 .isActive(promotion.getIsActive())
+                .allowLoyaltyStack(promotion.getAllowLoyaltyStack())
+                .maxLoyaltyPoints(promotion.getMaxLoyaltyPoints())
+                .startAt(promotion.getStartAt())
+                .endAt(promotion.getEndAt())
+                .perUserLimit(promotion.getPerUserLimit())
                 .build();
     }
 
@@ -95,6 +100,11 @@ public class PromotionServiceImpl implements PromotionService {
                 request.getIsActive() != null
                         ? request.getIsActive()
                         : true);
+        promotion.setAllowLoyaltyStack(
+                request.getAllowLoyaltyStack() != null
+                        ? request.getAllowLoyaltyStack()
+                        : false);
+        promotion.setMaxLoyaltyPoints(request.getMaxLoyaltyPoints());
 
         promotion = promotionRepository.save(promotion);
 
@@ -134,10 +144,15 @@ public class PromotionServiceImpl implements PromotionService {
         promotion.setPerUserLimit(request.getPerUserLimit());
         promotion.setStartAt(request.getStartAt());
         promotion.setEndAt(request.getEndAt());
+        if (request.getAllowLoyaltyStack() != null) {
+            promotion.setAllowLoyaltyStack(request.getAllowLoyaltyStack());
+        }
+        promotion.setMaxLoyaltyPoints(request.getMaxLoyaltyPoints());
 
         promotionRepository.save(promotion);
 
         promotionApplicableTierRepository.deleteByPromotionId(id);
+        promotionApplicableTierRepository.flush();
 
         if (request.getApplicableTiers() != null) {
 
@@ -206,6 +221,8 @@ public class PromotionServiceImpl implements PromotionService {
                 .startAt(promotion.getStartAt())
                 .endAt(promotion.getEndAt())
                 .isActive(promotion.getIsActive())
+                .allowLoyaltyStack(promotion.getAllowLoyaltyStack())
+                .maxLoyaltyPoints(promotion.getMaxLoyaltyPoints())
                 .applicableTiers(tiers)
                 .build();
     }
@@ -245,12 +262,18 @@ public class PromotionServiceImpl implements PromotionService {
             return;
         }
 
-        long count = promotionUsageRepository
+        long recordedUsages = promotionUsageRepository
                 .countByPromotionIdAndCustomerId(
                         promotion.getId(),
                         customerId);
 
-        if (count >= promotion.getPerUserLimit()) {
+        long pendingUsages = bookingRepository
+                .countByPromotionIdAndCustomerIdAndStatusNot(
+                        promotion.getId(),
+                        customerId,
+                        "CANCELED");
+
+        if (recordedUsages + pendingUsages >= promotion.getPerUserLimit()) {
             throw new RuntimeException("Promotion per-user limit reached");
         }
     }
@@ -351,6 +374,8 @@ public class PromotionServiceImpl implements PromotionService {
                 .finalAmount(
                         request.getOrderAmount()
                                 .subtract(discount))
+                .allowLoyaltyStack(promotion.getAllowLoyaltyStack())
+                .maxLoyaltyPoints(promotion.getMaxLoyaltyPoints())
                 .build();
     }
 
@@ -473,6 +498,25 @@ public class PromotionServiceImpl implements PromotionService {
                 .map(this::map)
                 .toList();
 
+    }
+
+    @Override
+    @Transactional
+    public void deletePromotion(Long id) {
+        if (!promotionRepository.existsById(id)) {
+            throw new RuntimeException("Promotion not found");
+        }
+        boolean hasUsages = promotionUsageRepository.existsByPromotionId(id);
+        if (hasUsages) {
+            throw new RuntimeException("Không thể xóa khuyến mãi đã có lịch sử sử dụng");
+        }
+        long activeBookings = bookingRepository.countByPromotionIdAndStatusNot(id, "CANCELED");
+        if (activeBookings > 0) {
+            throw new RuntimeException("Không thể xóa khuyến mãi đang được dùng trong booking");
+        }
+        promotionApplicableTierRepository.deleteByPromotionId(id);
+        promotionApplicableTierRepository.flush();
+        promotionRepository.deleteById(id);
     }
 
     @Override

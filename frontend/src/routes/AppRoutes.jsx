@@ -43,6 +43,7 @@ import CustomerWashHistoryListPage from '../pages/washHistory/CustomerWashHistor
 import WashHistoryDetailPage from '../pages/washHistory/WashHistoryDetailPage'
 import AdminWashHistoryListPage from '../pages/washHistory/AdminWashHistoryListPage'
 import AdminTierRulesPage from '../pages/loyalty/AdminTierRulesPage'
+import AdminPromotionManagementPage from '../pages/admin/AdminPromotionManagementPage'
 import CustomerPromotionListPage from '../pages/promotion/CustomerPromotionListPage'
 import CustomerPromotionDetailPage from '../pages/promotion/CustomerPromotionDetailPage'
 
@@ -112,6 +113,7 @@ function AppRoutes() {
           <Route path="admin/bookings/:id" element={<BookingDetailPage />} />
           <Route path="admin/wash-histories" element={<AdminWashHistoryListPage />} />
           <Route path="admin/loyalty/tier-rules" element={<AdminTierRulesPage />} />
+          <Route path="admin/promotions" element={<AdminPromotionManagementPage />} />
         </Route>
       </Route>
 
