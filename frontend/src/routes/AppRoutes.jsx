@@ -46,6 +46,8 @@ import AdminTierRulesPage from '../pages/loyalty/AdminTierRulesPage'
 import AdminPromotionManagementPage from '../pages/admin/AdminPromotionManagementPage'
 import CustomerPromotionListPage from '../pages/promotion/CustomerPromotionListPage'
 import CustomerPromotionDetailPage from '../pages/promotion/CustomerPromotionDetailPage'
+import CustomerNotificationListPage from '../pages/notification/CustomerNotificationListPage'
+import CustomerNotificationDetailPage from '../pages/notification/CustomerNotificationDetailPage'
 
 
 function AppRoutes() {
@@ -82,6 +84,8 @@ function AppRoutes() {
           <Route path="/customer/wash-histories/:id" element={<WashHistoryDetailPage />} />
           <Route path="/customer/promotions" element={<CustomerPromotionListPage />} />
           <Route path="/customer/promotions/:id" element={<CustomerPromotionDetailPage />} />
+          <Route path="/customer/notifications" element={<CustomerNotificationListPage />} />
+          <Route path="/customer/notifications/:id" element={<CustomerNotificationDetailPage />} />
         </Route>
       </Route>
 

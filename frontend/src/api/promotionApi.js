@@ -51,6 +51,25 @@ const promotionApi = {
     return Array.isArray(payload) ? payload : []
   },
 
+  // Alias kept for modal fetch (same endpoint, explicit name)
+  async getMyPromotionUsages() {
+    const response = await api.get('/promotions/me/usages')
+    const payload = unwrap(response)
+    return Array.isArray(payload) ? payload : []
+  },
+
+  async getAllPromotionUsages() {
+    const response = await api.get('/promotions/admin/promotion-usages')
+    const payload = unwrap(response)
+    return Array.isArray(payload) ? payload : []
+  },
+
+  async getPromotionUsages(promotionId) {
+    const response = await api.get(`/promotions/admin/promotions/${promotionId}/usages`)
+    const payload = unwrap(response)
+    return Array.isArray(payload) ? payload : []
+  },
+
   // active is Boolean — sent as query param per @RequestParam Boolean active
   async updatePromotionStatus(id, active) {
     const response = await api.patch(`/promotions/admin/${id}/status`, null, {
@@ -61,6 +80,25 @@ const promotionApi = {
 
   async deletePromotion(id) {
     const response = await api.delete(`/promotions/admin/${id}`)
+    return unwrap(response)
+  },
+
+  // filterType: 'ALL' | 'TIER' | 'MIN_VISITS' | 'MIN_SPENT'
+  // tier: string (required when filterType === 'TIER')
+  // minVisits / minSpent: number (required for their respective filter types)
+  async sendVoucher(id, { filterType, tier, minVisits, minSpent }) {
+    const response = await api.post(`/promotions/${id}/send-voucher`, {
+      filterType,
+      tier,
+      minVisits,
+      minSpent,
+    })
+    return unwrap(response)
+  },
+
+  // Used to enrich usage history rows with customer name/phone
+  async getUserById(id) {
+    const response = await api.get(`/users/${id}`)
     return unwrap(response)
   },
 }

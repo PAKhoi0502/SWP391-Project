@@ -60,6 +60,12 @@ public class PromotionServiceImpl implements PromotionService {
                 .startAt(promotion.getStartAt())
                 .endAt(promotion.getEndAt())
                 .perUserLimit(promotion.getPerUserLimit())
+                .applicableTiers(
+                        promotionApplicableTierRepository.findByPromotionId(promotion.getId())
+                                .stream()
+                                .map(t -> t.getTier())
+                                .toList()
+                )
                 .build();
     }
 
