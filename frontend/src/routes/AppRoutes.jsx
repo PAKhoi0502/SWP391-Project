@@ -39,6 +39,9 @@ import StaffBookingListPage from '../pages/booking/StaffBookingListPage'
 import StaffWalkInBookingPage from '../pages/booking/StaffWalkInBookingPage'
 import AdminBookingListPage from '../pages/booking/AdminBookingListPage'
 import PaymentReturnPage from '../pages/booking/PaymentReturnPage'
+import CustomerWashHistoryListPage from '../pages/washHistory/CustomerWashHistoryListPage'
+import WashHistoryDetailPage from '../pages/washHistory/WashHistoryDetailPage'
+import AdminWashHistoryListPage from '../pages/washHistory/AdminWashHistoryListPage'
 import AdminTierRulesPage from '../pages/loyalty/AdminTierRulesPage'
 import CustomerPromotionListPage from '../pages/promotion/CustomerPromotionListPage'
 import CustomerPromotionDetailPage from '../pages/promotion/CustomerPromotionDetailPage'
@@ -74,6 +77,8 @@ function AppRoutes() {
           <Route path="/customer/bookings" element={<CustomerBookingListPage />} />
           <Route path="/customer/bookings/:id" element={<BookingDetailPage />} />
           <Route path="/customer/booking-history" element={<BookingHistoryPage />} />
+          <Route path="/customer/wash-histories" element={<CustomerWashHistoryListPage />} />
+          <Route path="/customer/wash-histories/:id" element={<WashHistoryDetailPage />} />
           <Route path="/customer/promotions" element={<CustomerPromotionListPage />} />
           <Route path="/customer/promotions/:id" element={<CustomerPromotionDetailPage />} />
         </Route>
@@ -105,6 +110,7 @@ function AppRoutes() {
           <Route path="admin/service-packages" element={<AdminServicePackagePage />} />
           <Route path="admin/bookings" element={<AdminBookingListPage />} />
           <Route path="admin/bookings/:id" element={<BookingDetailPage />} />
+          <Route path="admin/wash-histories" element={<AdminWashHistoryListPage />} />
           <Route path="admin/loyalty/tier-rules" element={<AdminTierRulesPage />} />
         </Route>
       </Route>

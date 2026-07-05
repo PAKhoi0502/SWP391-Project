@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface WashHistoryRepository extends JpaRepository<WashHistory, Long> {
@@ -18,4 +19,8 @@ public interface WashHistoryRepository extends JpaRepository<WashHistory, Long> 
     Page<WashHistory> findByGarageIdOrderByCompletedAtDesc(Long garageId, Pageable pageable);
 
     Page<WashHistory> findByCustomerIdAndGarageIdOrderByCompletedAtDesc(Long customerId, Long garageId, Pageable pageable);
+
+    Page<WashHistory> findByCustomerIdInOrderByCompletedAtDesc(List<Long> customerIds, Pageable pageable);
+
+    Page<WashHistory> findByCustomerIdInAndGarageIdOrderByCompletedAtDesc(List<Long> customerIds, Long garageId, Pageable pageable);
 }
