@@ -13,4 +13,5 @@ public class RedeemPreviewResponse {
     private BigDecimal discountAmount;
     private BigDecimal originalPrice;
     private BigDecimal estimatedFinalPrice;
+    private String message;
 }

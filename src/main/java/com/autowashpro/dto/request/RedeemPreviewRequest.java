@@ -9,4 +9,5 @@ public class RedeemPreviewRequest {
     private Long servicePackageId;
     @NotNull
     private Integer points;
+    private java.math.BigDecimal subtotalAfterPromotion;
 }

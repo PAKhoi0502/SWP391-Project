@@ -54,13 +54,8 @@ public class ComboStepResolver {
         }
 
         List<ServicePackageStep> ordered = new ArrayList<>();
-        if (!mainSteps.isEmpty()) {
-            ordered.addAll(mainSteps.subList(0, mainSteps.size() - 1));
-            ordered.addAll(addOnSteps);
-            ordered.add(mainSteps.get(mainSteps.size() - 1));
-        } else {
-            ordered.addAll(addOnSteps);
-        }
+        ordered.addAll(mainSteps);
+        ordered.addAll(addOnSteps);
 
         return ordered;
     }
