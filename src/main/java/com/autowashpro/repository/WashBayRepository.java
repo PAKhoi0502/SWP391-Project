@@ -26,6 +26,11 @@ public interface WashBayRepository
     long countAvailableByGarageAndVehicleType(@Param("garageId") Long garageId,
             @Param("vehicleType") String vehicleType);
 
+    // Đếm tổng bay đang active (dùng cho kiểm tra slot tương lai — không dùng status real-time)
+    @Query("SELECT COUNT(w) FROM WashBay w WHERE w.garageId = :garageId AND w.vehicleType = :vehicleType AND w.isActive = true")
+    long countActiveByGarageAndVehicleType(@Param("garageId") Long garageId,
+            @Param("vehicleType") String vehicleType);
+
     @Query("SELECT w.vehicleType, COUNT(w) FROM WashBay w WHERE w.garageId = :garageId AND w.status <> com.autowashpro.entity.enums.WashBayStatus.MAINTENANCE AND w.isActive = true GROUP BY w.vehicleType")
     List<Object[]> countAvailableGroupedByVehicleType(@Param("garageId") Long garageId);
 
@@ -34,7 +39,9 @@ public interface WashBayRepository
     // Đếm booking đang chiếm wash bay theo garage + vehicle type + time
     @Query("""
             SELECT COUNT(b) FROM Booking b
+            LEFT JOIN Vehicle v ON v.id = b.vehicleId
             WHERE b.garageId = :garageId
+            AND (v.vehicleType = :vehicleType OR b.vehicleId IS NULL)
             AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
             AND b.startTime < :endTime
             AND b.endTime > :startTime

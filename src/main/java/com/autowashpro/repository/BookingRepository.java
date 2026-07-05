@@ -64,6 +64,11 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     List<Booking> findAllByOrderByStartTimeDesc();
 
+    long countByPromotionIdAndCustomerIdAndStatusNot(Long promotionId, Long customerId, String status);
+
+    long countByPromotionIdAndStatusNot(Long promotionId, String status);
+
+
     // ====================
 
     // Issue #11: Đếm booking chiếm wash bay theo garage + vehicle type.

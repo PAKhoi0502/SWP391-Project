@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   bookingFlowUtils,
   customerBookingFlowApi,
 } from '../../api/customerBookingFlowApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
+import promotionApi from '../../api/promotionApi'
 import './CustomerCreateBookingPage.css'
 import { getPackageType } from '../../services/servicePackageApi'
 
@@ -48,6 +49,28 @@ const formatMoney = (value) =>
     currency: 'VND',
     maximumFractionDigits: 0,
   }).format(Number(value || 0))
+
+const formatDiscountLabel = (promo) => {
+  const type = String(promo?.discountType || '').toUpperCase()
+  const value = promo?.discountValue
+  if (type === 'PERCENTAGE' && value != null) return `Voucher giảm ${value}%`
+  if ((type === 'FIXED_AMOUNT' || type === 'FIXED') && value != null)
+    return `Voucher giảm ${formatMoney(value)}`
+  return 'Voucher'
+}
+
+const formatEndDate = (value) => {
+  if (!value) return ''
+  try {
+    return new Date(value).toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+  } catch {
+    return String(value)
+  }
+}
 
 const getId = (item) =>
   item?.id ??
@@ -146,6 +169,7 @@ const isPastSlot = (slot, selectedDate) => {
 
 export default function CustomerCreateBookingPage() {
   const navigate = useNavigate()
+  const promoDropdownRef = useRef(null)
 
   const [currentStep, setCurrentStep] = useState(1)
 
@@ -164,6 +188,9 @@ export default function CustomerCreateBookingPage() {
 
   const [promotionCode, setPromotionCode] = useState('')
   const [promotionResult, setPromotionResult] = useState(null)
+  const [showPromoDropdown, setShowPromoDropdown] = useState(false)
+  const [eligiblePromotions, setEligiblePromotions] = useState([])
+  const [loadingEligible, setLoadingEligible] = useState(false)
   const [loyaltyPoints, setLoyaltyPoints] = useState('')
   const [loyaltyPreview, setLoyaltyPreview] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('')
@@ -390,7 +417,55 @@ export default function CustomerCreateBookingPage() {
     }
   }, [selectedSlotId, visibleSlots])
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (promoDropdownRef.current && !promoDropdownRef.current.contains(e.target)) {
+        setShowPromoDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // Reset promotion + eligible list when package or add-ons change
+  useEffect(() => {
+    setPromotionResult(null)
+    setPromotionCode('')
+    setEligiblePromotions([])
+    setShowPromoDropdown(false)
+  }, [selectedPackageId, selectedAddOnIds])
+
+  // Reset loyalty when promotion changes; also clear points if stacking is blocked
+  useEffect(() => {
+    setLoyaltyPreview(null)
+    if (promotionResult?.valid && !promotionResult?.allowLoyaltyStack) {
+      setLoyaltyPoints('')
+    }
+  }, [promotionResult])
+
+  // Load eligible promotions when package + subtotal are ready
+  useEffect(() => {
+    if (!selectedPackageId || priceSummary.subtotal <= 0) {
+      setEligiblePromotions([])
+      return
+    }
+    let mounted = true
+    setLoadingEligible(true)
+    promotionApi
+      .getEligiblePromotions({
+        servicePackageId: Number(selectedPackageId),
+        orderAmount: priceSummary.subtotal,
+      })
+      .then((data) => { if (mounted) setEligiblePromotions(data) })
+      .catch(() => { if (mounted) setEligiblePromotions([]) })
+      .finally(() => { if (mounted) setLoadingEligible(false) })
+    return () => { mounted = false }
+  }, [selectedPackageId, priceSummary.subtotal])
+
   const handleValidatePromotion = async () => {
+    setShowPromoDropdown(false)
+
     if (!promotionCode.trim()) {
       setPromotionResult(null)
       setMessage('Nhập mã khuyến mãi trước khi áp dụng.')
@@ -404,20 +479,48 @@ export default function CustomerCreateBookingPage() {
 
     try {
       setMessage('')
-      const result = await customerBookingFlowApi.validatePromotion({
-        code: promotionCode.trim(),
-        garageId: selectedGarageId,
-        vehicleId: getId(selectedVehicle),
-        servicePackageId: selectedPackageId,
-        bookingDate: selectedDate,
-        subtotal: priceSummary.subtotal,
+      const result = await promotionApi.validatePromotion({
+        promotionCode: promotionCode.trim(),
+        servicePackageId: Number(selectedPackageId),
+        orderAmount: priceSummary.subtotal,
       })
 
-      setPromotionResult(result)
-      setMessage(result?.message || 'Áp dụng mã khuyến mãi thành công.')
+      if (result?.valid === false) {
+        setPromotionResult(null)
+        setMessage(result?.message || 'Mã khuyến mãi không hợp lệ hoặc không áp dụng được.')
+      } else {
+        setPromotionResult(result)
+        setMessage(result?.message || 'Áp dụng mã khuyến mãi thành công.')
+      }
     } catch (error) {
       setPromotionResult(null)
-      setMessage(error.message || 'Mã khuyến mãi không hợp lệ.')
+      setMessage(error?.response?.data?.message || error.message || 'Mã khuyến mãi không hợp lệ.')
+    }
+  }
+
+  const handleSelectPromoFromDropdown = async (promo) => {
+    setPromotionCode(promo.code)
+    setShowPromoDropdown(false)
+    setPromotionResult(null)
+
+    try {
+      setMessage('')
+      const result = await promotionApi.validatePromotion({
+        promotionCode: promo.code,
+        servicePackageId: Number(selectedPackageId),
+        orderAmount: priceSummary.subtotal,
+      })
+
+      if (result?.valid === false) {
+        setPromotionResult(null)
+        setMessage(result?.message || 'Mã khuyến mãi không áp dụng được.')
+      } else {
+        setPromotionResult(result)
+        setMessage(result?.message || 'Áp dụng mã khuyến mãi thành công.')
+      }
+    } catch (error) {
+      setPromotionResult(null)
+      setMessage(error?.response?.data?.message || error.message || 'Mã khuyến mãi không hợp lệ.')
     }
   }
 
@@ -442,9 +545,10 @@ export default function CustomerCreateBookingPage() {
         selectedPackage?.packageId ??
         selectedPackage?.id
 
-      const result = await customerBookingFlowApi.redeemPreview({
+      const result = await loyaltyApi.redeemPreview({
         servicePackageId: Number(packageId),
         points,
+        subtotalAfterPromotion: priceSummary.subtotal - priceSummary.promotionDiscount,
       })
 
       setLoyaltyPreview(result)
@@ -452,16 +556,18 @@ export default function CustomerCreateBookingPage() {
       const validPoints = result?.validPoints ?? 0
       const discountAmount = result?.discountAmount ?? 0
 
-      if (validPoints < points) {
-        setMessage(
-          `Chỉ áp dụng được ${validPoints} điểm (giảm ${formatMoney(discountAmount)}). Điểm hợp lệ phải là bội số của 10 và không vượt quá điểm khả dụng.`,
-        )
+      if (result?.message) {
+        setMessage(result.message)
+      } else if (validPoints < points) {
+        setMessage(`Chỉ áp dụng được ${validPoints} điểm (giảm ${formatMoney(discountAmount)}).`)
       } else {
-        setMessage(`Áp dụng ${validPoints} điểm — giảm ${formatMoney(discountAmount)}.`)
+        setMessage(`Áp dụng ${validPoints} điểm, giảm ${formatMoney(discountAmount)}.`)
       }
     } catch (error) {
       setLoyaltyPreview(null)
-      setMessage(error?.response?.data?.message || error.message || 'Không thể tính thử điểm loyalty.')
+      const errMsg = error?.response?.data?.message || error?.message || ''
+      const isInsufficient = /insufficient|not enough|không đủ|khong du/i.test(errMsg)
+      setMessage(isInsufficient ? 'Bạn không đủ điểm khả dụng để đổi.' : (errMsg || 'Không thể tính thử điểm loyalty.'))
     }
   }
 
@@ -573,9 +679,21 @@ export default function CustomerCreateBookingPage() {
       return
     }
 
-    if (Number(loyaltyPoints || 0) > 0 && loyaltyPreview === null) {
-      setMessage('Bạn đã nhập điểm loyalty nhưng chưa bấm "Tính thử". Vui lòng bấm "Tính thử" trước khi xác nhận đặt lịch.')
+    if (promotionCode.trim() && !promotionResult?.valid) {
+      setMessage('Mã khuyến mãi chưa được xác thực. Nhấn "Áp dụng" để kiểm tra trước.')
       return
+    }
+
+    const enteredPoints = Number(loyaltyPoints || 0)
+    if (enteredPoints > 0) {
+      if (loyaltyPreview === null) {
+        setMessage('Bạn đã nhập điểm loyalty nhưng chưa bấm "Tính thử". Vui lòng bấm "Tính thử" trước khi xác nhận đặt lịch.')
+        return
+      }
+      if ((loyaltyPreview.validPoints ?? 0) <= 0) {
+        setMessage('Không thể áp dụng số điểm này. Vui lòng xóa điểm hoặc nhập lại và bấm "Tính thử".')
+        return
+      }
     }
 
     try {
@@ -604,7 +722,7 @@ export default function CustomerCreateBookingPage() {
         addOnServicePackageIds: selectedAddOnIds.map(Number),
         startTime,
         promotionCode: promotionCode.trim() || null,
-        usedPoints: loyaltyPreview?.validPoints ?? Number(loyaltyPoints || 0),
+        usedPoints: loyaltyPreview?.validPoints ?? 0,
         paymentMethod,
         note:
           paymentMethod === 'BANK_TRANSFER'
@@ -920,38 +1038,134 @@ export default function CustomerCreateBookingPage() {
                   <h2>Ưu đãi và xác nhận</h2>
                 </div>
 
-                <div className="booking-inline-fields">
-                  <label className="booking-field">
-                    Mã khuyến mãi
-                    <input
-                      value={promotionCode}
-                      placeholder="Nhập mã giảm giá"
-                      onChange={(event) => setPromotionCode(event.target.value)}
-                    />
-                  </label>
-                  <button type="button" onClick={handleValidatePromotion}>
-                    Áp dụng
-                  </button>
+                <div className="booking-promo-wrapper" ref={promoDropdownRef}>
+                  {!selectedPackage && (
+                    <p className="booking-muted booking-promo-hint">
+                      Vui lòng chọn gói dịch vụ trước khi chọn mã giảm giá.
+                    </p>
+                  )}
+                  <div className="booking-inline-fields">
+                    <label className="booking-field">
+                      Mã khuyến mãi
+                      <input
+                        value={promotionCode}
+                        placeholder={selectedPackage ? 'Nhập hoặc chọn mã giảm giá' : 'Chọn gói dịch vụ trước'}
+                        disabled={!selectedPackage}
+                        onFocus={() => { if (selectedPackage) setShowPromoDropdown(true) }}
+                        onChange={(event) => {
+                          setPromotionCode(event.target.value)
+                          setPromotionResult(null)
+                          if (selectedPackage) setShowPromoDropdown(true)
+                        }}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleValidatePromotion}
+                      disabled={!selectedPackage}
+                    >
+                      Áp dụng
+                    </button>
+                    {promotionResult?.valid && (
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => {
+                          setPromotionCode('')
+                          setPromotionResult(null)
+                          setShowPromoDropdown(false)
+                        }}
+                      >
+                        Bỏ mã
+                      </button>
+                    )}
+                  </div>
+
+                  {showPromoDropdown && selectedPackage && (
+                    <div className="booking-promo-dropdown">
+                      {loadingEligible ? (
+                        <div className="booking-promo-dd-state">Đang tải mã khuyến mãi...</div>
+                      ) : eligiblePromotions.length === 0 ? (
+                        <div className="booking-promo-dd-state">Không có mã phù hợp với lựa chọn hiện tại.</div>
+                      ) : (
+                        eligiblePromotions.map((promo) => (
+                          <button
+                            key={promo.id}
+                            type="button"
+                            className="booking-promo-dd-item"
+                            onClick={() => handleSelectPromoFromDropdown(promo)}
+                          >
+                            <div className="booking-promo-dd-top">
+                              <span className="booking-promo-dd-code">{promo.code}</span>
+                              <span className="booking-promo-dd-name">
+                                {promo.name || formatDiscountLabel(promo)}
+                              </span>
+                              <span className="booking-promo-dd-amount">
+                                {formatDiscountLabel(promo)}
+                              </span>
+                            </div>
+                            {promo.description && (
+                              <div className="booking-promo-dd-desc">{promo.description}</div>
+                            )}
+                            <div className="booking-promo-dd-meta">
+                              {promo.endAt && (
+                                <span>HSD: {formatEndDate(promo.endAt)}</span>
+                              )}
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {promotionResult?.valid && (
+                    <p className="booking-promo-success">
+                      Mã hợp lệ — giảm {formatMoney(promotionResult.discountAmount ?? 0)}
+                      {promotionResult.message ? `. ${promotionResult.message}` : ''}
+                    </p>
+                  )}
                 </div>
 
-                <div className="booking-inline-fields">
-                  <label className="booking-field">
-                    Điểm loyalty muốn dùng
-                    <input
-                      type="number"
-                      min="0"
-                      value={loyaltyPoints}
-                      placeholder="Ví dụ: 100"
-                      onChange={(event) => {
-                        setLoyaltyPoints(event.target.value)
-                        setLoyaltyPreview(null)
-                      }}
-                    />
-                  </label>
-                  <button type="button" onClick={handleRedeemPreview}>
-                    Tính thử
-                  </button>
-                </div>
+                {promotionResult?.valid && !promotionResult?.allowLoyaltyStack ? (
+                  <p className="booking-loyalty-blocked">
+                    Khuyến mãi này không cho phép dùng kèm điểm loyalty.
+                  </p>
+                ) : (
+                  <div className="booking-inline-fields">
+                    <label className="booking-field">
+                      Điểm loyalty muốn dùng
+                      {promotionResult?.valid && promotionResult?.allowLoyaltyStack && promotionResult?.maxLoyaltyPoints != null && (
+                        <span className="booking-loyalty-cap-hint">
+                          (tối đa {promotionResult.maxLoyaltyPoints} điểm khi dùng kèm mã này)
+                        </span>
+                      )}
+                      <input
+                        type="number"
+                        min="0"
+                        max={
+                          promotionResult?.valid && promotionResult?.allowLoyaltyStack && promotionResult?.maxLoyaltyPoints != null
+                            ? promotionResult.maxLoyaltyPoints
+                            : undefined
+                        }
+                        value={loyaltyPoints}
+                        placeholder="Ví dụ: 100"
+                        onChange={(event) => {
+                          let val = event.target.value
+                          const capMax = promotionResult?.valid && promotionResult?.allowLoyaltyStack && promotionResult?.maxLoyaltyPoints != null
+                            ? promotionResult.maxLoyaltyPoints
+                            : null
+                          if (val !== '' && capMax != null && Number(val) > capMax) val = String(capMax)
+                          if (val !== '' && Number(val) < 0) val = '0'
+                          setLoyaltyPoints(val)
+                          setLoyaltyPreview(null)
+                        }}
+                      />
+                    </label>
+                    <button type="button" onClick={handleRedeemPreview}>
+                      Tính thử
+                    </button>
+                  </div>
+                )}
                 <div className="booking-payment-method-box">
                   <h3>Phương thức thanh toán</h3>
 

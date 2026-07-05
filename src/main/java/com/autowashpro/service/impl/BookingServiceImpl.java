@@ -18,6 +18,7 @@ import com.autowashpro.dto.response.WalkInCustomerLookupResponse;
 import com.autowashpro.entity.*;
 import com.autowashpro.entity.enums.WashBayStatus;
 import com.autowashpro.repository.*;
+import com.autowashpro.entity.PromotionUsage;
 import com.autowashpro.service.BookingService;
 import com.autowashpro.service.LoyaltyService;
 import com.autowashpro.service.PromotionService;
@@ -58,6 +59,7 @@ public class BookingServiceImpl implements BookingService {
         private final CustomerLoyaltyRepository customerLoyaltyRepository;
         private final LoyaltyTierRuleRepository loyaltyTierRuleRepository;
         private final PromotionRepository promotionRepository;
+        private final PromotionUsageRepository promotionUsageRepository;
         private final BookingAssignedStaffRepository bookingAssignedStaffRepository;
         private final StaffProfileRepository staffProfileRepository;
         private final UserRepository userRepository;
@@ -381,7 +383,8 @@ public class BookingServiceImpl implements BookingService {
 
                 String bayType = mapVehicleTypeToBayType(vehicleType);
 
-                long availableBays = washBayRepository.countAvailableByGarageAndVehicleType(
+                // Dùng tổng bay active (bỏ qua status real-time) để kiểm tra slot tương lai
+                long totalBays = washBayRepository.countActiveByGarageAndVehicleType(
                                 garageId,
                                 bayType);
 
@@ -391,7 +394,7 @@ public class BookingServiceImpl implements BookingService {
                                 start,
                                 end);
 
-                return occupied < availableBays;
+                return occupied < totalBays;
         }
 
         private boolean isCareStaffAvailable(
@@ -534,11 +537,11 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 if (requiresWashBay(selectedPackages)) {
-                        long availableBays = washBayRepository
-                                        .countAvailableByGarageAndVehicleType(request.getGarageId(), bayType);
+                        long totalBays = washBayRepository
+                                        .countActiveByGarageAndVehicleType(request.getGarageId(), bayType);
                         long occupiedBays = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
                                         request.getGarageId(), bayType, startTime, endTime);
-                        if (occupiedBays >= availableBays) {
+                        if (occupiedBays >= totalBays) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                                                 "No wash bay available for this time slot");
                         }
@@ -613,6 +616,22 @@ public class BookingServiceImpl implements BookingService {
 
                 Booking saved = bookingRepository.save(booking);
 
+                if (usedPoints > 0) {
+                        loyalty.setAvailablePoints(loyalty.getAvailablePoints() - usedPoints);
+                        loyalty.setRedeemedPoints(loyalty.getRedeemedPoints() + usedPoints);
+                        customerLoyaltyRepository.save(loyalty);
+
+                        PointTransaction redeemTx = new PointTransaction();
+                        redeemTx.setCustomerId(customerId);
+                        redeemTx.setBookingId(saved.getId());
+                        redeemTx.setType("REDEEM");
+                        redeemTx.setPoints(-usedPoints);
+                        redeemTx.setRemainingPoints(0);
+                        redeemTx.setSource("BOOKING_REDEEM");
+                        redeemTx.setNote("Redeemed " + usedPoints + " points for booking #" + saved.getId());
+                        pointTransactionRepository.save(redeemTx);
+                }
+
                 int sortOrder = 1;
                 for (ServicePackage addOn : addOns) {
                         BookingAddOnServicePackage bookingAddOn = new BookingAddOnServicePackage();
@@ -623,6 +642,23 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 loyaltyService.updateBookingStatistics(booking.getId());
+
+                // Niêm phong promotion ngay khi booking được tạo
+                if (promotionId != null && !promotionUsageRepository.existsByBookingId(saved.getId())) {
+                        PromotionUsage usage = new PromotionUsage();
+                        usage.setPromotionId(promotionId);
+                        usage.setBookingId(saved.getId());
+                        usage.setCustomerId(customerId);
+                        usage.setDiscountAmount(promotionDiscountAmount);
+                        usage.setUsedAt(LocalDateTime.now());
+                        promotionUsageRepository.save(usage);
+
+                        promotionRepository.findById(promotionId).ifPresent(p -> {
+                                p.setUsedCount(p.getUsedCount() + 1);
+                                promotionRepository.save(p);
+                        });
+                }
+
                 notificationService.notifyBookingConfirmed(booking.getId());
 
                 BookingResponse response = toResponse(saved);
@@ -699,12 +735,11 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 if (requiresWashBay(selectedPackages)) {
-                        long availableBays = washBayRepository.countAvailableByGarageAndVehicleType(
+                        long totalBays = washBayRepository.countActiveByGarageAndVehicleType(
                                         request.getGarageId(), bayType);
                         long occupiedBays = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
                                         request.getGarageId(), bayType, startTime, endTime);
-
-                        if (occupiedBays >= availableBays) {
+                        if (occupiedBays >= totalBays) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                                                 "No wash bay available for this time slot");
                         }
@@ -714,6 +749,15 @@ public class BookingServiceImpl implements BookingService {
 
                 User matchedCustomer = findActiveCustomerByPhone(request.getGuestPhone());
                 Vehicle matchedVehicle = findMatchedCustomerVehicle(matchedCustomer, normalizedPlate);
+
+                if (matchedCustomer != null) {
+                        long customerGarageOverlap = bookingRepository.countOverlappingBookingsByCustomerAndGarage(
+                                        matchedCustomer.getId(), request.getGarageId(), startTime, endTime);
+                        if (customerGarageOverlap > 0) {
+                                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                                "Khách hàng này đã có lịch đặt tại garage trong khung giờ này");
+                        }
+                }
 
                 // Auto-save new vehicle for known customers when the plate is not in their profile yet
                 if (matchedCustomer != null && matchedVehicle == null && normalizedPlate != null) {
@@ -1119,18 +1163,10 @@ public class BookingServiceImpl implements BookingService {
                                                         addOnId));
                 }
 
-                // Add-on steps are inserted right before the final main step (handover),
-                // so staff still hand over the car last. If main has just one step,
-                // there's no handover phase to protect — it must run first.
+                // Main steps first, then add-on steps after.
                 List<ServicePackageStep> orderedTemplates = new ArrayList<>();
-                if (mainTemplates.size() > 1) {
-                        orderedTemplates.addAll(mainTemplates.subList(0, mainTemplates.size() - 1));
-                        orderedTemplates.addAll(addOnTemplates);
-                        orderedTemplates.add(mainTemplates.get(mainTemplates.size() - 1));
-                } else {
-                        orderedTemplates.addAll(mainTemplates);
-                        orderedTemplates.addAll(addOnTemplates);
-                }
+                orderedTemplates.addAll(mainTemplates);
+                orderedTemplates.addAll(addOnTemplates);
 
                 int stepOrder = 1;
                 for (ServicePackageStep template : orderedTemplates) {
@@ -1228,26 +1264,25 @@ public class BookingServiceImpl implements BookingService {
                         bookingAssignedStaffRepository.save(assignedStaff);
                 }
 
-                if (booking.getUsedPoints() != null && booking.getUsedPoints() > 0
-                                && !"CHECKED_IN".equals(status)) {
-                        customerLoyaltyRepository.findByCustomerId(booking.getCustomerId())
-                                        .ifPresent(loyalty -> {
-                                                loyalty.setAvailablePoints(
-                                                                loyalty.getAvailablePoints() + booking.getUsedPoints());
-                                                loyalty.setRedeemedPoints(
-                                                                Math.max(0, loyalty.getRedeemedPoints()
-                                                                                - booking.getUsedPoints()));
-                                                customerLoyaltyRepository.save(loyalty);
-                                        });
-                }
-
                 booking.setStatus("CANCELED");
                 booking.setNote(reason != null ? reason : booking.getNote());
                 booking.setRewardProcessed(false);
 
                 Booking saved = bookingRepository.save(booking);
-                // Hoàn điểm nếu có
-                loyaltyService.refundPointsForCanceledBooking(saved.getId());
+                // Hoàn điểm nếu có — không hoàn khi đã CHECKED_IN (điểm bị giữ làm phí)
+                if (!"CHECKED_IN".equals(status)) {
+                        loyaltyService.refundPointsForCanceledBooking(saved.getId());
+                }
+                // Trả lại promotion khi hủy booking
+                if (saved.getPromotionId() != null) {
+                        promotionUsageRepository.findByBookingId(saved.getId()).ifPresent(usage -> {
+                                promotionUsageRepository.delete(usage);
+                                promotionRepository.findById(saved.getPromotionId()).ifPresent(p -> {
+                                        p.setUsedCount(Math.max(0, p.getUsedCount() - 1));
+                                        promotionRepository.save(p);
+                                });
+                        });
+                }
                 return toResponse(saved);
         }
 
@@ -1294,6 +1329,16 @@ public class BookingServiceImpl implements BookingService {
                 booking.setRewardProcessed(false);
 
                 Booking saved = bookingRepository.save(booking);
+                // Trả lại promotion khi no-show
+                if (saved.getPromotionId() != null) {
+                        promotionUsageRepository.findByBookingId(saved.getId()).ifPresent(usage -> {
+                                promotionUsageRepository.delete(usage);
+                                promotionRepository.findById(saved.getPromotionId()).ifPresent(p -> {
+                                        p.setUsedCount(Math.max(0, p.getUsedCount() - 1));
+                                        promotionRepository.save(p);
+                                });
+                        });
+                }
                 return toResponse(saved);
         }
         // ===================== ISSUE #17 =====================

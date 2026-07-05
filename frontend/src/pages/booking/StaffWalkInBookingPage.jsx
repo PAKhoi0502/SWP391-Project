@@ -132,6 +132,7 @@ export default function StaffWalkInBookingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
+  const [customerConflictSlots, setCustomerConflictSlots] = useState(new Set())
 
   useEffect(() => {
     let active = true
@@ -348,7 +349,6 @@ export default function StaffWalkInBookingPage() {
 
         setSlots(
           allSlots.filter((slot) => {
-            if (!slot.available) return false
             if (isToday) return new Date(slot.startTime) > now
             return true
           }),
@@ -363,6 +363,32 @@ export default function StaffWalkInBookingPage() {
 
     return () => clearTimeout(slotDebounce.current)
   }, [form.garageId, form.servicePackageId, form.vehicleType, form.date])
+
+  useEffect(() => {
+    if (!customerLookup?.found || !customerLookup?.customerId || !form.garageId || !form.date) {
+      setCustomerConflictSlots(new Set())
+      return
+    }
+
+    let active = true
+    bookingApi.getStaffBookings({ date: form.date })
+      .then((bookings) => {
+        if (!active) return
+        const conflictSet = new Set(
+          bookings
+            .filter((b) => String(b.customerId) === String(customerLookup.customerId) && ['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'].includes(b.status))
+            .map((b) => b.startTime),
+        )
+        setCustomerConflictSlots(conflictSet)
+      })
+      .catch(() => {
+        if (active) setCustomerConflictSlots(new Set())
+      })
+
+    return () => {
+      active = false
+    }
+  }, [form.garageId, form.date, customerLookup])
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -500,7 +526,15 @@ export default function StaffWalkInBookingPage() {
       }
       navigate(id ? `/staff/bookings/${id}` : '/staff/bookings', { replace: true })
     } catch (err) {
-      setError(getErrorMessage(err, 'Tạo hồ sơ walk-in thất bại. Vui lòng thử lại.'))
+      const msg = getErrorMessage(err, '')
+      if (msg && msg.includes('đã có lịch đặt')) {
+        const conflictedSlot = form.startTime
+        setCustomerConflictSlots((prev) => new Set([...prev, conflictedSlot]))
+        setForm((prev) => ({ ...prev, startTime: '' }))
+        setFieldErrors((prev) => ({ ...prev, startTime: '' }))
+      } else {
+        setError(getErrorMessage(err, 'Tạo hồ sơ walk-in thất bại. Vui lòng thử lại.'))
+      }
     } finally {
       setSubmitting(false)
     }
@@ -821,19 +855,33 @@ export default function StaffWalkInBookingPage() {
               ) : (
                 <>
                   <div className="swi-slots-grid">
-                    {slots.map((slot) => (
-                      <button
-                        key={slot.startTime}
-                        type="button"
-                        className={`swi-slot${form.startTime === slot.startTime ? ' swi-slot--selected' : ''}`}
-                        onClick={() => {
-                          setFieldErrors((prev) => ({ ...prev, startTime: '' }))
-                          setForm((prev) => ({ ...prev, startTime: slot.startTime }))
-                        }}
-                      >
-                        {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
-                      </button>
-                    ))}
+                    {slots.map((slot) => {
+                      const isFull = !slot.available
+                      const isCustomerBooked = customerConflictSlots.has(slot.startTime)
+                      const isDisabled = isFull || isCustomerBooked
+                      return (
+                        <button
+                          key={slot.startTime}
+                          type="button"
+                          disabled={isDisabled}
+                          className={[
+                            'swi-slot',
+                            form.startTime === slot.startTime ? 'swi-slot--selected' : '',
+                            isFull ? 'swi-slot--full' : '',
+                            isCustomerBooked ? 'swi-slot--customer-booked' : '',
+                          ].filter(Boolean).join(' ')}
+                          onClick={() => {
+                            if (isDisabled) return
+                            setFieldErrors((prev) => ({ ...prev, startTime: '' }))
+                            setForm((prev) => ({ ...prev, startTime: slot.startTime }))
+                          }}
+                        >
+                          {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                          {isFull && <span className="swi-slot-full-label">Hết chỗ</span>}
+                          {isCustomerBooked && <span className="swi-slot-customer-booked-label">KH đã đặt</span>}
+                        </button>
+                      )
+                    })}
                   </div>
                   {fieldErrors.startTime && <p className="swi-field-error">{fieldErrors.startTime}</p>}
                 </>

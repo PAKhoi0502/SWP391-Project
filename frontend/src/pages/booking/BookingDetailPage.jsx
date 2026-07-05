@@ -719,6 +719,35 @@ function BookingDetailPage() {
       enriched.requiresCareStaff = Boolean(packageResult.value.requiresCareStaff)
       enriched.careStaffRequiredCount = packageResult.value.careStaffRequiredCount || 0
       enriched.careStaffType = packageResult.value.careStaffType || ''
+
+      // COMBO packages have no own steps — resolve template steps from included packages,
+      // mirroring the same insert-before-last logic as ComboStepResolver.java on the backend.
+      if (
+        enriched.servicePackageSteps.length === 0 &&
+        String(enriched.servicePackageType || '').toUpperCase() === 'COMBO' &&
+        Array.isArray(packageResult.value.includedServiceIds) &&
+        packageResult.value.includedServiceIds.length > 0
+      ) {
+        const includedPackages = await Promise.all(
+          packageResult.value.includedServiceIds.map((id) => getServicePackageById(id).catch(() => null)),
+        )
+        const mainIncludedSteps = []
+        const addOnIncludedSteps = []
+        for (const pkg of includedPackages.filter(Boolean)) {
+          const pkgType = String(pkg.serviceType || '').toUpperCase()
+          const steps = normalizeServiceSteps(getPackageStepSource(pkg))
+          if (pkgType === 'ADD_ON' || pkgType === 'ADDON') {
+            addOnIncludedSteps.push(...steps)
+          } else {
+            mainIncludedSteps.push(...steps)
+          }
+        }
+        const comboMerged =
+          mainIncludedSteps.length > 0
+            ? [...mainIncludedSteps, ...addOnIncludedSteps]
+            : addOnIncludedSteps
+        enriched.servicePackageSteps = comboMerged.map((step, index) => ({ ...step, order: index + 1 }))
+      }
     }
 
     enriched.addOnServicePackageNames = await resolveAddOnServicePackageNames(enriched.addOnServicePackageIds)
@@ -736,7 +765,7 @@ function BookingDetailPage() {
         // Add-on steps go right before the final main step (handover),
         // matching how the backend orders BookingServiceStep once service starts.
         const merged = mainSteps.length > 0
-          ? [...mainSteps.slice(0, -1), ...addOnSteps, mainSteps[mainSteps.length - 1]]
+          ? [...mainSteps, ...addOnSteps]
           : addOnSteps
         enriched.servicePackageSteps = merged.map((step, index) => ({ ...step, order: index + 1 }))
       }

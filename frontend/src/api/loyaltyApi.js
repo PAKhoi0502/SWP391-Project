@@ -24,6 +24,31 @@ export const loyaltyApi = {
     })
     return unwrap(response)
   },
+
+  async redeemPreview({ servicePackageId, points, subtotalAfterPromotion }) {
+    const response = await api.post('/loyalty/redeem-preview', {
+      servicePackageId,
+      points,
+      ...(subtotalAfterPromotion != null ? { subtotalAfterPromotion } : {}),
+    })
+    return unwrap(response)
+  },
+
+  async getAdminTierRules() {
+    const response = await api.get('/loyalty/admin/tier-rules')
+    const payload = unwrap(response)
+    return Array.isArray(payload) ? payload : []
+  },
+
+  async createTierRule(payload) {
+    const response = await api.post('/loyalty/admin/tier-rules', payload)
+    return unwrap(response)
+  },
+
+  async updateTierRule(id, payload) {
+    const response = await api.patch(`/loyalty/admin/tier-rules/${id}`, payload)
+    return unwrap(response)
+  },
 }
 
 export default loyaltyApi

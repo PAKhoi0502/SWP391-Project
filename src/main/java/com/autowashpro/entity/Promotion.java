@@ -58,6 +58,12 @@ public class Promotion {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
+    @Column(name = "allow_loyalty_stack", nullable = false)
+    private Boolean allowLoyaltyStack = false;
+
+    @Column(name = "max_loyalty_points")
+    private Integer maxLoyaltyPoints;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

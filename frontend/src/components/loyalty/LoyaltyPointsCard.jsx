@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { loyaltyApi } from '../../api/loyaltyApi'
+import LoyaltyTransactionsModal from './LoyaltyTransactionsModal'
 import './LoyaltyPointsCard.css'
 
 const TIER_META = {
@@ -8,8 +9,6 @@ const TIER_META = {
   GOLD: { label: 'Vàng', icon: '🥇' },
   PLATINUM: { label: 'Bạch kim', icon: '💎' },
 }
-
-const MAIN_TIERS = ['SILVER', 'GOLD', 'PLATINUM']
 
 const getTierMeta = (tier) => {
   const key = String(tier || '').toUpperCase()
@@ -28,6 +27,7 @@ export default function LoyaltyPointsCard() {
   const [tierRules, setTierRules] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [txModalOpen, setTxModalOpen] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -59,7 +59,7 @@ export default function LoyaltyPointsCard() {
   const currentTierKey = String(loyalty.currentTier || '').toUpperCase()
   const tierMeta = getTierMeta(currentTierKey)
 
-  const mainTierRules = tierRules.filter((r) => MAIN_TIERS.includes(String(r.tier || '').toUpperCase()))
+  const mainTierRules = [...tierRules].sort((a, b) => (a.priorityLevel ?? 0) - (b.priorityLevel ?? 0))
 
   return (
     <div className="lpc-root">
@@ -71,6 +71,13 @@ export default function LoyaltyPointsCard() {
             <span>{tierMeta.label}</span>
           </div>
         </div>
+        <button
+          type="button"
+          className="lpc-history-btn"
+          onClick={() => setTxModalOpen(true)}
+        >
+          Xem lịch sử điểm
+        </button>
       </div>
 
       <div className="lpc-points-row">
@@ -141,6 +148,8 @@ export default function LoyaltyPointsCard() {
           </div>
         </>
       )}
+
+      <LoyaltyTransactionsModal open={txModalOpen} onClose={() => setTxModalOpen(false)} />
     </div>
   )
 }

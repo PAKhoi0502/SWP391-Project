@@ -16,4 +16,6 @@ public interface LoyaltyTierRuleRepository
     List<LoyaltyTierRule> findByIsActiveTrueOrderByPriorityLevelAsc();
 
     List<LoyaltyTierRule> findByIsActiveTrueOrderByPriorityLevelDesc();
+
+    List<LoyaltyTierRule> findAllByOrderByPriorityLevelAsc();
 }

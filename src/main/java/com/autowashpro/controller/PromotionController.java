@@ -142,7 +142,7 @@ public ApiResponse<List<PromotionUsageResponse>> getPromotionUsages(
             .build();
 }
 
-@GetMapping("/promotions/me/usages")
+@GetMapping("/me/usages")
 @PreAuthorize("hasRole('CUSTOMER')")
 public ApiResponse<List<PromotionUsageResponse>> getMyPromotionUsages(
         @AuthenticationPrincipal UserDetails userDetails) {
@@ -155,6 +155,16 @@ public ApiResponse<List<PromotionUsageResponse>> getMyPromotionUsages(
             .data(promotionService.getMyPromotionUsages(customerId))
             .build();
 }
+@DeleteMapping("/admin/{id}")
+@PreAuthorize("hasRole('ADMIN')")
+public ApiResponse<Void> deletePromotion(@PathVariable Long id) {
+    promotionService.deletePromotion(id);
+    return ApiResponse.<Void>builder()
+            .success(true)
+            .message("Promotion deleted successfully")
+            .build();
+}
+
 @PostMapping("/{id}/send-voucher")
 @PreAuthorize("hasRole('ADMIN')")
 public ApiResponse<Integer> sendVoucher(
