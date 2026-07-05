@@ -58,7 +58,7 @@ export default function AdminServicePackagePage() {
       const name = getPackageName(item).toLowerCase()
       const matchKeyword = name.includes(keyword.trim().toLowerCase())
       const matchType = typeFilter === 'ALL' || getPackageType(item) === typeFilter
-      const matchVehicle = vehicleFilter === 'ALL' || item.vehicleType === vehicleFilter
+      const matchVehicle = vehicleFilter === 'ALL' || normalizeVehicleType(item.vehicleType) === normalizeVehicleType(vehicleFilter)
 
       return matchKeyword && matchType && matchVehicle
     })
@@ -97,12 +97,12 @@ export default function AdminServicePackagePage() {
   }
 
   const mainPackageOptions = useMemo(
-    () => packages.filter((item) => getPackageType(item) === 'MAIN' && item.vehicleType === form.vehicleType),
+    () => packages.filter((item) => getPackageType(item) === 'MAIN' && normalizeVehicleType(item.vehicleType) === normalizeVehicleType(form.vehicleType)),
     [packages, form.vehicleType],
   )
 
   const addOnPackageOptions = useMemo(
-    () => packages.filter((item) => getPackageType(item) === 'ADD_ON' && item.vehicleType === form.vehicleType),
+    () => packages.filter((item) => getPackageType(item) === 'ADD_ON' && normalizeVehicleType(item.vehicleType) === normalizeVehicleType(form.vehicleType)),
     [packages, form.vehicleType],
   )
 
@@ -596,9 +596,19 @@ washBayDurationMinutes: Number(form.durationMinutes),
   )
 }
 
+// Dữ liệu cũ (từ migration_v41) lưu xe máy là 'BIKE', trong khi form tạo gói
+// dùng 'MOTORBIKE' (VEHICLE_TYPES) — chuẩn hóa 2 giá trị này về cùng 1 loại
+// để so sánh/hiển thị không bị lệch nhau (giống cách backend đã tolerant cả 2).
+function normalizeVehicleType(value) {
+  const normalized = String(value || '').trim().toUpperCase()
+  if (normalized === 'BIKE' || normalized === 'MOTORBIKE' || normalized === 'MOTORCYCLE') return 'MOTORBIKE'
+  return normalized
+}
+
 function formatVehicleType(value) {
-  if (value === 'CAR') return 'Ô tô'
-  if (value === 'MOTORBIKE') return 'Xe máy'
+  const normalized = normalizeVehicleType(value)
+  if (normalized === 'CAR') return 'Ô tô'
+  if (normalized === 'MOTORBIKE') return 'Xe máy'
   return value || '-'
 }
 

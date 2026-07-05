@@ -588,6 +588,7 @@ public class BookingServiceImpl implements BookingService {
                 Booking booking = new Booking();
                 booking.setCustomerId(customerId);
                 booking.setVehicleId(request.getVehicleId());
+                booking.setVehicleType(bayType);
                 booking.setGarageId(request.getGarageId());
                 booking.setServicePackageId(request.getServicePackageId());
                 booking.setPromotionId(promotionId);
@@ -700,8 +701,8 @@ public class BookingServiceImpl implements BookingService {
                 if (requiresWashBay(selectedPackages)) {
                         long availableBays = washBayRepository.countAvailableByGarageAndVehicleType(
                                         request.getGarageId(), bayType);
-                        long occupiedBays = bookingRepository.countOverlappingBookingsByGarage(
-                                        request.getGarageId(), startTime, endTime);
+                        long occupiedBays = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
+                                        request.getGarageId(), bayType, startTime, endTime);
 
                         if (occupiedBays >= availableBays) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -740,6 +741,7 @@ public class BookingServiceImpl implements BookingService {
                 Booking booking = new Booking();
                 booking.setCustomerId(matchedCustomer != null ? matchedCustomer.getId() : null);
                 booking.setVehicleId(matchedVehicle != null ? matchedVehicle.getId() : null);
+                booking.setVehicleType(bayType);
                 booking.setGarageId(request.getGarageId());
                 booking.setServicePackageId(request.getServicePackageId());
                 booking.setCreatedByStaffId(staffUserId);
@@ -1118,13 +1120,15 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 // Add-on steps are inserted right before the final main step (handover),
-                // so staff still hand over the car last.
+                // so staff still hand over the car last. If main has just one step,
+                // there's no handover phase to protect — it must run first.
                 List<ServicePackageStep> orderedTemplates = new ArrayList<>();
-                if (!mainTemplates.isEmpty()) {
+                if (mainTemplates.size() > 1) {
                         orderedTemplates.addAll(mainTemplates.subList(0, mainTemplates.size() - 1));
                         orderedTemplates.addAll(addOnTemplates);
                         orderedTemplates.add(mainTemplates.get(mainTemplates.size() - 1));
                 } else {
+                        orderedTemplates.addAll(mainTemplates);
                         orderedTemplates.addAll(addOnTemplates);
                 }
 

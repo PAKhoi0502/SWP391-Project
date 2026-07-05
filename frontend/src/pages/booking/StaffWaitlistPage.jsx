@@ -1,16 +1,22 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { bookingApi } from '../../api/bookingApi'
+import { useCallback, useEffect, useState } from 'react'
 import { waitlistApi } from '../../api/waitlistApi'
 import { useAuth } from '../../contexts/AuthContext'
-import { Button, EmptyState, ErrorState, LoadingSpinner, Select } from '../../components/common/ui'
+import { Button, EmptyState, ErrorState, LoadingSpinner, Pagination, Select } from '../../components/common/ui'
 import './StaffWaitlistPage.css'
 
 const STATUS_OPTIONS = [
   { value: 'WAITING', label: 'Đang chờ' },
-  { value: 'ACCEPTED', label: 'Đã duyệt' },
-  { value: 'REJECTED', label: 'Đã từ chối' },
+  { value: 'OFFERED', label: 'Đã offer slot' },
+  { value: 'ACCEPTED', label: 'Đã nhận slot' },
+  { value: 'EXPIRED', label: 'Hết hạn' },
+  { value: 'CANCELED', label: 'Khách đã hủy' },
   { value: 'ALL', label: 'Tất cả' },
 ]
+
+const REASON_LABELS = {
+  NO_BAY: 'Hết chỗ rửa xe',
+  NO_CARE_STAFF: 'Hết nhân viên chăm xe',
+}
 
 function formatDate(value) {
   if (!value) return 'Chưa có ngày'
@@ -31,53 +37,59 @@ function formatTime(value) {
   })
 }
 
+function formatDateTime(value) {
+  if (!value) return null
+  return new Date(value).toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function getVehicleTypeLabel(vehicleType) {
+  const value = String(vehicleType || '').toUpperCase()
+  if (value === 'CAR') return 'Ô tô'
+  if (value === 'MOTORBIKE' || value === 'BIKE' || value === 'MOTORCYCLE') return 'Xe máy'
+  return vehicleType || 'Chưa có loại xe'
+}
+
+function getReasonLabel(reason) {
+  return REASON_LABELS[reason] || reason || 'Chưa rõ lý do'
+}
+
 function getStatusLabel(status) {
   const value = String(status || 'WAITING').toUpperCase()
   if (value === 'WAITING') return 'Đang chờ'
-  if (value === 'ACCEPTED') return 'Đã duyệt'
-  if (value === 'REJECTED') return 'Đã từ chối'
-  if (value === 'CANCELLED' || value === 'CANCELED') return 'Khách đã hủy'
+  if (value === 'OFFERED') return 'Đã offer slot'
+  if (value === 'ACCEPTED') return 'Đã nhận slot'
+  if (value === 'EXPIRED') return 'Hết hạn'
+  if (value === 'CANCELED' || value === 'CANCELLED') return 'Khách đã hủy'
   return value
 }
 
 function getStatusTone(status) {
   const value = String(status || 'WAITING').toUpperCase()
+  if (value === 'OFFERED') return 'offered'
   if (value === 'ACCEPTED') return 'accepted'
-  if (value === 'REJECTED' || value === 'CANCELLED' || value === 'CANCELED') return 'rejected'
+  if (value === 'EXPIRED') return 'expired'
+  if (value === 'CANCELED' || value === 'CANCELLED') return 'canceled'
   return 'waiting'
 }
 
 function getErrorMessage(error, fallback) {
-  return error?.message || error?.data?.message || fallback
+  return error?.response?.data?.message || error?.message || fallback
 }
 
-function extractSlots(payload) {
-  if (Array.isArray(payload)) return payload
-  if (Array.isArray(payload?.slots)) return payload.slots
-  if (Array.isArray(payload?.availableSlots)) return payload.availableSlots
-  if (Array.isArray(payload?.data)) return payload.data
-  if (Array.isArray(payload?.data?.slots)) return payload.data.slots
-  return []
-}
-
-function isSameSlot(a, b) {
-  if (!a || !b) return false
-  return new Date(a).getTime() === new Date(b).getTime()
-}
-
-function StaffWaitlistCard({ item, position, actionKey, onApprove, onReject }) {
-  const id = item?.id || item?.waitlistId
+function StaffWaitlistCard({ item, actionKey, onOffer, onExpire }) {
   const status = String(item?.status || 'WAITING').toUpperCase()
-  const isWaiting = status === 'WAITING'
-  const isApproving = actionKey === `approve-${id}`
-  const isRejecting = actionKey === `reject-${id}`
+  const canOffer = status === 'WAITING'
+  const canExpire = status === 'WAITING' || status === 'OFFERED'
+  const isOffering = actionKey === `offer-${item.id}`
+  const isExpiring = actionKey === `expire-${item.id}`
+  const offerExpiresAt = formatDateTime(item?.offerExpiresAt)
 
   return (
     <article className="staff-waitlist-card">
       <div className="staff-waitlist-card-header">
         <div>
           <span className="staff-waitlist-label">Customer</span>
-          <h2>{item?.customerName || 'Khách hàng'}</h2>
+          <h2>{item?.customerName || `Khách hàng #${item?.customerId || '-'}`}</h2>
         </div>
 
         <span className={`staff-waitlist-status staff-waitlist-status-${getStatusTone(status)}`}>
@@ -91,37 +103,51 @@ function StaffWaitlistCard({ item, position, actionKey, onApprove, onReject }) {
           <dd>{item?.garageName || `Garage #${item?.garageId || '-'}`}</dd>
         </div>
         <div>
+          <dt>Xe</dt>
+          <dd>{item?.vehicleName || `Xe #${item?.vehicleId || '-'}`}</dd>
+        </div>
+        <div>
           <dt>Gói dịch vụ</dt>
-          <dd>{item?.servicePackageName || item?.packageName || `Gói #${item?.servicePackageId || '-'}`}</dd>
+          <dd>{item?.servicePackageName || `Gói #${item?.servicePackageId || '-'}`}</dd>
         </div>
         <div>
-          <dt>Ngày</dt>
-          <dd>{formatDate(item?.date || item?.startTime)}</dd>
+          <dt>Loại xe</dt>
+          <dd>{getVehicleTypeLabel(item?.vehicleType)}</dd>
         </div>
         <div>
-          <dt>Khung giờ</dt>
-          <dd>{formatTime(item?.startTime)} - {formatTime(item?.endTime)}</dd>
+          <dt>Ngày mong muốn</dt>
+          <dd>{formatDate(item?.desiredStartTime)}</dd>
         </div>
         <div>
-          <dt>Vị trí</dt>
-          <dd>#{position}</dd>
+          <dt>Khung giờ mong muốn</dt>
+          <dd>{formatTime(item?.desiredStartTime)} - {formatTime(item?.desiredEndTime)}</dd>
         </div>
         <div>
-          <dt>Tạo lúc</dt>
-          <dd>{formatDate(item?.createdAt)}</dd>
+          <dt>Lý do vào waitlist</dt>
+          <dd>{getReasonLabel(item?.reason)}</dd>
+        </div>
+        <div>
+          <dt>Hạng thành viên</dt>
+          <dd>{item?.customerTier || 'BRONZE'}</dd>
         </div>
       </dl>
 
-      {item?.rejectedReason && <p className="staff-waitlist-reason">Lý do từ chối: {item.rejectedReason}</p>}
+      {status === 'OFFERED' && offerExpiresAt && (
+        <p className="staff-waitlist-reason">Offer hết hạn lúc: {offerExpiresAt}</p>
+      )}
 
-      {isWaiting && (
+      {(canOffer || canExpire) && (
         <div className="staff-waitlist-actions">
-          <Button loading={isApproving} disabled={Boolean(actionKey)} onClick={() => onApprove(item)}>
-            Duyệt
-          </Button>
-          <Button variant="ghost" loading={isRejecting} disabled={Boolean(actionKey)} onClick={() => onReject(id)}>
-            Từ chối
-          </Button>
+          {canOffer && (
+            <Button loading={isOffering} disabled={Boolean(actionKey)} onClick={() => onOffer(item)}>
+              Offer slot
+            </Button>
+          )}
+          {canExpire && (
+            <Button variant="ghost" loading={isExpiring} disabled={Boolean(actionKey)} onClick={() => onExpire(item)}>
+              Đánh dấu hết hạn
+            </Button>
+          )}
         </div>
       )}
     </article>
@@ -129,99 +155,73 @@ function StaffWaitlistCard({ item, position, actionKey, onApprove, onReject }) {
 }
 
 export default function StaffWaitlistPage() {
-  const { user } = useAuth()
+  const { role } = useAuth()
+  const isAdmin = String(role || '').toUpperCase().includes('ADMIN')
+
   const [status, setStatus] = useState('WAITING')
+  const [garageId, setGarageId] = useState('')
   const [items, setItems] = useState([])
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [actionKey, setActionKey] = useState('')
 
-  const sortedItems = useMemo(() => {
-    const sorted = [...items].sort((a, b) => {
-      const aTime = new Date(a?.createdAt || 0).getTime()
-      const bTime = new Date(b?.createdAt || 0).getTime()
-      return aTime - bTime
-    })
-
-    // Vị trí trong hàng chờ được tính theo thứ tự tham gia (createdAt),
-    // riêng cho mỗi nhóm garage + khung giờ, chứ không dựa vào field
-    // `position` lưu sẵn (có thể bị thiếu hoặc không tự cập nhật khi
-    // có người bị từ chối/hủy khỏi hàng chờ).
-    const groupCounters = new Map()
-
-    return sorted.map((item) => {
-      const groupKey = `${item?.garageId ?? ''}__${item?.startTime ?? ''}`
-      const nextPosition = (groupCounters.get(groupKey) || 0) + 1
-      groupCounters.set(groupKey, nextPosition)
-
-      return { ...item, computedPosition: nextPosition }
-    })
-  }, [items])
-
   const fetchQueue = useCallback(async () => {
     try {
       setLoading(true)
       setError('')
-      const result = await waitlistApi.getQueue({ status })
-      setItems(Array.isArray(result) ? result : [])
+      const data = await waitlistApi.getAdminWaitlists({
+        garageId: isAdmin ? garageId.trim() || undefined : undefined,
+        status,
+        page,
+        limit: 10,
+      })
+      setItems(Array.isArray(data?.content) ? data.content : [])
+      setTotalPages(data?.totalPages || 1)
     } catch (err) {
       setError(getErrorMessage(err, 'Không thể tải danh sách waitlist.'))
     } finally {
       setLoading(false)
     }
-  }, [status])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, page])
 
   useEffect(() => {
     fetchQueue()
   }, [fetchQueue])
 
-  const approve = async (item) => {
-    const id = item?.id || item?.waitlistId
+  const handleApplyGarageFilter = () => {
+    setPage(1)
+    fetchQueue()
+  }
 
+  const offer = async (item) => {
     try {
-      setActionKey(`approve-${id}`)
+      setActionKey(`offer-${item.id}`)
       setError('')
       setSuccess('')
-
-      const slots = extractSlots(
-        await bookingApi.getAvailableSlots({
-          garageId: item?.garageId,
-          servicePackageId: item?.servicePackageId,
-          vehicleType: item?.vehicleType,
-          date: item?.date || item?.startTime?.slice(0, 10),
-        }),
-      )
-
-      const targetSlot = slots.find((slot) => isSameSlot(slot?.startTime, item?.startTime))
-
-      if (!targetSlot?.available) {
-        setError('Slot này vẫn đang full, chưa thể duyệt waitlist. Vui lòng thử lại sau khi có khách hủy hoặc có slot trống.')
-        return
-      }
-
-      await waitlistApi.approve(id, user?.id || null)
-      setSuccess('Đã duyệt waitlist. Khi backend có auto-fill, slot sẽ được tạo booking tự động sau khi có hủy.')
+      await waitlistApi.offerWaitlist(item.id)
+      setSuccess('Đã offer slot cho khách hàng.')
       await fetchQueue()
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể duyệt waitlist.'))
+      setError(getErrorMessage(err, 'Không thể offer slot cho waitlist này.'))
     } finally {
       setActionKey('')
     }
   }
 
-  const reject = async (id) => {
-    const reason = window.prompt('Nhập lý do từ chối waitlist (không bắt buộc):') || ''
-
+  const expire = async (item) => {
     try {
-      setActionKey(`reject-${id}`)
+      setActionKey(`expire-${item.id}`)
       setError('')
       setSuccess('')
-      await waitlistApi.reject(id, user?.id || null, reason.trim())
-      setSuccess('Đã từ chối waitlist.')
+      await waitlistApi.expireWaitlist(item.id)
+      setSuccess('Đã đánh dấu hết hạn waitlist.')
       await fetchQueue()
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể từ chối waitlist.'))
+      setError(getErrorMessage(err, 'Không thể đánh dấu hết hạn waitlist này.'))
     } finally {
       setActionKey('')
     }
@@ -231,13 +231,33 @@ export default function StaffWaitlistPage() {
     <div className="staff-waitlist-page">
       <section className="staff-waitlist-hero">
         <div>
-          <p className="staff-waitlist-eyebrow">Staff waitlist</p>
-          <h1>Duyệt danh sách chờ</h1>
-          <p>Nhân viên xem hàng chờ, duyệt hoặc từ chối các yêu cầu waitlist của khách.</p>
+          <p className="staff-waitlist-eyebrow">{isAdmin ? 'Admin waitlist' : 'Staff waitlist'}</p>
+          <h1>Quản lý danh sách chờ</h1>
+          <p>Xem hàng chờ, offer slot trống hoặc đánh dấu hết hạn các yêu cầu waitlist của khách.</p>
         </div>
 
-        <div className="staff-waitlist-filter">
-          <Select label="Trạng thái" value={status} options={STATUS_OPTIONS} onChange={(e) => setStatus(e.target.value)} />
+        <div className="staff-waitlist-filters-row">
+          {isAdmin && (
+            <label className="staff-waitlist-garage-filter">
+              <span>Garage ID</span>
+              <input
+                placeholder="Tất cả garage"
+                value={garageId}
+                onChange={(event) => setGarageId(event.target.value)}
+                onBlur={handleApplyGarageFilter}
+                onKeyDown={(event) => event.key === 'Enter' && handleApplyGarageFilter()}
+              />
+            </label>
+          )}
+
+          <div className="staff-waitlist-filter">
+            <Select
+              label="Trạng thái"
+              value={status}
+              options={STATUS_OPTIONS}
+              onChange={(e) => { setStatus(e.target.value); setPage(1) }}
+            />
+          </div>
         </div>
       </section>
 
@@ -246,22 +266,25 @@ export default function StaffWaitlistPage() {
 
       {loading && <LoadingSpinner text="Đang tải waitlist..." />}
       {!loading && error && <ErrorState title="Không thể tải waitlist" description={error} onRetry={fetchQueue} />}
-      {!loading && !error && sortedItems.length === 0 && (
+      {!loading && !error && items.length === 0 && (
         <EmptyState icon="WL" title="Không có yêu cầu waitlist" description="Các yêu cầu khách tham gia waitlist sẽ hiển thị tại đây." />
       )}
-      {!loading && !error && sortedItems.length > 0 && (
-        <div className="staff-waitlist-grid">
-          {sortedItems.map((item) => (
-            <StaffWaitlistCard
-              key={item?.id || JSON.stringify(item)}
-              item={item}
-              position={item.computedPosition}
-              actionKey={actionKey}
-              onApprove={approve}
-              onReject={reject}
-            />
-          ))}
-        </div>
+      {!loading && !error && items.length > 0 && (
+        <>
+          <div className="staff-waitlist-grid">
+            {items.map((item) => (
+              <StaffWaitlistCard
+                key={item.id}
+                item={item}
+                actionKey={actionKey}
+                onOffer={offer}
+                onExpire={expire}
+              />
+            ))}
+          </div>
+
+          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+        </>
       )}
     </div>
   )

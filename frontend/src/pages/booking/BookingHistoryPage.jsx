@@ -350,9 +350,22 @@ export default function BookingHistoryPage() {
           return { bookingId, steps: actualSteps }
         }
 
-        // No actual steps yet — show template steps from service package so customer
-        // can see what the full workflow looks like before service starts
-        const templateSteps = await getPackageSteps(booking.servicePackageId)
+        // No actual steps yet — show template steps from service package (+ any
+        // add-ons) so customer can see what the full workflow looks like before
+        // service starts. Add-on steps are inserted right before the final main
+        // step, matching the order BookingServiceImpl uses once service starts.
+        const mainSteps = await getPackageSteps(booking.servicePackageId)
+        const addOnIds = Array.isArray(booking.addOnServicePackageIds) ? booking.addOnServicePackageIds : []
+        const addOnStepsNested = await Promise.all(addOnIds.map((id) => getPackageSteps(id)))
+        const addOnSteps = addOnStepsNested.flat()
+
+        // Only defer the main package's last step when there's an earlier
+        // sequence to protect it from — a single-step main must run first.
+        const merged = mainSteps.length > 1
+          ? [...mainSteps.slice(0, -1), ...addOnSteps, mainSteps[mainSteps.length - 1]]
+          : [...mainSteps, ...addOnSteps]
+
+        const templateSteps = merged.map((step, index) => ({ ...step, order: index + 1 }))
         return { bookingId, steps: templateSteps }
       }),
     )

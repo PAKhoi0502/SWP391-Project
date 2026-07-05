@@ -32,6 +32,7 @@ const NAV_ITEMS = {
     { to: '/admin/service-packages', label: 'Gói dịch vụ' },
     { to: '/admin/bookings', label: 'Booking' },
     { to: '/admin/wash-histories', label: 'Lịch sử rửa xe' },
+    { to: '/admin/waitlist', label: 'Waitlist' },
   ],
 }
 

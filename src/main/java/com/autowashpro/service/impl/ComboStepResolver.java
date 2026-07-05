@@ -53,12 +53,18 @@ public class ComboStepResolver {
             }
         }
 
+        // Only defer the main package's last step (treated as a "handover" step)
+        // when there's an earlier sequence to protect it from. If the main
+        // package has just one step, there's no distinct handover phase — it
+        // must run first, otherwise add-ons would appear to happen before the
+        // wash itself.
         List<ServicePackageStep> ordered = new ArrayList<>();
-        if (!mainSteps.isEmpty()) {
+        if (mainSteps.size() > 1) {
             ordered.addAll(mainSteps.subList(0, mainSteps.size() - 1));
             ordered.addAll(addOnSteps);
             ordered.add(mainSteps.get(mainSteps.size() - 1));
         } else {
+            ordered.addAll(mainSteps);
             ordered.addAll(addOnSteps);
         }
 

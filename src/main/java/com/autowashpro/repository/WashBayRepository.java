@@ -16,11 +16,17 @@ public interface WashBayRepository
     @Query("SELECT DISTINCT w.vehicleType FROM WashBay w WHERE w.garageId = :garageId AND w.isActive = true")
     List<String> findDistinctVehicleTypesByGarageId(@Param("garageId") Long garageId);
 
-    @Query("SELECT COUNT(w) FROM WashBay w WHERE w.garageId = :garageId AND w.vehicleType = :vehicleType AND w.status = com.autowashpro.entity.enums.WashBayStatus.AVAILABLE AND w.isActive = true")
+    // Tổng số bay (capacity) theo garage + loại xe — dùng "status <> MAINTENANCE"
+    // thay vì "status = AVAILABLE": bay đang IN_USE tại thời điểm hiện tại vẫn
+    // là 1 slot hợp lệ cho các khung giờ trong tương lai (sẽ trống lại khi
+    // lượt rửa hiện tại xong). Chỉ bay đang bảo trì mới thực sự bị loại khỏi
+    // capacity. Việc slot cụ thể còn trống hay không do
+    // countOverlappingBookingsByGarageAndVehicleType quyết định riêng.
+    @Query("SELECT COUNT(w) FROM WashBay w WHERE w.garageId = :garageId AND w.vehicleType = :vehicleType AND w.status <> com.autowashpro.entity.enums.WashBayStatus.MAINTENANCE AND w.isActive = true")
     long countAvailableByGarageAndVehicleType(@Param("garageId") Long garageId,
             @Param("vehicleType") String vehicleType);
 
-    @Query("SELECT w.vehicleType, COUNT(w) FROM WashBay w WHERE w.garageId = :garageId AND w.status = com.autowashpro.entity.enums.WashBayStatus.AVAILABLE AND w.isActive = true GROUP BY w.vehicleType")
+    @Query("SELECT w.vehicleType, COUNT(w) FROM WashBay w WHERE w.garageId = :garageId AND w.status <> com.autowashpro.entity.enums.WashBayStatus.MAINTENANCE AND w.isActive = true GROUP BY w.vehicleType")
     List<Object[]> countAvailableGroupedByVehicleType(@Param("garageId") Long garageId);
 
     boolean existsByGarageIdAndBayCode(Long garageId, String bayCode);

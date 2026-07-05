@@ -106,6 +106,7 @@ function AppRoutes() {
           <Route path="admin/bookings" element={<AdminBookingListPage />} />
           <Route path="admin/bookings/:id" element={<BookingDetailPage />} />
           <Route path="admin/wash-histories" element={<AdminWashHistoryListPage />} />
+          <Route path="admin/waitlist" element={<StaffWaitlistPage />} />
         </Route>
       </Route>
 

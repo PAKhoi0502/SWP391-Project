@@ -21,6 +21,7 @@ import com.autowashpro.service.EmailService;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -35,6 +36,7 @@ public class WaitlistServiceImpl implements WaitlistService {
     private final BookingRepository bookingRepository;
     private final StaffProfileRepository staffProfileRepository;
     private final CustomerLoyaltyRepository customerLoyaltyRepository;
+    private final UserRepository userRepository;
     private final BookingService bookingService;
     private final NotificationService notificationService;
     private final EmailService emailService;
@@ -245,6 +247,20 @@ public class WaitlistServiceImpl implements WaitlistService {
                     "Waitlist entry has passed the cutoff time and has been expired");
         }
 
+        // Rule: không cho staff offer nếu bay thực ra vẫn đang đầy — tránh mời
+        // khách nhận 1 slot mà lúc accept chắc chắn sẽ bị từ chối lại.
+        String bayType = normalizeVehicleType(waitlist.getVehicleType());
+        long availableBays = washBayRepository.countAvailableByGarageAndVehicleType(
+                waitlist.getGarageId(), bayType);
+        long occupiedBays = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
+                waitlist.getGarageId(), bayType,
+                waitlist.getDesiredStartTime(), waitlist.getDesiredEndTime());
+
+        if (occupiedBays >= availableBays) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "No wash bay available for this time slot yet — cannot offer this waitlist entry");
+        }
+
         waitlist.setStatus("OFFERED");
         waitlist.setOfferedAt(LocalDateTime.now());
         waitlist.setOfferExpiresAt(LocalDateTime.now().plusHours(2)); // default offer validity window
@@ -345,9 +361,13 @@ public class WaitlistServiceImpl implements WaitlistService {
         return WaitlistResponse.builder()
                 .id(w.getId())
                 .garageId(w.getGarageId())
+                .garageName(getGarageName(w.getGarageId()))
                 .customerId(w.getCustomerId())
+                .customerName(getUserName(w.getCustomerId()))
                 .vehicleId(w.getVehicleId())
+                .vehicleName(getVehicleName(w.getVehicleId()))
                 .servicePackageId(w.getServicePackageId())
+                .servicePackageName(getServicePackageName(w.getServicePackageId()))
                 .offeredBookingId(w.getOfferedBookingId())
                 .desiredStartTime(w.getDesiredStartTime())
                 .desiredEndTime(w.getDesiredEndTime())
@@ -363,5 +383,54 @@ public class WaitlistServiceImpl implements WaitlistService {
                 .expiredAt(w.getExpiredAt())
                 .createdAt(w.getCreatedAt())
                 .build();
+    }
+
+    private String getGarageName(Long garageId) {
+        if (garageId == null) return null;
+
+        return garageRepository.findById(garageId)
+                .map(Garage::getName)
+                .orElse(null);
+    }
+
+    private String getUserName(Long userId) {
+        if (userId == null) return null;
+
+        return userRepository.findById(userId)
+                .map(User::getFullName)
+                .orElse(null);
+    }
+
+    private String getServicePackageName(Long servicePackageId) {
+        if (servicePackageId == null) return null;
+
+        return servicePackageRepository.findById(servicePackageId)
+                .map(ServicePackage::getName)
+                .orElse(null);
+    }
+
+    private String getVehicleName(Long vehicleId) {
+        if (vehicleId == null) return null;
+
+        return vehicleRepository.findById(vehicleId)
+                .map(this::formatVehicleName)
+                .orElse(null);
+    }
+
+    private String formatVehicleName(Vehicle vehicle) {
+        String licensePlate = vehicle.getRawLicensePlate();
+        String brandModel = List.of(vehicle.getBrand(), vehicle.getModel()).stream()
+                .filter(value -> value != null && !value.isBlank())
+                .collect(Collectors.joining(" "));
+
+        if (licensePlate != null && !licensePlate.isBlank() && !brandModel.isBlank()) {
+            return licensePlate + " - " + brandModel;
+        }
+
+        if (licensePlate != null && !licensePlate.isBlank()) {
+            return licensePlate;
+        }
+
+        return brandModel;
     }
 }
