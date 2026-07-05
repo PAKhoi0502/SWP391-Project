@@ -40,6 +40,7 @@ import StaffWalkInBookingPage from '../pages/booking/StaffWalkInBookingPage'
 import AdminBookingListPage from '../pages/booking/AdminBookingListPage'
 import PaymentReturnPage from '../pages/booking/PaymentReturnPage'
 import AdminTierRulesPage from '../pages/loyalty/AdminTierRulesPage'
+import AdminPromotionManagementPage from '../pages/admin/AdminPromotionManagementPage'
 import CustomerPromotionListPage from '../pages/promotion/CustomerPromotionListPage'
 import CustomerPromotionDetailPage from '../pages/promotion/CustomerPromotionDetailPage'
 
@@ -106,6 +107,7 @@ function AppRoutes() {
           <Route path="admin/bookings" element={<AdminBookingListPage />} />
           <Route path="admin/bookings/:id" element={<BookingDetailPage />} />
           <Route path="admin/loyalty/tier-rules" element={<AdminTierRulesPage />} />
+          <Route path="admin/promotions" element={<AdminPromotionManagementPage />} />
         </Route>
       </Route>
 

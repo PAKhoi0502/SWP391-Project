@@ -1,0 +1,381 @@
+.adm-promo-page {
+  min-height: calc(100vh - 64px);
+  padding: 32px;
+  color: #f8fafc;
+  background:
+    radial-gradient(circle at top left, rgba(250, 204, 21, 0.08), transparent 28%),
+    radial-gradient(circle at top right, rgba(79, 70, 229, 0.12), transparent 32%),
+    linear-gradient(180deg, #111116 0%, #08080c 100%);
+}
+
+/* ── Hero ── */
+.adm-promo-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 28px 32px;
+  border: 1px solid rgba(250, 204, 21, 0.16);
+  border-radius: 24px;
+  background: rgba(15, 15, 22, 0.9);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
+  margin-bottom: 24px;
+}
+
+.adm-promo-kicker {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #facc15;
+}
+
+.adm-promo-hero h1 {
+  margin: 0 0 6px;
+  font-size: clamp(26px, 4vw, 44px);
+  line-height: 1.1;
+}
+
+.adm-promo-hero-text span {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.5;
+}
+
+.adm-promo-note {
+  font-style: normal;
+  color: rgba(250, 204, 21, 0.6);
+}
+
+.adm-promo-create-btn {
+  border: none;
+  border-radius: 14px;
+  padding: 12px 24px;
+  background: #facc15;
+  color: #111116;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.adm-promo-create-btn:hover {
+  background: #fde047;
+  transform: translateY(-1px);
+}
+
+/* ── States ── */
+.adm-promo-loading {
+  padding: 60px 24px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 15px;
+}
+
+.adm-promo-error {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  font-size: 14px;
+}
+
+.adm-promo-error-dismiss {
+  border: none;
+  background: transparent;
+  color: #fca5a5;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+.adm-promo-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 80px 24px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 15px;
+}
+
+/* ── Table ── */
+.adm-promo-table-wrapper {
+  border: 1px solid rgba(250, 204, 21, 0.12);
+  border-radius: 20px;
+  overflow: hidden;
+  overflow-x: auto;
+  background: rgba(15, 15, 22, 0.88);
+}
+
+.adm-promo-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 600px;
+}
+
+.adm-promo-table thead tr {
+  background: rgba(250, 204, 21, 0.06);
+  border-bottom: 1px solid rgba(250, 204, 21, 0.12);
+}
+
+.adm-promo-table th {
+  padding: 14px 18px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+}
+
+.adm-promo-table tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.15s;
+}
+
+.adm-promo-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.adm-promo-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.adm-promo-table tbody tr.row-inactive {
+  opacity: 0.55;
+}
+
+.adm-promo-table td {
+  padding: 14px 18px;
+  vertical-align: middle;
+}
+
+/* ── Cell styles ── */
+.adm-promo-code {
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 900;
+  color: #facc15;
+  background: rgba(250, 204, 21, 0.1);
+  border: 1px solid rgba(250, 204, 21, 0.22);
+  border-radius: 7px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.adm-promo-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.adm-promo-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 3px;
+  line-height: 1.4;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-promo-type-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.adm-promo-value {
+  font-size: 15px;
+  font-weight: 800;
+  color: #facc15;
+}
+
+.adm-promo-status {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+
+.adm-promo-status.active {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.adm-promo-status.inactive {
+  color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ── Row actions ── */
+.adm-promo-row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.adm-promo-btn-edit {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 6px 14px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.adm-promo-btn-edit:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.adm-promo-btn-toggle {
+  border: none;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.adm-promo-btn-toggle.on {
+  background: rgba(239, 68, 68, 0.14);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.28);
+}
+
+.adm-promo-btn-toggle.on:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.24);
+}
+
+.adm-promo-btn-toggle.off {
+  background: rgba(34, 197, 94, 0.12);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.adm-promo-btn-toggle.off:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.22);
+}
+
+.adm-promo-btn-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.adm-promo-btn-delete {
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+  white-space: nowrap;
+  transition: background 0.15s, opacity 0.15s;
+}
+.adm-promo-btn-delete:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.22);
+}
+.adm-promo-btn-delete:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Delete confirmation overlay ── */
+.adm-promo-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.adm-promo-confirm-modal {
+  background: #1a1a24;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 16px;
+  padding: 28px 32px;
+  max-width: 380px;
+  width: 90%;
+  color: #f1f5f9;
+}
+.adm-promo-confirm-modal p {
+  margin: 0 0 8px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.adm-promo-confirm-modal strong {
+  color: #fbbf24;
+}
+.adm-promo-confirm-note {
+  font-size: 13px !important;
+  color: #94a3b8 !important;
+  margin-bottom: 24px !important;
+}
+.adm-promo-confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+.adm-promo-confirm-btn-cancel {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: #cbd5e1;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.adm-promo-confirm-btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+.adm-promo-confirm-btn-delete {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #ef4444;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.adm-promo-confirm-btn-delete:hover {
+  background: #dc2626;
+}
+
+/* ── Responsive ── */
+@media (max-width: 720px) {
+  .adm-promo-page { padding: 20px 16px; }
+  .adm-promo-hero { padding: 20px; flex-direction: column; align-items: flex-start; }
+  .adm-promo-create-btn { width: 100%; text-align: center; }
+}

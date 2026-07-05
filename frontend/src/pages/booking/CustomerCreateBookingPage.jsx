@@ -436,9 +436,12 @@ export default function CustomerCreateBookingPage() {
     setShowPromoDropdown(false)
   }, [selectedPackageId, selectedAddOnIds])
 
-  // Reset loyaltyPreview whenever promotion changes so the preview stays consistent
+  // Reset loyalty when promotion changes; also clear points if stacking is blocked
   useEffect(() => {
     setLoyaltyPreview(null)
+    if (promotionResult?.valid && !promotionResult?.allowLoyaltyStack) {
+      setLoyaltyPoints('')
+    }
   }, [promotionResult])
 
   // Load eligible promotions when package + subtotal are ready
@@ -1096,17 +1099,14 @@ export default function CustomerCreateBookingPage() {
                               <span className="booking-promo-dd-name">
                                 {promo.name || formatDiscountLabel(promo)}
                               </span>
+                              <span className="booking-promo-dd-amount">
+                                {formatDiscountLabel(promo)}
+                              </span>
                             </div>
                             {promo.description && (
                               <div className="booking-promo-dd-desc">{promo.description}</div>
                             )}
                             <div className="booking-promo-dd-meta">
-                              {promo.minOrderAmount != null && (
-                                <span>Đơn tối thiểu {formatMoney(promo.minOrderAmount)}</span>
-                              )}
-                              {promo.maxDiscountAmount != null && (
-                                <span>Giảm tối đa {formatMoney(promo.maxDiscountAmount)}</span>
-                              )}
                               {promo.endAt && (
                                 <span>HSD: {formatEndDate(promo.endAt)}</span>
                               )}
@@ -1125,24 +1125,46 @@ export default function CustomerCreateBookingPage() {
                   )}
                 </div>
 
-                <div className="booking-inline-fields">
-                  <label className="booking-field">
-                    Điểm loyalty muốn dùng
-                    <input
-                      type="number"
-                      min="0"
-                      value={loyaltyPoints}
-                      placeholder="Ví dụ: 100"
-                      onChange={(event) => {
-                        setLoyaltyPoints(event.target.value)
-                        setLoyaltyPreview(null)
-                      }}
-                    />
-                  </label>
-                  <button type="button" onClick={handleRedeemPreview}>
-                    Tính thử
-                  </button>
-                </div>
+                {promotionResult?.valid && !promotionResult?.allowLoyaltyStack ? (
+                  <p className="booking-loyalty-blocked">
+                    Khuyến mãi này không cho phép dùng kèm điểm loyalty.
+                  </p>
+                ) : (
+                  <div className="booking-inline-fields">
+                    <label className="booking-field">
+                      Điểm loyalty muốn dùng
+                      {promotionResult?.valid && promotionResult?.allowLoyaltyStack && promotionResult?.maxLoyaltyPoints != null && (
+                        <span className="booking-loyalty-cap-hint">
+                          (tối đa {promotionResult.maxLoyaltyPoints} điểm khi dùng kèm mã này)
+                        </span>
+                      )}
+                      <input
+                        type="number"
+                        min="0"
+                        max={
+                          promotionResult?.valid && promotionResult?.allowLoyaltyStack && promotionResult?.maxLoyaltyPoints != null
+                            ? promotionResult.maxLoyaltyPoints
+                            : undefined
+                        }
+                        value={loyaltyPoints}
+                        placeholder="Ví dụ: 100"
+                        onChange={(event) => {
+                          let val = event.target.value
+                          const capMax = promotionResult?.valid && promotionResult?.allowLoyaltyStack && promotionResult?.maxLoyaltyPoints != null
+                            ? promotionResult.maxLoyaltyPoints
+                            : null
+                          if (val !== '' && capMax != null && Number(val) > capMax) val = String(capMax)
+                          if (val !== '' && Number(val) < 0) val = '0'
+                          setLoyaltyPoints(val)
+                          setLoyaltyPreview(null)
+                        }}
+                      />
+                    </label>
+                    <button type="button" onClick={handleRedeemPreview}>
+                      Tính thử
+                    </button>
+                  </div>
+                )}
                 <div className="booking-payment-method-box">
                   <h3>Phương thức thanh toán</h3>
 

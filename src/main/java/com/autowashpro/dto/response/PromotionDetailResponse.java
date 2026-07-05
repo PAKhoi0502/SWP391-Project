@@ -39,6 +39,10 @@ public class PromotionDetailResponse {
 
     private Boolean isActive;
 
+    private Boolean allowLoyaltyStack;
+
+    private Integer maxLoyaltyPoints;
+
     private List<String> applicableTiers;
 
 }

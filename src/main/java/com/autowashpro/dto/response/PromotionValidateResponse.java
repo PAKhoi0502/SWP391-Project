@@ -21,4 +21,8 @@ public class PromotionValidateResponse {
 
     private BigDecimal finalAmount;
 
+    private Boolean allowLoyaltyStack;
+
+    private Integer maxLoyaltyPoints;
+
 }

@@ -1,0 +1,281 @@
+/* ── Overlay ── */
+.apm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+/* ── Modal ── */
+.apm-modal {
+  width: 100%;
+  max-width: 720px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 22px;
+  background: #13131a;
+  border: 1px solid rgba(250, 204, 21, 0.18);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ── */
+.apm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 22px 28px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  position: sticky;
+  top: 0;
+  background: #13131a;
+  z-index: 1;
+}
+
+.apm-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.apm-close {
+  border: none;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.apm-close:hover {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+/* ── Loading ── */
+.apm-loading {
+  padding: 48px 28px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 14px;
+}
+
+/* ── Form ── */
+.apm-form {
+  padding: 22px 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.apm-api-error {
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  font-size: 13px;
+}
+
+/* ── Grid ── */
+.apm-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 18px;
+}
+
+.apm-field-full {
+  grid-column: 1 / -1;
+}
+
+/* ── Field ── */
+.apm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.apm-field label {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.apm-required {
+  color: #f87171;
+  margin-left: 2px;
+}
+
+.apm-label-hint {
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.35);
+  margin-left: 6px;
+}
+
+.apm-field input,
+.apm-field select,
+.apm-field textarea {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #f8fafc;
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.15s;
+  outline: none;
+}
+
+.apm-field textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.apm-field input:focus,
+.apm-field select:focus,
+.apm-field textarea:focus {
+  border-color: rgba(250, 204, 21, 0.5);
+}
+
+.apm-field input.error,
+.apm-field select.error,
+.apm-field textarea.error {
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+.apm-field select option {
+  background: #1a1a24;
+  color: #f8fafc;
+}
+
+.apm-field input[type='datetime-local']::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+}
+
+.apm-err {
+  font-size: 12px;
+  color: #f87171;
+  margin-top: 2px;
+}
+
+/* ── Tier checkboxes ── */
+.apm-tier-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.apm-tier-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  padding: 7px 14px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  user-select: none;
+  background: transparent;
+}
+
+.apm-tier-chip input[type='checkbox'] {
+  display: none;
+}
+
+.apm-tier-chip.selected {
+  border-color: rgba(250, 204, 21, 0.5);
+  background: rgba(250, 204, 21, 0.1);
+  color: #facc15;
+}
+
+.apm-tier-chip:hover {
+  border-color: rgba(250, 204, 21, 0.35);
+  color: rgba(250, 204, 21, 0.8);
+}
+
+/* ── Toggle label ── */
+.apm-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.apm-toggle-label input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: #facc15;
+  cursor: pointer;
+}
+
+/* ── Actions ── */
+.apm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.apm-btn-cancel {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 10px 22px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.apm-btn-cancel:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.apm-btn-submit {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 28px;
+  background: #facc15;
+  color: #111116;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.apm-btn-submit:hover:not(:disabled) {
+  background: #fde047;
+}
+
+.apm-btn-submit:disabled,
+.apm-btn-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Responsive ── */
+@media (max-width: 560px) {
+  .apm-overlay { padding: 0; align-items: flex-end; }
+  .apm-modal { border-radius: 22px 22px 0 0; max-height: 95vh; }
+  .apm-grid { grid-template-columns: 1fr; }
+  .apm-field-full { grid-column: 1; }
+}

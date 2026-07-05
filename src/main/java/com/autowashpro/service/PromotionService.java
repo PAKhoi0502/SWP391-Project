@@ -41,4 +41,6 @@ public interface PromotionService {
         List<PromotionUsageResponse> getMyPromotionUsages(Long customerId);
 
         int sendVoucher(Long promotionId, SendVoucherRequest request);
+
+        void deletePromotion(Long id);
 }

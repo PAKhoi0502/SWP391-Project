@@ -18,6 +18,7 @@ import com.autowashpro.dto.response.WalkInCustomerLookupResponse;
 import com.autowashpro.entity.*;
 import com.autowashpro.entity.enums.WashBayStatus;
 import com.autowashpro.repository.*;
+import com.autowashpro.entity.PromotionUsage;
 import com.autowashpro.service.BookingService;
 import com.autowashpro.service.LoyaltyService;
 import com.autowashpro.service.PromotionService;
@@ -58,6 +59,7 @@ public class BookingServiceImpl implements BookingService {
         private final CustomerLoyaltyRepository customerLoyaltyRepository;
         private final LoyaltyTierRuleRepository loyaltyTierRuleRepository;
         private final PromotionRepository promotionRepository;
+        private final PromotionUsageRepository promotionUsageRepository;
         private final BookingAssignedStaffRepository bookingAssignedStaffRepository;
         private final StaffProfileRepository staffProfileRepository;
         private final UserRepository userRepository;
@@ -639,6 +641,23 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 loyaltyService.updateBookingStatistics(booking.getId());
+
+                // Niêm phong promotion ngay khi booking được tạo
+                if (promotionId != null && !promotionUsageRepository.existsByBookingId(saved.getId())) {
+                        PromotionUsage usage = new PromotionUsage();
+                        usage.setPromotionId(promotionId);
+                        usage.setBookingId(saved.getId());
+                        usage.setCustomerId(customerId);
+                        usage.setDiscountAmount(promotionDiscountAmount);
+                        usage.setUsedAt(LocalDateTime.now());
+                        promotionUsageRepository.save(usage);
+
+                        promotionRepository.findById(promotionId).ifPresent(p -> {
+                                p.setUsedCount(p.getUsedCount() + 1);
+                                promotionRepository.save(p);
+                        });
+                }
+
                 notificationService.notifyBookingConfirmed(booking.getId());
 
                 BookingResponse response = toResponse(saved);
@@ -1252,6 +1271,16 @@ public class BookingServiceImpl implements BookingService {
                 if (!"CHECKED_IN".equals(status)) {
                         loyaltyService.refundPointsForCanceledBooking(saved.getId());
                 }
+                // Trả lại promotion khi hủy booking
+                if (saved.getPromotionId() != null) {
+                        promotionUsageRepository.findByBookingId(saved.getId()).ifPresent(usage -> {
+                                promotionUsageRepository.delete(usage);
+                                promotionRepository.findById(saved.getPromotionId()).ifPresent(p -> {
+                                        p.setUsedCount(Math.max(0, p.getUsedCount() - 1));
+                                        promotionRepository.save(p);
+                                });
+                        });
+                }
                 return toResponse(saved);
         }
 
@@ -1298,6 +1327,16 @@ public class BookingServiceImpl implements BookingService {
                 booking.setRewardProcessed(false);
 
                 Booking saved = bookingRepository.save(booking);
+                // Trả lại promotion khi no-show
+                if (saved.getPromotionId() != null) {
+                        promotionUsageRepository.findByBookingId(saved.getId()).ifPresent(usage -> {
+                                promotionUsageRepository.delete(usage);
+                                promotionRepository.findById(saved.getPromotionId()).ifPresent(p -> {
+                                        p.setUsedCount(Math.max(0, p.getUsedCount() - 1));
+                                        promotionRepository.save(p);
+                                });
+                        });
+                }
                 return toResponse(saved);
         }
         // ===================== ISSUE #17 =====================

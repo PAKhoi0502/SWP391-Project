@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Getter
 @Builder
@@ -23,6 +24,14 @@ public class PromotionResponse {
 
     private Boolean isActive;
 
-    
+    private Boolean allowLoyaltyStack;
+
+    private Integer maxLoyaltyPoints;
+
+    private LocalDateTime startAt;
+
+    private LocalDateTime endAt;
+
+    private Integer perUserLimit;
 
 }

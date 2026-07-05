@@ -193,6 +193,25 @@
   padding: 4px 14px;
 }
 
+.promo-detail-loyalty-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 20px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #a5b4fc;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.promo-detail-loyalty-badge::before {
+  content: '✓';
+  font-size: 12px;
+}
+
 .promo-detail-footer {
   display: flex;
   justify-content: center;
