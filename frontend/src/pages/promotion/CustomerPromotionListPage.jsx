@@ -2,7 +2,21 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { customerBookingFlowApi } from '../../api/customerBookingFlowApi'
 import promotionApi from '../../api/promotionApi'
+import PromotionUsageHistoryModal from '../../components/promotion/PromotionUsageHistoryModal'
 import './CustomerPromotionListPage.css'
+
+// Module-level cache: persists across modal opens within the session
+const promoCodeCache = new Map() // promotionId (Number) -> code string
+
+const sortByTimeDesc = (list) =>
+  [...list].sort((a, b) => {
+    const ta = a.usedAt ?? a.createdAt ?? a.appliedAt ?? a.timestamp ?? null
+    const tb = b.usedAt ?? b.createdAt ?? b.appliedAt ?? b.timestamp ?? null
+    if (!ta && !tb) return (b.id ?? 0) - (a.id ?? 0)
+    if (!ta) return 1
+    if (!tb) return -1
+    return new Date(tb) - new Date(ta)
+  })
 
 const formatMoney = (value) =>
   new Intl.NumberFormat('vi-VN', {
@@ -26,6 +40,53 @@ export default function CustomerPromotionListPage() {
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyUsages, setHistoryUsages] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState(null)
+
+  const openHistory = async () => {
+    setHistoryOpen(true)
+    setHistoryLoading(true)
+    setHistoryError(null)
+    try {
+      const data = await promotionApi.getMyPromotionUsages()
+      const sorted = sortByTimeDesc(data)
+
+      // Pre-populate cache from already-loaded promotions list
+      for (const p of promotions) {
+        if (p.id != null && p.code) promoCodeCache.set(Number(p.id), p.code)
+      }
+
+      // Fetch codes for any promotionId not yet in cache
+      const missingIds = [
+        ...new Set(
+          sorted
+            .map((u) => u.promotionId)
+            .filter((id) => id != null && !promoCodeCache.has(Number(id)))
+        ),
+      ]
+      await Promise.allSettled(
+        missingIds.map(async (id) => {
+          try {
+            const detail = await promotionApi.getPromotionById(id)
+            if (detail?.code) promoCodeCache.set(Number(id), detail.code)
+          } catch {}
+        })
+      )
+
+      const enriched = sorted.map((u) => ({
+        ...u,
+        promotionCode: promoCodeCache.get(Number(u.promotionId)) ?? null,
+      }))
+      setHistoryUsages(enriched)
+    } catch {
+      setHistoryError('Không thể tải lịch sử sử dụng. Vui lòng thử lại.')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
 
   useEffect(() => {
     let mounted = true
@@ -68,10 +129,11 @@ export default function CustomerPromotionListPage() {
     return set
   }, [bookings])
 
+  const isExpired = (promo) =>
+    promo.endAt != null && new Date(promo.endAt) < new Date()
+
   const isUsedUp = (promo) => {
-    // Has an active booking with this promo
     if (activeBookingPromoIds.has(promo.id)) return true
-    // Recorded usages hit per-user limit
     if (promo.perUserLimit != null) {
       const recorded = usageCountMap[promo.id] || 0
       if (recorded >= promo.perUserLimit) return true
@@ -80,7 +142,7 @@ export default function CustomerPromotionListPage() {
   }
 
   const visiblePromotions = useMemo(
-    () => promotions.filter((p) => !isUsedUp(p)),
+    () => promotions.filter((p) => !isExpired(p) && !isUsedUp(p)),
     [promotions, activeBookingPromoIds, usageCountMap]
   )
 
@@ -92,8 +154,8 @@ export default function CustomerPromotionListPage() {
           <h1>Ưu đãi của bạn</h1>
           <span>Khuyến mãi đang hoạt động — áp dụng khi đặt lịch rửa xe.</span>
         </div>
-        <button className="promo-list-book-btn" onClick={() => navigate('/booking')}>
-          Đặt lịch ngay
+        <button className="promo-list-history-btn" onClick={openHistory}>
+          Lịch sử mã đã dùng
         </button>
       </div>
 
@@ -148,6 +210,15 @@ export default function CustomerPromotionListPage() {
           ))}
         </div>
       )}
+      <PromotionUsageHistoryModal
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        title="Lịch sử mã khuyến mãi đã dùng"
+        usages={historyUsages}
+        loading={historyLoading}
+        error={historyError}
+        mode="customer"
+      />
     </div>
   )
 }
