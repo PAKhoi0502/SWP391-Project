@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { ROLES } from '../constants/roles'
 import { useAuth } from '../contexts/AuthContext'
+import NotificationDropdown from '../components/notification/NotificationDropdown'
 import './layout.css'
 
 const NAV_ITEMS = {
@@ -13,6 +14,7 @@ const NAV_ITEMS = {
     { to: '/customer/booking-history', label: 'Booking History' },
     { to: '/customer/wash-histories', label: 'Lịch sử rửa xe' },
     { to: '/customer/promotions', label: 'Ưu đãi' },
+    { to: '/customer/notifications', label: 'Thông báo' },
     { to: '/customer/vehicles', label: 'Xe của tôi' },
     { to: '/customer/profile', label: 'Hồ sơ' },
   ],
@@ -66,9 +68,12 @@ function DashboardLayout({ role }) {
   return (
     <div className="dashboard-layout">
       <aside className="dashboard-sidebar">
-        <Link className="app-brand" to="/">
-          AutoWash Pro
-        </Link>
+        <div className="app-brand-row">
+          <Link className="app-brand" to="/">
+            AutoWash Pro
+          </Link>
+          <NotificationDropdown />
+        </div>
 
         <nav className="dashboard-nav" aria-label={`${role} navigation`}>
           {items.map((item) => (

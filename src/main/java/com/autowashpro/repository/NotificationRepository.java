@@ -19,4 +19,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     int markAllAsRead(@Param("userId") Long userId);
 
     long countByUserIdAndIsRead(Long userId, Boolean isRead);
+
+    boolean existsByBookingIdAndEventType(Long bookingId, String eventType);
 }

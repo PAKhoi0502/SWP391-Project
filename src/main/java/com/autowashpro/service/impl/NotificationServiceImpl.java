@@ -87,6 +87,10 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional
     public void notifyRewardEarned(Long bookingId) {
+        // Guard against duplicate: BookingService and PaymentService both call this
+        if (notificationRepository.existsByBookingIdAndEventType(bookingId, "REWARD_EARNED")) {
+            return;
+        }
         // Lấy earned points từ EARN transaction
         pointTransactionRepository.findByBookingIdAndType(bookingId, "EARN").ifPresent(pt -> {
             bookingRepository.findById(bookingId).ifPresent(booking -> {

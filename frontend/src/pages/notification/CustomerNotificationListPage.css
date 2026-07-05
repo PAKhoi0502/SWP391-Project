@@ -1,0 +1,263 @@
+.cn-list-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 0;
+  color: #f8fafc;
+}
+
+/* ── Header ── */
+.cn-list-header {
+  margin-bottom: 24px;
+}
+
+.cn-list-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.cn-list-title-row h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: #f1f5f9;
+}
+
+.cn-mark-all-btn {
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  background: rgba(250, 204, 21, 0.08);
+  color: #facc15;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cn-mark-all-btn:hover:not(:disabled) {
+  background: rgba(250, 204, 21, 0.16);
+}
+.cn-mark-all-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Filter row ── */
+.cn-filter-row {
+  display: flex;
+  gap: 8px;
+}
+
+.cn-filter-btn {
+  padding: 7px 18px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.cn-filter-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.8);
+}
+.cn-filter-btn.active {
+  background: rgba(250, 204, 21, 0.1);
+  border-color: rgba(250, 204, 21, 0.35);
+  color: #facc15;
+}
+
+/* ── Error ── */
+.cn-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  color: #fca5a5;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+.cn-error-dismiss {
+  background: transparent;
+  border: none;
+  color: #fca5a5;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+}
+
+/* ── States ── */
+.cn-state {
+  padding: 48px 16px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 14px;
+}
+.cn-empty-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+.cn-empty p {
+  margin: 0;
+}
+
+/* ── List ── */
+.cn-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+  background: rgba(15, 15, 22, 0.7);
+}
+
+/* ── Item ── */
+.cn-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.cn-item:last-child {
+  border-bottom: none;
+}
+.cn-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cn-item.unread {
+  background: rgba(250, 204, 21, 0.04);
+  border-left: 3px solid rgba(250, 204, 21, 0.5);
+}
+.cn-item.unread:hover {
+  background: rgba(250, 204, 21, 0.07);
+}
+.cn-item.read {
+  border-left: 3px solid transparent;
+}
+
+/* Unread dot */
+.cn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #facc15;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+/* Item body */
+.cn-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.cn-item-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cn-item.read .cn-item-title {
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 600;
+}
+
+.cn-item-msg {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.45;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  margin-bottom: 6px;
+}
+
+.cn-item-time {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.3);
+}
+.cn-item.unread .cn-item-time {
+  color: rgba(250, 204, 21, 0.5);
+}
+
+/* Delete button */
+.cn-del-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.2);
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
+  margin-top: 2px;
+}
+.cn-item:hover .cn-del-btn {
+  opacity: 1;
+}
+.cn-del-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+.cn-del-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Pagination ── */
+.cn-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px 0 0;
+}
+.cn-page-btn {
+  padding: 8px 20px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cn-page-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+}
+.cn-page-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.cn-page-info {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+}

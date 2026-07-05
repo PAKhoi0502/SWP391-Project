@@ -73,6 +73,15 @@ export default function AdminPromotionManagementPage() {
     error: null,
   })
 
+  // ── Send-voucher modal state ───────────────────────────────
+  const [svTarget, setSvTarget] = useState(null)         // promo object
+  const [svFilterType, setSvFilterType] = useState('ALL')
+  const [svTier, setSvTier] = useState('')
+  const [svMinVisits, setSvMinVisits] = useState('')
+  const [svMinSpent, setSvMinSpent] = useState('')
+  const [svSending, setSvSending] = useState(false)
+  const [svResult, setSvResult] = useState(null)         // { success, message }
+
   const openUsageModal = async (title, fetchFn) => {
     setUsageModal({ open: true, title, usages: [], loading: true, error: null })
     try {
@@ -255,6 +264,39 @@ export default function AdminPromotionManagementPage() {
       setRangeMax(100000)
     } else {
       setRangeMax(100)
+    }
+  }
+
+  const openSendVoucher = (promo) => {
+    const hasTiers = Array.isArray(promo.applicableTiers) && promo.applicableTiers.length > 0
+    setSvTarget(promo)
+    setSvFilterType(hasTiers ? 'TIER' : 'ALL')
+    setSvTier(hasTiers ? promo.applicableTiers[0] : '')
+    setSvMinVisits('')
+    setSvMinSpent('')
+    setSvSending(false)
+    setSvResult(null)
+  }
+
+  const closeSendVoucher = () => { setSvTarget(null); setSvResult(null) }
+
+  const confirmSendVoucher = async () => {
+    if (!svTarget || svSending) return
+    setSvSending(true)
+    setSvResult(null)
+    try {
+      const result = await promotionApi.sendVoucher(svTarget.id, {
+        filterType: svFilterType,
+        tier: svFilterType === 'TIER' ? svTier : undefined,
+        minVisits: svFilterType === 'MIN_VISITS' ? Number(svMinVisits) || undefined : undefined,
+        minSpent: svFilterType === 'MIN_SPENT' ? Number(svMinSpent) || undefined : undefined,
+      })
+      setSvResult({ success: true, message: result?.message || 'Gửi thành công!' })
+    } catch (err) {
+      const msg = err?.response?.data?.message || err.message || 'Gửi thất bại.'
+      setSvResult({ success: false, message: msg })
+    } finally {
+      setSvSending(false)
     }
   }
 
@@ -487,6 +529,12 @@ export default function AdminPromotionManagementPage() {
                         Xem lượt dùng
                       </button>
                       <button
+                        className="adm-promo-btn-send"
+                        onClick={() => openSendVoucher(promo)}
+                      >
+                        Gửi thông báo
+                      </button>
+                      <button
                         className="adm-promo-btn-delete"
                         onClick={() => askDelete(promo)}
                         disabled={deletingId === promo.id}
@@ -510,6 +558,107 @@ export default function AdminPromotionManagementPage() {
             <div className="adm-promo-confirm-actions">
               <button className="adm-promo-confirm-btn-cancel" onClick={cancelDelete}>Hủy</button>
               <button className="adm-promo-confirm-btn-delete" onClick={confirmDelete}>Xóa</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {svTarget && (
+        <div className="adm-promo-confirm-overlay">
+          <div className="adm-sv-modal">
+            <h3 className="adm-sv-title">Gửi voucher</h3>
+            <p className="adm-sv-subtitle">
+              Mã: <strong>{svTarget.code}</strong> — {svTarget.name}
+            </p>
+
+            <div className="adm-sv-group">
+              <span className="adm-sv-label">Gửi đến:</span>
+              <div className="adm-sv-types">
+                {[
+                  { key: 'ALL', label: 'Tất cả khách hàng' },
+                  { key: 'TIER', label: 'Theo hạng thành viên' },
+                  { key: 'MIN_VISITS', label: 'Theo số lần đến' },
+                  { key: 'MIN_SPENT', label: 'Theo chi tiêu' },
+                ].map(({ key, label }) => (
+                  <label key={key} className="adm-sv-radio">
+                    <input
+                      type="radio"
+                      name="svFilterType"
+                      value={key}
+                      checked={svFilterType === key}
+                      onChange={() => setSvFilterType(key)}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {svFilterType === 'TIER' && (
+              <div className="adm-sv-group">
+                <span className="adm-sv-label">Hạng:</span>
+                <select
+                  className="adm-sv-select"
+                  value={svTier}
+                  onChange={(e) => setSvTier(e.target.value)}
+                >
+                  {(Array.isArray(svTarget.applicableTiers) && svTarget.applicableTiers.length > 0
+                    ? svTarget.applicableTiers
+                    : ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND']
+                  ).map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {svFilterType === 'MIN_VISITS' && (
+              <div className="adm-sv-group">
+                <span className="adm-sv-label">Tối thiểu số lần đến:</span>
+                <input
+                  type="number"
+                  className="adm-sv-input"
+                  min={1}
+                  placeholder="VD: 5"
+                  value={svMinVisits}
+                  onChange={(e) => setSvMinVisits(e.target.value)}
+                />
+              </div>
+            )}
+
+            {svFilterType === 'MIN_SPENT' && (
+              <div className="adm-sv-group">
+                <span className="adm-sv-label">Chi tiêu tối thiểu (VND):</span>
+                <input
+                  type="number"
+                  className="adm-sv-input"
+                  min={0}
+                  placeholder="VD: 500000"
+                  value={svMinSpent}
+                  onChange={(e) => setSvMinSpent(e.target.value)}
+                />
+              </div>
+            )}
+
+            {svResult && (
+              <div className={`adm-sv-result ${svResult.success ? 'success' : 'error'}`}>
+                {svResult.message}
+              </div>
+            )}
+
+            <div className="adm-promo-confirm-actions">
+              <button className="adm-promo-confirm-btn-cancel" onClick={closeSendVoucher}>
+                {svResult?.success ? 'Đóng' : 'Hủy'}
+              </button>
+              {!svResult?.success && (
+                <button
+                  className="adm-sv-confirm-btn"
+                  onClick={confirmSendVoucher}
+                  disabled={svSending || (svFilterType === 'TIER' && !svTier)}
+                >
+                  {svSending ? 'Đang gửi...' : 'Gửi'}
+                </button>
+              )}
             </div>
           </div>
         </div>

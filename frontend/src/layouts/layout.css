@@ -73,10 +73,17 @@
   border-right: 1px solid rgba(167, 139, 250, 0.16);
 }
 
+.app-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
 .dashboard-sidebar .app-brand {
   color: #fff;
   display: block;
-  margin-bottom: 24px;
+  margin-bottom: 0;
 }
 
 .dashboard-nav {

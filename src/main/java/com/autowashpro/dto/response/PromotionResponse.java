@@ -5,6 +5,7 @@ import lombok.Getter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Builder
@@ -33,5 +34,7 @@ public class PromotionResponse {
     private LocalDateTime endAt;
 
     private Integer perUserLimit;
+
+    private List<String> applicableTiers;
 
 }

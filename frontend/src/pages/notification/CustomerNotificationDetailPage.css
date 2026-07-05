@@ -1,0 +1,193 @@
+.cn-detail-page {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 32px 0;
+  color: #f8fafc;
+}
+
+/* ── Back nav ── */
+.cn-detail-nav {
+  margin-bottom: 24px;
+}
+
+.cn-back-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+}
+.cn-back-btn:hover {
+  color: #facc15;
+}
+
+/* ── States ── */
+.cn-detail-state {
+  padding: 60px 16px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 14px;
+}
+
+.cn-detail-error {
+  padding: 20px 24px;
+  border-radius: 14px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  color: #fca5a5;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.cn-detail-error button {
+  background: transparent;
+  border: none;
+  color: #facc15;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0;
+}
+
+/* ── Card ── */
+.cn-detail-card {
+  background: rgba(15, 15, 22, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 32px 36px;
+}
+
+.cn-detail-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+/* Type badge */
+.cn-detail-type-badge {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: rgba(250, 204, 21, 0.12);
+  border: 1px solid rgba(250, 204, 21, 0.25);
+  color: #facc15;
+}
+.cn-detail-type-badge.tier_upgraded {
+  background: rgba(167, 139, 250, 0.12);
+  border-color: rgba(167, 139, 250, 0.25);
+  color: #c4b5fd;
+}
+.cn-detail-type-badge.voucher_received {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.25);
+  color: #86efac;
+}
+.cn-detail-type-badge.reward_earned {
+  background: rgba(250, 204, 21, 0.1);
+  border-color: rgba(250, 204, 21, 0.25);
+  color: #fde047;
+}
+
+.cn-detail-read-tag {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.cn-detail-unread-tag {
+  font-size: 12px;
+  color: #facc15;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  background: rgba(250, 204, 21, 0.08);
+}
+
+/* Title & message */
+.cn-detail-title {
+  margin: 0 0 14px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #f1f5f9;
+  line-height: 1.35;
+}
+
+.cn-detail-msg {
+  margin: 0 0 28px;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+/* Meta */
+.cn-detail-meta {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.cn-detail-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.cn-detail-meta-label {
+  width: 80px;
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.cn-detail-meta-val {
+  color: rgba(255, 255, 255, 0.65);
+}
+.cn-detail-booking-link {
+  background: transparent;
+  border: none;
+  color: #facc15;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.15s;
+}
+.cn-detail-booking-link:hover {
+  opacity: 0.75;
+}
+
+/* Actions */
+.cn-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.cn-detail-delete-btn {
+  padding: 9px 22px;
+  border-radius: 10px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cn-detail-delete-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.18);
+}
+.cn-detail-delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
