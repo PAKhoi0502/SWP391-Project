@@ -48,6 +48,7 @@ import CustomerPromotionListPage from '../pages/promotion/CustomerPromotionListP
 import CustomerPromotionDetailPage from '../pages/promotion/CustomerPromotionDetailPage'
 import CustomerNotificationListPage from '../pages/notification/CustomerNotificationListPage'
 import CustomerNotificationDetailPage from '../pages/notification/CustomerNotificationDetailPage'
+import AdminTestEmailPage from '../pages/admin/AdminTestEmailPage'
 
 
 function AppRoutes() {
@@ -118,6 +119,7 @@ function AppRoutes() {
           <Route path="admin/wash-histories" element={<AdminWashHistoryListPage />} />
           <Route path="admin/loyalty/tier-rules" element={<AdminTierRulesPage />} />
           <Route path="admin/promotions" element={<AdminPromotionManagementPage />} />
+          <Route path="admin/notifications/test-email" element={<AdminTestEmailPage />} />
         </Route>
       </Route>
 
