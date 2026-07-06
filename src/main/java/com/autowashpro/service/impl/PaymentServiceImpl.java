@@ -1,8 +1,12 @@
 package com.autowashpro.service.impl;
 
+import com.autowashpro.common.AuditAction;
+import com.autowashpro.common.AuditMetadata;
+import com.autowashpro.common.AuditTargetType;
 
 
 import com.autowashpro.service.WashHistoryService;
+import com.autowashpro.service.AuditLogService;
 import com.autowashpro.dto.request.CreatePayOSPaymentRequest;
 import com.autowashpro.dto.response.CreatePayOSPaymentResponse;
 import com.autowashpro.dto.response.PaymentTransactionResponse;
@@ -47,6 +51,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate;
     private final WashHistoryService washHistoryService;
+    private final AuditLogService auditLogService;
     private final NotificationService notificationService;
     private final EmailService emailService;
     private final org.springframework.transaction.PlatformTransactionManager transactionManager;
@@ -200,6 +205,12 @@ public class PaymentServiceImpl implements PaymentService {
                         bookingRepository.save(booking);
                         bookingIdRef[0] = booking.getId();
                     }
+                    auditLogService.createAuditLog(
+                            null,
+                            AuditAction.PAYMENT_CONFIRMED,
+                            AuditTargetType.PAYMENT_TRANSACTION,
+                            transaction.getId(),
+                            AuditMetadata.of("bookingId", booking.getId(), "status", transaction.getStatus()));
                     return null;
                 });
 
@@ -222,6 +233,12 @@ public class PaymentServiceImpl implements PaymentService {
                     transaction.setStatus("CANCELLED");
                     transaction.setCancelReason("PayOS code: " + code);
                     transactionRepository.save(transaction);
+                    auditLogService.createAuditLog(
+                            null,
+                            AuditAction.PAYMENT_FAILED,
+                            AuditTargetType.PAYMENT_TRANSACTION,
+                            transaction.getId(),
+                            AuditMetadata.of("bookingId", transaction.getBookingId(), "status", transaction.getStatus(), "code", code));
                     return null;
                 });
             }

@@ -10,6 +10,7 @@ import com.autowashpro.security.CustomUserDetailsService;
 import com.autowashpro.security.JwtAuthenticationFilter;
 import com.autowashpro.security.JwtService;
 import com.autowashpro.service.AuthService;
+import com.autowashpro.service.AuditLogService;
 import com.autowashpro.service.ServicePackageService;
 import com.autowashpro.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +51,9 @@ class SecurityConfigTest {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private AuditLogService auditLogService;
 
     @MockitoBean
     private ServicePackageService servicePackageService;

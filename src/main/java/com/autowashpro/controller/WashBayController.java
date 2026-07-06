@@ -1,5 +1,9 @@
 package com.autowashpro.controller;
 
+import com.autowashpro.common.AuditAction;
+import com.autowashpro.common.AuditActorContext;
+import com.autowashpro.common.AuditMetadata;
+import com.autowashpro.common.AuditTargetType;
 import com.autowashpro.dto.request.WashBayCreateRequest;
 import com.autowashpro.dto.request.WashBayStatusUpdateRequest;
 import com.autowashpro.dto.request.WashBayUpdateRequest;
@@ -8,6 +12,7 @@ import com.autowashpro.dto.response.WashBayCapacityResponse;
 import com.autowashpro.dto.response.WashBayResponse;
 import com.autowashpro.entity.enums.WashBayStatus;
 import com.autowashpro.service.WashBayService;
+import com.autowashpro.service.AuditLogService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,11 +27,19 @@ import java.util.List;
 public class WashBayController {
 
     private final WashBayService washBayService;
+    private final AuditLogService auditLogService;
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<WashBayResponse> create(@Valid @RequestBody WashBayCreateRequest request) {
-        return ResponseEntity.ok(washBayService.create(request));
+        WashBayResponse response = washBayService.create(request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.WASH_BAY_CREATED,
+                AuditTargetType.WASH_BAY,
+                response.getId(),
+                AuditMetadata.of("garageId", response.getGarageId(), "status", response.getStatus()));
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping
@@ -67,13 +80,27 @@ public class WashBayController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<WashBayResponse> update(@PathVariable Long id,
                                                     @RequestBody WashBayUpdateRequest request) {
-        return ResponseEntity.ok(washBayService.update(id, request));
+        WashBayResponse response = washBayService.update(id, request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.WASH_BAY_UPDATED,
+                AuditTargetType.WASH_BAY,
+                id,
+                AuditMetadata.of("garageId", response.getGarageId(), "vehicleType", response.getVehicleType()));
+        return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN') or hasRole('STAFF')")
     public ResponseEntity<WashBayResponse> updateStatus(@PathVariable Long id,
                                                           @Valid @RequestBody WashBayStatusUpdateRequest request) {
-        return ResponseEntity.ok(washBayService.updateStatus(id, request));
+        WashBayResponse response = washBayService.updateStatus(id, request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.WASH_BAY_STATUS_UPDATED,
+                AuditTargetType.WASH_BAY,
+                id,
+                AuditMetadata.of("status", response.getStatus(), "isActive", response.getIsActive()));
+        return ResponseEntity.ok(response);
     }
 }
