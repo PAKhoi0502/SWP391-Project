@@ -3,6 +3,7 @@ package com.autowashpro.exception;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -58,6 +59,14 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.message").value("Unhandled failure"));
     }
 
+    @Test
+    void returnsForbiddenForAccessDeniedException() throws Exception {
+        mockMvc.perform(get("/test/errors/forbidden"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Access denied"));
+    }
+
     @RestController
     @RequestMapping("/test/errors")
     static class ErrorController {
@@ -80,6 +89,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/unhandled")
         void unhandled() {
             throw new IllegalStateException("Unhandled failure");
+        }
+
+        @GetMapping("/forbidden")
+        void forbidden() {
+            throw new AccessDeniedException("Access denied");
         }
     }
 }
