@@ -2,6 +2,7 @@ package com.autowashpro.exception;
 
 import com.autowashpro.common.ApiResponse;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -40,6 +41,15 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.badRequest().body(
                 errorResponse(message)
+        );
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleAccessDeniedException(
+            AccessDeniedException ex) {
+
+        return ResponseEntity.status(403).body(
+                errorResponse(ex.getMessage())
         );
     }
 

@@ -470,6 +470,7 @@ class BookingServiceImplTest {
 
         assertEquals("IN_PROGRESS", response.getStatus());
         assertEquals(washBay.getId(), response.getWashBayId());
+        assertNotNull(response.getWashBayStartTime());
         assertEquals(WashBayStatus.IN_USE, washBay.getStatus());
         assertEquals(booking.getId(), washBay.getCurrentBookingId());
         verify(bookingAssignedStaffRepository).save(any(BookingAssignedStaff.class));
@@ -484,6 +485,7 @@ class BookingServiceImplTest {
         Booking booking = confirmedBooking(vehicle, garage, mainPackage());
         booking.setStatus("IN_PROGRESS");
         booking.setWashBayId(3L);
+        booking.setWashBayStartTime(TestFixtures.BASE_TIME);
         StaffProfile staffProfile = TestFixtures.careStaff(staffUser, garage);
         WashBay washBay = TestFixtures.washBay(garage);
         washBay.setId(3L);
@@ -500,7 +502,9 @@ class BookingServiceImplTest {
 
         assertEquals("COMPLETED", response.getStatus());
         assertNotNull(response.getCompletedAt());
-        assertNull(response.getWashBayId());
+        assertEquals(3L, response.getWashBayId());
+        assertEquals(TestFixtures.BASE_TIME, response.getWashBayStartTime());
+        assertNotNull(response.getWashBayEndTime());
         assertEquals(WashBayStatus.AVAILABLE, washBay.getStatus());
         assertNull(washBay.getCurrentBookingId());
         assertEquals("RELEASED", assignedStaff.getStatus());
