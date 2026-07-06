@@ -10,6 +10,7 @@ import com.autowashpro.entity.Vehicle;
 import com.autowashpro.repository.BookingRepository;
 import com.autowashpro.repository.PaymentTransactionRepository;
 import com.autowashpro.service.EmailService;
+import com.autowashpro.service.AuditLogService;
 import com.autowashpro.service.LoyaltyService;
 import com.autowashpro.service.NotificationService;
 import com.autowashpro.service.WashHistoryService;
@@ -81,6 +82,9 @@ class PaymentServiceImplTest {
 
     @Mock
     private EmailService emailService;
+
+    @Mock
+    private AuditLogService auditLogService;
 
     @Mock
     private PlatformTransactionManager transactionManager;

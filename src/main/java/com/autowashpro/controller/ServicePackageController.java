@@ -1,10 +1,15 @@
 package com.autowashpro.controller;
 
+import com.autowashpro.common.AuditAction;
+import com.autowashpro.common.AuditActorContext;
+import com.autowashpro.common.AuditMetadata;
+import com.autowashpro.common.AuditTargetType;
 import com.autowashpro.dto.request.CreateServicePackageRequest;
 import com.autowashpro.dto.request.UpdateServicePackageRequest;
 import com.autowashpro.dto.request.UpdateServicePackageStatusRequest;
 import com.autowashpro.dto.response.ServicePackageResponse;
 import com.autowashpro.service.ServicePackageService;
+import com.autowashpro.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,12 +21,20 @@ import java.util.List;
 public class ServicePackageController {
 
     private final ServicePackageService servicePackageService;
+    private final AuditLogService auditLogService;
 
     @PostMapping
     public ServicePackageResponse create(
             @RequestBody CreateServicePackageRequest request) {
 
-        return servicePackageService.create(request);
+        ServicePackageResponse response = servicePackageService.create(request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.SERVICE_PACKAGE_CREATED,
+                AuditTargetType.SERVICE_PACKAGE,
+                response.getId(),
+                AuditMetadata.of("code", response.getCode(), "isActive", response.getIsActive()));
+        return response;
     }
 
     @GetMapping
@@ -42,9 +55,14 @@ public class ServicePackageController {
             @PathVariable Long id,
             @RequestBody UpdateServicePackageRequest request) {
 
-        return servicePackageService.update(
+        ServicePackageResponse response = servicePackageService.update(id, request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.SERVICE_PACKAGE_UPDATED,
+                AuditTargetType.SERVICE_PACKAGE,
                 id,
-                request);
+                AuditMetadata.of("code", response.getCode(), "isActive", response.getIsActive()));
+        return response;
     }
 
     @PatchMapping("/{id}/status")
@@ -52,9 +70,14 @@ public class ServicePackageController {
             @PathVariable Long id,
             @RequestBody UpdateServicePackageStatusRequest request) {
 
-        return servicePackageService.updateStatus(
+        ServicePackageResponse response = servicePackageService.updateStatus(id, request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.SERVICE_PACKAGE_STATUS_UPDATED,
+                AuditTargetType.SERVICE_PACKAGE,
                 id,
-                request);
+                AuditMetadata.of("isActive", response.getIsActive()));
+        return response;
     }
 
     @GetMapping("/available")

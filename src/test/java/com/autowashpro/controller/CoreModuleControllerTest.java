@@ -1,5 +1,7 @@
 package com.autowashpro.controller;
 
+import com.autowashpro.common.AuditAction;
+import com.autowashpro.common.AuditTargetType;
 import com.autowashpro.dto.response.AuthResponse;
 import com.autowashpro.dto.response.GarageCapabilitiesResponse;
 import com.autowashpro.dto.response.GarageResponse;
@@ -13,6 +15,7 @@ import com.autowashpro.dto.response.WashBayResponse;
 import com.autowashpro.entity.enums.WashBayStatus;
 import com.autowashpro.security.JwtAuthenticationFilter;
 import com.autowashpro.service.AuthService;
+import com.autowashpro.service.AuditLogService;
 import com.autowashpro.service.GarageService;
 import com.autowashpro.service.ServicePackageService;
 import com.autowashpro.service.UserService;
@@ -63,6 +66,9 @@ class CoreModuleControllerTest {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private AuditLogService auditLogService;
 
     @MockitoBean
     private UserService userService;
@@ -227,6 +233,13 @@ class CoreModuleControllerTest {
                         .content("{\"role\":\"STAFF\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.role").value("STAFF"));
+
+        verify(auditLogService).createAuditLog(
+                isNull(),
+                eq(AuditAction.USER_ROLE_UPDATED),
+                eq(AuditTargetType.USER),
+                eq(9L),
+                any());
     }
 
     @Test

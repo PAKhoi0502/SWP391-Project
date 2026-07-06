@@ -33,6 +33,8 @@ $env:UPLOAD_MAX_IMAGE_SIZE_BYTES="5242880"
 
 Apply `database/migration_v51_image_uploads.sql` to the SQL Server database before using image upload APIs.
 
+Apply `database/migration_v52_audit_logs.sql` to the SQL Server database before using audit log APIs.
+
 ## Business Rule Coverage
 
 | Area | Covered Rules |
@@ -53,4 +55,5 @@ Apply `database/migration_v51_image_uploads.sql` to the SQL Server database befo
 | Notifications | Booking/payment/reward notification creation, reward notification idempotency, notification ownership, mark-as-read, mark-all-read, delete. |
 | Wash history | Created after paid completed booking, earned points copied, idempotency, invalid-state skip cases. |
 | Research export | Admin-only access, date and format validation, stable anonymization, PII exclusion, CSV/JSON consistency, walk-in grouping, paid-only customer spending. |
+| Audit logs | Admin-only list and detail access, actor/action/target/date filters, sensitive metadata redaction, booking/payment/management/promotion/loyalty action coverage. |
 | Image upload | Image signatures and size limits, folder restrictions, avatar ownership, inspection garage access, managed public IDs, storage cleanup, and delete permissions. |

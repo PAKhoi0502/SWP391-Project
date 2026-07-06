@@ -1,10 +1,14 @@
 package com.autowashpro.controller;
 
 import com.autowashpro.common.ApiResponse;
+import com.autowashpro.common.AuditAction;
+import com.autowashpro.common.AuditMetadata;
+import com.autowashpro.common.AuditTargetType;
 import com.autowashpro.dto.request.CreatePayOSPaymentRequest;
 import com.autowashpro.dto.response.CreatePayOSPaymentResponse;
 import com.autowashpro.dto.response.PaymentTransactionResponse;
 import com.autowashpro.service.PaymentService;
+import com.autowashpro.service.AuditLogService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import vn.payos.type.Webhook;
@@ -23,6 +27,7 @@ import java.util.Map;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final AuditLogService auditLogService;
 
   @PostMapping("/payos/create")
 @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
@@ -31,10 +36,17 @@ public ApiResponse<CreatePayOSPaymentResponse> createPayOSPayment(
         @AuthenticationPrincipal UserDetails userDetails) {
 
     Long staffUserId = Long.valueOf(userDetails.getUsername());
+    CreatePayOSPaymentResponse response = paymentService.createPayOSPayment(request, staffUserId);
+    auditLogService.createAuditLog(
+            staffUserId,
+            AuditAction.PAYMENT_LINK_CREATED,
+            AuditTargetType.PAYMENT_TRANSACTION,
+            response.getTransactionId(),
+            AuditMetadata.of("bookingId", request.getBookingId(), "status", response.getStatus()));
     return ApiResponse.<CreatePayOSPaymentResponse>builder()
             .success(true)
             .message("PayOS payment link created successfully")
-            .data(paymentService.createPayOSPayment(request, staffUserId))
+            .data(response)
             .build();
 }
 
@@ -75,10 +87,17 @@ public ApiResponse<Void> handleWebhook(@RequestBody Map<String, Object> webhookD
             @AuthenticationPrincipal UserDetails userDetails) {
 
         Long staffUserId = Long.valueOf(userDetails.getUsername());
+        PaymentTransactionResponse response = paymentService.cancelTransaction(id, staffUserId);
+        auditLogService.createAuditLog(
+                staffUserId,
+                AuditAction.PAYMENT_TRANSACTION_CANCELLED,
+                AuditTargetType.PAYMENT_TRANSACTION,
+                id,
+                AuditMetadata.of("bookingId", response.getBookingId(), "status", response.getStatus()));
         return ApiResponse.<PaymentTransactionResponse>builder()
                 .success(true)
                 .message("Transaction cancelled successfully")
-                .data(paymentService.cancelTransaction(id, staffUserId))
+                .data(response)
                 .build();
     }
 }
