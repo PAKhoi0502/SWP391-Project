@@ -107,6 +107,7 @@ function AppRoutes() {
           <Route path="admin" element={<DashboardPlaceholderPage title="Admin Dashboard" />} />
           <Route path="admin/users" element={<AdminUsersPage />} />
           <Route path="admin/staff-profiles" element={<AdminStaffProfilesPage />} />
+          <Route path="admin/profile" element={<ProfilePage />} />
           <Route path="admin/vehicles" element={<AdminVehiclesPage />} />
           <Route path="admin/garages" element={<AdminGarageListPage />} />
           <Route path="admin/garages/create" element={<AdminGarageFormPage />} />

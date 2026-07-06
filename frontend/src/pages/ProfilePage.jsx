@@ -1,6 +1,7 @@
 import { Component, useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { userService } from '../services/userService'
+import { uploadService } from '../services/uploadService'
 import LoyaltyPointsCard from '../components/loyalty/LoyaltyPointsCard'
 
 // Error boundary to prevent LoyaltyPointsCard crash from taking down the whole profile
@@ -26,18 +27,16 @@ class LoyaltyBoundary extends Component {
   }
 }
 
-const emptyForm = { fullName: '', email: '', phone: '' }
-
 export default function ProfilePage() {
   const { user, setCurrentUser } = useAuth()
   const initialProfile = user || getStoredUser()
   const [form, setForm] = useState(() => toForm(initialProfile))
   const [profile, setProfile] = useState(initialProfile)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [avatarBusy, setAvatarBusy] = useState(false)
 
   useEffect(() => {
     let ignore = false
@@ -65,33 +64,54 @@ export default function ProfilePage() {
     setSuccess('')
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    const validationError = validate(form)
+  const handleAvatarUpload = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
 
-    if (validationError) {
-      setError(validationError)
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setError('Chỉ chấp nhận ảnh JPEG, PNG hoặc WEBP.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Ảnh không được vượt quá 5 MB.')
       return
     }
 
-    setSaving(true)
+    setAvatarBusy(true)
     setError('')
     setSuccess('')
 
     try {
-      const updated = await userService.updateMe({
-        fullName: form.fullName.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-      })
+      await uploadService.uploadImage(file, 'avatars')
+      const updated = await userService.getMe()
       setProfile(updated)
-      setForm(toForm(updated))
       setCurrentUser(updated)
-      setSuccess('Cập nhật hồ sơ thành công.')
+      setSuccess('Cập nhật ảnh đại diện thành công.')
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể cập nhật hồ sơ.'))
+      setError(getErrorMessage(err, 'Không thể cập nhật ảnh đại diện.'))
     } finally {
-      setSaving(false)
+      setAvatarBusy(false)
+    }
+  }
+
+  const handleAvatarDelete = async () => {
+    if (!profile?.avatarPublicId) return
+
+    setAvatarBusy(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      await uploadService.deleteImage(profile.avatarPublicId)
+      const updated = await userService.getMe()
+      setProfile(updated)
+      setCurrentUser(updated)
+      setSuccess('Đã xóa ảnh đại diện.')
+    } catch (err) {
+      setError(getErrorMessage(err, 'Không thể xóa ảnh đại diện.'))
+    } finally {
+      setAvatarBusy(false)
     }
   }
 
@@ -122,7 +142,32 @@ export default function ProfilePage() {
       `}</style>
 
       <div style={heroStyle}>
-        <div style={avatarStyle}>{getInitial(profile)}</div>
+        <div style={avatarPanelStyle}>
+          <div style={avatarStyle}>
+            {profile?.avatarUrl ? (
+              <img src={profile.avatarUrl} alt="Ảnh đại diện" style={avatarImageStyle} />
+            ) : (
+              getInitial(profile)
+            )}
+          </div>
+          <div style={avatarActionsStyle}>
+            <label style={{ ...buttonStyle, cursor: avatarBusy ? 'not-allowed' : 'pointer', opacity: avatarBusy ? 0.6 : 1 }}>
+              {avatarBusy ? 'Đang xử lý...' : 'Chọn ảnh'}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={avatarBusy}
+                onChange={handleAvatarUpload}
+                style={{ display: 'none' }}
+              />
+            </label>
+            {profile?.avatarPublicId && (
+              <button type="button" disabled={avatarBusy} onClick={handleAvatarDelete} style={deleteAvatarButtonStyle}>
+                Xóa ảnh
+              </button>
+            )}
+          </div>
+        </div>
         <div>
           <h1 style={{ margin: 0, fontSize: 26 }}>
             {profile?.fullName || profile?.email || 'Hồ sơ của tôi'}
@@ -211,19 +256,6 @@ function getStoredUser() {
   }
 }
 
-function validate(data) {
-  const email = data.email.trim()
-  const phone = data.phone.trim()
-
-  if (!data.fullName.trim()) return 'Vui lòng nhập họ và tên.'
-  if (!email) return 'Vui lòng nhập email.'
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Email không hợp lệ.'
-  if (!phone) return 'Vui lòng nhập số điện thoại.'
-  if (!/^[0-9+\-\s()]{8,20}$/.test(phone)) return 'Số điện thoại không hợp lệ.'
-
-  return ''
-}
-
 function getErrorMessage(err, fallback) {
   const raw = err.response?.data?.message || err.response?.data || fallback
   if (String(raw).includes('Email already exists')) return 'Email đã được sử dụng.'
@@ -266,6 +298,24 @@ const avatarStyle = {
   height: 64,
   justifyContent: 'center',
   width: 64,
+  overflow: 'hidden',
+}
+
+const avatarImageStyle = {
+  height: '100%',
+  objectFit: 'cover',
+  width: '100%',
+}
+
+const avatarPanelStyle = {
+  alignItems: 'center',
+  display: 'flex',
+  gap: 12,
+}
+
+const avatarActionsStyle = {
+  display: 'grid',
+  gap: 6,
 }
 
 const cardStyle = {
@@ -311,6 +361,18 @@ const buttonStyle = {
   font: 'inherit',
   fontWeight: 800,
   padding: '12px 18px',
+}
+
+const deleteAvatarButtonStyle = {
+  background: '#fff',
+  border: '1px solid #fecaca',
+  borderRadius: 10,
+  color: '#b91c1c',
+  cursor: 'pointer',
+  font: 'inherit',
+  fontSize: 13,
+  fontWeight: 700,
+  padding: '8px 12px',
 }
 
 const infoRowStyle = {

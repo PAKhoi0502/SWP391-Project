@@ -9,13 +9,13 @@ import java.util.List;
 public class VehicleInspectionCreateRequest {
 
     @NotBlank
-    private String inspectionType; // BEFORE_WASH hoặc AFTER_WASH
+    private String inspectionType;
 
     private String notes;
 
-    private List<String> images; // danh sách URL ảnh
+    private List<String> imagePublicIds;
 
-    private String exteriorCondition; // JSON string hoặc text mô tả
+    private String exteriorCondition;
 
-    private String interiorCondition; // JSON string hoặc text mô tả
+    private String interiorCondition;
 }
