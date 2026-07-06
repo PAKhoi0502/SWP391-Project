@@ -6,6 +6,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Objects;
@@ -50,6 +51,15 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(403).body(
                 errorResponse(ex.getMessage())
+        );
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Object>> handleMaxUploadSizeExceededException(
+            MaxUploadSizeExceededException ex) {
+
+        return ResponseEntity.badRequest().body(
+                errorResponse("image exceeds configured size limit")
         );
     }
 

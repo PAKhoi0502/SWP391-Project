@@ -7,6 +7,7 @@ import { garageService } from '../../services/garageService'
 import { getServicePackageById, getPackageName } from '../../services/servicePackageApi'
 import { staffProfileService } from '../../services/staffProfileService'
 import { userService } from '../../services/userService'
+import { uploadService } from '../../services/uploadService'
 import { vehicleService } from '../../services/vehicleService'
 import { getWashBayById } from '../../services/washBayApi'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
@@ -121,6 +122,7 @@ const blankInspectionForm = {
   exteriorCondition: '',
   interiorCondition: '',
   notes: '',
+  images: [],
 }
 
 const formatDateTime = (value) => {
@@ -515,6 +517,7 @@ const buildInspectionForms = (booking, items) =>
         exteriorCondition: inspection?.exteriorCondition || '',
         interiorCondition: inspection?.interiorCondition || '',
         notes: inspection?.notes || '',
+        images: Array.isArray(inspection?.images) ? inspection.images : [],
       },
     }
   }, {})
@@ -604,6 +607,7 @@ function BookingDetailPage() {
   const [inspections, setInspections] = useState([])
   const [inspectionForms, setInspectionForms] = useState({})
   const [inspectionSavingType, setInspectionSavingType] = useState('')
+  const [inspectionUploadingType, setInspectionUploadingType] = useState('')
   const [inspectionMessage, setInspectionMessage] = useState('')
   const [inspectionError, setInspectionError] = useState('')
   const [customerBookingNo, setCustomerBookingNo] = useState(null)
@@ -1476,6 +1480,41 @@ function BookingDetailPage() {
     }))
   }
 
+  const handleInspectionImageUpload = async (type, event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !booking?.id) return
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setInspectionError('Chỉ chấp nhận ảnh JPEG, PNG hoặc WEBP.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setInspectionError('Ảnh không được vượt quá 5 MB.')
+      return
+    }
+
+    setInspectionUploadingType(type)
+    setInspectionError('')
+    setInspectionMessage('')
+
+    try {
+      const uploaded = await uploadService.uploadImage(file, 'inspections', booking.id)
+      setInspectionForms((current) => ({
+        ...current,
+        [type]: {
+          ...(current[type] || blankInspectionForm),
+          images: [...(current[type]?.images || []), uploaded],
+        },
+      }))
+      setInspectionMessage('Đã tải ảnh lên. Lưu inspection để liên kết ảnh.')
+    } catch (err) {
+      setInspectionError(err?.response?.data?.message || err?.message || 'Không tải được ảnh inspection.')
+    } finally {
+      setInspectionUploadingType('')
+    }
+  }
+
   const handleSaveInspection = async (type) => {
     if (!booking?.id) return
 
@@ -1485,6 +1524,7 @@ function BookingDetailPage() {
       exteriorCondition: form.exteriorCondition.trim(),
       interiorCondition: form.interiorCondition.trim(),
       notes: form.notes.trim(),
+      imagePublicIds: (form.images || []).map((image) => image.publicId).filter(Boolean),
     }
 
     try {
@@ -1554,10 +1594,31 @@ function BookingDetailPage() {
           </label>
         </div>
 
+        <div className="booking-inspection-images">
+          {(form.images || []).map((image) => (
+            <img key={image.publicId || image.id} src={image.imageUrl} alt="Inspection" />
+          ))}
+          {!isLocked && (
+            <label className="booking-inspection-upload">
+              {inspectionUploadingType === type ? 'Đang tải ảnh...' : 'Thêm ảnh'}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                disabled={inspectionUploadingType === type}
+                onChange={(event) => handleInspectionImageUpload(type, event)}
+              />
+            </label>
+          )}
+        </div>
+
         {isLocked ? (
           <p className="booking-inspection-locked-hint">Dịch vụ đã hoàn thành, không thể chỉnh sửa inspection.</p>
         ) : (
-          <button type="button" disabled={inspectionSavingType === type} onClick={() => handleSaveInspection(type)}>
+          <button
+            type="button"
+            disabled={inspectionSavingType === type || inspectionUploadingType === type}
+            onClick={() => handleSaveInspection(type)}
+          >
             {inspectionSavingType === type ? 'Đang lưu...' : existingInspection ? 'Cập nhật inspection' : 'Tạo inspection'}
           </button>
         )}

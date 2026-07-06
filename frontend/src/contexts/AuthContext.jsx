@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { authService, authStorage } from "../services/authService";
 
 const AuthContext = createContext(null);
@@ -56,6 +56,8 @@ function normalizeUser(user, token) {
     email: user?.email || tokenUser?.email || null,
     phone: user?.phone || null,
     role: String(role).toUpperCase(),
+    avatarUrl: user?.avatarUrl || null,
+    avatarPublicId: user?.avatarPublicId || null,
   };
 }
 
@@ -91,7 +93,7 @@ export function AuthProvider({ children }) {
 
   const isAuthenticated = Boolean(accessToken && user);
 
-  const loadCurrentUser = async () => {
+  const loadCurrentUser = useCallback(async () => {
     const token = authStorage.getAccessToken();
 
     if (!token) {
@@ -125,7 +127,7 @@ if (finalUser) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
  const login = async (payload) => {
   const authData = await authService.login(payload);
@@ -145,7 +147,7 @@ if (finalUser) {
     authData.data?.user ||
     buildUserFromToken(token);
 
-  const loggedUser = normalizeUser(rawLoggedUser, token);
+  let loggedUser = normalizeUser(rawLoggedUser, token);
 
   // QUAN TRỌNG: xóa session cũ trước khi lưu tài khoản mới
   authStorage.clearAuth();
@@ -155,6 +157,14 @@ if (finalUser) {
     refreshToken,
     user: loggedUser,
   });
+
+  try {
+    const currentUser = await authService.getCurrentUser();
+    loggedUser = normalizeUser(currentUser, token);
+    authStorage.setAuth({ user: loggedUser });
+  } catch {
+    loggedUser = normalizeUser(rawLoggedUser, token);
+  }
 
   setAccessToken(token);
   setUser(loggedUser);
@@ -175,14 +185,14 @@ if (finalUser) {
     }
   };
 
-  const setCurrentUser = (currentUser) => {
+  const setCurrentUser = useCallback((currentUser) => {
     setUser(currentUser);
     authStorage.setAuth({ user: currentUser });
-  };
+  }, []);
 
   useEffect(() => {
     loadCurrentUser();
-  }, []);
+  }, [loadCurrentUser]);
 
   const value = useMemo(
     () => ({
@@ -196,7 +206,7 @@ if (finalUser) {
       loadCurrentUser,
       setCurrentUser,
     }),
-    [user, loading, isAuthenticated]
+    [user, loading, isAuthenticated, loadCurrentUser, setCurrentUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -4,7 +4,9 @@ import com.autowashpro.dto.request.UpdateProfileRequest;
 import com.autowashpro.dto.request.UpdateUserRoleRequest;
 import com.autowashpro.dto.request.UpdateUserStatusRequest;
 import com.autowashpro.dto.response.UserDetailResponse;
+import com.autowashpro.entity.Upload;
 import com.autowashpro.entity.User;
+import com.autowashpro.repository.UploadRepository;
 import com.autowashpro.repository.UserRepository;
 import com.autowashpro.support.TestFixtures;
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,9 @@ class UserServiceImplTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private UploadRepository uploadRepository;
+
     @InjectMocks
     private UserServiceImpl userService;
 
@@ -41,6 +46,23 @@ class UserServiceImplTest {
 
         assertEquals(customer.getEmail(), response.getEmail());
         assertEquals("CUSTOMER", response.getRole());
+    }
+
+    @Test
+    void getCurrentUserIncludesCurrentAvatar() {
+        User customer = TestFixtures.customer();
+        Upload avatar = new Upload();
+        avatar.setFileUrl("https://images.test/avatar.jpg");
+        avatar.setPublicId("autowashpro/avatars/avatar-1");
+        when(userRepository.findById(customer.getId())).thenReturn(Optional.of(customer));
+        when(uploadRepository.findFirstByOwnerIdAndEntityTypeAndEntityIdOrderByCreatedAtDesc(
+                customer.getId(), "AVATAR", customer.getId()))
+                .thenReturn(Optional.of(avatar));
+
+        UserDetailResponse response = userService.getCurrentUser(customer.getId());
+
+        assertEquals(avatar.getFileUrl(), response.getAvatarUrl());
+        assertEquals(avatar.getPublicId(), response.getAvatarPublicId());
     }
 
     @Test

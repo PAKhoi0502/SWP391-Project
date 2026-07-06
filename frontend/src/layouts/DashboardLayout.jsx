@@ -26,6 +26,7 @@ const NAV_ITEMS = {
     { to: '/staff/profile', label: 'Hồ sơ' },
   ],
   [ROLES.ADMIN]: [
+    { to: '/admin/profile', label: 'Hồ sơ' },
     { to: '/admin', label: 'Tổng quan' },
     { to: '/admin/users', label: 'Người dùng' },
     { to: '/admin/staff-profiles', label: 'Nhân viên' },
@@ -92,9 +93,16 @@ function DashboardLayout({ role }) {
 
       <div className="dashboard-shell">
         <header className="dashboard-header">
-          <div>
+          <div className="dashboard-user-summary">
+            {user?.avatarUrl ? (
+              <img className="dashboard-user-avatar" src={user.avatarUrl} alt="Avatar" />
+            ) : (
+              <span className="dashboard-user-avatar-fallback">{getInitial(user)}</span>
+            )}
+            <div>
             <strong>{role}</strong>
             <span>{user?.fullName || user?.email || user?.phone || 'Người dùng'}</span>
+            </div>
           </div>
 
           <button className="text-button" type="button" onClick={handleLogout}>
@@ -108,6 +116,10 @@ function DashboardLayout({ role }) {
       </div>
     </div>
   )
+}
+
+function getInitial(user) {
+  return String(user?.fullName || user?.email || 'U').trim().charAt(0).toUpperCase()
 }
 
 export default DashboardLayout
