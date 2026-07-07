@@ -38,6 +38,7 @@ const NAV_ITEMS = {
     { to: '/admin/wash-histories', label: 'Lịch sử rửa xe' },
     { to: '/admin/waitlist', label: 'Waitlist' },
     { to: '/admin/loyalty/tier-rules', label: 'Hạng thành viên' },
+    { to: '/admin/loyalty/adjust-points', label: 'Điều chỉnh điểm' },
     { to: '/admin/promotions', label: 'Khuyến mãi' },
     { to: '/admin/notifications/test-email', label: 'Kiểm tra email' },
     { to: '/admin/research/export', label: 'Xuất dữ liệu nghiên cứu' },

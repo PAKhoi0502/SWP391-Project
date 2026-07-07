@@ -49,6 +49,11 @@ export const loyaltyApi = {
     const response = await api.patch(`/loyalty/admin/tier-rules/${id}`, payload)
     return unwrap(response)
   },
+
+  async adjustPoints({ customerId, points, type = 'ADJUST', reason }) {
+    const response = await api.post('/loyalty/admin/adjust-points', { customerId, points, type, reason })
+    return unwrap(response)
+  },
 }
 
 export default loyaltyApi
