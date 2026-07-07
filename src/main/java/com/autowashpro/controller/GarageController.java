@@ -1,5 +1,9 @@
 package com.autowashpro.controller;
 
+import com.autowashpro.common.AuditAction;
+import com.autowashpro.common.AuditActorContext;
+import com.autowashpro.common.AuditMetadata;
+import com.autowashpro.common.AuditTargetType;
 import com.autowashpro.dto.request.GarageCreateRequest;
 import com.autowashpro.dto.request.GarageStatusUpdateRequest;
 import com.autowashpro.dto.request.GarageUpdateRequest;
@@ -7,6 +11,7 @@ import com.autowashpro.dto.response.GarageCapabilitiesResponse;
 import com.autowashpro.dto.response.GarageResponse;
 import com.autowashpro.dto.response.PageResponse;
 import com.autowashpro.service.GarageService;
+import com.autowashpro.service.AuditLogService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,11 +24,19 @@ import org.springframework.web.bind.annotation.*;
 public class GarageController {
 
     private final GarageService garageService;
+    private final AuditLogService auditLogService;
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<GarageResponse> create(@Valid @RequestBody GarageCreateRequest request) {
-        return ResponseEntity.ok(garageService.create(request));
+        GarageResponse response = garageService.create(request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.GARAGE_CREATED,
+                AuditTargetType.GARAGE,
+                response.getId(),
+                AuditMetadata.of("garageCode", response.getGarageCode(), "isActive", response.getIsActive()));
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping
@@ -45,14 +58,28 @@ public class GarageController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<GarageResponse> update(@PathVariable Long id,
                                                    @RequestBody GarageUpdateRequest request) {
-        return ResponseEntity.ok(garageService.update(id, request));
+        GarageResponse response = garageService.update(id, request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.GARAGE_UPDATED,
+                AuditTargetType.GARAGE,
+                id,
+                AuditMetadata.of("garageCode", response.getGarageCode()));
+        return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<GarageResponse> updateStatus(@PathVariable Long id,
                                                          @Valid @RequestBody GarageStatusUpdateRequest request) {
-        return ResponseEntity.ok(garageService.updateStatus(id, request));
+        GarageResponse response = garageService.updateStatus(id, request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.GARAGE_STATUS_UPDATED,
+                AuditTargetType.GARAGE,
+                id,
+                AuditMetadata.of("isActive", response.getIsActive()));
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}/capabilities")

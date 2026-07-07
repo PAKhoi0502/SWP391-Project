@@ -1083,6 +1083,8 @@ public class BookingServiceImpl implements BookingService {
                                                 HttpStatus.NOT_FOUND,
                                                 "Service package not found"));
 
+                LocalDateTime startedAt = LocalDateTime.now();
+
                 // ================= Assign Wash Bay =================
                 if (Boolean.TRUE.equals(servicePackage.getRequiresWashBay())) {
 
@@ -1098,6 +1100,7 @@ public class BookingServiceImpl implements BookingService {
                                                         "No wash bay available"));
 
                         booking.setWashBayId(washBay.getId());
+                        booking.setWashBayStartTime(startedAt);
 
                         washBay.setStatus(WashBayStatus.IN_USE);
 
@@ -1193,7 +1196,7 @@ public class BookingServiceImpl implements BookingService {
                 // ================= Update Booking =================
                 booking.setStatus("IN_PROGRESS");
 
-                booking.setStartedAt(LocalDateTime.now());
+                booking.setStartedAt(startedAt);
 
                 if (request.getNote() != null
                                 && !request.getNote().isBlank()) {
@@ -1428,6 +1431,8 @@ public class BookingServiceImpl implements BookingService {
                                                         + booking.getStatus());
                 }
 
+                LocalDateTime completedAt = LocalDateTime.now();
+
                 // 4. Release wash bay nếu có
                 if (booking.getWashBayId() != null) {
                         washBayRepository.findById(booking.getWashBayId()).ifPresent(washBay -> {
@@ -1435,7 +1440,7 @@ public class BookingServiceImpl implements BookingService {
                                 washBay.setCurrentBookingId(null);
                                 washBayRepository.save(washBay);
                         });
-                        booking.setWashBayId(null);
+                        booking.setWashBayEndTime(completedAt);
                 }
 
                 // 5. Release care staff nếu có
@@ -1448,7 +1453,7 @@ public class BookingServiceImpl implements BookingService {
 
                 // 6. Update booking
                 booking.setStatus("COMPLETED");
-                booking.setCompletedAt(LocalDateTime.now());
+                booking.setCompletedAt(completedAt);
                 booking.setRewardProcessed(false);
                 if (note != null && !note.isBlank()) {
                         booking.setNote(note);
@@ -1784,6 +1789,8 @@ return toResponse(saved);
                                 .checkedInAt(b.getCheckedInAt())
                                 .startedAt(b.getStartedAt())
                                 .washBayId(b.getWashBayId())
+                                .washBayStartTime(b.getWashBayStartTime())
+                                .washBayEndTime(b.getWashBayEndTime())
                                 .completedAt(b.getCompletedAt())
                                 .paidAt(b.getPaidAt())
                                 .rewardProcessed(b.getRewardProcessed())

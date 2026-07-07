@@ -48,6 +48,7 @@ import CustomerPromotionListPage from '../pages/promotion/CustomerPromotionListP
 import CustomerPromotionDetailPage from '../pages/promotion/CustomerPromotionDetailPage'
 import CustomerNotificationListPage from '../pages/notification/CustomerNotificationListPage'
 import CustomerNotificationDetailPage from '../pages/notification/CustomerNotificationDetailPage'
+import AdminTestEmailPage from '../pages/admin/AdminTestEmailPage'
 
 
 function AppRoutes() {
@@ -106,6 +107,7 @@ function AppRoutes() {
           <Route path="admin" element={<DashboardPlaceholderPage title="Admin Dashboard" />} />
           <Route path="admin/users" element={<AdminUsersPage />} />
           <Route path="admin/staff-profiles" element={<AdminStaffProfilesPage />} />
+          <Route path="admin/profile" element={<ProfilePage />} />
           <Route path="admin/vehicles" element={<AdminVehiclesPage />} />
           <Route path="admin/garages" element={<AdminGarageListPage />} />
           <Route path="admin/garages/create" element={<AdminGarageFormPage />} />
@@ -119,6 +121,7 @@ function AppRoutes() {
           <Route path="admin/waitlist" element={<StaffWaitlistPage />} />
           <Route path="admin/loyalty/tier-rules" element={<AdminTierRulesPage />} />
           <Route path="admin/promotions" element={<AdminPromotionManagementPage />} />
+          <Route path="admin/notifications/test-email" element={<AdminTestEmailPage />} />
         </Route>
       </Route>
 

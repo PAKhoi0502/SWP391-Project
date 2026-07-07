@@ -33,11 +33,18 @@ public class EmailServiceImpl implements EmailService {
     @Value("${app.mail.from-name}")
     private String fromName;
 
+    @Value("${app.mail.enabled:true}")
+    private boolean mailEnabled;
+
     // ===================== CORE SEND =====================
 
     @Override
     @Async
     public void sendEmail(String to, String subject, String htmlContent) {
+        if (!mailEnabled) {
+            return;
+        }
+
         if (to == null || to.isBlank()) {
             log.warn("[EMAIL_SKIP] Recipient email is null or blank, skipping");
             return;

@@ -1,8 +1,13 @@
 package com.autowashpro.controller;
 
+import com.autowashpro.common.AuditAction;
+import com.autowashpro.common.AuditActorContext;
+import com.autowashpro.common.AuditMetadata;
+import com.autowashpro.common.AuditTargetType;
 import com.autowashpro.dto.request.*;
 import com.autowashpro.dto.response.UserDetailResponse;
 import com.autowashpro.service.UserService;
+import com.autowashpro.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +20,7 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final AuditLogService auditLogService;
 
     @GetMapping("/me")
     public UserDetailResponse me(
@@ -57,7 +63,14 @@ public class UserController {
             @PathVariable Long id,
             @RequestBody UpdateUserStatusRequest request) {
 
-        return userService.updateStatus(id, request);
+        UserDetailResponse response = userService.updateStatus(id, request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.USER_STATUS_UPDATED,
+                AuditTargetType.USER,
+                id,
+                AuditMetadata.of("isActive", response.getIsActive()));
+        return response;
     }
 
     @PatchMapping("/{id}/role")
@@ -65,6 +78,13 @@ public class UserController {
             @PathVariable Long id,
             @RequestBody UpdateUserRoleRequest request) {
 
-        return userService.updateRole(id, request);
+        UserDetailResponse response = userService.updateRole(id, request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.USER_ROLE_UPDATED,
+                AuditTargetType.USER,
+                id,
+                AuditMetadata.of("role", response.getRole()));
+        return response;
     }
 }

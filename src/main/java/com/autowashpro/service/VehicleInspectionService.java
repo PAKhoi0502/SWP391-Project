@@ -7,8 +7,16 @@ import com.autowashpro.dto.response.VehicleInspectionResponse;
 import java.util.List;
 
 public interface VehicleInspectionService {
-    VehicleInspectionResponse create(Long bookingId, VehicleInspectionCreateRequest request, Long staffUserId);
+    VehicleInspectionResponse create(
+            Long bookingId,
+            VehicleInspectionCreateRequest request,
+            Long currentUserId,
+            String role);
     List<VehicleInspectionResponse> listByBooking(Long bookingId, Long currentUserId, String role);
     VehicleInspectionResponse getById(Long id, Long currentUserId, String role);
-    VehicleInspectionResponse update(Long id, VehicleInspectionUpdateRequest request, Long staffUserId);
+    VehicleInspectionResponse update(
+            Long id,
+            VehicleInspectionUpdateRequest request,
+            Long currentUserId,
+            String role);
 }

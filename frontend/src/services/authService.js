@@ -104,8 +104,8 @@ export const authService = {
   },
 
   async getCurrentUser() {
-    const res = await api.get("/auth/me");
-    return res.data?.user || res.data?.data || res.data;
+    const res = await api.get("/users/me");
+    return res.data?.data || res.data;
   },
 
   async forgotPassword(payload) {

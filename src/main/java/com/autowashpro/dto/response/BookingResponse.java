@@ -37,6 +37,8 @@ public class BookingResponse {
     private Long createdByStaffId;
     private LocalDateTime startedAt;
     private Long washBayId;
+    private LocalDateTime washBayStartTime;
+    private LocalDateTime washBayEndTime;
     private LocalDateTime completedAt;
     private LocalDateTime paidAt;
     private Boolean rewardProcessed;

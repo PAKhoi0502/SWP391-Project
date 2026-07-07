@@ -20,4 +20,8 @@ public class UserDetailResponse {
     private String role;
 
     private Boolean isActive;
+
+    private String avatarUrl;
+
+    private String avatarPublicId;
 }

@@ -9,5 +9,5 @@ public class VehicleInspectionUpdateRequest {
     private String notes;
     private String exteriorCondition;
     private String interiorCondition;
-    private List<String> images;
+    private List<String> imagePublicIds;
 }
