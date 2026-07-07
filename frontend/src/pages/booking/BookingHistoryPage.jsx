@@ -4,6 +4,7 @@ import { bookingApi } from '../../api/bookingApi'
 import customerBookingFlowApi from '../../api/customerBookingFlowApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
 import { getServicePackageById, getPackageName } from '../../services/servicePackageApi'
+import { vehicleInspectionApi } from '../../api/vehicleInspectionApi'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import './BookingHistoryPage.css'
 
@@ -254,7 +255,11 @@ const getPaymentMethodText = (booking) => {
   return 'Chưa cập nhật'
 }
 
-const pkgStepsCache = {}
+let pkgStepsCache = {}
+
+const clearPackageStepsCache = () => {
+  pkgStepsCache = {}
+}
 
 const getPackageSteps = async (packageId) => {
   if (!packageId) return []
@@ -287,7 +292,10 @@ const getPackageSteps = async (packageId) => {
   return []
 }
 
-const getHistoryTimelineItems = (booking, serviceSteps = []) => {
+const getInspectionByType = (inspections, type) =>
+  Array.isArray(inspections) ? inspections.find((item) => String(item?.type || '').toUpperCase() === type) : null
+
+const getHistoryTimelineItems = (booking, serviceSteps = [], inspections = []) => {
   const status = String(booking?.status || '').toUpperCase()
   const paymentStatus = String(booking?.paymentStatus || '').toUpperCase()
   const checkedInAt = booking?.checkedInAt
@@ -307,6 +315,7 @@ const getHistoryTimelineItems = (booking, serviceSteps = []) => {
   }
 
   const checkinActive = ['CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'].includes(status) || Boolean(checkedInAt)
+  const beforeWashInspection = getInspectionByType(inspections, 'BEFORE_WASH')
 
   const stepItems = Array.isArray(serviceSteps) && serviceSteps.length > 0
     ? serviceSteps
@@ -322,8 +331,9 @@ const getHistoryTimelineItems = (booking, serviceSteps = []) => {
   return [
     { label: 'Đặt lịch', active: true, time: booking?.startTime },
     { label: 'Check-in', active: checkinActive, time: checkedInAt },
+    { label: 'Kiểm tra', active: Boolean(beforeWashInspection), time: beforeWashInspection?.createdAt },
     ...stepItems,
-    { label: 'Hoàn thành', active: status === 'COMPLETED', time: booking?.completedAt },
+    { label: 'Bàn giao', active: status === 'COMPLETED', time: booking?.completedAt },
     { label: 'Thanh toán', active: paymentStatus === 'PAID', time: booking?.paidAt },
   ]
 }
@@ -340,6 +350,38 @@ export default function BookingHistoryPage() {
   const [cancelModalBookingId, setCancelModalBookingId] = useState(null)
   const [cancelModalBooking, setCancelModalBooking] = useState(null)
   const [serviceStepsByBookingId, setServiceStepsByBookingId] = useState({})
+  const [inspectionsByBookingId, setInspectionsByBookingId] = useState({})
+
+  const fetchInspectionsForBookings = async (bookingList) => {
+    if (!Array.isArray(bookingList) || bookingList.length === 0) return
+
+    const relevant = bookingList.filter((b) => {
+      const s = String(b?.status || '').toUpperCase()
+      return !['CANCELED', 'CANCELLED', 'NO_SHOW'].includes(s) && getBookingId(b)
+    })
+
+    if (relevant.length === 0) return
+
+    const results = await Promise.allSettled(
+      relevant.map(async (booking) => {
+        const bookingId = getBookingId(booking)
+        if (!bookingId) return { bookingId: null, inspections: [] }
+
+        const inspections = await vehicleInspectionApi.listByBooking(bookingId).catch(() => [])
+        return { bookingId, inspections }
+      }),
+    )
+
+    setInspectionsByBookingId((prev) => {
+      const next = { ...prev }
+      results.forEach((r) => {
+        if (r.status === 'fulfilled' && r.value?.bookingId) {
+          next[String(r.value.bookingId)] = r.value.inspections
+        }
+      })
+      return next
+    })
+  }
 
   const fetchServiceStepsForBookings = async (bookingList) => {
     if (!Array.isArray(bookingList) || bookingList.length === 0) return
@@ -399,8 +441,11 @@ export default function BookingHistoryPage() {
       const data = await customerBookingFlowApi.getCustomerBookings()
       const enrichedData = await enrichBookingsWithDetail(Array.isArray(data) ? data : [])
       setBookings(enrichedData)
+      clearPackageStepsCache()
       setServiceStepsByBookingId({})
       fetchServiceStepsForBookings(enrichedData)
+      setInspectionsByBookingId({})
+      fetchInspectionsForBookings(enrichedData)
     } catch (error) {
       setMessage(error.message || 'Không tải được lịch sử booking.')
       setBookings([])
@@ -424,8 +469,11 @@ export default function BookingHistoryPage() {
 
         if (mounted) {
           setBookings(enrichedData)
+          clearPackageStepsCache()
           setServiceStepsByBookingId({})
           fetchServiceStepsForBookings(enrichedData)
+          setInspectionsByBookingId({})
+          fetchInspectionsForBookings(enrichedData)
         }
       } catch (error) {
         if (mounted) {
@@ -661,7 +709,11 @@ export default function BookingHistoryPage() {
                   <div className="booking-history-mini-timeline-card">
                     <span>Tiến trình</span>
                     <div className="booking-history-mini-timeline">
-                      {getHistoryTimelineItems(booking, serviceStepsByBookingId[String(bookingId)] || []).map((item, index) => (
+                      {getHistoryTimelineItems(
+                        booking,
+                        serviceStepsByBookingId[String(bookingId)] || [],
+                        inspectionsByBookingId[String(bookingId)] || [],
+                      ).map((item, index) => (
                         <div
                           key={`${bookingId}-${index}-${item.label}`}
                           className={[

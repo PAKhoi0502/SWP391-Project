@@ -65,6 +65,7 @@ public class BookingServiceImpl implements BookingService {
         private final UserRepository userRepository;
         private final BookingServiceStepRepository bookingServiceStepRepository;
         private final ServicePackageStepRepository servicePackageStepRepository;
+        private final VehicleInspectionRepository vehicleInspectionRepository;
         private final ComboStepResolver comboStepResolver;
         private final BookingAddOnServicePackageRepository bookingAddOnServicePackageRepository;
         private final PointTransactionRepository pointTransactionRepository;
@@ -997,24 +998,27 @@ public class BookingServiceImpl implements BookingService {
         public BookingResponse checkInBooking(
                         Long bookingId,
                         Long staffUserId,
+                        String role,
                         String note) {
-
-                StaffProfile staff = staffProfileRepository
-                                .findByUser_Id(staffUserId)
-                                .orElseThrow(() -> new ResponseStatusException(
-                                                HttpStatus.FORBIDDEN,
-                                                "Staff profile not found"));
 
                 Booking booking = bookingRepository.findById(bookingId)
                                 .orElseThrow(() -> new ResponseStatusException(
                                                 HttpStatus.NOT_FOUND,
                                                 "Booking not found"));
 
-                if (!booking.getGarageId().equals(staff.getGarageId())) {
+                if (!"ROLE_ADMIN".equals(role)) {
+                        StaffProfile staff = staffProfileRepository
+                                        .findByUser_Id(staffUserId)
+                                        .orElseThrow(() -> new ResponseStatusException(
+                                                        HttpStatus.FORBIDDEN,
+                                                        "Staff profile not found"));
 
-                        throw new ResponseStatusException(
-                                        HttpStatus.FORBIDDEN,
-                                        "Booking belongs to another garage");
+                        if (!booking.getGarageId().equals(staff.getGarageId())) {
+
+                                throw new ResponseStatusException(
+                                                HttpStatus.FORBIDDEN,
+                                                "Booking belongs to another garage");
+                        }
                 }
 
                 if (!"CONFIRMED".equals(booking.getStatus())) {
@@ -1045,19 +1049,8 @@ public class BookingServiceImpl implements BookingService {
         public BookingResponse startService(
                         Long bookingId,
                         Long staffUserId,
+                        String role,
                         StartServiceRequest request) {
-
-                StaffProfile staff = staffProfileRepository
-                                .findByUser_Id(staffUserId)
-                                .orElseThrow(() -> new ResponseStatusException(
-                                                HttpStatus.FORBIDDEN,
-                                                "Staff profile not found"));
-
-                if (!Boolean.TRUE.equals(staff.getIsActive())) {
-                        throw new ResponseStatusException(
-                                        HttpStatus.FORBIDDEN,
-                                        "Staff profile is inactive");
-                }
 
                 Booking booking = bookingRepository
                                 .findById(bookingId)
@@ -1065,10 +1058,24 @@ public class BookingServiceImpl implements BookingService {
                                                 HttpStatus.NOT_FOUND,
                                                 "Booking not found"));
 
-                if (!booking.getGarageId().equals(staff.getGarageId())) {
-                        throw new ResponseStatusException(
-                                        HttpStatus.FORBIDDEN,
-                                        "Booking belongs to another garage");
+                if (!"ROLE_ADMIN".equals(role)) {
+                        StaffProfile staff = staffProfileRepository
+                                        .findByUser_Id(staffUserId)
+                                        .orElseThrow(() -> new ResponseStatusException(
+                                                        HttpStatus.FORBIDDEN,
+                                                        "Staff profile not found"));
+
+                        if (!Boolean.TRUE.equals(staff.getIsActive())) {
+                                throw new ResponseStatusException(
+                                                HttpStatus.FORBIDDEN,
+                                                "Staff profile is inactive");
+                        }
+
+                        if (!booking.getGarageId().equals(staff.getGarageId())) {
+                                throw new ResponseStatusException(
+                                                HttpStatus.FORBIDDEN,
+                                                "Booking belongs to another garage");
+                        }
                 }
 
                 if (!"CHECKED_IN".equals(booking.getStatus())) {
@@ -1431,6 +1438,12 @@ public class BookingServiceImpl implements BookingService {
                                                         + booking.getStatus());
                 }
 
+                // 3b. Validate required inspections exist (kiểm tra / bàn giao are fixed
+                // booking-level steps, not service-package steps — "bàn giao" is this
+                // completeService action itself, so it must be preceded by the
+                // required VehicleInspection records)
+                requireInspectionsBeforeCompletion(booking);
+
                 LocalDateTime completedAt = LocalDateTime.now();
 
                 // 4. Release wash bay nếu có
@@ -1462,6 +1475,49 @@ public class BookingServiceImpl implements BookingService {
                 Booking saved = bookingRepository.save(booking);
 
                 return toResponse(saved);
+        }
+
+        private void requireInspectionsBeforeCompletion(Booking booking) {
+                List<VehicleInspection> inspections = vehicleInspectionRepository
+                                .findByBookingIdOrderByCreatedAtAsc(booking.getId());
+
+                boolean hasBeforeWash = inspections.stream()
+                                .anyMatch(inspection -> "BEFORE_WASH".equals(inspection.getType()));
+
+                if (!hasBeforeWash) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "BEFORE_WASH inspection is required before completing this booking");
+                }
+
+                if (requiresAfterWashInspection(booking)) {
+                        boolean hasAfterWash = inspections.stream()
+                                        .anyMatch(inspection -> "AFTER_WASH".equals(inspection.getType()));
+
+                        if (!hasAfterWash) {
+                                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                                "AFTER_WASH inspection is required before completing this booking");
+                        }
+                }
+        }
+
+        private boolean requiresAfterWashInspection(Booking booking) {
+                if (!getBookingAddOnIds(booking.getId()).isEmpty()) {
+                        return true;
+                }
+
+                ServicePackage servicePackage = servicePackageRepository
+                                .findById(booking.getServicePackageId())
+                                .orElse(null);
+
+                if (servicePackage == null) {
+                        return false;
+                }
+
+                String type = servicePackage.getServiceType() == null
+                                ? ""
+                                : servicePackage.getServiceType().trim().toUpperCase();
+
+                return "ADD_ON".equals(type) || "ADDON".equals(type) || "COMBO".equals(type);
         }
 
         @Override

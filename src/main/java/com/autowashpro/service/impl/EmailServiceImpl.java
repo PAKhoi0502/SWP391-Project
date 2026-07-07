@@ -15,6 +15,8 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 
 @Slf4j
@@ -35,6 +37,9 @@ public class EmailServiceImpl implements EmailService {
 
     @Value("${app.mail.enabled:true}")
     private boolean mailEnabled;
+
+    @Value("${app.frontend-url}")
+    private String frontendUrl;
 
     // ===================== CORE SEND =====================
 
@@ -257,21 +262,23 @@ public class EmailServiceImpl implements EmailService {
     @Async
     public void sendForgotPasswordEmail(String to, String fullName, String token) {
         String subject = "[AutoWash Pro] Reset Your Password";
+        String resetLink = frontendUrl + "/reset-password?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
         String html = """
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                     <h2 style="color: #dc2626;">🔐 Reset Your Password</h2>
                     <p>Dear %s,</p>
                     <p>We received a request to reset your password.</p>
-                    <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
-                        <p><strong>Your reset token:</strong></p>
-                        <p style="font-size: 18px; font-weight: bold; color: #2563eb; word-break: break-all;">%s</p>
-                        <p style="color: #6b7280; font-size: 12px;">This token expires in 15 minutes.</p>
+                    <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0; text-align: center;">
+                        <a href="%s" style="display: inline-block; background: #2563eb; color: #ffffff; font-weight: bold; text-decoration: none; padding: 12px 24px; border-radius: 6px;">Reset Password</a>
+                        <p style="color: #6b7280; font-size: 12px; margin-top: 12px;">Or copy this link into your browser:</p>
+                        <p style="font-size: 13px; word-break: break-all;"><a href="%s">%s</a></p>
+                        <p style="color: #6b7280; font-size: 12px;">This link expires in 15 minutes.</p>
                     </div>
                     <p>If you did not request this, please ignore this email.</p>
                     <hr/>
                     <p style="color: #6b7280; font-size: 12px;">AutoWash Pro - Smart Car Wash Management System</p>
                 </div>
-                """.formatted(fullName, token);
+                """.formatted(fullName, resetLink, resetLink, resetLink);
         sendEmail(to, subject, html);
     }
 

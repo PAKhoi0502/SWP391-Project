@@ -4,8 +4,8 @@ import { STAFF_TYPES } from '../constants/staffTypes'
 import { useAuth } from '../contexts/AuthContext'
 import { garageService } from '../services/garageService'
 import { staffProfileService } from '../services/staffProfileService'
-import { uploadService } from '../services/uploadService'
 import { userService } from '../services/userService'
+import ImageUpload from '../components/upload/ImageUpload'
 
 export default function StaffProfilePage() {
   const { user, setCurrentUser } = useAuth()
@@ -13,7 +13,6 @@ export default function StaffProfilePage() {
   const [account, setAccount] = useState(user)
   const [garage, setGarage] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [avatarBusy, setAvatarBusy] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
@@ -48,48 +47,25 @@ export default function StaffProfilePage() {
     setCurrentUser(currentUser)
   }
 
-  const handleAvatarUpload = async (event) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file) return
-
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setError('Chỉ chấp nhận ảnh JPEG, PNG hoặc WEBP.')
-      return
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Ảnh không được vượt quá 5 MB.')
-      return
-    }
-
-    setAvatarBusy(true)
+  const handleAvatarUploaded = async () => {
     setError('')
     setMessage('')
     try {
-      await uploadService.uploadImage(file, 'avatars')
       await refreshAccount()
       setMessage('Cập nhật ảnh đại diện thành công.')
     } catch (err) {
-      setError(getError(err, 'Không thể cập nhật ảnh đại diện.'))
-    } finally {
-      setAvatarBusy(false)
+      setError(getError(err, 'Không thể tải lại hồ sơ.'))
     }
   }
 
-  const handleAvatarDelete = async () => {
-    if (!account?.avatarPublicId) return
-
-    setAvatarBusy(true)
+  const handleAvatarDeleted = async () => {
     setError('')
     setMessage('')
     try {
-      await uploadService.deleteImage(account.avatarPublicId)
       await refreshAccount()
       setMessage('Đã xóa ảnh đại diện.')
     } catch (err) {
-      setError(getError(err, 'Không thể xóa ảnh đại diện.'))
-    } finally {
-      setAvatarBusy(false)
+      setError(getError(err, 'Không thể tải lại hồ sơ.'))
     }
   }
 
@@ -99,31 +75,18 @@ export default function StaffProfilePage() {
   return (
     <div style={cardStyle}>
       <div style={profileHeadStyle}>
-        <div style={avatarStyle}>
-          {account?.avatarUrl ? (
-            <img src={account.avatarUrl} alt="Ảnh đại diện" style={avatarImageStyle} />
-          ) : (
-            getInitial(account)
-          )}
-        </div>
+        {!account?.avatarUrl && <div style={avatarStyle}>{getInitial(account)}</div>}
         <div>
           <h1 style={{ margin: 0, color: '#fff' }}>Hồ sơ của tôi</h1>
           <div style={avatarActionsStyle}>
-            <label style={avatarButtonStyle}>
-              {avatarBusy ? 'Đang xử lý...' : 'Chọn ảnh'}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                disabled={avatarBusy}
-                onChange={handleAvatarUpload}
-                style={{ display: 'none' }}
-              />
-            </label>
-            {account?.avatarPublicId && (
-              <button type="button" disabled={avatarBusy} onClick={handleAvatarDelete} style={deleteButtonStyle}>
-                Xóa ảnh
-              </button>
-            )}
+            <ImageUpload
+              className="image-upload--round image-upload--sm image-upload--pill"
+              folder="avatars"
+              images={account?.avatarUrl ? [{ publicId: account.avatarPublicId, imageUrl: account.avatarUrl }] : []}
+              onUploaded={handleAvatarUploaded}
+              onDeleted={handleAvatarDeleted}
+              multiple={false}
+            />
           </div>
         </div>
       </div>
@@ -164,9 +127,6 @@ const gridStyle = { display: 'grid', gap: 14, maxWidth: 720 }
 const rowStyle = { alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', gap: 16, paddingBottom: 12 }
 const profileHeadStyle = { alignItems: 'center', display: 'flex', gap: 16, marginBottom: 24 }
 const avatarStyle = { alignItems: 'center', background: '#0369a1', borderRadius: '50%', color: '#fff', display: 'flex', flex: '0 0 72px', fontSize: 28, fontWeight: 800, height: 72, justifyContent: 'center', overflow: 'hidden', width: 72 }
-const avatarImageStyle = { height: '100%', objectFit: 'cover', width: '100%' }
 const avatarActionsStyle = { display: 'flex', gap: 8, marginTop: 10 }
-const avatarButtonStyle = { background: '#0369a1', borderRadius: 10, color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 800, padding: '8px 12px' }
-const deleteButtonStyle = { background: 'transparent', border: '1px solid #fca5a5', borderRadius: 10, color: '#fecaca', cursor: 'pointer', font: 'inherit', fontSize: 13, fontWeight: 800, padding: '8px 12px' }
 const errorStyle = { background: 'rgba(127,29,29,0.28)', borderRadius: 10, color: '#fecaca', padding: 10 }
 const messageStyle = { background: 'rgba(20,83,45,0.28)', borderRadius: 10, color: '#bbf7d0', padding: 10 }

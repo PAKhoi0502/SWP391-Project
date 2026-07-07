@@ -56,12 +56,14 @@ public interface BookingService {
         BookingResponse checkInBooking(
                         Long bookingId,
                         Long staffUserId,
+                        String role,
                         String note);
 
         // ===================== ISSUE #16 =====================
         BookingResponse startService(
                         Long bookingId,
                         Long staffUserId,
+                        String role,
                         StartServiceRequest request);
 
         // ===================== ISSUE #19 =====================

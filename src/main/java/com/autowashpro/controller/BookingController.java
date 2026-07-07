@@ -206,7 +206,8 @@ public class BookingController {
                         @AuthenticationPrincipal UserDetails userDetails) {
 
                 Long staffUserId = Long.valueOf(userDetails.getUsername());
-                BookingResponse response = bookingService.checkInBooking(id, staffUserId, request.getNote());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                BookingResponse response = bookingService.checkInBooking(id, staffUserId, role, request.getNote());
                 auditLogService.createAuditLog(
                                 staffUserId,
                                 AuditAction.BOOKING_CHECKED_IN,
@@ -232,7 +233,8 @@ public class BookingController {
                         @RequestBody StartServiceRequest request) {
 
                 Long staffUserId = Long.valueOf(userDetails.getUsername());
-                BookingResponse response = bookingService.startService(id, staffUserId, request);
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                BookingResponse response = bookingService.startService(id, staffUserId, role, request);
                 auditLogService.createAuditLog(
                                 staffUserId,
                                 AuditAction.BOOKING_SERVICE_STARTED,
