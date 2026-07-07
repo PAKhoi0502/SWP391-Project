@@ -51,6 +51,7 @@ import CustomerNotificationDetailPage from '../pages/notification/CustomerNotifi
 import AdminTestEmailPage from '../pages/admin/AdminTestEmailPage'
 import AdminDashboardPage from '../pages/admin/AdminDashboardPage'
 import AdminResearchExportPage from '../pages/admin/AdminResearchExportPage'
+import AdminAuditLogPage from '../pages/admin/AdminAuditLogPage'
 
 
 function AppRoutes() {
@@ -125,6 +126,7 @@ function AppRoutes() {
           <Route path="admin/promotions" element={<AdminPromotionManagementPage />} />
           <Route path="admin/notifications/test-email" element={<AdminTestEmailPage />} />
           <Route path="admin/research/export" element={<AdminResearchExportPage />} />
+          <Route path="admin/audit-logs" element={<AdminAuditLogPage />} />
         </Route>
       </Route>
 
