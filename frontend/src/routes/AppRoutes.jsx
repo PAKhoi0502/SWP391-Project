@@ -49,6 +49,7 @@ import CustomerPromotionDetailPage from '../pages/promotion/CustomerPromotionDet
 import CustomerNotificationListPage from '../pages/notification/CustomerNotificationListPage'
 import CustomerNotificationDetailPage from '../pages/notification/CustomerNotificationDetailPage'
 import AdminTestEmailPage from '../pages/admin/AdminTestEmailPage'
+import AdminDashboardPage from '../pages/admin/AdminDashboardPage'
 
 
 function AppRoutes() {
@@ -104,7 +105,7 @@ function AppRoutes() {
 
       <Route element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]} />}>
         <Route element={<AdminLayout />}>
-          <Route path="admin" element={<DashboardPlaceholderPage title="Admin Dashboard" />} />
+          <Route path="admin" element={<AdminDashboardPage />} />
           <Route path="admin/users" element={<AdminUsersPage />} />
           <Route path="admin/staff-profiles" element={<AdminStaffProfilesPage />} />
           <Route path="admin/profile" element={<ProfilePage />} />
