@@ -36,6 +36,7 @@ const NAV_ITEMS = {
     { to: '/admin/service-packages', label: 'Gói dịch vụ' },
     { to: '/admin/bookings', label: 'Booking' },
     { to: '/admin/wash-histories', label: 'Lịch sử rửa xe' },
+    { to: '/admin/waitlist', label: 'Waitlist' },
     { to: '/admin/loyalty/tier-rules', label: 'Hạng thành viên' },
     { to: '/admin/promotions', label: 'Khuyến mãi' },
     { to: '/admin/notifications/test-email', label: 'Kiểm tra email' },

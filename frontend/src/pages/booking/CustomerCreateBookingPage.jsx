@@ -609,6 +609,7 @@ export default function CustomerCreateBookingPage() {
       garageName: waitlistDraft.garageName || '',
       servicePackageId: String(waitlistDraft.servicePackageId || ''),
       servicePackageName: waitlistDraft.servicePackageName || '',
+      vehicleId: String(waitlistDraft.vehicleId || ''),
       vehicleType: waitlistDraft.vehicleType || '',
       date: waitlistDraft.date || '',
       startTime: waitlistDraft.startTime || '',

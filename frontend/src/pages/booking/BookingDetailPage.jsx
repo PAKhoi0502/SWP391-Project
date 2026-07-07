@@ -1598,30 +1598,30 @@ function BookingDetailPage() {
           {(form.images || []).map((image) => (
             <img key={image.publicId || image.id} src={image.imageUrl} alt="Inspection" />
           ))}
-          {!isLocked && (
-            <label className="booking-inspection-upload">
-              {inspectionUploadingType === type ? 'Đang tải ảnh...' : 'Thêm ảnh'}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                disabled={inspectionUploadingType === type}
-                onChange={(event) => handleInspectionImageUpload(type, event)}
-              />
-            </label>
-          )}
+          <label className="booking-inspection-upload">
+            {inspectionUploadingType === type ? 'Đang tải ảnh...' : 'Thêm ảnh'}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={inspectionUploadingType === type}
+              onChange={(event) => handleInspectionImageUpload(type, event)}
+            />
+          </label>
         </div>
 
-        {isLocked ? (
-          <p className="booking-inspection-locked-hint">Dịch vụ đã hoàn thành, không thể chỉnh sửa inspection.</p>
-        ) : (
-          <button
-            type="button"
-            disabled={inspectionSavingType === type || inspectionUploadingType === type}
-            onClick={() => handleSaveInspection(type)}
-          >
-            {inspectionSavingType === type ? 'Đang lưu...' : existingInspection ? 'Cập nhật inspection' : 'Tạo inspection'}
-          </button>
+        {isLocked && (
+          <p className="booking-inspection-locked-hint">
+            Dịch vụ đã hoàn thành, không thể chỉnh sửa tình trạng/ghi chú. Vẫn có thể thêm ảnh.
+          </p>
         )}
+
+        <button
+          type="button"
+          disabled={inspectionSavingType === type || inspectionUploadingType === type}
+          onClick={() => handleSaveInspection(type)}
+        >
+          {inspectionSavingType === type ? 'Đang lưu...' : existingInspection ? 'Cập nhật inspection' : 'Tạo inspection'}
+        </button>
       </article>
     )
   }

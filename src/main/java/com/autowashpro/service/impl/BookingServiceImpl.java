@@ -591,6 +591,7 @@ public class BookingServiceImpl implements BookingService {
                 Booking booking = new Booking();
                 booking.setCustomerId(customerId);
                 booking.setVehicleId(request.getVehicleId());
+                booking.setVehicleType(bayType);
                 booking.setGarageId(request.getGarageId());
                 booking.setServicePackageId(request.getServicePackageId());
                 booking.setPromotionId(promotionId);
@@ -784,6 +785,7 @@ public class BookingServiceImpl implements BookingService {
                 Booking booking = new Booking();
                 booking.setCustomerId(matchedCustomer != null ? matchedCustomer.getId() : null);
                 booking.setVehicleId(matchedVehicle != null ? matchedVehicle.getId() : null);
+                booking.setVehicleType(bayType);
                 booking.setGarageId(request.getGarageId());
                 booking.setServicePackageId(request.getServicePackageId());
                 booking.setCreatedByStaffId(staffUserId);

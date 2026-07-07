@@ -151,7 +151,8 @@ export default function ServicePackageDetailPage() {
 }
 
 function formatVehicleType(value) {
-  if (value === 'CAR') return 'Ô tô'
-  if (value === 'MOTORBIKE') return 'Xe máy'
+  const normalized = String(value || '').toUpperCase()
+  if (normalized === 'CAR') return 'Ô tô'
+  if (normalized === 'BIKE' || normalized === 'MOTORBIKE') return 'Xe máy'
   return 'Mọi loại xe'
 }

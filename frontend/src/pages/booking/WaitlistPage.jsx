@@ -1,8 +1,11 @@
 import { Link, useSearchParams } from 'react-router-dom'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { waitlistApi } from '../../api/waitlistApi'
 import { Button } from '../../components/common/ui'
 import './WaitlistPage.css'
+
+const WAITING_STATUSES = new Set(['WAITING'])
+const OFFERED_STATUSES = new Set(['OFFERED'])
 
 function formatDate(date) {
   if (!date) return 'Chưa có ngày'
@@ -38,15 +41,14 @@ function getStatusLabel(status) {
   const value = String(status || 'WAITING').toUpperCase()
   if (value === 'WAITING') return 'Đang chờ'
   if (value === 'OFFERED') return 'Có slot trống'
-  if (value === 'ACCEPTED') return 'Đã duyệt'
-  if (value === 'REJECTED') return 'Đã từ chối'
-  if (value === 'CANCELLED' || value === 'CANCELED') return 'Đã hủy'
+  if (value === 'ACCEPTED') return 'Đã nhận slot'
+  if (value === 'CANCELED' || value === 'CANCELLED') return 'Đã hủy'
   if (value === 'EXPIRED') return 'Hết hạn'
   return value
 }
 
 function getErrorMessage(error, fallback) {
-  return error?.message || error?.data?.message || fallback
+  return error?.response?.data?.message || error?.message || fallback
 }
 
 function InfoRow({ label, value }) {
@@ -65,11 +67,13 @@ export default function WaitlistPage() {
   const [error, setError] = useState('')
   const [items, setItems] = useState([])
   const [loadingItems, setLoadingItems] = useState(false)
+  const [actionKey, setActionKey] = useState('')
 
   const garageId = searchParams.get('garageId') || ''
   const garageName = searchParams.get('garageName') || ''
   const servicePackageId = searchParams.get('servicePackageId') || ''
   const servicePackageName = searchParams.get('servicePackageName') || ''
+  const vehicleId = searchParams.get('vehicleId') || ''
   const vehicleType = searchParams.get('vehicleType') || ''
   const date = searchParams.get('date') || ''
   const startTime = searchParams.get('startTime') || ''
@@ -78,38 +82,27 @@ export default function WaitlistPage() {
 
   const backToBookingUrl = `/booking?garageId=${garageId}&servicePackageId=${servicePackageId}&vehicleType=${vehicleType}&date=${date}`
 
-  const waitlistPayload = useMemo(() => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}')
-    return {
-      garageId: Number(garageId),
-      garageName,
-      servicePackageId: Number(servicePackageId),
-      servicePackageName,
-      vehicleType,
-      date,
-      startTime,
-      endTime,
-      customerId: user?.id || 'Guest',
-      customerName: user?.fullName || user?.name || 'Khách hàng',
+  const fetchMine = useCallback(async () => {
+    try {
+      setLoadingItems(true)
+      setError('')
+      const result = await waitlistApi.getMine()
+      const content = Array.isArray(result?.content) ? result.content : []
+      setItems([...content].sort((left, right) => new Date(right?.createdAt || 0) - new Date(left?.createdAt || 0)))
+    } catch (err) {
+      setError(getErrorMessage(err, 'Không tải được danh sách chờ.'))
+    } finally {
+      setLoadingItems(false)
     }
-  }, [garageId, garageName, servicePackageId, servicePackageName, vehicleType, date, startTime, endTime])
+  }, [])
 
   useEffect(() => {
     if (isJoinFlow) return
-
-    const user = JSON.parse(localStorage.getItem('user') || '{}')
-    setLoadingItems(true)
-    waitlistApi.getMine()
-      .then((result) => {
-        const mine = result.filter((item) => !user?.id || String(item?.customerId) === String(user.id))
-        setItems(mine.sort((left, right) => new Date(right?.createdAt || 0) - new Date(left?.createdAt || 0)))
-      })
-      .catch(() => setError('Không tải được danh sách chờ.'))
-      .finally(() => setLoadingItems(false))
-  }, [isJoinFlow])
+    fetchMine()
+  }, [isJoinFlow, fetchMine])
 
   const handleConfirmJoinWaitlist = async () => {
-    if (!garageId || !servicePackageId || !vehicleType || !date) {
+    if (!garageId || !servicePackageId || !vehicleId || !date) {
       setError('Thiếu thông tin slot. Vui lòng quay lại trang chọn slot và chọn lại.')
       return
     }
@@ -117,13 +110,40 @@ export default function WaitlistPage() {
     try {
       setLoading(true)
       setError('')
-      const createdEntry = await waitlistApi.join(waitlistPayload)
-      localStorage.setItem('waitlistDraft', JSON.stringify(createdEntry || waitlistPayload))
-      setJoinedEntry(createdEntry || waitlistPayload)
+      const createdEntry = await waitlistApi.join({
+        garageId,
+        vehicleId,
+        servicePackageId,
+        desiredStartTime: startTime,
+        reason: 'NO_BAY',
+      })
+      setJoinedEntry(createdEntry)
     } catch (err) {
       setError(getErrorMessage(err, 'Không thể tham gia waitlist. Vui lòng thử lại.'))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const runAction = async (id, action, successMessage) => {
+    if (!id) return
+
+    try {
+      setActionKey(`${action}-${id}`)
+      setError('')
+
+      if (action === 'cancel') {
+        await waitlistApi.cancel(id)
+      } else {
+        await waitlistApi.accept(id)
+      }
+
+      await fetchMine()
+      window.alert(successMessage)
+    } catch (err) {
+      setError(getErrorMessage(err, 'Không thể cập nhật waitlist. Vui lòng thử lại.'))
+    } finally {
+      setActionKey('')
     }
   }
 
@@ -134,8 +154,8 @@ export default function WaitlistPage() {
           <p className="waitlist-eyebrow">Waitlist</p>
           <h1>Danh sách chờ của tôi</h1>
           <p>
-            Các yêu cầu waitlist sẽ nằm ở đây. Khi được duyệt và tạo booking, lịch hẹn mới
-            xuất hiện ở trang Lịch hẹn.
+            Các yêu cầu waitlist sẽ nằm ở đây. Khi được offer slot, bạn có thể nhận slot đó,
+            lịch hẹn mới sẽ xuất hiện ở trang Lịch hẹn.
           </p>
 
           {error && <p className="waitlist-message waitlist-message-error">{error}</p>}
@@ -145,20 +165,52 @@ export default function WaitlistPage() {
             <div className="waitlist-empty">Bạn chưa có yêu cầu waitlist nào.</div>
           ) : (
             <div className="waitlist-list">
-              {items.map((item) => (
-                <article className="waitlist-card" key={item.id || `${item.garageId}-${item.startTime}`}>
-                  <div className="waitlist-card-header">
-                    <strong>{item.servicePackageName || `Gói #${item.servicePackageId || '-'}`}</strong>
-                    <span>{getStatusLabel(item.status)}</span>
-                  </div>
-                  <div className="waitlist-card-details">
-                    <div>Garage: {item.garageName || `Garage #${item.garageId || '-'}`}</div>
-                    <div>Ngày: {formatDate(item.date || item.startTime)}</div>
-                    <div>Khung giờ: {formatTime(item.startTime)} - {formatTime(item.endTime)}</div>
-                    <div>Vị trí: #{item.position || '-'}</div>
-                  </div>
-                </article>
-              ))}
+              {items.map((item) => {
+                const status = String(item.status || 'WAITING').toUpperCase()
+                const canCancel = WAITING_STATUSES.has(status) || OFFERED_STATUSES.has(status)
+                const canAccept = OFFERED_STATUSES.has(status)
+                const isCancelling = actionKey === `cancel-${item.id}`
+                const isAccepting = actionKey === `accept-${item.id}`
+
+                return (
+                  <article className="waitlist-card" key={item.id}>
+                    <div className="waitlist-card-header">
+                      <strong>{item.servicePackageName || `Gói #${item.servicePackageId || '-'}`}</strong>
+                      <span>{getStatusLabel(status)}</span>
+                    </div>
+                    <div className="waitlist-card-details">
+                      <div>Garage: {item.garageName || `Garage #${item.garageId || '-'}`}</div>
+                      <div>Xe: {item.vehicleName || `Xe #${item.vehicleId || '-'}`}</div>
+                      <div>Ngày: {formatDate(item.desiredStartTime)}</div>
+                      <div>Khung giờ: {formatTime(item.desiredStartTime)} - {formatTime(item.desiredEndTime)}</div>
+                    </div>
+
+                    {(canCancel || canAccept) && (
+                      <div className="waitlist-actions">
+                        {canAccept && (
+                          <Button
+                            loading={isAccepting}
+                            disabled={Boolean(actionKey)}
+                            onClick={() => runAction(item.id, 'accept', 'Đã nhận slot. Booking mới đã được tạo.')}
+                          >
+                            Nhận slot
+                          </Button>
+                        )}
+                        {canCancel && (
+                          <Button
+                            variant="ghost"
+                            loading={isCancelling}
+                            disabled={Boolean(actionKey)}
+                            onClick={() => runAction(item.id, 'cancel', 'Đã hủy waitlist.')}
+                          >
+                            Hủy waitlist
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </article>
+                )
+              })}
             </div>
           )}
 
