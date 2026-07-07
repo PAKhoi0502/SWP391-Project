@@ -441,14 +441,19 @@ washBayDurationMinutes: Number(form.durationMinutes),
               </p>
             </div>
           ) : (
-            <textarea
-              className="service-package-textarea"
-              name="stepsTemplate"
-              value={form.stepsTemplate}
-              onChange={handleChange}
-              placeholder={'Steps template, mỗi dòng là 1 bước\nVí dụ:\nKiểm tra xe\nRửa ngoại thất\nLau khô và bàn giao'}
-              style={{ marginTop: 12 }}
-            />
+            <>
+              <textarea
+                className="service-package-textarea"
+                name="stepsTemplate"
+                value={form.stepsTemplate}
+                onChange={handleChange}
+                placeholder={'Steps template, mỗi dòng là 1 bước\nVí dụ:\nRửa ngoại thất\nSấy khô'}
+                style={{ marginTop: 12 }}
+              />
+              <p style={{ marginTop: 8, color: '#64748b', fontSize: 13 }}>
+                Không cần thêm bước "kiểm tra" hay "bàn giao" — hệ thống tự thêm 2 bước này vào đầu và cuối mỗi booking. Chỉ nhập các bước xử lý thực tế của gói (vd rửa xe, dưỡng bóng).
+              </p>
+            </>
           )}
 
           <div className="service-package-actions" style={{ marginTop: 16 }}>

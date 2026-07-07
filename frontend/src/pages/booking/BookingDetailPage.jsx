@@ -7,10 +7,10 @@ import { garageService } from '../../services/garageService'
 import { getServicePackageById, getPackageName } from '../../services/servicePackageApi'
 import { staffProfileService } from '../../services/staffProfileService'
 import { userService } from '../../services/userService'
-import { uploadService } from '../../services/uploadService'
 import { vehicleService } from '../../services/vehicleService'
 import { getWashBayById } from '../../services/washBayApi'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
+import ImageUpload from '../../components/upload/ImageUpload'
 import CheckInBookingModal from '../../components/Booking/CheckInBookingModal'
 import CompleteServiceModal from '../../components/Booking/CompleteServiceModal'
 import NoShowBookingModal from '../../components/Booking/NoShowBookingModal'
@@ -493,20 +493,6 @@ const getInspectionTypes = (booking) => {
 
 const getInspectionByType = (items, type) => items.find((item) => String(item?.type || '').toUpperCase() === type)
 
-const getStepInspectionType = (step, allSteps, booking) => {
-  if (!Array.isArray(allSteps) || allSteps.length === 0) return null
-
-  const orders = allSteps.map((item) => Number(item.stepOrder || item.order || 0))
-  const minOrder = Math.min(...orders)
-  const maxOrder = Math.max(...orders)
-  const stepOrder = Number(step.stepOrder || step.order || 0)
-  const types = getInspectionTypes(booking)
-
-  if (stepOrder === minOrder && types.includes('BEFORE_WASH')) return 'BEFORE_WASH'
-  if (stepOrder === maxOrder && maxOrder !== minOrder && types.includes('AFTER_WASH')) return 'AFTER_WASH'
-  return null
-}
-
 const buildInspectionForms = (booking, items) =>
   getInspectionTypes(booking).reduce((forms, type) => {
     const inspection = getInspectionByType(items, type)
@@ -607,7 +593,6 @@ function BookingDetailPage() {
   const [inspections, setInspections] = useState([])
   const [inspectionForms, setInspectionForms] = useState({})
   const [inspectionSavingType, setInspectionSavingType] = useState('')
-  const [inspectionUploadingType, setInspectionUploadingType] = useState('')
   const [inspectionMessage, setInspectionMessage] = useState('')
   const [inspectionError, setInspectionError] = useState('')
   const [customerBookingNo, setCustomerBookingNo] = useState(null)
@@ -725,7 +710,7 @@ function BookingDetailPage() {
       enriched.careStaffType = packageResult.value.careStaffType || ''
 
       // COMBO packages have no own steps — resolve template steps from included packages,
-      // mirroring the same insert-before-last logic as ComboStepResolver.java on the backend.
+      // mirroring ComboStepResolver.java on the backend (main steps, then add-on steps).
       if (
         enriched.servicePackageSteps.length === 0 &&
         String(enriched.servicePackageType || '').toUpperCase() === 'COMBO' &&
@@ -766,8 +751,8 @@ function BookingDetailPage() {
 
       if (addOnSteps.length > 0) {
         const mainSteps = enriched.servicePackageSteps || []
-        // Add-on steps go right before the final main step (handover),
-        // matching how the backend orders BookingServiceStep once service starts.
+        // Main steps first, then add-on steps, matching how the backend
+        // orders BookingServiceStep once service starts.
         const merged = mainSteps.length > 0
           ? [...mainSteps, ...addOnSteps]
           : addOnSteps
@@ -1215,6 +1200,15 @@ function BookingDetailPage() {
       return
     }
 
+    if (!getInspectionByType(inspections, 'BEFORE_WASH')) {
+      setCompleteServiceError('Vui lòng tạo inspection "Trước khi sử dụng dịch vụ" trước khi hoàn thành booking.')
+      return
+    }
+    if (getInspectionTypes(booking).includes('AFTER_WASH') && !getInspectionByType(inspections, 'AFTER_WASH')) {
+      setCompleteServiceError('Vui lòng tạo inspection "Sau khi sử dụng dịch vụ" trước khi hoàn thành booking.')
+      return
+    }
+
     setCompleteServiceLoading(true)
     setCompleteServiceError('')
     try {
@@ -1480,39 +1474,25 @@ function BookingDetailPage() {
     }))
   }
 
-  const handleInspectionImageUpload = async (type, event) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file || !booking?.id) return
+  const handleInspectionImageUploaded = (type, uploaded) => {
+    setInspectionForms((current) => ({
+      ...current,
+      [type]: {
+        ...(current[type] || blankInspectionForm),
+        images: [...(current[type]?.images || []), uploaded],
+      },
+    }))
+    setInspectionMessage('Đã tải ảnh lên. Lưu inspection để liên kết ảnh.')
+  }
 
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setInspectionError('Chỉ chấp nhận ảnh JPEG, PNG hoặc WEBP.')
-      return
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setInspectionError('Ảnh không được vượt quá 5 MB.')
-      return
-    }
-
-    setInspectionUploadingType(type)
-    setInspectionError('')
-    setInspectionMessage('')
-
-    try {
-      const uploaded = await uploadService.uploadImage(file, 'inspections', booking.id)
-      setInspectionForms((current) => ({
-        ...current,
-        [type]: {
-          ...(current[type] || blankInspectionForm),
-          images: [...(current[type]?.images || []), uploaded],
-        },
-      }))
-      setInspectionMessage('Đã tải ảnh lên. Lưu inspection để liên kết ảnh.')
-    } catch (err) {
-      setInspectionError(err?.response?.data?.message || err?.message || 'Không tải được ảnh inspection.')
-    } finally {
-      setInspectionUploadingType('')
-    }
+  const handleInspectionImageDeleted = (type, publicId) => {
+    setInspectionForms((current) => ({
+      ...current,
+      [type]: {
+        ...(current[type] || blankInspectionForm),
+        images: (current[type]?.images || []).filter((image) => image.publicId !== publicId),
+      },
+    }))
   }
 
   const handleSaveInspection = async (type) => {
@@ -1594,20 +1574,14 @@ function BookingDetailPage() {
           </label>
         </div>
 
-        <div className="booking-inspection-images">
-          {(form.images || []).map((image) => (
-            <img key={image.publicId || image.id} src={image.imageUrl} alt="Inspection" />
-          ))}
-          <label className="booking-inspection-upload">
-            {inspectionUploadingType === type ? 'Đang tải ảnh...' : 'Thêm ảnh'}
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              disabled={inspectionUploadingType === type}
-              onChange={(event) => handleInspectionImageUpload(type, event)}
-            />
-          </label>
-        </div>
+        <ImageUpload
+          folder="inspections"
+          entityId={booking?.id}
+          images={form.images || []}
+          onUploaded={(uploaded) => handleInspectionImageUploaded(type, uploaded)}
+          onDeleted={(publicId) => handleInspectionImageDeleted(type, publicId)}
+          multiple
+        />
 
         {isLocked && (
           <p className="booking-inspection-locked-hint">
@@ -1617,31 +1591,13 @@ function BookingDetailPage() {
 
         <button
           type="button"
-          disabled={inspectionSavingType === type || inspectionUploadingType === type}
+          disabled={inspectionSavingType === type}
           onClick={() => handleSaveInspection(type)}
         >
           {inspectionSavingType === type ? 'Đang lưu...' : existingInspection ? 'Cập nhật inspection' : 'Tạo inspection'}
         </button>
       </article>
     )
-  }
-
-  const renderStepInspection = (step) => {
-    if (role !== 'staff') return null
-
-    const type = getStepInspectionType(step, serviceSteps, booking)
-    if (!type) return null
-
-    return <div className="booking-step-inspection">{renderInspectionCard(type)}</div>
-  }
-
-  const isStepInspectionBlocked = (step) => {
-    if (role !== 'staff') return false
-
-    const type = getStepInspectionType(step, serviceSteps, booking)
-    if (!type) return false
-
-    return !getInspectionByType(inspections, type)
   }
 
   return (
@@ -1831,6 +1787,8 @@ function BookingDetailPage() {
               </div>
               <small>{booking.servicePackageName || TEXT.servicePackage}</small>
             </div>
+            {role === 'staff' && ['IN_PROGRESS', 'COMPLETED'].includes(currentStatus) && renderInspectionCard('BEFORE_WASH')}
+
             {serviceSteps.length > 0 ? (
               <ServiceStepsProgress
                 steps={serviceSteps}
@@ -1839,8 +1797,6 @@ function BookingDetailPage() {
                 onReopenStep={role !== 'customer' ? handleReopenServiceStep : undefined}
                 actionLoadingStepId={stepActionLoadingId}
                 error={stepActionError}
-                renderStepExtra={renderStepInspection}
-                isStepBlocked={isStepInspectionBlocked}
               />
             ) : booking.servicePackageSteps?.length > 0 ? (
               <ol className="booking-service-step-list">
@@ -1857,6 +1813,11 @@ function BookingDetailPage() {
             ) : (
               <p className="booking-service-step-empty">{TEXT.serviceStepsEmpty}</p>
             )}
+
+            {role === 'staff' &&
+              ['IN_PROGRESS', 'COMPLETED'].includes(currentStatus) &&
+              getInspectionTypes(booking).includes('AFTER_WASH') &&
+              renderInspectionCard('AFTER_WASH')}
           </section>
 
           {role === 'staff' && (inspectionMessage || inspectionError) && (

@@ -23,6 +23,7 @@ import com.autowashpro.entity.ServicePackageStep;
 import com.autowashpro.entity.StaffProfile;
 import com.autowashpro.entity.User;
 import com.autowashpro.entity.Vehicle;
+import com.autowashpro.entity.VehicleInspection;
 import com.autowashpro.entity.WashBay;
 import com.autowashpro.entity.enums.StaffType;
 import com.autowashpro.entity.enums.WashBayStatus;
@@ -41,6 +42,7 @@ import com.autowashpro.repository.ServicePackageStepRepository;
 import com.autowashpro.repository.StaffProfileRepository;
 import com.autowashpro.repository.UserRepository;
 import com.autowashpro.repository.VehicleRepository;
+import com.autowashpro.repository.VehicleInspectionRepository;
 import com.autowashpro.repository.WashBayRepository;
 import com.autowashpro.service.EmailService;
 import com.autowashpro.service.LoyaltyService;
@@ -124,6 +126,9 @@ class BookingServiceImplTest {
 
     @Mock
     private ServicePackageStepRepository servicePackageStepRepository;
+
+    @Mock
+    private VehicleInspectionRepository vehicleInspectionRepository;
 
     @Mock
     private ComboStepResolver comboStepResolver;
@@ -428,11 +433,26 @@ class BookingServiceImplTest {
         when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
         when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
 
-        BookingResponse response = bookingService.checkInBooking(booking.getId(), staffUser.getId(), "arrived");
+        BookingResponse response = bookingService.checkInBooking(booking.getId(), staffUser.getId(), "ROLE_STAFF", "arrived");
 
         assertEquals("CHECKED_IN", response.getStatus());
         assertNotNull(response.getCheckedInAt());
         assertEquals("arrived", response.getNote());
+    }
+
+    @Test
+    void checkInBookingAllowsAdminWithoutStaffProfile() {
+        User adminUser = TestFixtures.staff();
+        Garage garage = TestFixtures.garage();
+        Vehicle vehicle = TestFixtures.car(TestFixtures.customer());
+        Booking booking = confirmedBooking(vehicle, garage, mainPackage());
+        when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
+        when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
+
+        BookingResponse response = bookingService.checkInBooking(booking.getId(), adminUser.getId(), "ROLE_ADMIN", "arrived");
+
+        assertEquals("CHECKED_IN", response.getStatus());
+        verify(staffProfileRepository, never()).findByUser_Id(any());
     }
 
     @Test
@@ -466,7 +486,7 @@ class BookingServiceImplTest {
         StartServiceRequest request = new StartServiceRequest();
         request.setNote("start now");
 
-        BookingResponse response = bookingService.startService(booking.getId(), staffUser.getId(), request);
+        BookingResponse response = bookingService.startService(booking.getId(), staffUser.getId(), "ROLE_STAFF", request);
 
         assertEquals("IN_PROGRESS", response.getStatus());
         assertEquals(washBay.getId(), response.getWashBayId());
@@ -474,6 +494,38 @@ class BookingServiceImplTest {
         assertEquals(WashBayStatus.IN_USE, washBay.getStatus());
         assertEquals(booking.getId(), washBay.getCurrentBookingId());
         verify(bookingAssignedStaffRepository).save(any(BookingAssignedStaff.class));
+        verify(bookingServiceStepRepository).save(any(BookingServiceStep.class));
+    }
+
+    @Test
+    void startServiceAllowsAdminWithoutStaffProfile() {
+        User adminUser = TestFixtures.staff();
+        Garage garage = TestFixtures.garage();
+        Vehicle vehicle = TestFixtures.car(TestFixtures.customer());
+        ServicePackage servicePackage = mainPackage();
+        Booking booking = confirmedBooking(vehicle, garage, servicePackage);
+        booking.setStatus("CHECKED_IN");
+        WashBay washBay = TestFixtures.washBay(garage);
+        ServicePackageStep template = serviceStep(servicePackage);
+        when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
+        when(servicePackageRepository.findById(servicePackage.getId())).thenReturn(Optional.of(servicePackage));
+        when(washBayRepository.findFirstByGarageIdAndVehicleTypeAndStatusAndIsActiveTrue(
+                garage.getId(), "CAR", WashBayStatus.AVAILABLE)).thenReturn(Optional.of(washBay));
+        when(washBayRepository.save(any(WashBay.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(comboStepResolver.resolveSteps(servicePackage)).thenReturn(List.of(template));
+        when(bookingServiceStepRepository.save(any(BookingServiceStep.class))).thenAnswer(invocation -> {
+            BookingServiceStep step = invocation.getArgument(0);
+            step.setId(101L);
+            return step;
+        });
+        when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
+        StartServiceRequest request = new StartServiceRequest();
+
+        BookingResponse response = bookingService.startService(booking.getId(), adminUser.getId(), "ROLE_ADMIN", request);
+
+        assertEquals("IN_PROGRESS", response.getStatus());
+        assertEquals(washBay.getId(), response.getWashBayId());
+        verify(staffProfileRepository, never()).findByUser_Id(any());
         verify(bookingServiceStepRepository).save(any(BookingServiceStep.class));
     }
 
@@ -497,6 +549,8 @@ class BookingServiceImplTest {
         when(washBayRepository.findById(washBay.getId())).thenReturn(Optional.of(washBay));
         when(bookingAssignedStaffRepository.findByBookingId(booking.getId())).thenReturn(List.of(assignedStaff));
         when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
+        when(vehicleInspectionRepository.findByBookingIdOrderByCreatedAtAsc(booking.getId()))
+                .thenReturn(List.of(inspection("BEFORE_WASH")));
 
         BookingResponse response = bookingService.completeService(booking.getId(), staffUser.getId(), "ROLE_STAFF", "done");
 
@@ -508,6 +562,80 @@ class BookingServiceImplTest {
         assertEquals(WashBayStatus.AVAILABLE, washBay.getStatus());
         assertNull(washBay.getCurrentBookingId());
         assertEquals("RELEASED", assignedStaff.getStatus());
+    }
+
+    @Test
+    void completeServiceFailsWithoutBeforeWashInspection() {
+        User staffUser = TestFixtures.staff();
+        Garage garage = TestFixtures.garage();
+        Vehicle vehicle = TestFixtures.car(TestFixtures.customer());
+        Booking booking = confirmedBooking(vehicle, garage, mainPackage());
+        booking.setStatus("IN_PROGRESS");
+        StaffProfile staffProfile = TestFixtures.careStaff(staffUser, garage);
+        when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
+        when(staffProfileRepository.findByUser_Id(staffUser.getId())).thenReturn(Optional.of(staffProfile));
+        when(vehicleInspectionRepository.findByBookingIdOrderByCreatedAtAsc(booking.getId()))
+                .thenReturn(List.of());
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> bookingService.completeService(booking.getId(), staffUser.getId(), "ROLE_STAFF", "done"));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        verify(bookingRepository, never()).save(any(Booking.class));
+    }
+
+    @Test
+    void completeServiceFailsWithoutAfterWashInspectionWhenAddOnPresent() {
+        User staffUser = TestFixtures.staff();
+        Garage garage = TestFixtures.garage();
+        Vehicle vehicle = TestFixtures.car(TestFixtures.customer());
+        Booking booking = confirmedBooking(vehicle, garage, mainPackage());
+        booking.setStatus("IN_PROGRESS");
+        StaffProfile staffProfile = TestFixtures.careStaff(staffUser, garage);
+        BookingAddOnServicePackage addOn = new BookingAddOnServicePackage();
+        addOn.setServicePackageId(2L);
+        when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
+        when(staffProfileRepository.findByUser_Id(staffUser.getId())).thenReturn(Optional.of(staffProfile));
+        when(bookingAddOnServicePackageRepository.findByBookingIdOrderBySortOrderAsc(booking.getId()))
+                .thenReturn(List.of(addOn));
+        when(vehicleInspectionRepository.findByBookingIdOrderByCreatedAtAsc(booking.getId()))
+                .thenReturn(List.of(inspection("BEFORE_WASH")));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> bookingService.completeService(booking.getId(), staffUser.getId(), "ROLE_STAFF", "done"));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        verify(bookingRepository, never()).save(any(Booking.class));
+    }
+
+    @Test
+    void completeServiceSucceedsWithBothInspectionsWhenAddOnPresent() {
+        User staffUser = TestFixtures.staff();
+        Garage garage = TestFixtures.garage();
+        Vehicle vehicle = TestFixtures.car(TestFixtures.customer());
+        Booking booking = confirmedBooking(vehicle, garage, mainPackage());
+        booking.setStatus("IN_PROGRESS");
+        StaffProfile staffProfile = TestFixtures.careStaff(staffUser, garage);
+        BookingAddOnServicePackage addOn = new BookingAddOnServicePackage();
+        addOn.setServicePackageId(2L);
+        when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
+        when(staffProfileRepository.findByUser_Id(staffUser.getId())).thenReturn(Optional.of(staffProfile));
+        when(bookingAssignedStaffRepository.findByBookingId(booking.getId())).thenReturn(List.of());
+        when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
+        when(bookingAddOnServicePackageRepository.findByBookingIdOrderBySortOrderAsc(booking.getId()))
+                .thenReturn(List.of(addOn));
+        when(vehicleInspectionRepository.findByBookingIdOrderByCreatedAtAsc(booking.getId()))
+                .thenReturn(List.of(inspection("BEFORE_WASH"), inspection("AFTER_WASH")));
+
+        BookingResponse response = bookingService.completeService(booking.getId(), staffUser.getId(), "ROLE_STAFF", "done");
+
+        assertEquals("COMPLETED", response.getStatus());
+    }
+
+    private VehicleInspection inspection(String type) {
+        VehicleInspection inspection = new VehicleInspection();
+        inspection.setType(type);
+        return inspection;
     }
 
     @Test

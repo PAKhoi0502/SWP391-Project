@@ -1,8 +1,8 @@
 import { Component, useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { userService } from '../services/userService'
-import { uploadService } from '../services/uploadService'
 import LoyaltyPointsCard from '../components/loyalty/LoyaltyPointsCard'
+import ImageUpload from '../components/upload/ImageUpload'
 
 // Error boundary to prevent LoyaltyPointsCard crash from taking down the whole profile
 class LoyaltyBoundary extends Component {
@@ -36,7 +36,6 @@ export default function ProfilePage() {
   const [loadError, setLoadError] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [avatarBusy, setAvatarBusy] = useState(false)
 
   useEffect(() => {
     let ignore = false
@@ -64,54 +63,32 @@ export default function ProfilePage() {
     setSuccess('')
   }
 
-  const handleAvatarUpload = async (event) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file) return
+  const refreshProfile = async () => {
+    const updated = await userService.getMe()
+    setProfile(updated)
+    setCurrentUser(updated)
+    return updated
+  }
 
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setError('Chỉ chấp nhận ảnh JPEG, PNG hoặc WEBP.')
-      return
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Ảnh không được vượt quá 5 MB.')
-      return
-    }
-
-    setAvatarBusy(true)
+  const handleAvatarUploaded = async () => {
     setError('')
     setSuccess('')
-
     try {
-      await uploadService.uploadImage(file, 'avatars')
-      const updated = await userService.getMe()
-      setProfile(updated)
-      setCurrentUser(updated)
+      await refreshProfile()
       setSuccess('Cập nhật ảnh đại diện thành công.')
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể cập nhật ảnh đại diện.'))
-    } finally {
-      setAvatarBusy(false)
+      setError(getErrorMessage(err, 'Không thể tải lại hồ sơ.'))
     }
   }
 
-  const handleAvatarDelete = async () => {
-    if (!profile?.avatarPublicId) return
-
-    setAvatarBusy(true)
+  const handleAvatarDeleted = async () => {
     setError('')
     setSuccess('')
-
     try {
-      await uploadService.deleteImage(profile.avatarPublicId)
-      const updated = await userService.getMe()
-      setProfile(updated)
-      setCurrentUser(updated)
+      await refreshProfile()
       setSuccess('Đã xóa ảnh đại diện.')
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể xóa ảnh đại diện.'))
-    } finally {
-      setAvatarBusy(false)
+      setError(getErrorMessage(err, 'Không thể tải lại hồ sơ.'))
     }
   }
 
@@ -143,30 +120,15 @@ export default function ProfilePage() {
 
       <div style={heroStyle}>
         <div style={avatarPanelStyle}>
-          <div style={avatarStyle}>
-            {profile?.avatarUrl ? (
-              <img src={profile.avatarUrl} alt="Ảnh đại diện" style={avatarImageStyle} />
-            ) : (
-              getInitial(profile)
-            )}
-          </div>
-          <div style={avatarActionsStyle}>
-            <label style={{ ...buttonStyle, cursor: avatarBusy ? 'not-allowed' : 'pointer', opacity: avatarBusy ? 0.6 : 1 }}>
-              {avatarBusy ? 'Đang xử lý...' : 'Chọn ảnh'}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                disabled={avatarBusy}
-                onChange={handleAvatarUpload}
-                style={{ display: 'none' }}
-              />
-            </label>
-            {profile?.avatarPublicId && (
-              <button type="button" disabled={avatarBusy} onClick={handleAvatarDelete} style={deleteAvatarButtonStyle}>
-                Xóa ảnh
-              </button>
-            )}
-          </div>
+          {!profile?.avatarUrl && <div style={avatarStyle}>{getInitial(profile)}</div>}
+          <ImageUpload
+            className="image-upload--round image-upload--sm image-upload--pill"
+            folder="avatars"
+            images={profile?.avatarUrl ? [{ publicId: profile.avatarPublicId, imageUrl: profile.avatarUrl }] : []}
+            onUploaded={handleAvatarUploaded}
+            onDeleted={handleAvatarDeleted}
+            multiple={false}
+          />
         </div>
         <div>
           <h1 style={{ margin: 0, fontSize: 26 }}>
@@ -301,21 +263,10 @@ const avatarStyle = {
   overflow: 'hidden',
 }
 
-const avatarImageStyle = {
-  height: '100%',
-  objectFit: 'cover',
-  width: '100%',
-}
-
 const avatarPanelStyle = {
   alignItems: 'center',
   display: 'flex',
   gap: 12,
-}
-
-const avatarActionsStyle = {
-  display: 'grid',
-  gap: 6,
 }
 
 const cardStyle = {
@@ -351,28 +302,6 @@ const inputStyle = {
   font: 'inherit',
   padding: '11px 12px',
   width: '100%',
-}
-
-const buttonStyle = {
-  background: '#0369a1',
-  border: 0,
-  borderRadius: 12,
-  color: '#fff',
-  font: 'inherit',
-  fontWeight: 800,
-  padding: '12px 18px',
-}
-
-const deleteAvatarButtonStyle = {
-  background: '#fff',
-  border: '1px solid #fecaca',
-  borderRadius: 10,
-  color: '#b91c1c',
-  cursor: 'pointer',
-  font: 'inherit',
-  fontSize: 13,
-  fontWeight: 700,
-  padding: '8px 12px',
 }
 
 const infoRowStyle = {
