@@ -50,6 +50,7 @@ import CustomerNotificationListPage from '../pages/notification/CustomerNotifica
 import CustomerNotificationDetailPage from '../pages/notification/CustomerNotificationDetailPage'
 import AdminTestEmailPage from '../pages/admin/AdminTestEmailPage'
 import AdminDashboardPage from '../pages/admin/AdminDashboardPage'
+import AdminResearchExportPage from '../pages/admin/AdminResearchExportPage'
 
 
 function AppRoutes() {
@@ -123,6 +124,7 @@ function AppRoutes() {
           <Route path="admin/loyalty/tier-rules" element={<AdminTierRulesPage />} />
           <Route path="admin/promotions" element={<AdminPromotionManagementPage />} />
           <Route path="admin/notifications/test-email" element={<AdminTestEmailPage />} />
+          <Route path="admin/research/export" element={<AdminResearchExportPage />} />
         </Route>
       </Route>
 
