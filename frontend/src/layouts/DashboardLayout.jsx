@@ -41,6 +41,7 @@ const NAV_ITEMS = {
     { to: '/admin/promotions', label: 'Khuyến mãi' },
     { to: '/admin/notifications/test-email', label: 'Kiểm tra email' },
     { to: '/admin/research/export', label: 'Xuất dữ liệu nghiên cứu' },
+    { to: '/admin/audit-logs', label: 'Nhật ký hệ thống' },
   ],
 }
 
