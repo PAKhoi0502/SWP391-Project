@@ -27,11 +27,12 @@ public class VehicleInspectionController {
             @Valid @RequestBody VehicleInspectionCreateRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
 
-        Long staffUserId = Long.valueOf(userDetails.getUsername());
+        Long currentUserId = Long.valueOf(userDetails.getUsername());
+        String role = userDetails.getAuthorities().iterator().next().getAuthority();
         return ApiResponse.<VehicleInspectionResponse>builder()
                 .success(true)
                 .message("Inspection created successfully")
-                .data(vehicleInspectionService.create(bookingId, request, staffUserId))
+                .data(vehicleInspectionService.create(bookingId, request, currentUserId, role))
                 .build();
     }
 
@@ -72,11 +73,12 @@ public class VehicleInspectionController {
             @RequestBody VehicleInspectionUpdateRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
 
-        Long staffUserId = Long.valueOf(userDetails.getUsername());
+        Long currentUserId = Long.valueOf(userDetails.getUsername());
+        String role = userDetails.getAuthorities().iterator().next().getAuthority();
         return ApiResponse.<VehicleInspectionResponse>builder()
                 .success(true)
                 .message("Inspection updated successfully")
-                .data(vehicleInspectionService.update(id, request, staffUserId))
+                .data(vehicleInspectionService.update(id, request, currentUserId, role))
                 .build();
     } 
 }

@@ -53,15 +53,15 @@ public class SecurityConfig {
                         .permitAll()
 
                         .requestMatchers(
-                                "/users")
-                        .hasRole("ADMIN")
+                                "/users/me",
+                                "/auth/me")
+                        .authenticated()
 
                         .requestMatchers(
-                                "/users/*")
-                        .hasRole("ADMIN")
-
-                        .requestMatchers(
-                                "/users/*/status")
+                                "/users",
+                                "/users/*",
+                                "/users/*/status",
+                                "/users/*/role")
                         .hasRole("ADMIN")
 
                         .requestMatchers(HttpMethod.GET, "/service-packages/available")
@@ -81,11 +81,6 @@ public class SecurityConfig {
 
 .requestMatchers(HttpMethod.PATCH, "/service-packages/*/status")
 .hasRole("ADMIN")
-
-                        .requestMatchers(
-                                "/users/me",
-                                "/auth/me")
-                        .authenticated()
 
                         .anyRequest()
                         .authenticated())

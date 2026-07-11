@@ -1,6 +1,10 @@
 package com.autowashpro.controller;
 
 import com.autowashpro.common.ApiResponse;
+import com.autowashpro.common.AuditAction;
+import com.autowashpro.common.AuditActorContext;
+import com.autowashpro.common.AuditMetadata;
+import com.autowashpro.common.AuditTargetType;
 import com.autowashpro.dto.request.AdjustPointsRequest;
 import com.autowashpro.dto.request.CreateLoyaltyTierRuleRequest;
 import com.autowashpro.dto.request.RedeemPreviewRequest;
@@ -10,6 +14,7 @@ import com.autowashpro.dto.response.LoyaltyTierRuleResponse;
 import com.autowashpro.dto.response.PointTransactionResponse;
 import com.autowashpro.dto.response.RedeemPreviewResponse;
 import com.autowashpro.service.LoyaltyService;
+import com.autowashpro.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,6 +30,7 @@ import java.util.List;
 public class LoyaltyController {
 
     private final LoyaltyService loyaltyService;
+    private final AuditLogService auditLogService;
 
     @GetMapping("/me")
     @PreAuthorize("hasRole('CUSTOMER')")
@@ -62,10 +68,17 @@ public class LoyaltyController {
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<LoyaltyTierRuleResponse> createTierRule(
             @RequestBody CreateLoyaltyTierRuleRequest request) {
+        LoyaltyTierRuleResponse response = loyaltyService.createTierRule(request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.LOYALTY_TIER_RULE_CREATED,
+                AuditTargetType.LOYALTY_TIER_RULE,
+                response.getId(),
+                AuditMetadata.of("tier", response.getTier()));
         return ApiResponse.<LoyaltyTierRuleResponse>builder()
                 .success(true)
                 .message("Tier rule created successfully")
-                .data(loyaltyService.createTierRule(request))
+                .data(response)
                 .build();
     }
 
@@ -74,10 +87,17 @@ public class LoyaltyController {
     public ApiResponse<LoyaltyTierRuleResponse> updateTierRule(
             @PathVariable Long id,
             @RequestBody UpdateLoyaltyTierRuleRequest request) {
+        LoyaltyTierRuleResponse response = loyaltyService.updateTierRule(id, request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.LOYALTY_TIER_RULE_UPDATED,
+                AuditTargetType.LOYALTY_TIER_RULE,
+                id,
+                AuditMetadata.of("tier", response.getTier()));
         return ApiResponse.<LoyaltyTierRuleResponse>builder()
                 .success(true)
                 .message("Tier rule updated successfully")
-                .data(loyaltyService.updateTierRule(id, request))
+                .data(response)
                 .build();
     }
 
@@ -120,6 +140,15 @@ public class LoyaltyController {
                 request.getPoints(),
                 request.getType(),
                 request.getReason());
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.LOYALTY_POINTS_ADJUSTED,
+                AuditTargetType.CUSTOMER_LOYALTY,
+                request.getCustomerId(),
+                AuditMetadata.of(
+                        "points", request.getPoints(),
+                        "type", request.getType(),
+                        "reason", request.getReason()));
         return ApiResponse.<Void>builder()
                 .success(true)
                 .message("Points adjusted successfully")

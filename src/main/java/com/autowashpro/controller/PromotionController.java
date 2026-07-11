@@ -1,6 +1,10 @@
 package com.autowashpro.controller;
 
 import com.autowashpro.common.ApiResponse;
+import com.autowashpro.common.AuditAction;
+import com.autowashpro.common.AuditActorContext;
+import com.autowashpro.common.AuditMetadata;
+import com.autowashpro.common.AuditTargetType;
 import com.autowashpro.dto.request.CreatePromotionRequest;
 import com.autowashpro.dto.request.PromotionValidateRequest;
 import com.autowashpro.dto.request.SendVoucherRequest;
@@ -10,6 +14,7 @@ import com.autowashpro.dto.response.PromotionResponse;
 import com.autowashpro.dto.response.PromotionUsageResponse;
 import com.autowashpro.dto.response.PromotionValidateResponse;
 import com.autowashpro.service.PromotionService;
+import com.autowashpro.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,16 +30,23 @@ import java.util.List;
 public class PromotionController {
 
     private final PromotionService promotionService;
+    private final AuditLogService auditLogService;
 
     @PostMapping("/admin")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<PromotionResponse> createPromotion(
             @RequestBody CreatePromotionRequest request) {
-
+        PromotionResponse response = promotionService.createPromotion(request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.PROMOTION_CREATED,
+                AuditTargetType.PROMOTION,
+                response.getId(),
+                AuditMetadata.of("code", response.getCode(), "isActive", response.getIsActive()));
         return ApiResponse.<PromotionResponse>builder()
                 .success(true)
                 .message("Promotion created successfully")
-                .data(promotionService.createPromotion(request))
+                .data(response)
                 .build();
     }
 
@@ -43,11 +55,17 @@ public class PromotionController {
     public ApiResponse<PromotionResponse> updatePromotion(
             @PathVariable Long id,
             @RequestBody UpdatePromotionRequest request) {
-
+        PromotionResponse response = promotionService.updatePromotion(id, request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.PROMOTION_UPDATED,
+                AuditTargetType.PROMOTION,
+                id,
+                AuditMetadata.of("code", response.getCode(), "isActive", response.getIsActive()));
         return ApiResponse.<PromotionResponse>builder()
                 .success(true)
                 .message("Promotion updated successfully")
-                .data(promotionService.updatePromotion(id, request))
+                .data(response)
                 .build();
     }
 
@@ -56,11 +74,17 @@ public class PromotionController {
     public ApiResponse<PromotionResponse> updateStatus(
             @PathVariable Long id,
             @RequestParam Boolean active) {
-
+        PromotionResponse response = promotionService.updatePromotionStatus(id, active);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.PROMOTION_STATUS_UPDATED,
+                AuditTargetType.PROMOTION,
+                id,
+                AuditMetadata.of("isActive", response.getIsActive()));
         return ApiResponse.<PromotionResponse>builder()
                 .success(true)
                 .message("Promotion status updated successfully")
-                .data(promotionService.updatePromotionStatus(id, active))
+                .data(response)
                 .build();
     }
 
@@ -159,6 +183,12 @@ public ApiResponse<List<PromotionUsageResponse>> getMyPromotionUsages(
 @PreAuthorize("hasRole('ADMIN')")
 public ApiResponse<Void> deletePromotion(@PathVariable Long id) {
     promotionService.deletePromotion(id);
+    auditLogService.createAuditLog(
+            AuditActorContext.currentActorId(),
+            AuditAction.PROMOTION_DELETED,
+            AuditTargetType.PROMOTION,
+            id,
+            AuditMetadata.of());
     return ApiResponse.<Void>builder()
             .success(true)
             .message("Promotion deleted successfully")
@@ -171,6 +201,12 @@ public ApiResponse<Integer> sendVoucher(
         @PathVariable Long id,
         @RequestBody SendVoucherRequest request) {
     int count = promotionService.sendVoucher(id, request);
+    auditLogService.createAuditLog(
+            AuditActorContext.currentActorId(),
+            AuditAction.PROMOTION_VOUCHER_SENT,
+            AuditTargetType.PROMOTION,
+            id,
+            AuditMetadata.of("recipientCount", count));
     return ApiResponse.<Integer>builder()
             .success(true)
             .message("Voucher sent to " + count + " customers")

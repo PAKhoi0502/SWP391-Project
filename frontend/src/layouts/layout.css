@@ -103,6 +103,28 @@
   gap: 2px;
 }
 
+.dashboard-header .dashboard-user-summary {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.dashboard-user-avatar,
+.dashboard-user-avatar-fallback {
+  align-items: center;
+  background: #0369a1;
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  flex: 0 0 38px;
+  font-size: 15px;
+  font-weight: 800;
+  height: 38px;
+  justify-content: center;
+  object-fit: cover;
+  width: 38px;
+}
+
 .dashboard-header span {
   color: rgba(255, 255, 255, 0.5);
   font-size: 14px;

@@ -45,6 +45,7 @@ import CustomerWashHistoryListPage from '../pages/washHistory/CustomerWashHistor
 import WashHistoryDetailPage from '../pages/washHistory/WashHistoryDetailPage'
 import AdminWashHistoryListPage from '../pages/washHistory/AdminWashHistoryListPage'
 import AdminTierRulesPage from '../pages/loyalty/AdminTierRulesPage'
+import AdminAdjustPointsPage from '../pages/loyalty/AdminAdjustPointsPage'
 import AdminPromotionManagementPage from '../pages/admin/AdminPromotionManagementPage'
 import CustomerPromotionListPage from '../pages/promotion/CustomerPromotionListPage'
 import CustomerPromotionDetailPage from '../pages/promotion/CustomerPromotionDetailPage'
@@ -54,6 +55,8 @@ import AdminTestEmailPage from '../pages/admin/AdminTestEmailPage'
 import AdminDashboardPage from '../pages/admin/AdminDashboardPage'
 import ProfileLayout from '../layouts/ProfileLayout'
 import AboutUsPage from '../pages/AboutUsPage'
+import AdminResearchExportPage from '../pages/admin/AdminResearchExportPage'
+import AdminAuditLogPage from '../pages/admin/AdminAuditLogPage'
 
 
 function AppRoutes() {
@@ -123,6 +126,7 @@ function AppRoutes() {
           <Route path="admin" element={<AdminDashboardPage />} />
           <Route path="admin/users" element={<AdminUsersPage />} />
           <Route path="admin/staff-profiles" element={<AdminStaffProfilesPage />} />
+          <Route path="admin/profile" element={<ProfilePage />} />
           <Route path="admin/vehicles" element={<AdminVehiclesPage />} />
           <Route path="admin/garages" element={<AdminGarageListPage />} />
           <Route path="admin/garages/create" element={<AdminGarageFormPage />} />
@@ -133,9 +137,13 @@ function AppRoutes() {
           <Route path="admin/bookings" element={<AdminBookingListPage />} />
           <Route path="admin/bookings/:id" element={<BookingDetailPage />} />
           <Route path="admin/wash-histories" element={<AdminWashHistoryListPage />} />
+          <Route path="admin/waitlist" element={<StaffWaitlistPage />} />
           <Route path="admin/loyalty/tier-rules" element={<AdminTierRulesPage />} />
+          <Route path="admin/loyalty/adjust-points" element={<AdminAdjustPointsPage />} />
           <Route path="admin/promotions" element={<AdminPromotionManagementPage />} />
           <Route path="admin/notifications/test-email" element={<AdminTestEmailPage />} />
+          <Route path="admin/research/export" element={<AdminResearchExportPage />} />
+          <Route path="admin/audit-logs" element={<AdminAuditLogPage />} />
         </Route>
       </Route>
 

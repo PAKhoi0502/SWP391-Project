@@ -1,7 +1,7 @@
 import api from './api'
 
 export const PACKAGE_TYPES = ['MAIN', 'ADD_ON', 'COMBO']
-export const VEHICLE_TYPES = ['CAR', 'MOTORBIKE']
+export const VEHICLE_TYPES = ['CAR', 'BIKE']
 
 function cleanParams(params = {}) {
   return Object.fromEntries(

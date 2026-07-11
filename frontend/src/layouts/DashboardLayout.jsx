@@ -10,6 +10,7 @@ const NAV_ITEMS = {
     { to: '/customer/vehicles', label: 'Xe của tôi' },
   ],
   [ROLES.ADMIN]: [
+    { to: '/admin/profile', label: 'Hồ sơ' },
     { to: '/admin', label: 'Tổng quan' },
     { to: '/admin/users', label: 'Người dùng' },
     { to: '/admin/staff-profiles', label: 'Nhân viên' },
@@ -19,9 +20,13 @@ const NAV_ITEMS = {
     { to: '/admin/service-packages', label: 'Gói dịch vụ' },
     { to: '/admin/bookings', label: 'Booking' },
     { to: '/admin/wash-histories', label: 'Lịch sử rửa xe' },
+    { to: '/admin/waitlist', label: 'Waitlist' },
     { to: '/admin/loyalty/tier-rules', label: 'Hạng thành viên' },
+    { to: '/admin/loyalty/adjust-points', label: 'Điều chỉnh điểm' },
     { to: '/admin/promotions', label: 'Khuyến mãi' },
     { to: '/admin/notifications/test-email', label: 'Kiểm tra email' },
+    { to: '/admin/research/export', label: 'Xuất dữ liệu nghiên cứu' },
+    { to: '/admin/audit-logs', label: 'Nhật ký hệ thống' },
   ],
 }
 
@@ -65,9 +70,16 @@ function DashboardLayout({ role }) {
 
       <div className="dashboard-shell">
         <header className="dashboard-header">
-          <div>
+          <div className="dashboard-user-summary">
+            {user?.avatarUrl ? (
+              <img className="dashboard-user-avatar" src={user.avatarUrl} alt="Avatar" />
+            ) : (
+              <span className="dashboard-user-avatar-fallback">{getInitial(user)}</span>
+            )}
+            <div>
             <strong>{role}</strong>
             <span>{user?.fullName || user?.email || user?.phone || 'Người dùng'}</span>
+            </div>
           </div>
 
           <button className="text-button" type="button" onClick={handleLogout}>
@@ -81,6 +93,10 @@ function DashboardLayout({ role }) {
       </div>
     </div>
   )
+}
+
+function getInitial(user) {
+  return String(user?.fullName || user?.email || 'U').trim().charAt(0).toUpperCase()
 }
 
 export default DashboardLayout

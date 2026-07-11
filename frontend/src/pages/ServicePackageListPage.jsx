@@ -344,3 +344,17 @@ function PackageCard({ item, isAuthenticated, delay }) {
     </div>
   )
 }
+
+function formatVehicleType(value) {
+  const normalized = String(value || '').toUpperCase()
+  if (normalized === 'CAR') return 'Ô tô'
+  if (normalized === 'BIKE' || normalized === 'MOTORBIKE') return 'Xe máy'
+  return 'Mọi loại xe'
+}
+
+function formatPackageType(value) {
+  if (value === 'MAIN') return 'Main'
+  if (value === 'ADD_ON') return 'Add-on'
+  if (value === 'COMBO') return 'Combo'
+  return value || '-'
+}

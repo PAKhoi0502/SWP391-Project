@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { authService, authStorage } from "../services/authService";
 
 const AuthContext = createContext(null);
@@ -56,6 +56,8 @@ function normalizeUser(user, token) {
     email: user?.email || tokenUser?.email || null,
     phone: user?.phone || null,
     role: String(role).toUpperCase(),
+    avatarUrl: user?.avatarUrl || null,
+    avatarPublicId: user?.avatarPublicId || null,
   };
 }
 
@@ -98,7 +100,7 @@ export function AuthProvider({ children }) {
 
   const isAuthenticated = Boolean(accessToken && user);
 
-  const loadCurrentUser = async () => {
+  const loadCurrentUser = useCallback(async () => {
     const token = authStorage.getAccessToken();
 
     if (!token) {
@@ -139,7 +141,7 @@ export function AuthProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
  const login = async (payload) => {
   const authData = await authService.login(payload);
@@ -159,7 +161,7 @@ export function AuthProvider({ children }) {
     authData.data?.user ||
     buildUserFromToken(token);
 
-  const loggedUser = normalizeUser(rawLoggedUser, token);
+  let loggedUser = normalizeUser(rawLoggedUser, token);
 
   // QUAN TRỌNG: xóa session cũ trước khi lưu tài khoản mới
   authStorage.clearAuth();
@@ -169,6 +171,14 @@ export function AuthProvider({ children }) {
     refreshToken,
     user: loggedUser,
   });
+
+  try {
+    const currentUser = await authService.getCurrentUser();
+    loggedUser = normalizeUser(currentUser, token);
+    authStorage.setAuth({ user: loggedUser });
+  } catch {
+    loggedUser = normalizeUser(rawLoggedUser, token);
+  }
 
   setAccessToken(token);
   setUser(loggedUser);
@@ -189,9 +199,8 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const setCurrentUser = (currentUser) => {
+  const setCurrentUser = useCallback((currentUser) => {
     const cachedUser = authStorage.getUser();
-    // Preserve fullName/email from cache if the new data omits them
     const merged = {
       ...currentUser,
       fullName: currentUser?.fullName || currentUser?.name || cachedUser?.fullName || '',
@@ -199,11 +208,11 @@ export function AuthProvider({ children }) {
     };
     setUser(merged);
     authStorage.setAuth({ user: merged });
-  };
+  }, []);
 
   useEffect(() => {
     loadCurrentUser();
-  }, []);
+  }, [loadCurrentUser]);
 
   const value = useMemo(
     () => ({
@@ -217,7 +226,7 @@ export function AuthProvider({ children }) {
       loadCurrentUser,
       setCurrentUser,
     }),
-    [user, loading, isAuthenticated]
+    [user, loading, isAuthenticated, loadCurrentUser, setCurrentUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

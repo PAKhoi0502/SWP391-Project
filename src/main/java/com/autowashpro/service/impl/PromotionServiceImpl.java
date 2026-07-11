@@ -44,6 +44,76 @@ public class PromotionServiceImpl implements PromotionService {
     private final NotificationService notificationService;
     private final UserRepository userRepository;
 
+    private void validatePromotionFields(
+            String code,
+            String name,
+            String discountType,
+            BigDecimal discountValue,
+            BigDecimal maxDiscountAmount,
+            BigDecimal minOrderAmount,
+            Integer usageLimit,
+            Integer perUserLimit,
+            LocalDateTime startAt,
+            LocalDateTime endAt,
+            Integer maxLoyaltyPoints) {
+
+        if (code != null && code.isBlank()) {
+            throw new RuntimeException("Promotion code is required");
+        }
+
+        if (name == null || name.isBlank()) {
+            throw new RuntimeException("Promotion name is required");
+        }
+
+        if (discountType == null || discountType.isBlank()) {
+            throw new RuntimeException("Discount type is required");
+        }
+
+        String normalizedType = discountType.trim().toUpperCase();
+        boolean percentage = "PERCENT".equals(normalizedType)
+                || "PERCENTAGE".equals(normalizedType);
+        boolean fixed = "FIXED".equals(normalizedType)
+                || "FIXED_AMOUNT".equals(normalizedType);
+        if (!percentage && !fixed) {
+            throw new RuntimeException("Unsupported discount type");
+        }
+
+        if (discountValue == null || discountValue.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("Discount value must be greater than zero");
+        }
+
+        if (percentage && discountValue.compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new RuntimeException("Percentage discount cannot exceed 100");
+        }
+
+        if (maxDiscountAmount != null && maxDiscountAmount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("Max discount amount cannot be negative");
+        }
+
+        if (minOrderAmount != null && minOrderAmount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("Min order amount cannot be negative");
+        }
+
+        if (usageLimit != null && usageLimit <= 0) {
+            throw new RuntimeException("Usage limit must be greater than zero");
+        }
+
+        if (perUserLimit != null && perUserLimit <= 0) {
+            throw new RuntimeException("Per-user limit must be greater than zero");
+        }
+
+        if (startAt == null || endAt == null) {
+            throw new RuntimeException("Promotion start and end time are required");
+        }
+
+        if (!startAt.isBefore(endAt)) {
+            throw new RuntimeException("Promotion start time must be before end time");
+        }
+
+        if (maxLoyaltyPoints != null && maxLoyaltyPoints < 0) {
+            throw new RuntimeException("Max loyalty points cannot be negative");
+        }
+    }
 
     private PromotionResponse map(Promotion promotion) {
 
@@ -84,6 +154,23 @@ public class PromotionServiceImpl implements PromotionService {
     @Override
     @Transactional
     public PromotionResponse createPromotion(CreatePromotionRequest request) {
+
+        validatePromotionFields(
+                request.getCode(),
+                request.getName(),
+                request.getDiscountType(),
+                request.getDiscountValue(),
+                request.getMaxDiscountAmount(),
+                request.getMinOrderAmount(),
+                request.getUsageLimit(),
+                request.getPerUserLimit(),
+                request.getStartAt(),
+                request.getEndAt(),
+                request.getMaxLoyaltyPoints());
+
+        if (request.getCode() == null || request.getCode().isBlank()) {
+            throw new RuntimeException("Promotion code is required");
+        }
 
         if (promotionRepository.existsByCode(request.getCode())) {
             throw new RuntimeException("Promotion code already exists");
@@ -139,6 +226,19 @@ public class PromotionServiceImpl implements PromotionService {
 
         Promotion promotion = promotionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Promotion not found"));
+
+        validatePromotionFields(
+                null,
+                request.getName(),
+                request.getDiscountType(),
+                request.getDiscountValue(),
+                request.getMaxDiscountAmount(),
+                request.getMinOrderAmount(),
+                request.getUsageLimit(),
+                request.getPerUserLimit(),
+                request.getStartAt(),
+                request.getEndAt(),
+                request.getMaxLoyaltyPoints());
 
         promotion.setName(request.getName());
         promotion.setDescription(request.getDescription());

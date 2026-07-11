@@ -11,6 +11,7 @@ import { userService } from '../../services/userService'
 import { vehicleService } from '../../services/vehicleService'
 import { getWashBayById } from '../../services/washBayApi'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
+import ImageUpload from '../../components/upload/ImageUpload'
 import CheckInBookingModal from '../../components/Booking/CheckInBookingModal'
 import CompleteServiceModal from '../../components/Booking/CompleteServiceModal'
 import NoShowBookingModal from '../../components/Booking/NoShowBookingModal'
@@ -122,6 +123,7 @@ const blankInspectionForm = {
   exteriorCondition: '',
   interiorCondition: '',
   notes: '',
+  images: [],
 }
 
 const formatDateTime = (value) => {
@@ -492,20 +494,6 @@ const getInspectionTypes = (booking) => {
 
 const getInspectionByType = (items, type) => items.find((item) => String(item?.type || '').toUpperCase() === type)
 
-const getStepInspectionType = (step, allSteps, booking) => {
-  if (!Array.isArray(allSteps) || allSteps.length === 0) return null
-
-  const orders = allSteps.map((item) => Number(item.stepOrder || item.order || 0))
-  const minOrder = Math.min(...orders)
-  const maxOrder = Math.max(...orders)
-  const stepOrder = Number(step.stepOrder || step.order || 0)
-  const types = getInspectionTypes(booking)
-
-  if (stepOrder === minOrder && types.includes('BEFORE_WASH')) return 'BEFORE_WASH'
-  if (stepOrder === maxOrder && maxOrder !== minOrder && types.includes('AFTER_WASH')) return 'AFTER_WASH'
-  return null
-}
-
 const buildInspectionForms = (booking, items) =>
   getInspectionTypes(booking).reduce((forms, type) => {
     const inspection = getInspectionByType(items, type)
@@ -516,6 +504,7 @@ const buildInspectionForms = (booking, items) =>
         exteriorCondition: inspection?.exteriorCondition || '',
         interiorCondition: inspection?.interiorCondition || '',
         notes: inspection?.notes || '',
+        images: Array.isArray(inspection?.images) ? inspection.images : [],
       },
     }
   }, {})
@@ -723,7 +712,7 @@ function BookingDetailPage() {
       enriched.careStaffType = packageResult.value.careStaffType || ''
 
       // COMBO packages have no own steps — resolve template steps from included packages,
-      // mirroring the same insert-before-last logic as ComboStepResolver.java on the backend.
+      // mirroring ComboStepResolver.java on the backend (main steps, then add-on steps).
       if (
         enriched.servicePackageSteps.length === 0 &&
         String(enriched.servicePackageType || '').toUpperCase() === 'COMBO' &&
@@ -764,8 +753,8 @@ function BookingDetailPage() {
 
       if (addOnSteps.length > 0) {
         const mainSteps = enriched.servicePackageSteps || []
-        // Add-on steps go right before the final main step (handover),
-        // matching how the backend orders BookingServiceStep once service starts.
+        // Main steps first, then add-on steps, matching how the backend
+        // orders BookingServiceStep once service starts.
         const merged = mainSteps.length > 0
           ? [...mainSteps, ...addOnSteps]
           : addOnSteps
@@ -1215,6 +1204,15 @@ function BookingDetailPage() {
       return
     }
 
+    if (!getInspectionByType(inspections, 'BEFORE_WASH')) {
+      setCompleteServiceError('Vui lòng tạo inspection "Trước khi sử dụng dịch vụ" trước khi hoàn thành booking.')
+      return
+    }
+    if (getInspectionTypes(booking).includes('AFTER_WASH') && !getInspectionByType(inspections, 'AFTER_WASH')) {
+      setCompleteServiceError('Vui lòng tạo inspection "Sau khi sử dụng dịch vụ" trước khi hoàn thành booking.')
+      return
+    }
+
     setCompleteServiceLoading(true)
     setCompleteServiceError('')
     try {
@@ -1485,6 +1483,27 @@ function BookingDetailPage() {
     }))
   }
 
+  const handleInspectionImageUploaded = (type, uploaded) => {
+    setInspectionForms((current) => ({
+      ...current,
+      [type]: {
+        ...(current[type] || blankInspectionForm),
+        images: [...(current[type]?.images || []), uploaded],
+      },
+    }))
+    setInspectionMessage('Đã tải ảnh lên. Lưu inspection để liên kết ảnh.')
+  }
+
+  const handleInspectionImageDeleted = (type, publicId) => {
+    setInspectionForms((current) => ({
+      ...current,
+      [type]: {
+        ...(current[type] || blankInspectionForm),
+        images: (current[type]?.images || []).filter((image) => image.publicId !== publicId),
+      },
+    }))
+  }
+
   const handleSaveInspection = async (type) => {
     if (!booking?.id) return
 
@@ -1494,6 +1513,7 @@ function BookingDetailPage() {
       exteriorCondition: form.exteriorCondition.trim(),
       interiorCondition: form.interiorCondition.trim(),
       notes: form.notes.trim(),
+      imagePublicIds: (form.images || []).map((image) => image.publicId).filter(Boolean),
     }
 
     try {
@@ -1567,38 +1587,34 @@ function BookingDetailPage() {
           </label>
         </div>
 
-        {isLocked ? (
-          <p className="bd-inspection-locked">Service completed — inspection is read-only.</p>
-        ) : (
-          <button type="button" className="bd-inspection-save-btn" disabled={inspectionSavingType === type} onClick={() => handleSaveInspection(type)}>
-            {inspectionSavingType === type ? 'Saving...' : existingInspection ? 'Update inspection' : 'Create inspection'}
-          </button>
+        <ImageUpload
+          folder="inspections"
+          entityId={booking?.id}
+          images={form.images || []}
+          onUploaded={(uploaded) => handleInspectionImageUploaded(type, uploaded)}
+          onDeleted={(publicId) => handleInspectionImageDeleted(type, publicId)}
+          multiple
+        />
+
+        {isLocked && (
+          <p className="booking-inspection-locked-hint">
+            Dịch vụ đã hoàn thành, không thể chỉnh sửa tình trạng/ghi chú. Vẫn có thể thêm ảnh.
+          </p>
         )}
+
+        <button
+          type="button"
+          disabled={inspectionSavingType === type}
+          onClick={() => handleSaveInspection(type)}
+        >
+          {inspectionSavingType === type ? 'Đang lưu...' : existingInspection ? 'Cập nhật inspection' : 'Tạo inspection'}
+        </button>
       </article>
     )
   }
 
-  const renderStepInspection = (step) => {
-    if (role !== 'staff') return null
-
-    const type = getStepInspectionType(step, serviceSteps, booking)
-    if (!type) return null
-
-    return <div className="bd-step-inspection">{renderInspectionCard(type)}</div>
-  }
-
-  const isStepInspectionBlocked = (step) => {
-    if (role !== 'staff') return false
-
-    const type = getStepInspectionType(step, serviceSteps, booking)
-    if (!type) return false
-
-    return !getInspectionByType(inspections, type)
-  }
-
   const statusKey = String(booking?.status || '').toLowerCase().replace('cancelled', 'canceled')
   const paymentKey = String(booking?.paymentStatus || '').toLowerCase()
-
   return (
     <div className="bd-page">
       <section className="bd-hero">
@@ -1788,6 +1804,8 @@ function BookingDetailPage() {
               </div>
               <span className="bd-section-meta">{booking.servicePackageName || TEXT.servicePackage}</span>
             </div>
+            {role === 'staff' && ['IN_PROGRESS', 'COMPLETED'].includes(currentStatus) && renderInspectionCard('BEFORE_WASH')}
+
             {serviceSteps.length > 0 ? (
               <ServiceStepsProgress
                 steps={serviceSteps}
@@ -1796,8 +1814,6 @@ function BookingDetailPage() {
                 onReopenStep={role !== 'customer' ? handleReopenServiceStep : undefined}
                 actionLoadingStepId={stepActionLoadingId}
                 error={stepActionError}
-                renderStepExtra={renderStepInspection}
-                isStepBlocked={isStepInspectionBlocked}
               />
             ) : booking.servicePackageSteps?.length > 0 ? (
               <ol className="bd-step-list">
@@ -1814,6 +1830,11 @@ function BookingDetailPage() {
             ) : (
               <p className="bd-step-empty">{TEXT.serviceStepsEmpty}</p>
             )}
+
+            {role === 'staff' &&
+              ['IN_PROGRESS', 'COMPLETED'].includes(currentStatus) &&
+              getInspectionTypes(booking).includes('AFTER_WASH') &&
+              renderInspectionCard('AFTER_WASH')}
           </section>
 
           {/* ── Inspection messages ── */}

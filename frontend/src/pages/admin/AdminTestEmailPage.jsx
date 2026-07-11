@@ -11,6 +11,12 @@ export default function AdminTestEmailPage() {
   const [success, setSuccess] = useState(null)   // null | string
   const [error, setError] = useState(null)       // null | string
 
+  const [bookingId, setBookingId] = useState('')
+  const [bookingIdError, setBookingIdError] = useState('')
+  const [sendingReminder, setSendingReminder] = useState(false)
+  const [reminderSuccess, setReminderSuccess] = useState(null)
+  const [reminderError, setReminderError] = useState(null)
+
   const validate = (val) => {
     if (!val.trim()) return 'Email is required.'
     if (!EMAIL_RE.test(val.trim())) return 'Please enter a valid email address.'
@@ -44,6 +50,41 @@ export default function AdminTestEmailPage() {
   const handleEmailChange = (e) => {
     setEmail(e.target.value)
     if (fieldError) setFieldError(validate(e.target.value))
+  }
+
+  const validateBookingId = (val) => {
+    if (!val.trim()) return 'Booking ID không được bỏ trống.'
+    if (!/^\d+$/.test(val.trim())) return 'Booking ID phải là số nguyên dương.'
+    return ''
+  }
+
+  const handleSendReminder = async (e) => {
+    e.preventDefault()
+    const err = validateBookingId(bookingId)
+    if (err) { setBookingIdError(err); return }
+
+    setSendingReminder(true)
+    setReminderSuccess(null)
+    setReminderError(null)
+    setBookingIdError('')
+
+    try {
+      await adminNotificationApi.sendTestReminder(bookingId.trim())
+      setReminderSuccess(`Email nhắc lịch đã được gửi cho booking #${bookingId.trim()}.`)
+    } catch (caught) {
+      const msg =
+        caught?.response?.data?.message ||
+        caught?.message ||
+        'Không thể gửi email nhắc lịch. Vui lòng thử lại.'
+      setReminderError(msg)
+    } finally {
+      setSendingReminder(false)
+    }
+  }
+
+  const handleBookingIdChange = (e) => {
+    setBookingId(e.target.value)
+    if (bookingIdError) setBookingIdError(validateBookingId(e.target.value))
   }
 
   return (
@@ -104,6 +145,66 @@ export default function AdminTestEmailPage() {
           <div className="ate-result error" role="alert">
             <span className="ate-result-icon" aria-hidden="true">✕</span>
             {error}
+          </div>
+        )}
+      </div>
+
+      <div className="ate-header" style={{ marginTop: 40 }}>
+        <h1 style={{ fontSize: 22 }}>Test email nhắc lịch</h1>
+        <p className="ate-desc">
+          Gửi thử email nhắc lịch cho một booking cụ thể để kiểm tra nội dung/cấu hình.
+        </p>
+      </div>
+
+      <div className="ate-card">
+        <form className="ate-form" onSubmit={handleSendReminder} noValidate>
+          <div className={`ate-field${bookingIdError ? ' has-error' : ''}`}>
+            <label className="ate-label" htmlFor="test-reminder-booking-id">
+              Booking ID
+            </label>
+            <input
+              id="test-reminder-booking-id"
+              type="text"
+              inputMode="numeric"
+              className="ate-input"
+              placeholder="VD: 123"
+              value={bookingId}
+              onChange={handleBookingIdChange}
+              autoComplete="off"
+              disabled={sendingReminder}
+            />
+            {bookingIdError && (
+              <span className="ate-field-error">{bookingIdError}</span>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            className="ate-submit-btn"
+            disabled={sendingReminder}
+          >
+            {sendingReminder ? (
+              <>
+                <span className="ate-spinner" aria-hidden="true" />
+                Đang gửi...
+              </>
+            ) : (
+              'Gửi email nhắc lịch'
+            )}
+          </button>
+        </form>
+
+        {reminderSuccess && (
+          <div className="ate-result success" role="status">
+            <span className="ate-result-icon" aria-hidden="true">✓</span>
+            {reminderSuccess}
+          </div>
+        )}
+
+        {reminderError && (
+          <div className="ate-result error" role="alert">
+            <span className="ate-result-icon" aria-hidden="true">✕</span>
+            {reminderError}
           </div>
         )}
       </div>

@@ -15,8 +15,7 @@ import java.util.List;
  * Resolves the ordered list of processing steps for a service package.
  * MAIN/ADD_ON packages simply use their own steps. A COMBO package has no
  * steps of its own: its steps are derived from its included MAIN + ADD_ON
- * packages, with the add-on steps inserted right before the main package's
- * final step (handover) so the car is still handed over last.
+ * packages, with all main steps running first followed by add-on steps.
  */
 @Component
 @RequiredArgsConstructor

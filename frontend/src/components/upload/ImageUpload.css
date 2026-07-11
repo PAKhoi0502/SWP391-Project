@@ -1,0 +1,113 @@
+.image-upload-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.image-upload-thumb {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.image-upload-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.image-upload-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.65);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.image-upload-remove:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.image-upload-add {
+  width: 96px;
+  height: 96px;
+  border-radius: 16px;
+  border: 1px dashed #c7d2fe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #6366f1;
+  cursor: pointer;
+  background: #f5f3ff;
+  transition: 0.2s ease;
+}
+
+.image-upload-add:hover {
+  border-color: #8b5cf6;
+  background: #ede9fe;
+}
+
+.image-upload-add input {
+  display: none;
+}
+
+.image-upload-error {
+  margin: 10px 0 0;
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.image-upload--round .image-upload-thumb,
+.image-upload--round .image-upload-add {
+  border-radius: 50%;
+}
+
+.image-upload--sm .image-upload-thumb,
+.image-upload--sm .image-upload-add {
+  width: 72px;
+  height: 72px;
+}
+
+.image-upload--pill .image-upload-add {
+  width: auto;
+  height: auto;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  background: rgba(167, 139, 250, 0.12);
+  color: #a78bfa;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.image-upload--pill .image-upload-add:hover {
+  border-color: rgba(167, 139, 250, 0.65);
+  background: rgba(167, 139, 250, 0.2);
+}
+
+.image-upload-preview-img {
+  display: block;
+  max-width: 100%;
+  max-height: 60vh;
+  margin: 0 auto;
+  border-radius: 12px;
+  object-fit: contain;
+}

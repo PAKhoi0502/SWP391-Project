@@ -1,5 +1,9 @@
 package com.autowashpro.controller;
 
+import com.autowashpro.common.AuditAction;
+import com.autowashpro.common.AuditActorContext;
+import com.autowashpro.common.AuditMetadata;
+import com.autowashpro.common.AuditTargetType;
 import com.autowashpro.dto.request.StaffProfileCreateRequest;
 import com.autowashpro.dto.request.StaffProfileStatusUpdateRequest;
 import com.autowashpro.dto.request.StaffProfileUpdateRequest;
@@ -7,6 +11,7 @@ import com.autowashpro.dto.response.PageResponse;
 import com.autowashpro.dto.response.StaffProfileResponse;
 import com.autowashpro.entity.enums.StaffType;
 import com.autowashpro.service.StaffProfileService;
+import com.autowashpro.service.AuditLogService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,11 +25,19 @@ import org.springframework.web.bind.annotation.*;
 public class StaffProfileController {
 
     private final StaffProfileService staffProfileService;
+    private final AuditLogService auditLogService;
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<StaffProfileResponse> create(@Valid @RequestBody StaffProfileCreateRequest request) {
-        return ResponseEntity.ok(staffProfileService.create(request));
+        StaffProfileResponse response = staffProfileService.create(request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.STAFF_PROFILE_CREATED,
+                AuditTargetType.STAFF_PROFILE,
+                response.getId(),
+                AuditMetadata.of("userId", response.getUserId(), "garageId", response.getGarageId(), "staffType", response.getStaffType()));
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping
@@ -56,13 +69,27 @@ public class StaffProfileController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<StaffProfileResponse> update(@PathVariable Long id,
                                                          @RequestBody StaffProfileUpdateRequest request) {
-        return ResponseEntity.ok(staffProfileService.update(id, request));
+        StaffProfileResponse response = staffProfileService.update(id, request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.STAFF_PROFILE_UPDATED,
+                AuditTargetType.STAFF_PROFILE,
+                id,
+                AuditMetadata.of("garageId", response.getGarageId(), "staffType", response.getStaffType()));
+        return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<StaffProfileResponse> updateStatus(@PathVariable Long id,
                                                                @Valid @RequestBody StaffProfileStatusUpdateRequest request) {
-        return ResponseEntity.ok(staffProfileService.updateStatus(id, request));
+        StaffProfileResponse response = staffProfileService.updateStatus(id, request);
+        auditLogService.createAuditLog(
+                AuditActorContext.currentActorId(),
+                AuditAction.STAFF_PROFILE_STATUS_UPDATED,
+                AuditTargetType.STAFF_PROFILE,
+                id,
+                AuditMetadata.of("isActive", response.getIsActive()));
+        return ResponseEntity.ok(response);
     }
 }

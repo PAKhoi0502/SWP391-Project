@@ -1,107 +1,132 @@
 import { useEffect, useState } from 'react'
+import { StatusBadge } from '../components/common/ui'
 import { STAFF_TYPES } from '../constants/staffTypes'
+import { useAuth } from '../contexts/AuthContext'
 import { garageService } from '../services/garageService'
 import { staffProfileService } from '../services/staffProfileService'
-import './StaffProfilePage.css'
-
-function formatStaffType(type) {
-  if (!STAFF_TYPES.includes(type)) return type || '—'
-  return type.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
-}
-
-function getInitials(name) {
-  return String(name || '')
-    .split(' ')
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase() || 'S'
-}
+import { userService } from '../services/userService'
+import ImageUpload from '../components/upload/ImageUpload'
 
 export default function StaffProfilePage() {
+  const { user, setCurrentUser } = useAuth()
   const [profile, setProfile] = useState(null)
+  const [account, setAccount] = useState(user)
   const [garage, setGarage] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
 
   useEffect(() => {
     let ignore = false
 
-    staffProfileService.getMe()
-      .then(async (data) => {
+    Promise.all([
+      staffProfileService.getMe(),
+      userService.getMe(),
+      garageService.list({ page: 1, limit: 100 }),
+    ])
+      .then(([staff, currentUser, garages]) => {
         if (ignore) return
-        setProfile(data)
-        const garages = await garageService.list({ page: 1, limit: 100 })
-        if (!ignore) {
-          setGarage((garages.data || []).find((item) => item.id === data.garageId) || null)
-        }
+        setProfile(staff)
+        setAccount(currentUser)
+        setCurrentUser(currentUser)
+        setGarage((garages.data || []).find((item) => item.id === staff.garageId) || null)
       })
       .catch((err) => {
-        if (!ignore) {
-          setError(err.response?.data?.message || err.response?.data || 'Failed to load staff profile.')
-        }
+        if (!ignore) setError(getError(err, 'Không thể tải hồ sơ nhân viên.'))
       })
       .finally(() => {
         if (!ignore) setLoading(false)
       })
 
     return () => { ignore = true }
-  }, [])
+  }, [setCurrentUser])
 
-  if (loading) {
-    return <div className="spp-page"><div className="spp-state">Loading profile...</div></div>
+  const refreshAccount = async () => {
+    const currentUser = await userService.getMe()
+    setAccount(currentUser)
+    setCurrentUser(currentUser)
   }
 
-  if (error) {
-    return <div className="spp-page"><div className="spp-state spp-state--error">{error}</div></div>
+  const handleAvatarUploaded = async () => {
+    setError('')
+    setMessage('')
+    try {
+      await refreshAccount()
+      setMessage('Cập nhật ảnh đại diện thành công.')
+    } catch (err) {
+      setError(getError(err, 'Không thể tải lại hồ sơ.'))
+    }
   }
 
-  const isActive = profile?.isActive !== false
-  const name = profile?.userFullName || `User #${profile?.userId}`
-  const garageName = garage?.name || (profile?.garageId ? `Garage #${profile.garageId}` : '—')
+  const handleAvatarDeleted = async () => {
+    setError('')
+    setMessage('')
+    try {
+      await refreshAccount()
+      setMessage('Đã xóa ảnh đại diện.')
+    } catch (err) {
+      setError(getError(err, 'Không thể tải lại hồ sơ.'))
+    }
+  }
+
+  if (loading) return <div style={cardStyle}>Đang tải hồ sơ nhân viên...</div>
+  if (!profile) return <div style={{ ...cardStyle, color: '#fecaca' }}>{error}</div>
 
   return (
-    <div className="spp-page">
-      <div className="spp-card">
-
-        {/* ── Header ── */}
-        <div className="spp-header">
-          <div className="spp-header-top">
-            <span className="spp-eyebrow">My profile</span>
-            <span className={`spp-badge spp-badge--${isActive ? 'active' : 'inactive'}`}>
-              <span className="spp-badge-dot" />
-              {isActive ? 'Active' : 'Inactive'}
-            </span>
-          </div>
-          <div className="spp-identity">
-            <div className="spp-avatar">{getInitials(name)}</div>
-            <div className="spp-identity-info">
-              <span className="spp-name">{name}</span>
-              {profile?.staffCode && (
-                <span className="spp-code">#{profile.staffCode}</span>
-              )}
-              <span className="spp-sub">Account details and garage assignment</span>
-            </div>
+    <div style={cardStyle}>
+      <div style={profileHeadStyle}>
+        {!account?.avatarUrl && <div style={avatarStyle}>{getInitial(account)}</div>}
+        <div>
+          <h1 style={{ margin: 0, color: '#fff' }}>Hồ sơ của tôi</h1>
+          <div style={avatarActionsStyle}>
+            <ImageUpload
+              className="image-upload--round image-upload--sm image-upload--pill"
+              folder="avatars"
+              images={account?.avatarUrl ? [{ publicId: account.avatarPublicId, imageUrl: account.avatarUrl }] : []}
+              onUploaded={handleAvatarUploaded}
+              onDeleted={handleAvatarDeleted}
+              multiple={false}
+            />
           </div>
         </div>
+      </div>
 
-        {/* ── Details ── */}
-        <div className="spp-details">
-          <div className="spp-detail-cell">
-            <span className="spp-detail-label">Staff code</span>
-            <span className="spp-detail-value">{profile?.staffCode || '—'}</span>
-          </div>
-          <div className="spp-detail-cell">
-            <span className="spp-detail-label">Role</span>
-            <span className="spp-detail-value">{formatStaffType(profile?.staffType)}</span>
-          </div>
-          <div className="spp-detail-cell spp-detail-cell--full">
-            <span className="spp-detail-label">Garage</span>
-            <span className="spp-detail-value">{garageName}</span>
-          </div>
-        </div>
+      {error && <p style={errorStyle}>{error}</p>}
+      {message && <p style={messageStyle}>{message}</p>}
 
+      <div style={gridStyle}>
+        <Row label="Tên nhân viên" value={profile.userFullName || `User #${profile.userId}`} />
+        <Row label="Mã nhân viên" value={profile.staffCode} />
+        <Row label="Garage" value={garage?.name || `Garage #${profile.garageId}`} />
+        <Row label="Loại staff" value={formatStaffType(profile.staffType)} />
+        <Row label="Trạng thái" value={<StatusBadge status={profile.isActive === false ? 'Inactive' : 'Active'} />} />
       </div>
     </div>
   )
 }
+
+function Row({ label, value }) {
+  return <div style={rowStyle}><span style={{ color: 'rgba(200,220,255,0.58)' }}>{label}</span><strong style={{ color: '#fff', textAlign: 'right' }}>{value}</strong></div>
+}
+
+function formatStaffType(type) {
+  if (!STAFF_TYPES.includes(type)) return type || '-'
+  return type.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+function getInitial(account) {
+  return String(account?.fullName || account?.email || 'U').trim().charAt(0).toUpperCase()
+}
+
+function getError(error, fallback) {
+  return error?.response?.data?.message || error?.response?.data || error?.message || fallback
+}
+
+const cardStyle = { background: 'rgba(15,23,42,0.86)', border: '1px solid rgba(148,163,184,0.16)', borderRadius: 24, color: 'rgba(226,232,240,0.78)', padding: 24 }
+const gridStyle = { display: 'grid', gap: 14, maxWidth: 720 }
+const rowStyle = { alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', gap: 16, paddingBottom: 12 }
+const profileHeadStyle = { alignItems: 'center', display: 'flex', gap: 16, marginBottom: 24 }
+const avatarStyle = { alignItems: 'center', background: '#0369a1', borderRadius: '50%', color: '#fff', display: 'flex', flex: '0 0 72px', fontSize: 28, fontWeight: 800, height: 72, justifyContent: 'center', overflow: 'hidden', width: 72 }
+const avatarActionsStyle = { display: 'flex', gap: 8, marginTop: 10 }
+const errorStyle = { background: 'rgba(127,29,29,0.28)', borderRadius: 10, color: '#fecaca', padding: 10 }
+const messageStyle = { background: 'rgba(20,83,45,0.28)', borderRadius: 10, color: '#bbf7d0', padding: 10 }

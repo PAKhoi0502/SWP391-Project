@@ -1,6 +1,9 @@
 package com.autowashpro.controller;
 
 import com.autowashpro.common.ApiResponse;
+import com.autowashpro.common.AuditAction;
+import com.autowashpro.common.AuditMetadata;
+import com.autowashpro.common.AuditTargetType;
 import com.autowashpro.dto.request.BookingCreateRequest;
 import com.autowashpro.dto.request.WalkInBookingCreateRequest;
 import com.autowashpro.dto.response.AvailableSlotResponse;
@@ -8,6 +11,7 @@ import com.autowashpro.dto.response.BookingResponse;
 import com.autowashpro.dto.response.BookingSummaryResponse;
 import com.autowashpro.dto.response.WalkInCustomerLookupResponse;
 import com.autowashpro.service.BookingService;
+import com.autowashpro.service.AuditLogService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -35,6 +39,7 @@ import org.springframework.security.core.Authentication;
 public class BookingController {
 
         private final BookingService bookingService;
+        private final AuditLogService auditLogService;
 
         @GetMapping("/available-slots")
         public ApiResponse<AvailableSlotResponse> getAvailableSlots(
@@ -58,10 +63,17 @@ public class BookingController {
                         @AuthenticationPrincipal UserDetails userDetails) {
 
                 Long customerId = Long.valueOf(userDetails.getUsername());
+                BookingResponse response = bookingService.createBooking(request, customerId);
+                auditLogService.createAuditLog(
+                                customerId,
+                                AuditAction.BOOKING_CREATED,
+                                AuditTargetType.BOOKING,
+                                response.getId(),
+                                AuditMetadata.of("status", response.getStatus()));
                 return ApiResponse.<BookingResponse>builder()
                                 .success(true)
                                 .message("Booking created successfully")
-                                .data(bookingService.createBooking(request, customerId))
+                                .data(response)
                                 .build();
         }
 
@@ -72,10 +84,17 @@ public class BookingController {
                         @AuthenticationPrincipal UserDetails userDetails) {
 
                 Long staffUserId = Long.valueOf(userDetails.getUsername());
+                BookingResponse response = bookingService.createWalkInBooking(request, staffUserId);
+                auditLogService.createAuditLog(
+                                staffUserId,
+                                AuditAction.BOOKING_WALK_IN_CREATED,
+                                AuditTargetType.BOOKING,
+                                response.getId(),
+                                AuditMetadata.of("status", response.getStatus()));
                 return ApiResponse.<BookingResponse>builder()
                                 .success(true)
                                 .message("Walk-in booking created successfully")
-                                .data(bookingService.createWalkInBooking(request, staffUserId))
+                                .data(response)
                                 .build();
         }
 
@@ -187,15 +206,19 @@ public class BookingController {
                         @AuthenticationPrincipal UserDetails userDetails) {
 
                 Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                BookingResponse response = bookingService.checkInBooking(id, staffUserId, role, request.getNote());
+                auditLogService.createAuditLog(
+                                staffUserId,
+                                AuditAction.BOOKING_CHECKED_IN,
+                                AuditTargetType.BOOKING,
+                                id,
+                                AuditMetadata.of("status", response.getStatus(), "note", request.getNote()));
 
                 return ApiResponse.<BookingResponse>builder()
                                 .success(true)
                                 .message("Booking checked in successfully")
-                                .data(
-                                                bookingService.checkInBooking(
-                                                                id,
-                                                                staffUserId,
-                                                                request.getNote()))
+                                .data(response)
                                 .build();
         }
 
@@ -210,15 +233,19 @@ public class BookingController {
                         @RequestBody StartServiceRequest request) {
 
                 Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                BookingResponse response = bookingService.startService(id, staffUserId, role, request);
+                auditLogService.createAuditLog(
+                                staffUserId,
+                                AuditAction.BOOKING_SERVICE_STARTED,
+                                AuditTargetType.BOOKING,
+                                id,
+                                AuditMetadata.of("status", response.getStatus()));
 
                 return ApiResponse.<BookingResponse>builder()
                                 .success(true)
                                 .message("Service started successfully")
-                                .data(
-                                                bookingService.startService(
-                                                                id,
-                                                                staffUserId,
-                                                                request))
+                                .data(response)
                                 .build();
         }
 
@@ -232,11 +259,18 @@ public class BookingController {
                 Long currentUserId = Long.valueOf(userDetails.getUsername());
                 String role = userDetails.getAuthorities().iterator().next().getAuthority();
                 String reason = request != null ? request.getReason() : null;
+                BookingResponse response = bookingService.cancelBooking(id, currentUserId, role, reason);
+                auditLogService.createAuditLog(
+                                currentUserId,
+                                AuditAction.BOOKING_CANCELLED,
+                                AuditTargetType.BOOKING,
+                                id,
+                                AuditMetadata.of("status", response.getStatus(), "reason", reason));
 
                 return ApiResponse.<BookingResponse>builder()
                                 .success(true)
                                 .message("Booking cancelled successfully")
-                                .data(bookingService.cancelBooking(id, currentUserId, role, reason))
+                                .data(response)
                                 .build();
         }
 
@@ -249,11 +283,18 @@ public class BookingController {
 
                 Long staffUserId = Long.valueOf(userDetails.getUsername());
                 String reason = request != null ? request.getReason() : null;
+                BookingResponse response = bookingService.markNoShow(id, staffUserId, reason);
+                auditLogService.createAuditLog(
+                                staffUserId,
+                                AuditAction.BOOKING_MARKED_NO_SHOW,
+                                AuditTargetType.BOOKING,
+                                id,
+                                AuditMetadata.of("status", response.getStatus(), "reason", reason));
 
                 return ApiResponse.<BookingResponse>builder()
                                 .success(true)
                                 .message("Booking marked as no-show successfully")
-                                .data(bookingService.markNoShow(id, staffUserId, reason))
+                                .data(response)
                                 .build();
         }
 
@@ -292,15 +333,18 @@ public class BookingController {
                         @AuthenticationPrincipal UserDetails userDetails) {
 
                 Long staffUserId = Long.valueOf(userDetails.getUsername());
+                BookingServiceStepResponse response = bookingService.completeServiceStep(stepId, staffUserId, request);
+                auditLogService.createAuditLog(
+                                staffUserId,
+                                AuditAction.BOOKING_SERVICE_STEP_COMPLETED,
+                                AuditTargetType.BOOKING_SERVICE_STEP,
+                                stepId,
+                                AuditMetadata.of("status", response.getStatus()));
 
                 return ApiResponse.<BookingServiceStepResponse>builder()
                                 .success(true)
                                 .message("Service step completed successfully")
-                                .data(
-                                                bookingService.completeServiceStep(
-                                                                stepId,
-                                                                staffUserId,
-                                                                request))
+                                .data(response)
                                 .build();
         }
 
@@ -312,15 +356,18 @@ public class BookingController {
                         @AuthenticationPrincipal UserDetails userDetails) {
 
                 Long staffUserId = Long.valueOf(userDetails.getUsername());
+                BookingServiceStepResponse response = bookingService.reopenServiceStep(stepId, staffUserId, request);
+                auditLogService.createAuditLog(
+                                staffUserId,
+                                AuditAction.BOOKING_SERVICE_STEP_REOPENED,
+                                AuditTargetType.BOOKING_SERVICE_STEP,
+                                stepId,
+                                AuditMetadata.of("status", response.getStatus()));
 
                 return ApiResponse.<BookingServiceStepResponse>builder()
                                 .success(true)
                                 .message("Service step reopened successfully")
-                                .data(
-                                                bookingService.reopenServiceStep(
-                                                                stepId,
-                                                                staffUserId,
-                                                                request))
+                                .data(response)
                                 .build();
         }
 
@@ -334,11 +381,18 @@ public class BookingController {
                 Long staffUserId = Long.valueOf(userDetails.getUsername());
                 String role = userDetails.getAuthorities().iterator().next().getAuthority();
                 String note = request != null ? request.getNote() : null;
+                BookingResponse response = bookingService.completeService(id, staffUserId, role, note);
+                auditLogService.createAuditLog(
+                                staffUserId,
+                                AuditAction.BOOKING_SERVICE_COMPLETED,
+                                AuditTargetType.BOOKING,
+                                id,
+                                AuditMetadata.of("status", response.getStatus(), "note", note));
 
                 return ApiResponse.<BookingResponse>builder()
                                 .success(true)
                                 .message("Service completed successfully")
-                                .data(bookingService.completeService(id, staffUserId, role, note))
+                                .data(response)
                                 .build();
         }
 
@@ -355,16 +409,20 @@ public class BookingController {
                                 .iterator()
                                 .next()
                                 .getAuthority();
+                BookingResponse response = bookingService.markBookingPaid(id, staffUserId, role, request);
+                auditLogService.createAuditLog(
+                                staffUserId,
+                                AuditAction.BOOKING_MARK_PAID,
+                                AuditTargetType.BOOKING,
+                                id,
+                                AuditMetadata.of(
+                                                "paymentStatus", response.getPaymentStatus(),
+                                                "paymentMethod", response.getPaymentMethod()));
 
                 return ApiResponse.<BookingResponse>builder()
                                 .success(true)
                                 .message("Booking marked as paid successfully")
-                                .data(
-                                                bookingService.markBookingPaid(
-                                                                id,
-                                                                staffUserId,
-                                                                role,
-                                                                request))
+                                .data(response)
                                 .build();
         }
 
@@ -381,16 +439,18 @@ public class BookingController {
                                 .iterator()
                                 .next()
                                 .getAuthority();
+                BookingResponse response = bookingService.updatePaymentMethod(id, staffUserId, role, request);
+                auditLogService.createAuditLog(
+                                staffUserId,
+                                AuditAction.BOOKING_PAYMENT_METHOD_UPDATED,
+                                AuditTargetType.BOOKING,
+                                id,
+                                AuditMetadata.of("paymentMethod", response.getPaymentMethod()));
 
                 return ApiResponse.<BookingResponse>builder()
                                 .success(true)
                                 .message("Payment method updated successfully")
-                                .data(
-                                                bookingService.updatePaymentMethod(
-                                                                id,
-                                                                staffUserId,
-                                                                role,
-                                                                request))
+                                .data(response)
                                 .build();
         }
 }

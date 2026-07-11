@@ -1,244 +1,391 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { useAuth } from '../../contexts/AuthContext'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
+import adminAnalyticsApi from '../../api/adminAnalyticsApi'
+import { getGarages } from '../../api/GarageApi'
 import './AdminDashboardPage.css'
 
-function getGreeting() {
-  const h = new Date().getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 18) return 'Good afternoon'
-  return 'Good evening'
+const PIE_COLORS = ['#7c3aed', '#2563eb', '#0ea5e9', '#22c55e', '#f59e0b', '#ef4444']
+
+const currencyFormat = (value) =>
+  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(
+    Number(value || 0)
+  )
+
+const numberFormat = (value) => new Intl.NumberFormat('vi-VN').format(Number(value || 0))
+
+const todayIso = () => new Date().toISOString().slice(0, 10)
+
+const daysAgoIso = (days) => {
+  const date = new Date()
+  date.setDate(date.getDate() - days)
+  return date.toISOString().slice(0, 10)
 }
 
-const GROUPS = [
-  {
-    label: 'Users & Staff',
-    tag: 'blue',
-    items: [
-      {
-        to: '/admin/users',
-        title: 'Users',
-        description: 'Manage customer accounts, roles, and access control.',
-        color: 'blue',
-        icon: (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
-        ),
-      },
-      {
-        to: '/admin/staff-profiles',
-        title: 'Staff',
-        description: 'View and manage staff profiles assigned to garages.',
-        color: 'indigo',
-        icon: (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
-          </svg>
-        ),
-      },
-    ],
-  },
-  {
-    label: 'Bookings',
-    tag: 'indigo',
-    items: [
-      {
-        to: '/admin/bookings',
-        title: 'Bookings',
-        description: 'Monitor all bookings across every garage and status.',
-        color: 'indigo',
-        icon: (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-            <line x1="16" y1="2" x2="16" y2="6"/>
-            <line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
-        ),
-      },
-      {
-        to: '/admin/wash-histories',
-        title: 'Wash History',
-        description: 'View completed wash records and service history logs.',
-        color: 'cyan',
-        icon: (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
-        ),
-      },
-    ],
-  },
-  {
-    label: 'Catalog',
-    tag: 'emerald',
-    items: [
-      {
-        to: '/admin/vehicles',
-        title: 'Vehicles',
-        description: 'Browse and manage all customer-registered vehicles.',
-        color: 'violet',
-        icon: (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="1" y="3" width="15" height="13" rx="2"/>
-            <path d="M16 8h4l3 3v3h-7V8z"/>
-            <circle cx="5.5" cy="18.5" r="2.5"/>
-            <circle cx="18.5" cy="18.5" r="2.5"/>
-          </svg>
-        ),
-      },
-      {
-        to: '/admin/garages',
-        title: 'Garages',
-        description: 'Configure garage locations, info, and operating hours.',
-        color: 'emerald',
-        icon: (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-            <polyline points="9 22 9 12 15 12 15 22"/>
-          </svg>
-        ),
-      },
-      {
-        to: '/admin/wash-bays',
-        title: 'Wash Bays',
-        description: 'Manage wash bay availability and assignments per garage.',
-        color: 'cyan',
-        icon: (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
-          </svg>
-        ),
-      },
-      {
-        to: '/admin/service-packages',
-        title: 'Service Packages',
-        description: 'Create and update wash service packages and pricing.',
-        color: 'amber',
-        icon: (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/>
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-            <line x1="12" y1="22.08" x2="12" y2="12"/>
-          </svg>
-        ),
-      },
-    ],
-  },
-  {
-    label: 'Loyalty & Marketing',
-    tag: 'rose',
-    items: [
-      {
-        to: '/admin/loyalty/tier-rules',
-        title: 'Loyalty Tiers',
-        description: 'Configure membership tier thresholds and point rules.',
-        color: 'violet',
-        icon: (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-          </svg>
-        ),
-      },
-      {
-        to: '/admin/promotions',
-        title: 'Promotions',
-        description: 'Manage discount codes, promotions, and usage limits.',
-        color: 'rose',
-        icon: (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-            <line x1="7" y1="7" x2="7.01" y2="7"/>
-          </svg>
-        ),
-      },
-    ],
-  },
-  {
-    label: 'System',
-    tag: 'slate',
-    items: [
-      {
-        to: '/admin/notifications/test-email',
-        title: 'Test Email',
-        description: 'Send test notification emails to verify delivery.',
-        color: 'slate',
-        icon: (
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-            <polyline points="22,6 12,13 2,6"/>
-          </svg>
-        ),
-      },
-    ],
-  },
-]
+function AdminDashboardPage() {
+  const [garages, setGarages] = useState([])
+  const [filters, setFilters] = useState({ from: daysAgoIso(30), to: todayIso(), garageId: '' })
+  const [appliedFilters, setAppliedFilters] = useState(filters)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-export default function AdminDashboardPage() {
-  const { user } = useAuth()
-  const [visible, setVisible] = useState(false)
+  const [overview, setOverview] = useState(null)
+  const [bookings, setBookings] = useState(null)
+  const [revenue, setRevenue] = useState(null)
+  const [loyalty, setLoyalty] = useState(null)
+  const [promotions, setPromotions] = useState(null)
+  const [washBays, setWashBays] = useState(null)
 
   useEffect(() => {
-    const id = requestAnimationFrame(() => setVisible(true))
-    return () => cancelAnimationFrame(id)
+    getGarages({ limit: 100 })
+      .then((result) => setGarages(Array.isArray(result?.data) ? result.data : []))
+      .catch(() => setGarages([]))
   }, [])
 
-  const firstName = user?.fullName?.split(' ').at(-1) || user?.fullName || 'there'
-  const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  useEffect(() => {
+    let cancelled = false
+    const filterParams = {
+      from: appliedFilters.from || undefined,
+      to: appliedFilters.to || undefined,
+      garageId: appliedFilters.garageId || undefined,
+    }
 
-  let cardIndex = 0
+    setLoading(true)
+    setError('')
+
+    Promise.all([
+      adminAnalyticsApi.getOverview(filterParams),
+      adminAnalyticsApi.getBookingStatistics(filterParams),
+      adminAnalyticsApi.getRevenueStatistics(filterParams),
+      adminAnalyticsApi.getLoyaltyStatistics(filterParams),
+      adminAnalyticsApi.getPromotionPerformance(filterParams),
+      adminAnalyticsApi.getWashBayPerformance(filterParams),
+    ])
+      .then(([overviewRes, bookingsRes, revenueRes, loyaltyRes, promotionsRes, washBaysRes]) => {
+        if (cancelled) return
+        setOverview(overviewRes)
+        setBookings(bookingsRes)
+        setRevenue(revenueRes)
+        setLoyalty(loyaltyRes)
+        setPromotions(promotionsRes)
+        setWashBays(washBaysRes)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setError(err?.response?.data?.message || err.message || 'Không thể tải dữ liệu thống kê')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [appliedFilters])
+
+  const bookingStatusData = useMemo(
+    () =>
+      Object.entries(bookings?.byStatus || {}).map(([status, count]) => ({
+        status,
+        count,
+      })),
+    [bookings]
+  )
+
+  const handleApplyFilters = (event) => {
+    event.preventDefault()
+    setAppliedFilters(filters)
+  }
+
+  const handleReset = () => {
+    const reset = { from: daysAgoIso(30), to: todayIso(), garageId: '' }
+    setFilters(reset)
+    setAppliedFilters(reset)
+  }
 
   return (
-    <div className={`adm-home${visible ? ' adm-home--in' : ''}`}>
-      <div className="adm-home-greeting">
-        <p className="adm-home-date">{today}</p>
-        <h1>
-          {getGreeting()}, {firstName}.
-        </h1>
-        <p className="adm-home-sub">Manage your platform from the admin dashboard.</p>
+    <section className="admin-dashboard-page">
+      <div className="admin-dashboard-hero">
+        <div>
+          <p className="admin-dashboard-kicker">Analytics</p>
+          <h1>Tổng quan hệ thống</h1>
+          <p>Booking, doanh thu, hạng thành viên, khuyến mãi và hiệu suất khoang rửa xe.</p>
+        </div>
+
+        <form className="admin-dashboard-filter-box" onSubmit={handleApplyFilters}>
+          <label>
+            Từ ngày
+            <input
+              type="date"
+              value={filters.from}
+              max={filters.to}
+              onChange={(e) => setFilters((prev) => ({ ...prev, from: e.target.value }))}
+            />
+          </label>
+          <label>
+            Đến ngày
+            <input
+              type="date"
+              value={filters.to}
+              min={filters.from}
+              onChange={(e) => setFilters((prev) => ({ ...prev, to: e.target.value }))}
+            />
+          </label>
+          <label>
+            Garage
+            <select
+              value={filters.garageId}
+              onChange={(e) => setFilters((prev) => ({ ...prev, garageId: e.target.value }))}
+            >
+              <option value="">Tất cả garage</option>
+              {garages.map((garage) => (
+                <option key={garage.id} value={garage.id}>
+                  {garage.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="admin-dashboard-filter-actions">
+            <button className="admin-dashboard-primary-btn" type="submit">
+              Áp dụng
+            </button>
+            <button className="admin-dashboard-ghost-btn" type="button" onClick={handleReset}>
+              Đặt lại
+            </button>
+          </div>
+        </form>
       </div>
 
-      <div className="adm-home-sections">
-        {GROUPS.map((group) => (
-          <div key={group.label} className="adm-section">
-            <div className="adm-section-header">
-              <span className={`adm-section-tag adm-section-tag--${group.tag}`} />
-              <h3 className="adm-section-label">{group.label}</h3>
-            </div>
-            <div className="adm-section-row">
-              {group.items.map((item) => {
-                const i = cardIndex++
-                return (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    className={`adm-card adm-card--${item.color}`}
-                    style={{ '--i': i }}
-                  >
-                    <div className="adm-card-icon">{item.icon}</div>
-                    <div className="adm-card-body">
-                      <h2>{item.title}</h2>
-                      <p>{item.description}</p>
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
-          </div>
-        ))}
+      {error && <div className="admin-dashboard-alert error">{error}</div>}
+      {loading && <div className="admin-dashboard-alert loading">Đang tải dữ liệu...</div>}
+
+      {overview && (
+        <div className="admin-dashboard-stat-grid">
+          <StatCard label="Tổng booking" value={numberFormat(overview.totalBookings)} />
+          <StatCard label="Hoàn thành" value={numberFormat(overview.completedBookings)} tone="active" />
+          <StatCard label="Đã huỷ" value={numberFormat(overview.canceledBookings)} tone="inactive" />
+          <StatCard label="No-show" value={numberFormat(overview.noShowBookings)} tone="maintenance" />
+          <StatCard label="Doanh thu" value={currencyFormat(overview.totalRevenue)} />
+          <StatCard label="Thành viên loyalty" value={numberFormat(overview.loyaltyMembers)} />
+          <StatCard label="Điểm khả dụng" value={numberFormat(overview.totalAvailablePoints)} />
+          <StatCard label="Lượt dùng khuyến mãi" value={numberFormat(overview.promotionUsages)} />
+          <StatCard label="Lượt dùng khoang rửa" value={numberFormat(overview.washBayUsages)} />
+        </div>
+      )}
+
+      <div className="admin-dashboard-grid">
+        <section className="admin-dashboard-panel">
+          <header className="admin-dashboard-panel-header">
+            <h2>Booking theo ngày</h2>
+            <p>Số lượng booking trong khoảng thời gian đã chọn</p>
+          </header>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={bookings?.byDate || []}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+              <Tooltip />
+              <Bar dataKey="bookingCount" name="Booking" fill="#7c3aed" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </section>
+
+        <section className="admin-dashboard-panel">
+          <header className="admin-dashboard-panel-header">
+            <h2>Booking theo trạng thái</h2>
+            <p>Phân bổ trạng thái booking</p>
+          </header>
+          <ResponsiveContainer width="100%" height={280}>
+            <PieChart margin={{ top: 12, right: 24, bottom: 8, left: 24 }}>
+              <Pie data={bookingStatusData} dataKey="count" nameKey="status" outerRadius={90}>
+                {bookingStatusData.map((entry, index) => (
+                  <Cell key={entry.status} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+              <Legend formatter={(value, entry) => `${value}: ${entry.payload.count}`} />
+            </PieChart>
+          </ResponsiveContainer>
+        </section>
+
+        <section className="admin-dashboard-panel">
+          <header className="admin-dashboard-panel-header">
+            <h2>Doanh thu theo ngày</h2>
+            <p>Tổng: {currencyFormat(revenue?.totalRevenue)} · Trung bình: {currencyFormat(revenue?.averageRevenue)}</p>
+          </header>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={revenue?.byDate || []}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => numberFormat(v)} />
+              <Tooltip formatter={(value) => currencyFormat(value)} />
+              <Line type="monotone" dataKey="revenue" name="Doanh thu" stroke="#2563eb" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </section>
+
+        <section className="admin-dashboard-panel">
+          <header className="admin-dashboard-panel-header">
+            <h2>Doanh thu theo phương thức thanh toán</h2>
+          </header>
+          <table className="admin-dashboard-table">
+            <thead>
+              <tr>
+                <th>Phương thức</th>
+                <th>Số booking đã thanh toán</th>
+                <th>Doanh thu</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(revenue?.byPaymentMethod || []).map((row) => (
+                <tr key={row.paymentMethod}>
+                  <td>{row.paymentMethod}</td>
+                  <td>{numberFormat(row.paidBookingCount)}</td>
+                  <td>{currencyFormat(row.revenue)}</td>
+                </tr>
+              ))}
+              {!revenue?.byPaymentMethod?.length && (
+                <tr>
+                  <td colSpan={3}>Không có dữ liệu</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </section>
+
+        <section className="admin-dashboard-panel">
+          <header className="admin-dashboard-panel-header">
+            <h2>Hạng thành viên (Loyalty)</h2>
+            <p>
+              {numberFormat(loyalty?.totalMembers)} thành viên · {numberFormat(loyalty?.totalAvailablePoints)} điểm khả
+              dụng
+            </p>
+          </header>
+          <table className="admin-dashboard-table">
+            <thead>
+              <tr>
+                <th>Hạng</th>
+                <th>Thành viên</th>
+                <th>Điểm khả dụng</th>
+                <th>Điểm đã đổi</th>
+                <th>Tổng chi tiêu</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(loyalty?.byTier || []).map((row) => (
+                <tr key={row.tier}>
+                  <td>{row.tier}</td>
+                  <td>{numberFormat(row.memberCount)}</td>
+                  <td>{numberFormat(row.availablePoints)}</td>
+                  <td>{numberFormat(row.redeemedPoints)}</td>
+                  <td>{currencyFormat(row.totalSpent)}</td>
+                </tr>
+              ))}
+              {!loyalty?.byTier?.length && (
+                <tr>
+                  <td colSpan={5}>Không có dữ liệu</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </section>
+
+        <section className="admin-dashboard-panel">
+          <header className="admin-dashboard-panel-header">
+            <h2>Hiệu suất khuyến mãi</h2>
+            <p>
+              {numberFormat(promotions?.totalUsages)} lượt dùng · {currencyFormat(promotions?.totalDiscountAmount)} đã
+              giảm
+            </p>
+          </header>
+          <table className="admin-dashboard-table">
+            <thead>
+              <tr>
+                <th>Mã</th>
+                <th>Tên</th>
+                <th>Lượt dùng</th>
+                <th>Số tiền giảm</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(promotions?.promotions || []).map((row) => (
+                <tr key={row.promotionId}>
+                  <td>{row.code}</td>
+                  <td>{row.name}</td>
+                  <td>{numberFormat(row.usageCount)}</td>
+                  <td>{currencyFormat(row.discountAmount)}</td>
+                </tr>
+              ))}
+              {!promotions?.promotions?.length && (
+                <tr>
+                  <td colSpan={4}>Không có dữ liệu</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </section>
+
+        <section className="admin-dashboard-panel admin-dashboard-panel-wide">
+          <header className="admin-dashboard-panel-header">
+            <h2>Hiệu suất khoang rửa xe</h2>
+            <p>
+              {numberFormat(washBays?.totalUsages)} lượt · {numberFormat(washBays?.totalUsageMinutes)} phút · trung
+              bình {Math.round(washBays?.averageUsageMinutes || 0)} phút/lượt
+            </p>
+          </header>
+          <table className="admin-dashboard-table">
+            <thead>
+              <tr>
+                <th>Khoang</th>
+                <th>Loại xe</th>
+                <th>Lượt dùng</th>
+                <th>Tổng phút</th>
+                <th>TB phút/lượt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(washBays?.washBays || []).map((row) => (
+                <tr key={row.washBayId}>
+                  <td>{row.bayCode}</td>
+                  <td>{row.vehicleType}</td>
+                  <td>{numberFormat(row.usageCount)}</td>
+                  <td>{numberFormat(row.usageMinutes)}</td>
+                  <td>{Math.round(row.averageUsageMinutes || 0)}</td>
+                </tr>
+              ))}
+              {!washBays?.washBays?.length && (
+                <tr>
+                  <td colSpan={5}>Không có dữ liệu</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </section>
       </div>
+    </section>
+  )
+}
+
+function StatCard({ label, value, tone }) {
+  return (
+    <div className={`admin-dashboard-stat-card${tone ? ` ${tone}` : ''}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
   )
 }
+
+export default AdminDashboardPage

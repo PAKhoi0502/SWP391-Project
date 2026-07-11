@@ -71,12 +71,13 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     // ====================
 
-    // Issue #11: Đếm booking chiếm wash bay theo garage + vehicle type
+    // Issue #11: Đếm booking chiếm wash bay theo garage + vehicle type.
+    // Dùng b.vehicleType (lưu trực tiếp trên booking) thay vì JOIN sang Vehicle,
+    // vì khách vãng lai (walk-in) không có vehicle_id nên sẽ bị JOIN loại bỏ nhầm.
     @Query("""
         SELECT COUNT(b) FROM Booking b
-        JOIN Vehicle v ON v.id = b.vehicleId
         WHERE b.garageId = :garageId
-        AND v.vehicleType = :vehicleType
+        AND b.vehicleType = :vehicleType
         AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
         AND b.startTime < :endTime
         AND b.endTime > :startTime

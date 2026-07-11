@@ -1,8 +1,11 @@
 package com.autowashpro.service.impl;
 
+import com.autowashpro.common.UploadFolder;
 import com.autowashpro.dto.request.*;
 import com.autowashpro.dto.response.UserDetailResponse;
+import com.autowashpro.entity.Upload;
 import com.autowashpro.entity.User;
+import com.autowashpro.repository.UploadRepository;
 import com.autowashpro.repository.UserRepository;
 import com.autowashpro.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +19,7 @@ import java.util.List;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final UploadRepository uploadRepository;
 
     private UserDetailResponse map(User user) {
 
@@ -29,6 +33,23 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
+    private UserDetailResponse mapCurrent(User user) {
+        UserDetailResponse response = map(user);
+        Upload avatar = uploadRepository
+                .findFirstByOwnerIdAndEntityTypeAndEntityIdOrderByCreatedAtDesc(
+                        user.getId(),
+                        UploadFolder.AVATARS.getEntityType(),
+                        user.getId())
+                .orElse(null);
+
+        if (avatar != null) {
+            response.setAvatarUrl(avatar.getFileUrl());
+            response.setAvatarPublicId(avatar.getPublicId());
+        }
+
+        return response;
+    }
+
     @Override
     public UserDetailResponse getCurrentUser(Long userId) {
 
@@ -36,7 +57,7 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() ->
                         new RuntimeException("User not found"));
 
-        return map(user);
+        return mapCurrent(user);
     }
 
     @Override
@@ -67,7 +88,7 @@ public class UserServiceImpl implements UserService {
 
         userRepository.save(user);
 
-        return map(user);
+        return mapCurrent(user);
     }
 
     @Override

@@ -26,6 +26,9 @@ public class Booking {
     @Column(name = "vehicle_id")
     private Long vehicleId;
 
+    @Column(name = "vehicle_type")
+    private String vehicleType;
+
     @Column(name = "garage_id")
     private Long garageId;
 
