@@ -18,70 +18,90 @@ function validateForm(form, isCreate) {
 
   if (isCreate) {
     if (!form.tier || !form.tier.trim()) {
-      errors.tier = 'Tên hạng không được để trống'
+      errors.tier = 'Tier name is required'
     }
   }
 
   const spent = Number(form.minTotalSpent)
   if (form.minTotalSpent === '' || isNaN(spent)) {
-    errors.minTotalSpent = 'Vui lòng nhập tổng chi tiêu tối thiểu'
+    errors.minTotalSpent = 'Min total spend is required'
   } else if (spent < 0) {
-    errors.minTotalSpent = 'Tổng chi tiêu tối thiểu phải >= 0'
+    errors.minTotalSpent = 'Min total spend must be >= 0'
   }
 
   const visits = Number(form.minTotalVisits)
   if (form.minTotalVisits === '' || isNaN(visits)) {
-    errors.minTotalVisits = 'Vui lòng nhập số lần ghé thăm tối thiểu'
+    errors.minTotalVisits = 'Min total visits is required'
   } else if (!Number.isInteger(visits)) {
-    errors.minTotalVisits = 'Số lần ghé thăm phải là số nguyên'
+    errors.minTotalVisits = 'Min visits must be an integer'
   } else if (visits < 0) {
-    errors.minTotalVisits = 'Số lần ghé thăm tối thiểu phải >= 0'
+    errors.minTotalVisits = 'Min visits must be >= 0'
   }
 
   const pts = Number(form.minTotalPoints)
   if (form.minTotalPoints === '' || isNaN(pts)) {
-    errors.minTotalPoints = 'Vui lòng nhập điểm tích lũy tối thiểu'
+    errors.minTotalPoints = 'Min total points is required'
   } else if (!Number.isInteger(pts)) {
-    errors.minTotalPoints = 'Điểm tích lũy phải là số nguyên'
+    errors.minTotalPoints = 'Min points must be an integer'
   } else if (pts < 0) {
-    errors.minTotalPoints = 'Điểm tích lũy tối thiểu phải >= 0'
+    errors.minTotalPoints = 'Min points must be >= 0'
   }
 
   const days = Number(form.bookingWindowDays)
   if (form.bookingWindowDays === '' || isNaN(days)) {
-    errors.bookingWindowDays = 'Vui lòng nhập số ngày giữ slot'
+    errors.bookingWindowDays = 'Advance booking days is required'
   } else if (!Number.isInteger(days)) {
-    errors.bookingWindowDays = 'Số ngày giữ slot phải là số nguyên'
+    errors.bookingWindowDays = 'Must be an integer'
   } else if (days < 1) {
-    errors.bookingWindowDays = 'Số ngày giữ slot phải >= 1'
+    errors.bookingWindowDays = 'Must be >= 1'
   }
 
   const maxB = Number(form.maxUpcomingBookings)
   if (form.maxUpcomingBookings === '' || isNaN(maxB)) {
-    errors.maxUpcomingBookings = 'Vui lòng nhập số booking tối đa'
+    errors.maxUpcomingBookings = 'Max bookings is required'
   } else if (!Number.isInteger(maxB)) {
-    errors.maxUpcomingBookings = 'Số booking tối đa phải là số nguyên'
+    errors.maxUpcomingBookings = 'Must be an integer'
   } else if (maxB < 1) {
-    errors.maxUpcomingBookings = 'Số booking tối đa phải >= 1'
+    errors.maxUpcomingBookings = 'Must be >= 1'
   }
 
   const mult = Number(form.pointMultiplier)
   if (form.pointMultiplier === '' || isNaN(mult)) {
-    errors.pointMultiplier = 'Vui lòng nhập hệ số điểm'
+    errors.pointMultiplier = 'Point multiplier is required'
   } else if (mult <= 0) {
-    errors.pointMultiplier = 'Hệ số điểm phải > 0'
+    errors.pointMultiplier = 'Point multiplier must be > 0'
   }
 
   const prio = Number(form.priorityLevel)
   if (form.priorityLevel === '' || isNaN(prio)) {
-    errors.priorityLevel = 'Vui lòng nhập mức ưu tiên'
+    errors.priorityLevel = 'Priority level is required'
   } else if (!Number.isInteger(prio)) {
-    errors.priorityLevel = 'Mức ưu tiên phải là số nguyên'
+    errors.priorityLevel = 'Must be an integer'
   } else if (prio < 1) {
-    errors.priorityLevel = 'Mức ưu tiên phải >= 1'
+    errors.priorityLevel = 'Must be >= 1'
   }
 
   return errors
+}
+
+const TIER_COLORS = {
+  BRONZE:   { dot: '#cd7f32', badge: 'tier-rule-badge--bronze',   card: 'tier-rule-card--bronze' },
+  SILVER:   { dot: '#94a3b8', badge: 'tier-rule-badge--silver',   card: 'tier-rule-card--silver' },
+  GOLD:     { dot: '#f59e0b', badge: 'tier-rule-badge--gold',     card: 'tier-rule-card--gold' },
+  PLATINUM: { dot: '#818cf8', badge: 'tier-rule-badge--platinum', card: 'tier-rule-card--platinum' },
+}
+
+function getTierStyle(tier) {
+  return TIER_COLORS[String(tier || '').toUpperCase()] || { dot: '#2563eb', badge: '', card: '' }
+}
+
+function TierDot({ tier }) {
+  const { dot } = getTierStyle(tier)
+  return (
+    <span
+      style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: dot, flexShrink: 0 }}
+    />
+  )
 }
 
 function Field({ label, name, value, onChange, error, min, step, placeholder, type = 'number' }) {
@@ -108,7 +128,7 @@ function Field({ label, name, value, onChange, error, min, step, placeholder, ty
 function formatVND(val) {
   const n = Number(val)
   if (isNaN(n)) return '—'
-  return n.toLocaleString('vi-VN') + 'đ'
+  return n.toLocaleString('en-US') + ' VND'
 }
 
 export default function AdminTierRulesPage() {
@@ -131,7 +151,7 @@ export default function AdminTierRulesPage() {
       const data = await loyaltyApi.getAdminTierRules()
       setRules(data)
     } catch {
-      setApiError('Không thể tải danh sách hạng thành viên. Vui lòng thử lại.')
+      setApiError('Failed to load loyalty tiers. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -219,13 +239,13 @@ export default function AdminTierRulesPage() {
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || ''
       if (/already exists/i.test(msg)) {
-        setSubmitError('Hạng thành viên này đã tồn tại.')
+        setSubmitError('This tier already exists.')
       } else if (/not found/i.test(msg)) {
-        setSubmitError('Không tìm thấy hạng thành viên.')
+        setSubmitError('Loyalty tier not found.')
       } else if (msg) {
         setSubmitError(msg)
       } else {
-        setSubmitError('Có lỗi xảy ra, vui lòng thử lại.')
+        setSubmitError('An error occurred. Please try again.')
       }
     } finally {
       setSubmitting(false)
@@ -266,15 +286,15 @@ export default function AdminTierRulesPage() {
       <div className="tier-rules-hero">
         <div className="tier-rules-hero-text">
           <p className="tier-rules-kicker">Loyalty System</p>
-          <h1>Hạng thành viên</h1>
-          <span>Quản lý tier rule — điều kiện lên hạng, hệ số điểm, giới hạn đặt lịch.</span>
+          <h1>Loyalty Tiers</h1>
+          <span>Manage tier rules — upgrade conditions, point multipliers, and booking limits.</span>
         </div>
         <div className="tier-rules-hero-actions">
           <button className="tier-rules-btn-refresh" onClick={loadRules} disabled={loading}>
-            {loading ? 'Đang tải...' : 'Làm mới'}
+            {loading ? 'Loading...' : 'Refresh'}
           </button>
           <button className="tier-rules-btn-create" onClick={openCreate}>
-            + Tạo hạng mới
+            + Create tier
           </button>
         </div>
       </div>
@@ -282,49 +302,54 @@ export default function AdminTierRulesPage() {
       {apiError && <div className="tier-rules-error-banner">{apiError}</div>}
 
       {loading && rules.length === 0 ? (
-        <div className="tier-rules-loading">Đang tải danh sách hạng thành viên...</div>
+        <div className="tier-rules-loading">Loading loyalty tiers...</div>
       ) : !loading && rules.length === 0 ? (
         <div className="tier-rules-empty">
-          Chưa có hạng thành viên nào.{' '}
+          No loyalty tiers yet.{' '}
           <button onClick={openCreate} className="tier-rules-inline-link">
-            Tạo hạng đầu tiên
+            Create first tier
           </button>
         </div>
       ) : (
         <div className="tier-rules-grid">
-          {sorted.map((rule) => (
+          {sorted.map((rule) => {
+            const tierStyle = getTierStyle(rule.tier)
+            return (
             <div
               key={rule.id ?? rule.tier}
-              className={`tier-rule-card${rule.isActive === false ? ' inactive' : ''}`}
+              className={`tier-rule-card ${tierStyle.card}${rule.isActive === false ? ' inactive' : ''}`}
             >
               <div className="tier-rule-card-header">
-                <span className="tier-rule-badge">{rule.tier}</span>
+                <span className={`tier-rule-badge ${tierStyle.badge}`}>
+                  <TierDot tier={rule.tier} />
+                  {rule.tier}
+                </span>
                 <div className="tier-rule-card-header-right">
                   {rule.id != null ? (
                     <button
                       className={`tier-toggle-btn${rule.isActive === false ? ' off' : ' on'}`}
                       onClick={() => handleToggleActive(rule)}
                       disabled={togglingIds.has(rule.id)}
-                      title={rule.isActive === false ? 'Bật hạng này' : 'Tắt hạng này'}
+                      title={rule.isActive === false ? 'Enable this tier' : 'Disable this tier'}
                     >
                       {togglingIds.has(rule.id)
                         ? '...'
                         : rule.isActive === false
-                          ? 'Tắt'
-                          : 'Hoạt động'}
+                          ? 'Off'
+                          : 'Active'}
                     </button>
                   ) : (
                     <span className={`tier-status${rule.isActive === false ? ' inactive' : ' active'}`}>
-                      {rule.isActive === false ? 'Tắt' : 'Hoạt động'}
+                      {rule.isActive === false ? 'Off' : 'Active'}
                     </span>
                   )}
                   {rule.id != null ? (
                     <button className="tier-edit-btn" onClick={() => openEdit(rule)}>
-                      Sửa
+                      Edit
                     </button>
                   ) : (
-                    <span className="tier-no-id-warn" title="Backend không trả id, không thể sửa">
-                      Không có ID
+                    <span className="tier-no-id-warn" title="Backend returned no id — cannot edit">
+                      No ID
                     </span>
                   )}
                 </div>
@@ -332,36 +357,37 @@ export default function AdminTierRulesPage() {
 
               <div className="tier-rule-fields">
                 <div className="tier-rule-field">
-                  <span>Mức ưu tiên</span>
+                  <span>Priority</span>
                   <strong>#{rule.priorityLevel}</strong>
                 </div>
                 <div className="tier-rule-field">
-                  <span>Chi tiêu tối thiểu</span>
+                  <span>Min spend</span>
                   <strong>{formatVND(rule.minTotalSpent)}</strong>
                 </div>
                 <div className="tier-rule-field">
-                  <span>Số lần ghé tối thiểu</span>
-                  <strong>{rule.minTotalVisits} lần</strong>
+                  <span>Min visits</span>
+                  <strong>{rule.minTotalVisits} visits</strong>
                 </div>
                 <div className="tier-rule-field">
-                  <span>Điểm tối thiểu</span>
-                  <strong>{rule.minTotalPoints} điểm</strong>
+                  <span>Min points</span>
+                  <strong>{rule.minTotalPoints} pts</strong>
                 </div>
                 <div className="tier-rule-field">
-                  <span>Ngày giữ slot trước</span>
-                  <strong>{rule.bookingWindowDays} ngày</strong>
+                  <span>Advance booking</span>
+                  <strong>{rule.bookingWindowDays} days</strong>
                 </div>
                 <div className="tier-rule-field">
-                  <span>Booking tối đa</span>
+                  <span>Max bookings</span>
                   <strong>{rule.maxUpcomingBookings}</strong>
                 </div>
                 <div className="tier-rule-field highlight">
-                  <span>Hệ số điểm</span>
+                  <span>Point multiplier</span>
                   <strong>×{rule.pointMultiplier}</strong>
                 </div>
               </div>
             </div>
-          ))}
+          )
+          })}
         </div>
       )}
 
@@ -369,7 +395,7 @@ export default function AdminTierRulesPage() {
         <div className="tier-modal-overlay" onClick={closeModal}>
           <div className="tier-modal" onClick={(e) => e.stopPropagation()}>
             <div className="tier-modal-header">
-              <h2>{isCreate ? 'Tạo hạng thành viên mới' : `Cập nhật hạng ${editingRule?.tier}`}</h2>
+              <h2>{isCreate ? 'Create loyalty tier' : `Update tier ${editingRule?.tier}`}</h2>
               <button className="tier-modal-close" onClick={closeModal} type="button">
                 ✕
               </button>
@@ -380,19 +406,19 @@ export default function AdminTierRulesPage() {
             <form className="tier-form" onSubmit={handleSubmit} noValidate>
               {isCreate && (
                 <Field
-                  label="Tên hạng (TIER) *"
+                  label="Tier name *"
                   name="tier"
                   type="text"
                   value={form.tier}
                   onChange={handleChange}
                   error={errors.tier}
-                  placeholder="VD: BRONZE, SILVER, GOLD, PLATINUM"
+                  placeholder="e.g. BRONZE, SILVER, GOLD"
                 />
               )}
 
               <div className="tier-form-row">
                 <Field
-                  label="Chi tiêu tối thiểu (đ)"
+                  label="Min total spend (VND)"
                   name="minTotalSpent"
                   value={form.minTotalSpent}
                   onChange={handleChange}
@@ -402,7 +428,7 @@ export default function AdminTierRulesPage() {
                   placeholder="0"
                 />
                 <Field
-                  label="Số lần ghé tối thiểu"
+                  label="Min total visits"
                   name="minTotalVisits"
                   value={form.minTotalVisits}
                   onChange={handleChange}
@@ -415,7 +441,7 @@ export default function AdminTierRulesPage() {
 
               <div className="tier-form-row">
                 <Field
-                  label="Điểm tích lũy tối thiểu"
+                  label="Min total points"
                   name="minTotalPoints"
                   value={form.minTotalPoints}
                   onChange={handleChange}
@@ -425,7 +451,7 @@ export default function AdminTierRulesPage() {
                   placeholder="0"
                 />
                 <Field
-                  label="Mức ưu tiên (priority)"
+                  label="Priority level"
                   name="priorityLevel"
                   value={form.priorityLevel}
                   onChange={handleChange}
@@ -438,7 +464,7 @@ export default function AdminTierRulesPage() {
 
               <div className="tier-form-row">
                 <Field
-                  label="Số ngày giữ slot đặt trước"
+                  label="Advance booking days"
                   name="bookingWindowDays"
                   value={form.bookingWindowDays}
                   onChange={handleChange}
@@ -448,7 +474,7 @@ export default function AdminTierRulesPage() {
                   placeholder="7"
                 />
                 <Field
-                  label="Booking tối đa đồng thời"
+                  label="Max concurrent bookings"
                   name="maxUpcomingBookings"
                   value={form.maxUpcomingBookings}
                   onChange={handleChange}
@@ -460,7 +486,7 @@ export default function AdminTierRulesPage() {
               </div>
 
               <Field
-                label="Hệ số nhân điểm (×)"
+                label="Point multiplier (×)"
                 name="pointMultiplier"
                 value={form.pointMultiplier}
                 onChange={handleChange}
@@ -479,7 +505,7 @@ export default function AdminTierRulesPage() {
                       checked={!!form.isActive}
                       onChange={handleChange}
                     />
-                    <span>Đang hoạt động</span>
+                    <span>Active</span>
                   </label>
                 </div>
               )}
@@ -491,10 +517,10 @@ export default function AdminTierRulesPage() {
                   onClick={closeModal}
                   disabled={submitting}
                 >
-                  Hủy
+                  Cancel
                 </button>
                 <button type="submit" className="tier-btn-submit" disabled={submitting}>
-                  {submitting ? 'Đang lưu...' : isCreate ? 'Tạo hạng' : 'Cập nhật'}
+                  {submitting ? 'Saving...' : isCreate ? 'Create tier' : 'Update'}
                 </button>
               </div>
             </form>

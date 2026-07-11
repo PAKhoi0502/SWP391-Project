@@ -111,3 +111,190 @@
   border-radius: 12px;
   object-fit: contain;
 }
+
+/* ── Avatar preview modal ── */
+.image-upload-avatar-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(10, 18, 36, 0.45);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.image-upload-avatar-modal {
+  background: #fff;
+  border-radius: 24px;
+  padding: 28px 28px 24px;
+  width: 100%;
+  max-width: 340px;
+  box-shadow: 0 24px 64px rgba(10, 18, 36, 0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  animation: iau-modal-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes iau-modal-in {
+  from { opacity: 0; transform: scale(0.92) translateY(12px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+.image-upload-avatar-modal-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  align-self: flex-start;
+}
+
+.image-upload-avatar-modal-img {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #e2e8f0;
+  box-shadow: 0 8px 24px rgba(46, 194, 247, 0.18);
+}
+
+.image-upload-avatar-modal-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.image-upload-avatar-modal-cancel {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 12px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.image-upload-avatar-modal-cancel:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.image-upload-avatar-modal-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.image-upload-avatar-modal-confirm {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #0855b3 0%, #2ec2f7 100%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  box-shadow: 0 4px 12px rgba(46, 194, 247, 0.3);
+}
+
+.image-upload-avatar-modal-confirm:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.image-upload-avatar-modal-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Avatar mode ── */
+.image-upload--avatar {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.image-upload-avatar-label {
+  cursor: pointer;
+  display: block;
+  line-height: 0;
+}
+
+.image-upload-avatar-circle {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.image-upload-avatar-circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.image-upload-avatar-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(10, 18, 36, 0.55);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+}
+
+.image-upload-avatar-label:hover .image-upload-avatar-overlay {
+  opacity: 1;
+}
+
+.image-upload-avatar-overlay span {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.image-upload-avatar-delete {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  transition: background 0.15s;
+}
+
+.image-upload-avatar-delete:hover {
+  background: #dc2626;
+}
+
+.image-upload-avatar-delete:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

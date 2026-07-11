@@ -31,6 +31,8 @@ public class BookingSummaryResponse {
 
     private String paymentStatus;
 
+    private String paymentMethod;
+
     private BigDecimal finalPrice;
 
     private Boolean isWalkIn;
@@ -46,4 +48,12 @@ public class BookingSummaryResponse {
     private Boolean rewardProcessed;
 
     private Integer pointsEarned;
+
+    private String note;
+
+    private LocalDateTime checkedInAt;
+
+    private LocalDateTime completedAt;
+
+    private LocalDateTime paidAt;
 }

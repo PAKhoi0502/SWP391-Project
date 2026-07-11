@@ -13,7 +13,7 @@ export const uploadService = {
     }
 
     const response = await api.post('/uploads/images', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: { 'Content-Type': undefined },
     })
     return unwrap(response)
   },

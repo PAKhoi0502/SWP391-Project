@@ -87,14 +87,22 @@ export function AuthProvider({ children }) {
     return authStorage.getAccessToken() || null;
   });
 
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    return authStorage.getUser() || null;
+  });
 
-  const [loading, setLoading] = useState(true);
+  // Start non-loading if both token + cached user exist — avoids Sign in/Sign up flash on F5
+  const [loading, setLoading] = useState(() => {
+    const hasToken = Boolean(authStorage.getAccessToken())
+    const hasUser  = Boolean(authStorage.getUser())
+    return !(hasToken && hasUser)
+  });
 
   const isAuthenticated = Boolean(accessToken && user);
 
   const loadCurrentUser = useCallback(async () => {
-    const token = authStorage.getAccessToken();
+    const token      = authStorage.getAccessToken();
+    const cachedUser = authStorage.getUser();
 
     if (!token) {
       setAccessToken(null);
@@ -103,26 +111,36 @@ export function AuthProvider({ children }) {
       return null;
     }
 
-    setAccessToken(token);
+    // Has both token and cached user — restore session immediately without hitting /users/me
+    if (cachedUser) {
+      const finalUser = normalizeUser(cachedUser, token);
+      setAccessToken(token);
+      setUser(finalUser);
+      setLoading(false);
+      return finalUser;
+    }
 
+    // No cached user — fetch from server
+    setAccessToken(token);
     try {
       const currentUser = await authService.getCurrentUser();
-      const finalUser = currentUser ? normalizeUser(currentUser, token) : null;
+      const merged = { ...currentUser };
+      if (!merged.fullName) merged.fullName = '';
+      if (!merged.email)    merged.email    = null;
 
-if (finalUser) {
-  setUser(finalUser);
-
-  authStorage.setAuth({
-    accessToken: token,
-    user: finalUser,
-  });
-}
-
+      const finalUser = normalizeUser(merged, token);
+      if (finalUser) {
+        setUser(finalUser);
+        authStorage.setAuth({ accessToken: token, user: finalUser });
+      }
       return finalUser;
-    } catch {
-      authStorage.clearAuth();
-      setAccessToken(null);
-      setUser(null);
+    } catch (err) {
+      const status = err?.response?.status;
+      if (status === 401) {
+        authStorage.clearAuth();
+        setAccessToken(null);
+        setUser(null);
+      }
       return null;
     } finally {
       setLoading(false);
@@ -186,8 +204,14 @@ if (finalUser) {
   };
 
   const setCurrentUser = useCallback((currentUser) => {
-    setUser(currentUser);
-    authStorage.setAuth({ user: currentUser });
+    const cachedUser = authStorage.getUser();
+    const merged = {
+      ...currentUser,
+      fullName: currentUser?.fullName || currentUser?.name || cachedUser?.fullName || '',
+      email:    currentUser?.email    || cachedUser?.email    || null,
+    };
+    setUser(merged);
+    authStorage.setAuth({ user: merged });
   }, []);
 
   useEffect(() => {

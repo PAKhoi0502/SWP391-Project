@@ -1,89 +1,129 @@
-.cn-list-page {
-  max-width: 760px;
+/* ── Page wrapper — Hero1.jpg bg, same as BookingHistoryPage ── */
+.cn-page {
+  min-height: 100vh;
+  padding-top: 92px;
+  position: relative;
+  box-sizing: border-box;
+  background-color: #0a1224;
+  background:
+    linear-gradient(
+      160deg,
+      rgba(8, 18, 35, 0.55) 0%,
+      rgba(8, 18, 35, 0.40) 50%,
+      rgba(8, 18, 35, 0.65) 100%
+    ),
+    url('/images/Hero1.jpg') center / cover no-repeat fixed;
+}
+
+@keyframes cn-item-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.cn-content {
+  max-width: 720px;
   margin: 0 auto;
-  padding: 32px 0;
-  color: #f8fafc;
+  padding: 40px 20px 60px;
 }
 
-/* ── Header ── */
-.cn-list-header {
-  margin-bottom: 24px;
+/* ── Hero ── */
+.cn-hero {
+  margin-bottom: 32px;
 }
 
-.cn-list-title-row {
+.cn-hero-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #2EC2F7;
+  margin: 0 0 8px;
+}
+
+.cn-hero-title {
+  font-size: 30px;
+  font-weight: 900;
+  color: #ffffff;
+  margin: 0 0 6px;
+  line-height: 1.2;
+}
+
+.cn-hero-sub {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0;
+}
+
+/* ── Toolbar ── */
+.cn-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 20px;
 }
 
-.cn-list-title-row h1 {
-  margin: 0;
-  font-size: 26px;
-  font-weight: 800;
-  color: #f1f5f9;
-}
-
-.cn-mark-all-btn {
-  padding: 8px 18px;
-  border-radius: 10px;
-  border: 1px solid rgba(250, 204, 21, 0.3);
-  background: rgba(250, 204, 21, 0.08);
-  color: #facc15;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.cn-mark-all-btn:hover:not(:disabled) {
-  background: rgba(250, 204, 21, 0.16);
-}
-.cn-mark-all-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* ── Filter row ── */
 .cn-filter-row {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .cn-filter-btn {
-  padding: 7px 18px;
-  border-radius: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: transparent;
-  color: rgba(255, 255, 255, 0.55);
+  padding: 6px 18px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.60);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background 0.14s, color 0.14s, border-color 0.14s;
+  font-family: inherit;
 }
 .cn-filter-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.8);
+  background: rgba(46, 194, 247, 0.12);
+  border-color: rgba(46, 194, 247, 0.45);
+  color: #2EC2F7;
 }
 .cn-filter-btn.active {
-  background: rgba(250, 204, 21, 0.1);
-  border-color: rgba(250, 204, 21, 0.35);
-  color: #facc15;
+  background: rgba(46, 194, 247, 0.15);
+  border-color: #2EC2F7;
+  color: #2EC2F7;
 }
 
-/* ── Error ── */
+.cn-mark-all-btn {
+  padding: 6px 18px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(46, 194, 247, 0.35);
+  background: rgba(46, 194, 247, 0.10);
+  color: #2EC2F7;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.14s;
+  font-family: inherit;
+}
+.cn-mark-all-btn:hover:not(:disabled) {
+  background: rgba(46, 194, 247, 0.22);
+}
+.cn-mark-all-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Error banner ── */
 .cn-error {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 10px 16px;
-  border-radius: 10px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.10);
+  border: 1px solid rgba(239, 68, 68, 0.25);
   color: #fca5a5;
-  font-size: 14px;
+  font-size: 13.5px;
   margin-bottom: 16px;
 }
 .cn-error-dismiss {
@@ -93,60 +133,63 @@
   cursor: pointer;
   font-size: 13px;
   padding: 0;
+  opacity: 0.6;
+  transition: opacity 0.14s;
 }
+.cn-error-dismiss:hover { opacity: 1; }
 
 /* ── States ── */
 .cn-state {
-  padding: 48px 16px;
+  padding: 56px 16px;
   text-align: center;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.40);
   font-size: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(12px);
 }
 .cn-empty-icon {
   font-size: 40px;
   margin-bottom: 12px;
+  opacity: 0.45;
 }
-.cn-empty p {
-  margin: 0;
-}
+.cn-empty p { margin: 0; }
 
-/* ── List ── */
+/* ── List container ── */
 .cn-list {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  overflow: hidden;
-  background: rgba(15, 15, 22, 0.7);
+  gap: 10px;
 }
 
-/* ── Item ── */
+/* ── Notification item card — glass style ── */
 .cn-item {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 16px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
   cursor: pointer;
-  transition: background 0.12s;
-}
-.cn-item:last-child {
-  border-bottom: none;
+  transition: box-shadow 0.16s, background 0.14s, transform 0.14s;
+  animation: cn-item-in 0.2s ease both;
+  border-left: 4px solid transparent;
+  backdrop-filter: blur(8px);
 }
 .cn-item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 6px 24px rgba(10, 18, 36, 0.22);
+  transform: translateY(-1px);
 }
-
 .cn-item.unread {
-  background: rgba(250, 204, 21, 0.04);
-  border-left: 3px solid rgba(250, 204, 21, 0.5);
-}
-.cn-item.unread:hover {
-  background: rgba(250, 204, 21, 0.07);
+  border-left-color: #2EC2F7;
+  background: rgba(255, 255, 255, 0.95);
 }
 .cn-item.read {
-  border-left: 3px solid transparent;
+  border-left-color: transparent;
+  background: rgba(255, 255, 255, 0.80);
 }
 
 /* Unread dot */
@@ -154,10 +197,26 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #facc15;
+  background: #2EC2F7;
   flex-shrink: 0;
   margin-top: 6px;
 }
+
+/* Item icon */
+.cn-item-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.cn-item-icon--reward  { background: rgba(5, 150, 105, 0.10); }
+.cn-item-icon--tier    { background: rgba(234, 179, 8, 0.12); }
+.cn-item-icon--voucher { background: rgba(46, 194, 247, 0.12); }
+.cn-item-icon--default { background: rgba(23, 32, 51, 0.07); }
 
 /* Item body */
 .cn-item-body {
@@ -165,24 +224,44 @@
   min-width: 0;
 }
 
+.cn-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
 .cn-item-title {
   font-size: 14px;
   font-weight: 700;
-  color: #f1f5f9;
-  margin-bottom: 4px;
+  color: #172033;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .cn-item.read .cn-item-title {
-  color: rgba(255, 255, 255, 0.5);
+  color: #64748b;
   font-weight: 600;
 }
 
+.cn-type-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cn-type-badge--reward  { background: rgba(5, 150, 105, 0.10); color: #059669; }
+.cn-type-badge--tier    { background: rgba(234, 179, 8, 0.12); color: #b45309; }
+.cn-type-badge--voucher { background: rgba(46, 194, 247, 0.12); color: #0879B8; }
+.cn-type-badge--default { background: rgba(23, 32, 51, 0.07); color: #475569; }
+
 .cn-item-msg {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.5);
-  line-height: 1.45;
+  color: #64748b;
+  line-height: 1.5;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -190,14 +269,13 @@
   -webkit-box-orient: vertical;
   margin-bottom: 6px;
 }
+.cn-item.read .cn-item-msg { color: #94a3b8; }
 
 .cn-item-time {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.3);
+  font-size: 11.5px;
+  color: #94a3b8;
 }
-.cn-item.unread .cn-item-time {
-  color: rgba(250, 204, 21, 0.5);
-}
+.cn-item.unread .cn-item-time { color: #0879B8; }
 
 /* Delete button */
 .cn-del-btn {
@@ -207,57 +285,52 @@
   justify-content: center;
   width: 26px;
   height: 26px;
-  border-radius: 7px;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  border: 1px solid rgba(23, 32, 51, 0.10);
   background: transparent;
-  color: rgba(255, 255, 255, 0.2);
+  color: #94a3b8;
   font-size: 11px;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s, background 0.12s, color 0.12s;
   margin-top: 2px;
 }
-.cn-item:hover .cn-del-btn {
-  opacity: 1;
-}
+.cn-item:hover .cn-del-btn { opacity: 1; }
 .cn-del-btn:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.15);
-  color: #fca5a5;
-  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.10);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.25);
 }
-.cn-del-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
+.cn-del-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ── Pagination ── */
 .cn-pagination {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  padding: 24px 0 0;
+  gap: 14px;
+  padding: 28px 0 0;
 }
 .cn-page-btn {
   padding: 8px 20px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.7);
+  border: 1.5px solid rgba(255, 255, 255, 0.20);
+  background: rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 0.70);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
+  font-family: inherit;
+  transition: background 0.14s, border-color 0.14s, color 0.14s;
 }
 .cn-page-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
-  color: #f1f5f9;
+  background: rgba(46, 194, 247, 0.18);
+  border-color: #2EC2F7;
+  color: #2EC2F7;
 }
-.cn-page-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
+.cn-page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 .cn-page-info {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.50);
+  font-weight: 600;
 }

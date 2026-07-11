@@ -139,7 +139,7 @@ export default function AdminPromotionManagementPage() {
 
       setUsageModal((prev) => ({ ...prev, usages: enriched, loading: false }))
     } catch (err) {
-      const msg = err?.response?.data?.message || err.message || 'Không tải được lịch sử.'
+      const msg = err?.response?.data?.message || err.message || 'Failed to load history.'
       setUsageModal((prev) => ({ ...prev, loading: false, error: msg }))
     }
   }
@@ -154,7 +154,7 @@ export default function AdminPromotionManagementPage() {
       const data = await promotionApi.getActivePromotions()
       setPromotions(data)
     } catch {
-      setError('Không tải được danh sách khuyến mãi.')
+      setError('Failed to load promotions.')
     } finally {
       setLoading(false)
     }
@@ -177,7 +177,7 @@ export default function AdminPromotionManagementPage() {
       setPromotions((prev) => prev.filter((p) => p.id !== deleteTarget.id))
     } catch (err) {
       const msg = err?.response?.data?.message || err.message || ''
-      setError(msg || 'Xóa khuyến mãi thất bại.')
+      setError(msg || 'Failed to delete promotion.')
     } finally {
       setDeletingId(null)
     }
@@ -197,7 +197,7 @@ export default function AdminPromotionManagementPage() {
       )
     } catch (err) {
       const msg = err?.response?.data?.message || err.message || ''
-      setError(msg || 'Cập nhật trạng thái thất bại.')
+      setError(msg || 'Failed to update status.')
     } finally {
       setTogglingIds((prev) => {
         const next = new Set(prev)
@@ -291,9 +291,9 @@ export default function AdminPromotionManagementPage() {
         minVisits: svFilterType === 'MIN_VISITS' ? Number(svMinVisits) || undefined : undefined,
         minSpent: svFilterType === 'MIN_SPENT' ? Number(svMinSpent) || undefined : undefined,
       })
-      setSvResult({ success: true, message: result?.message || 'Gửi thành công!' })
+      setSvResult({ success: true, message: result?.message || 'Sent successfully!' })
     } catch (err) {
-      const msg = err?.response?.data?.message || err.message || 'Gửi thất bại.'
+      const msg = err?.response?.data?.message || err.message || 'Failed to send.'
       setSvResult({ success: false, message: msg })
     } finally {
       setSvSending(false)
@@ -315,24 +315,24 @@ export default function AdminPromotionManagementPage() {
     <div className="adm-promo-page">
       <div className="adm-promo-hero">
         <div className="adm-promo-hero-text">
-          <p className="adm-promo-kicker">Quản trị viên</p>
-          <h1>Quản lý khuyến mãi</h1>
+          <p className="adm-promo-kicker">Admin</p>
+          <h1>Promotions</h1>
           <span>
-            Tạo, chỉnh sửa và bật/tắt các chương trình khuyến mãi.{' '}
+            Create, edit and toggle promotions.{' '}
             <em className="adm-promo-note">
-              Danh sách chỉ hiển thị khuyến mãi đang active — reload để cập nhật sau khi vô hiệu hóa.
+              List shows active promotions only — reload to update after deactivating.
             </em>
           </span>
         </div>
         <div className="adm-promo-hero-actions">
           <button
             className="adm-promo-btn-all-usages"
-            onClick={() => openUsageModal('Tất cả lượt dùng mã', promotionApi.getAllPromotionUsages.bind(promotionApi))}
+            onClick={() => openUsageModal('All promo code usages', promotionApi.getAllPromotionUsages.bind(promotionApi))}
           >
-            Xem tất cả lượt dùng
+            All usages
           </button>
           <button className="adm-promo-create-btn" onClick={openCreate}>
-            + Tạo khuyến mãi
+            + Create promotion
           </button>
         </div>
       </div>
@@ -347,24 +347,24 @@ export default function AdminPromotionManagementPage() {
       {!loading && promotions.length > 0 && (
         <div className="adm-sf-bar">
           <div className="adm-sf-group">
-            <span className="adm-sf-label">Sắp xếp</span>
+            <span className="adm-sf-label">Sort</span>
             <div className="adm-sf-row">
               <select
                 className="adm-sf-select"
                 value={sortField}
                 onChange={(e) => { setSortField(e.target.value); setDateFilter('') }}
               >
-                <option value="">Mặc định</option>
-                <option value="code">Mã A–Z</option>
-                <option value="startAt">Ngày bắt đầu</option>
-                <option value="endAt">Ngày kết thúc</option>
+                <option value="">Default</option>
+                <option value="code">Code A–Z</option>
+                <option value="startAt">Start date</option>
+                <option value="endAt">End date</option>
               </select>
               {sortField !== '' && (
                 <button
                   className={`adm-sf-dir-btn ${sortDir}`}
                   onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
                 >
-                  {sortDir === 'asc' ? '↑ Tăng dần' : '↓ Giảm dần'}
+                  {sortDir === 'asc' ? '↑ Asc' : '↓ Desc'}
                 </button>
               )}
             </div>
@@ -373,7 +373,7 @@ export default function AdminPromotionManagementPage() {
           {(sortField === 'startAt' || sortField === 'endAt') && (
             <div className="adm-sf-group">
               <span className="adm-sf-label">
-                Lọc theo {sortField === 'startAt' ? 'ngày bắt đầu' : 'ngày kết thúc'}
+                Filter by {sortField === 'startAt' ? 'start date' : 'end date'}
               </span>
               <div className="adm-sf-row">
                 <input
@@ -384,7 +384,7 @@ export default function AdminPromotionManagementPage() {
                 />
                 {dateFilter && (
                   <button className="adm-sf-dir-btn" onClick={() => setDateFilter('')}>
-                    ✕ Xóa
+                    ✕ Clear
                   </button>
                 )}
               </div>
@@ -392,12 +392,12 @@ export default function AdminPromotionManagementPage() {
           )}
 
           <div className="adm-sf-group">
-            <span className="adm-sf-label">Loại giảm giá</span>
+            <span className="adm-sf-label">Discount type</span>
             <div className="adm-sf-row">
               {[
-                { key: 'ALL', label: 'Tất cả' },
-                { key: 'PERCENT', label: 'Phần trăm' },
-                { key: 'FIXED', label: 'Số tiền' },
+                { key: 'ALL', label: 'All' },
+                { key: 'PERCENT', label: 'Percent' },
+                { key: 'FIXED', label: 'Fixed' },
               ].map(({ key, label }) => (
                 <button
                   key={key}
@@ -413,7 +413,7 @@ export default function AdminPromotionManagementPage() {
           {typeFilter !== 'ALL' && sliderAbsMax > 0 && (
             <div className="adm-sf-group">
               <span className="adm-sf-label">
-                Giá trị tối đa:{' '}
+                Max value:{' '}
                 {typeFilter === 'PERCENT' ? `${rangeMax}%` : formatMoney(rangeMax)}
               </span>
               <div className="adm-sf-range-row">
@@ -435,36 +435,36 @@ export default function AdminPromotionManagementPage() {
 
           {hasActiveFilters && (
             <button className="adm-sf-reset-btn" onClick={resetFilters}>
-              Đặt lại
+              Reset
             </button>
           )}
         </div>
       )}
 
       {loading ? (
-        <div className="adm-promo-loading">Đang tải danh sách khuyến mãi...</div>
+        <div className="adm-promo-loading">Loading promotions...</div>
       ) : promotions.length === 0 ? (
         <div className="adm-promo-empty">
-          <p>Chưa có khuyến mãi nào đang hoạt động.</p>
+          <p>No active promotions.</p>
           <button className="adm-promo-create-btn" onClick={openCreate}>
-            Tạo khuyến mãi đầu tiên
+            Create first promotion
           </button>
         </div>
       ) : filteredPromotions.length === 0 ? (
         <div className="adm-promo-empty">
-          <p>Không có khuyến mãi nào phù hợp với bộ lọc.</p>
-          <button className="adm-sf-reset-btn" onClick={resetFilters}>Đặt lại bộ lọc</button>
+          <p>No promotions match this filter.</p>
+          <button className="adm-sf-reset-btn" onClick={resetFilters}>Reset filters</button>
         </div>
       ) : (
         <div className="adm-promo-table-wrapper">
           <table className="adm-promo-table">
             <thead>
               <tr>
-                <th>Mã</th>
-                <th>Tên</th>
-                <th>Loại / Giảm</th>
-                <th>Trạng thái</th>
-                <th>Thao tác</th>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Type / Value</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -482,8 +482,8 @@ export default function AdminPromotionManagementPage() {
                   <td>
                     <div className="adm-promo-type-label">
                       {promo.discountType === 'PERCENTAGE' || promo.discountType === 'PERCENT'
-                        ? 'Phần trăm'
-                        : 'Số tiền'}
+                        ? 'Percent'
+                        : 'Fixed'}
                     </div>
                     <div className="adm-promo-value">
                       {formatDiscount(promo.discountType, promo.discountValue)}
@@ -491,10 +491,10 @@ export default function AdminPromotionManagementPage() {
                   </td>
                   <td>
                     {isExpired(promo) ? (
-                      <span className="adm-promo-status expired">Hết hạn</span>
+                      <span className="adm-promo-status expired">Expired</span>
                     ) : (
                       <span className={`adm-promo-status ${promo.isActive !== false ? 'active' : 'inactive'}`}>
-                        {promo.isActive !== false ? 'Đang hoạt động' : 'Vô hiệu'}
+                        {promo.isActive !== false ? 'Active' : 'Inactive'}
                       </span>
                     )}
                   </td>
@@ -504,7 +504,7 @@ export default function AdminPromotionManagementPage() {
                         className="adm-promo-btn-edit"
                         onClick={() => openEdit(promo.id)}
                       >
-                        Sửa
+                        Edit
                       </button>
                       <button
                         className={`adm-promo-btn-toggle ${promo.isActive !== false ? 'on' : 'off'}`}
@@ -514,32 +514,32 @@ export default function AdminPromotionManagementPage() {
                         {togglingIds.has(promo.id)
                           ? '...'
                           : promo.isActive !== false
-                          ? 'Vô hiệu hóa'
-                          : 'Kích hoạt'}
+                          ? 'Deactivate'
+                          : 'Activate'}
                       </button>
                       <button
                         className="adm-promo-btn-usages"
                         onClick={() =>
                           openUsageModal(
-                            `Lượt dùng: ${promo.code}`,
+                            `Usages: ${promo.code}`,
                             () => promotionApi.getPromotionUsages(promo.id)
                           )
                         }
                       >
-                        Xem lượt dùng
+                        Usages
                       </button>
                       <button
                         className="adm-promo-btn-send"
                         onClick={() => openSendVoucher(promo)}
                       >
-                        Gửi thông báo
+                        Send voucher
                       </button>
                       <button
                         className="adm-promo-btn-delete"
                         onClick={() => askDelete(promo)}
                         disabled={deletingId === promo.id}
                       >
-                        {deletingId === promo.id ? '...' : 'Xóa'}
+                        {deletingId === promo.id ? '...' : 'Delete'}
                       </button>
                     </div>
                   </td>
@@ -553,11 +553,11 @@ export default function AdminPromotionManagementPage() {
       {deleteTarget && (
         <div className="adm-promo-confirm-overlay">
           <div className="adm-promo-confirm-modal">
-            <p>Xác nhận xóa khuyến mãi <strong>{deleteTarget.code}</strong>?</p>
-            <p className="adm-promo-confirm-note">Chỉ xóa được nếu chưa có lịch sử sử dụng.</p>
+            <p>Delete promotion <strong>{deleteTarget.code}</strong>?</p>
+            <p className="adm-promo-confirm-note">Can only delete if no usage history exists.</p>
             <div className="adm-promo-confirm-actions">
-              <button className="adm-promo-confirm-btn-cancel" onClick={cancelDelete}>Hủy</button>
-              <button className="adm-promo-confirm-btn-delete" onClick={confirmDelete}>Xóa</button>
+              <button className="adm-promo-confirm-btn-cancel" onClick={cancelDelete}>Cancel</button>
+              <button className="adm-promo-confirm-btn-delete" onClick={confirmDelete}>Delete</button>
             </div>
           </div>
         </div>
@@ -566,19 +566,19 @@ export default function AdminPromotionManagementPage() {
       {svTarget && (
         <div className="adm-promo-confirm-overlay">
           <div className="adm-sv-modal">
-            <h3 className="adm-sv-title">Gửi voucher</h3>
+            <h3 className="adm-sv-title">Send voucher</h3>
             <p className="adm-sv-subtitle">
-              Mã: <strong>{svTarget.code}</strong> — {svTarget.name}
+              Code: <strong>{svTarget.code}</strong> — {svTarget.name}
             </p>
 
             <div className="adm-sv-group">
-              <span className="adm-sv-label">Gửi đến:</span>
+              <span className="adm-sv-label">Send to:</span>
               <div className="adm-sv-types">
                 {[
-                  { key: 'ALL', label: 'Tất cả khách hàng' },
-                  { key: 'TIER', label: 'Theo hạng thành viên' },
-                  { key: 'MIN_VISITS', label: 'Theo số lần đến' },
-                  { key: 'MIN_SPENT', label: 'Theo chi tiêu' },
+                  { key: 'ALL', label: 'All customers' },
+                  { key: 'TIER', label: 'By loyalty tier' },
+                  { key: 'MIN_VISITS', label: 'By visit count' },
+                  { key: 'MIN_SPENT', label: 'By spend amount' },
                 ].map(({ key, label }) => (
                   <label key={key} className="adm-sv-radio">
                     <input
@@ -596,7 +596,7 @@ export default function AdminPromotionManagementPage() {
 
             {svFilterType === 'TIER' && (
               <div className="adm-sv-group">
-                <span className="adm-sv-label">Hạng:</span>
+                <span className="adm-sv-label">Tier:</span>
                 <select
                   className="adm-sv-select"
                   value={svTier}
@@ -604,9 +604,11 @@ export default function AdminPromotionManagementPage() {
                 >
                   {(Array.isArray(svTarget.applicableTiers) && svTarget.applicableTiers.length > 0
                     ? svTarget.applicableTiers
-                    : ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND']
+                    : ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM']
                   ).map((t) => (
-                    <option key={t} value={t}>{t}</option>
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -614,12 +616,12 @@ export default function AdminPromotionManagementPage() {
 
             {svFilterType === 'MIN_VISITS' && (
               <div className="adm-sv-group">
-                <span className="adm-sv-label">Tối thiểu số lần đến:</span>
+                <span className="adm-sv-label">Min visits:</span>
                 <input
                   type="number"
                   className="adm-sv-input"
                   min={1}
-                  placeholder="VD: 5"
+                  placeholder="e.g. 5"
                   value={svMinVisits}
                   onChange={(e) => setSvMinVisits(e.target.value)}
                 />
@@ -628,12 +630,12 @@ export default function AdminPromotionManagementPage() {
 
             {svFilterType === 'MIN_SPENT' && (
               <div className="adm-sv-group">
-                <span className="adm-sv-label">Chi tiêu tối thiểu (VND):</span>
+                <span className="adm-sv-label">Min spend (VND):</span>
                 <input
                   type="number"
                   className="adm-sv-input"
                   min={0}
-                  placeholder="VD: 500000"
+                  placeholder="e.g. 500000"
                   value={svMinSpent}
                   onChange={(e) => setSvMinSpent(e.target.value)}
                 />
@@ -648,7 +650,7 @@ export default function AdminPromotionManagementPage() {
 
             <div className="adm-promo-confirm-actions">
               <button className="adm-promo-confirm-btn-cancel" onClick={closeSendVoucher}>
-                {svResult?.success ? 'Đóng' : 'Hủy'}
+                {svResult?.success ? 'Close' : 'Cancel'}
               </button>
               {!svResult?.success && (
                 <button
@@ -656,7 +658,7 @@ export default function AdminPromotionManagementPage() {
                   onClick={confirmSendVoucher}
                   disabled={svSending || (svFilterType === 'TIER' && !svTier)}
                 >
-                  {svSending ? 'Đang gửi...' : 'Gửi'}
+                  {svSending ? 'Sending...' : 'Send'}
                 </button>
               )}
             </div>

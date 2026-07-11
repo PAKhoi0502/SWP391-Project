@@ -30,10 +30,10 @@ function normalizeStatus(status) {
 function getStatusLabel(status) {
   const normalized = normalizeStatus(status)
 
-  if (WAITING_STATUSES.has(normalized)) return 'Đang chờ'
-  if (OFFERED_STATUSES.has(normalized)) return 'Có slot'
-  if (ACCEPTED_STATUSES.has(normalized)) return 'Đã nhận slot'
-  if (CANCELLED_STATUSES.has(normalized)) return 'Đã hủy'
+  if (WAITING_STATUSES.has(normalized)) return 'Waiting'
+  if (OFFERED_STATUSES.has(normalized)) return 'Slot offered'
+  if (ACCEPTED_STATUSES.has(normalized)) return 'Accepted'
+  if (CANCELLED_STATUSES.has(normalized)) return 'Cancelled'
 
   return normalized
 }
@@ -53,9 +53,9 @@ function getErrorMessage(error, fallback) {
 }
 
 function formatDate(value) {
-  if (!value) return 'Chưa có ngày'
+  if (!value) return 'No date'
 
-  return new Date(value).toLocaleDateString('vi-VN', {
+  return new Date(value).toLocaleDateString('en-US', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -63,9 +63,9 @@ function formatDate(value) {
 }
 
 function formatTime(value) {
-  if (!value) return 'Chưa có giờ'
+  if (!value) return 'No time'
 
-  return new Date(value).toLocaleTimeString('vi-VN', {
+  return new Date(value).toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
   })
@@ -74,12 +74,12 @@ function formatTime(value) {
 function getVehicleTypeLabel(vehicleType) {
   const value = String(vehicleType || '').toUpperCase()
 
-  if (value === 'CAR') return 'Ô tô'
+  if (value === 'CAR') return 'Car'
   if (value === 'MOTORBIKE' || value === 'BIKE' || value === 'MOTORCYCLE') {
-    return 'Xe máy'
+    return 'Motorbike'
   }
 
-  return vehicleType || 'Chưa có loại xe'
+  return vehicleType || 'Unknown type'
 }
 
 function getDisplayValue(...values) {
@@ -120,19 +120,19 @@ function WaitlistCard({ item, actionKey, onCancel, onAccept }) {
 
       <dl className="customer-waitlist-details">
         <div>
-          <dt>Dịch vụ</dt>
-          <dd>{packageName || `Gói dịch vụ #${item?.servicePackageId || '-'}`}</dd>
+          <dt>Service</dt>
+          <dd>{packageName || `Package #${item?.servicePackageId || '-'}`}</dd>
         </div>
         <div>
-          <dt>Loại xe</dt>
+          <dt>Vehicle type</dt>
           <dd>{getVehicleTypeLabel(item?.vehicleType)}</dd>
         </div>
         <div>
-          <dt>Ngày</dt>
+          <dt>Date</dt>
           <dd>{formatDate(date)}</dd>
         </div>
         <div>
-          <dt>Khung giờ</dt>
+          <dt>Time slot</dt>
           <dd>
             {formatTime(startTime)} - {formatTime(endTime)}
           </dd>
@@ -154,7 +154,7 @@ function WaitlistCard({ item, actionKey, onCancel, onAccept }) {
               disabled={Boolean(actionKey)}
               onClick={() => onCancel(id)}
             >
-              Hủy waitlist
+              Cancel waitlist
             </Button>
           )}
         </div>
@@ -185,7 +185,7 @@ export default function CustomerWaitlistPage() {
       const result = await waitlistApi.getMine()
       setItems(extractWaitlistItems(result))
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể tải waitlist của bạn.'))
+      setError(getErrorMessage(err, 'Could not load your waitlist.'))
     } finally {
       setLoading(false)
     }
@@ -213,7 +213,7 @@ export default function CustomerWaitlistPage() {
       setSuccess(successMessage)
       await fetchWaitlist()
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể cập nhật waitlist. Vui lòng thử lại.'))
+      setError(getErrorMessage(err, 'Could not update waitlist. Please try again.'))
     } finally {
       setActionKey('')
     }
@@ -224,12 +224,12 @@ export default function CustomerWaitlistPage() {
       <section className="customer-waitlist-hero">
         <div>
           <p className="customer-waitlist-eyebrow">Customer waitlist</p>
-          <h1>Waitlist của tôi</h1>
-          <p>Theo dõi các slot đang chờ, hủy yêu cầu hoặc nhận slot khi garage offer.</p>
+          <h1>My Waitlist</h1>
+          <p>Track pending slots, cancel requests, or accept a slot when the garage offers one.</p>
         </div>
 
         <Link className="customer-waitlist-new-link" to="/booking">
-          Tìm slot mới
+          Find a new slot
         </Link>
       </section>
 
@@ -238,17 +238,17 @@ export default function CustomerWaitlistPage() {
         <p className="customer-waitlist-message customer-waitlist-message-error">{error}</p>
       )}
 
-      {loading && <LoadingSpinner text="Đang tải waitlist..." />}
+      {loading && <LoadingSpinner text="Loading waitlist..." />}
 
       {!loading && error && (
-        <ErrorState title="Không thể tải waitlist" description={error} onRetry={fetchWaitlist} />
+        <ErrorState title="Could not load waitlist" description={error} onRetry={fetchWaitlist} />
       )}
 
       {!loading && !error && sortedItems.length === 0 && (
         <EmptyState
           icon="WL"
-          title="Chưa có waitlist"
-          description="Khi slot đã đầy, bạn có thể tham gia waitlist từ trang chọn khung giờ."
+          title="No waitlist entries"
+          description="When a slot is full, you can join the waitlist from the time slot selection screen."
         />
       )}
 
@@ -259,8 +259,8 @@ export default function CustomerWaitlistPage() {
               key={getWaitlistId(item) || JSON.stringify(item)}
               item={item}
               actionKey={actionKey}
-              onCancel={(id) => runAction(id, 'cancel', 'Đã hủy waitlist.')}
-              onAccept={(id) => runAction(id, 'accept', 'Đã nhận slot được offer.')}
+              onCancel={(id) => runAction(id, 'cancel', 'Waitlist entry cancelled.')}
+              onAccept={(id) => runAction(id, 'accept', 'Slot accepted successfully.')}
             />
           ))}
         </div>

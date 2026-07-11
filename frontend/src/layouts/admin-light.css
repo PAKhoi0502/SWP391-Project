@@ -1,0 +1,201 @@
+/* ─── Admin light override — wraps all admin pages ─── */
+/* Scopes dark UI kit components to blue/white theme    */
+
+/* ── Table ── */
+.admin-light .ui-table-wrap {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+.admin-light .ui-table th {
+  background: #f8fafc !important;
+  color: #475569 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  font-size: 11.5px !important;
+  letter-spacing: 0.05em;
+}
+
+.admin-light .ui-table td {
+  background: transparent !important;
+  color: #334155 !important;
+  border-top: 1px solid #f1f5f9 !important;
+  font-weight: 500 !important;
+}
+
+.admin-light .ui-table td[colspan] {
+  color: #94a3b8 !important;
+}
+
+.admin-light .ui-table tbody tr:hover td {
+  background: #f8fafc !important;
+}
+
+/* ── Modal ── */
+.admin-light .ui-modal-overlay {
+  background: rgba(15, 23, 42, 0.4) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+.admin-light .ui-modal {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.15) !important;
+  border-radius: 16px !important;
+}
+
+.admin-light .ui-modal-header {
+  border-bottom: 1px solid #f1f5f9 !important;
+  padding: 18px 20px !important;
+}
+
+.admin-light .ui-modal-title {
+  color: #0f172a !important;
+  font-size: 16px !important;
+}
+
+.admin-light .ui-modal-close {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #64748b !important;
+}
+
+.admin-light .ui-modal-close:hover {
+  background: #fef2f2 !important;
+  border-color: #fecaca !important;
+  color: #ef4444 !important;
+  box-shadow: none !important;
+}
+
+.admin-light .ui-modal-body {
+  color: #334155 !important;
+}
+
+.admin-light .ui-modal-footer {
+  border-top: 1px solid #f1f5f9 !important;
+}
+
+/* ── Inputs ── */
+.admin-light .ui-input,
+.admin-light .ui-select,
+.admin-light .ui-textarea,
+.admin-light .ui-search {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: none !important;
+}
+
+.admin-light .ui-input::placeholder,
+.admin-light .ui-textarea::placeholder,
+.admin-light .ui-search::placeholder {
+  color: #94a3b8 !important;
+}
+
+.admin-light .ui-input:focus,
+.admin-light .ui-select:focus,
+.admin-light .ui-textarea:focus,
+.admin-light .ui-search:focus {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
+  background: #ffffff !important;
+}
+
+.admin-light .ui-select option {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+.admin-light .ui-label {
+  color: #475569 !important;
+}
+
+.admin-light .ui-error-text {
+  color: #dc2626 !important;
+}
+
+.admin-light .ui-helper-text {
+  color: #94a3b8 !important;
+}
+
+/* ── Buttons ── */
+.admin-light .ui-btn-primary {
+  background: #2563eb !important;
+  border-color: #2563eb !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2) !important;
+}
+
+.admin-light .ui-btn-primary:hover {
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.3) !important;
+}
+
+.admin-light .ui-btn-secondary {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #475569 !important;
+}
+
+.admin-light .ui-btn-secondary:hover {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: none !important;
+}
+
+.admin-light .ui-btn-ghost {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #475569 !important;
+}
+
+.admin-light .ui-btn-ghost:hover {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: none !important;
+}
+
+/* ── Pagination ── */
+.admin-light .ui-page-btn {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #475569 !important;
+}
+
+.admin-light .ui-page-btn:hover:not(:disabled) {
+  background: #eff6ff !important;
+  border-color: #93c5fd !important;
+  color: #2563eb !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.admin-light .ui-page-btn.active {
+  background: #2563eb !important;
+  border-color: #2563eb !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2) !important;
+}
+
+/* ── Empty / loading state ── */
+.admin-light .ui-center-state {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: none !important;
+}
+
+.admin-light .ui-state-title {
+  color: #0f172a !important;
+}
+
+.admin-light .ui-state-desc {
+  color: #64748b !important;
+}
+
+.admin-light .ui-spinner {
+  border-color: rgba(37, 99, 235, 0.15) !important;
+  border-top-color: #2563eb !important;
+  box-shadow: none !important;
+}

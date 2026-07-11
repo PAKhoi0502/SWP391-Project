@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { bookingApi } from '../../api/bookingApi'
 import { userService } from '../../services/userService'
 import { getServicePackageById } from '../../services/servicePackageApi'
-import './BookingHistoryPage.css'
+import './StaffBookingListPage.css'
 
 const statuses = ['ALL', 'CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED', 'CANCELED', 'NO_SHOW']
 const closedStatuses = new Set(['COMPLETED', 'CANCELED', 'CANCELLED', 'NO_SHOW'])
@@ -11,12 +11,12 @@ const bookingCachePrefix = 'booking-detail-cache-'
 const paymentMethodCachePrefix = 'booking-payment-method-'
 const payosPaidCachePrefix = 'booking-payos-paid-'
 const staffProfileMissingMessage =
-  'Tài khoản staff này chưa có hồ sơ nhân viên (StaffProfile) hoặc chưa gắn garage, nên backend không trả booking được.'
+  'This staff account has no staff profile or is not assigned to a garage. The backend cannot return bookings.'
 
 const normalizeText = (value) =>
   String(value || '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
 
 const readCachedBooking = (bookingId) => {
@@ -44,7 +44,6 @@ const readCachedPayOSPaidAt = (bookingId) => {
 
 const mergeFrontendOverride = (booking, cached) => {
   if (!cached?.frontendOverride) return booking
-
   return {
     ...booking,
     status: cached.status || booking.status,
@@ -89,55 +88,34 @@ const toArray = (payload) => {
 
 const getStatusText = (status) => {
   const value = String(status || '').toUpperCase()
-
-  if (value === 'CONFIRMED') return 'Chưa thực hiện'
-  if (value === 'CHECKED_IN') return 'Đã check-in'
-  if (value === 'IN_PROGRESS') return 'Đang thực hiện'
-  if (value === 'COMPLETED') return 'Đã hoàn thành'
-  if (value === 'CANCELED' || value === 'CANCELLED') return 'Đã hủy'
+  if (value === 'CONFIRMED') return 'Confirmed'
+  if (value === 'CHECKED_IN') return 'Checked in'
+  if (value === 'IN_PROGRESS') return 'In progress'
+  if (value === 'COMPLETED') return 'Completed'
+  if (value === 'CANCELED' || value === 'CANCELLED') return 'Canceled'
   if (value === 'NO_SHOW') return 'No-show'
-
   return status || 'N/A'
 }
 
 const getPaymentStatusText = (status) => {
   const value = String(status || '').toUpperCase()
-
-  if (value === 'PAID') return 'Đã thanh toán'
-  if (value === 'UNPAID') return 'Chưa thanh toán'
-  if (value === 'PENDING') return 'Đang chờ'
-  if (value === 'CANCELED' || value === 'CANCELLED') return 'Đã hủy'
-
-  return status || 'Chưa thanh toán'
+  if (value === 'PAID') return 'Paid'
+  if (value === 'UNPAID') return 'Unpaid'
+  if (value === 'PENDING') return 'Pending'
+  if (value === 'CANCELED' || value === 'CANCELLED') return 'Canceled'
+  return status || 'Unpaid'
 }
 
 const getPaymentMethodText = (booking) => {
   const value = inferPaymentMethod(booking)
-
-  if (value === 'BANK_TRANSFER' || value === 'PAYOS') {
-    return 'Chuyển khoản'
-  }
-
-  if (value === 'CASH') {
-    return 'Tiền mặt'
-  }
-
-  return 'Chưa cập nhật'
-}
-
-const formatNamedValue = (name, id, fallback) => {
-  const safeName = name || fallback || (id ? `#${id}` : 'Chưa cập nhật')
-
-  return (
-    <span className="booking-named-value">
-      <strong>{safeName}</strong>
-    </span>
-  )
+  if (value === 'BANK_TRANSFER' || value === 'PAYOS') return 'Transfer'
+  if (value === 'CASH') return 'Cash'
+  return 'Not set'
 }
 
 const formatDateTime = (value) => {
-  if (!value) return 'Chưa cập nhật'
-  return new Date(value).toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' })
+  if (!value) return '—'
+  return new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 const formatMoney = (value) =>
@@ -153,7 +131,6 @@ const persistPayOSReturnPath = (path, result) => {
     storage.setItem('payosReturnPath', path)
     storage.setItem('payosLastReturnPath', path)
   })
-
   if (orderCode) {
     localStorage.setItem(`payosReturnPath-${orderCode}`, path)
     sessionStorage.setItem(`payosReturnPath-${orderCode}`, path)
@@ -178,7 +155,6 @@ const resolveAddOnNames = async (ids) => {
 const enrichBookingsWithPayment = async (items) => {
   if (!Array.isArray(items)) return []
 
-  // Fetch tên customer cho từng bookingId có customerId
   const uniqueCustomerIds = [...new Set(items.map((b) => b.customerId).filter(Boolean))]
   const userMap = {}
   await Promise.allSettled(
@@ -188,7 +164,7 @@ const enrichBookingsWithPayment = async (items) => {
         const name = getUserName(user)
         if (name) userMap[String(customerId)] = name
       } catch {
-        // Ignore — fallback to cache
+        // fallback to cache
       }
     }),
   )
@@ -198,7 +174,7 @@ const enrichBookingsWithPayment = async (items) => {
       const cached = readCachedBooking(booking.id)
       const transactions = await bookingApi.getPaymentTransactions(booking.id)
       const transactionList = toArray(transactions)
-      const paidTransaction = transactionList.find((transaction) => String(transaction?.status || '').toUpperCase() === 'PAID')
+      const paidTransaction = transactionList.find((t) => String(t?.status || '').toUpperCase() === 'PAID')
       const latestTransaction = transactionList[0]
       const paymentTransaction = paidTransaction || latestTransaction
       const cachedPayOSPaidAt = readCachedPayOSPaidAt(booking.id)
@@ -216,7 +192,7 @@ const enrichBookingsWithPayment = async (items) => {
           booking.customerName ||
           userMap[String(booking.customerId)] ||
           readCachedCustomerName(booking.customerId) ||
-          (booking.customerId ? `Khách hàng #${booking.customerId}` : 'Khách vãng lai'),
+          (booking.customerId ? `Customer #${booking.customerId}` : 'Walk-in guest'),
         paymentMethod:
           booking.paymentMethod ||
           cached.paymentMethod ||
@@ -241,76 +217,74 @@ const enrichBookingsWithPayment = async (items) => {
   )
 }
 
+function StatusBadge({ status }) {
+  const key = String(status || '').toLowerCase().replace('cancelled', 'canceled')
+  return <span className={`sbl-badge sbl-badge--${key}`}>{getStatusText(status)}</span>
+}
+
+function PaymentBadge({ status }) {
+  const key = String(status || '').toLowerCase()
+  return <span className={`sbl-badge sbl-badge--${key}`}>{getPaymentStatusText(status)}</span>
+}
+
 function StaffBookingListPage() {
   const [bookings, setBookings] = useState([])
   const [status, setStatus] = useState('ALL')
   const [date, setDate] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterOpen, setFilterOpen] = useState(false)
   const [dateOpen, setDateOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [creatingPayOSId, setCreatingPayOSId] = useState(null)
   const [error, setError] = useState('')
 
-  const loadBookings = async () => {
+  const loadBookings = async (silent = false) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       setError('')
       const data = await bookingApi.getStaffBookings({ status, date })
       setBookings(await enrichBookingsWithPayment(data))
     } catch (err) {
-      setBookings([])
+      if (!silent) setBookings([])
       const message = err?.response?.data?.message || err?.message || ''
-      setError(
+      if (!silent) setError(
         message.toLowerCase().includes('staff profile')
           ? staffProfileMissingMessage
-          : message || 'Không tải được danh sách booking.',
+          : message || 'Failed to load bookings.',
       )
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
   useEffect(() => {
     loadBookings()
+    const timer = setInterval(() => loadBookings(true), 15_000)
+    return () => clearInterval(timer)
   }, [status, date])
 
-  const title = useMemo(() => (date ? `Booking ngày ${date}` : 'Booking được phân công'), [date])
+  const title = useMemo(
+    () => (date ? `Bookings on ${new Date(date + 'T00:00:00').toLocaleDateString('en-US', { dateStyle: 'medium' })}` : 'Assigned bookings'),
+    [date],
+  )
 
   const visibleBookings = bookings
     .filter((booking) => {
       const bookingStatus = String(booking?.status || '').toUpperCase()
-
-      if (status === 'ALL') {
-        return !closedStatuses.has(bookingStatus)
-      }
-
-      if (status === 'CANCELED') {
-        return bookingStatus === 'CANCELED' || bookingStatus === 'CANCELLED'
-      }
-
+      if (status === 'ALL') return !closedStatuses.has(bookingStatus)
+      if (status === 'CANCELED') return bookingStatus === 'CANCELED' || bookingStatus === 'CANCELLED'
       return bookingStatus === status
     })
     .filter((booking) => {
       const keyword = normalizeText(searchTerm)
       if (!keyword) return true
-
       const fields = [
-        booking.id,
-        booking.customerId,
-        booking.customerName,
-        booking.vehicleId,
-        booking.vehicleName,
-        booking.garageId,
-        booking.garageName,
-        booking.servicePackageId,
-        booking.servicePackageName,
-        booking.licensePlate,
+        booking.id, booking.customerId, booking.customerName, booking.vehicleId,
+        booking.vehicleName, booking.garageId, booking.garageName, booking.servicePackageId,
+        booking.servicePackageName, booking.licensePlate,
       ]
-
       return fields.some((field) => normalizeText(field).includes(keyword))
     })
-    .sort((left, right) => Number(right?.id || 0) - Number(left?.id || 0))
+    .sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0))
 
   const handleCreatePayOS = async (booking) => {
     try {
@@ -325,171 +299,168 @@ function StaffBookingListPage() {
       }
       await loadBookings()
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Không tạo được QR PayOS.')
+      setError(err?.response?.data?.message || err?.message || 'Failed to create PayOS QR.')
     } finally {
       setCreatingPayOSId(null)
     }
   }
 
   return (
-    <div className="booking-history-page">
-      <section className="booking-history-hero">
-        <div>
-          <p>Staff</p>
-          <h1>{title}</h1>
-          <span>Theo dõi booking theo garage được phân công.</span>
-        </div>
+    <div className="sbl-page">
+      <section className="sbl-hero">
+        <p className="sbl-eyebrow">Staff</p>
+        <h1>{title}</h1>
+        <p>Track bookings assigned to your garage.</p>
       </section>
 
-      <section className={`booking-filter-shell ${filterOpen ? 'open' : ''}`}>
-        <button
-          type="button"
-          className="booking-filter-menu-btn"
-          aria-expanded={filterOpen}
-          onClick={() => setFilterOpen((value) => !value)}
-        >
-          <span className="booking-filter-menu-icon" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
-          Bộ lọc
-        </button>
+      <div className="sbl-filters">
+        <div className="sbl-search">
+          <label>Search</label>
+          <input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Customer name, vehicle, booking ID, plate..."
+          />
+        </div>
 
-        <div className="booking-filter-panel">
-          <label className="booking-filter-search">
-            <span>Tìm kiếm</span>
-            <input
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Tên khách, xe, ID khách, ID xe, ID gói, mã booking..."
-            />
-          </label>
-
-          <div className="booking-history-filter-group">
-            {statuses.map((item) => (
-              <button key={item} className={status === item ? 'active' : ''} type="button" onClick={() => setStatus(item)}>
-                {item === 'ALL' ? 'Tất cả' : getStatusText(item)}
-              </button>
-            ))}
-          </div>
-
-          <div className={`booking-date-filter ${dateOpen ? 'open' : ''}`}>
-            <button type="button" className="booking-date-toggle" onClick={() => setDateOpen((value) => !value)}>
-              {date ? <strong>{new Date(date).toLocaleDateString('vi-VN')}</strong> : 'Lọc theo ngày'}
+        <div className="sbl-status-pills">
+          {statuses.map((item) => (
+            <button
+              key={item}
+              type="button"
+              className={`sbl-pill${status === item ? ' sbl-pill--active' : ''}`}
+              onClick={() => setStatus(item)}
+            >
+              {item === 'ALL' ? 'Active' : getStatusText(item)}
             </button>
-            <div className="booking-date-dropdown">
-              <div className="booking-date-dropdown-head">
-                <span>Chọn ngày booking</span>
-                {date && <strong>{new Date(date).toLocaleDateString('vi-VN')}</strong>}
-              </div>
-              <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-              <div className="booking-date-actions">
-                <button type="button" onClick={() => setDate(new Date().toISOString().slice(0, 10))}>
-                  Hôm nay
-                </button>
-                {date && (
-                  <button type="button" onClick={() => setDate('')}>
-                    Xóa ngày
-                  </button>
-                )}
-              </div>
+          ))}
+        </div>
+
+        <div className={`sbl-date-wrap${dateOpen ? ' open' : ''}`}>
+          <button
+            type="button"
+            className="sbl-date-btn"
+            onClick={() => setDateOpen((v) => !v)}
+          >
+            {date
+              ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { dateStyle: 'medium' })
+              : 'Filter by date'}
+          </button>
+          <div className="sbl-date-panel">
+            <p className="sbl-date-panel-head">Select date</p>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <div className="sbl-date-actions">
+              <button type="button" onClick={() => { setDate(new Date().toISOString().slice(0, 10)); setDateOpen(false) }}>Today</button>
+              {date && <button type="button" onClick={() => { setDate(''); setDateOpen(false) }}>Clear</button>}
             </div>
           </div>
         </div>
 
-        <button type="button" className="booking-history-refresh-btn" onClick={loadBookings}>
-          <span aria-hidden="true">↻</span>
-          Làm mới
+        <button type="button" className="sbl-refresh" onClick={loadBookings}>
+          ↻ Refresh
         </button>
-      </section>
+      </div>
 
-      {error && <div className="booking-history-message">{error}</div>}
+      {error && <div className="sbl-error">{error}</div>}
+
       {loading ? (
-        <div className="booking-history-empty">Đang tải booking...</div>
+        <div className="sbl-empty">Loading bookings...</div>
       ) : visibleBookings.length === 0 ? (
-        <div className="booking-history-empty">Chưa có booking phù hợp.</div>
+        <div className="sbl-empty">No bookings found.</div>
       ) : (
-        <section className="booking-history-list">
-          {visibleBookings.map((booking) => (
-            <article className="booking-history-card" key={booking.id}>
-              {String(booking.status || '').toUpperCase() === 'NO_SHOW' && (
-                <div className="booking-no-show-seal">NO SHOW</div>
-              )}
-              <div className="booking-history-card-top">
-                <div>
-                  <p>Mã booking</p>
-                  <h2>#{booking.id}</h2>
+        <div className="sbl-list">
+          {visibleBookings.map((booking) => {
+            const bookingStatus = String(booking.status || '').toLowerCase()
+            const cardClass = `sbl-card sbl-card--${bookingStatus.replace('cancelled', 'canceled')}`
+            const isNoShow = bookingStatus === 'no_show'
+            const isCompleted = bookingStatus === 'completed'
+            const isPaid = String(booking.paymentStatus || '').toUpperCase() === 'PAID'
+
+            return (
+              <article className={cardClass} key={booking.id}>
+                {isNoShow && <div className="sbl-no-show-seal">NO SHOW</div>}
+
+                <div className="sbl-card-head">
+                  <div>
+                    <p className="sbl-card-num-label">Booking</p>
+                    <h2 className="sbl-card-num">#{booking.id}</h2>
+                  </div>
+                  <div className="sbl-badges">
+                    {booking.isWalkIn && <span className="sbl-badge sbl-badge--walkin">Walk-in</span>}
+                    <StatusBadge status={booking.status} />
+                    <PaymentBadge status={booking.paymentStatus} />
+                  </div>
                 </div>
-                <div className="booking-history-badges">
-                  {booking.isWalkIn && (
-                    <span className="garage-walk-in">Khách đặt tại garage</span>
+
+                <div className="sbl-info">
+                  <div className="sbl-info-cell">
+                    <span className="sbl-info-label">Customer</span>
+                    <span className="sbl-info-value">
+                      {booking.customerName || (booking.customerId ? `Customer #${booking.customerId}` : 'Walk-in guest')}
+                    </span>
+                  </div>
+                  <div className="sbl-info-cell">
+                    <span className="sbl-info-label">Vehicle</span>
+                    <span className="sbl-info-value">
+                      {booking.vehicleName && booking.licensePlate
+                        ? `${booking.vehicleName} · ${booking.licensePlate}`
+                        : booking.vehicleName || booking.licensePlate || '—'}
+                    </span>
+                  </div>
+                  <div className="sbl-info-cell">
+                    <span className="sbl-info-label">Garage</span>
+                    <span className="sbl-info-value">{booking.garageName || `Garage #${booking.garageId}`}</span>
+                  </div>
+                  <div className="sbl-info-cell">
+                    <span className="sbl-info-label">Package</span>
+                    <span className="sbl-info-value">{booking.servicePackageName || `Package #${booking.servicePackageId}`}</span>
+                  </div>
+                  {Array.isArray(booking.addOnServicePackageNames) && booking.addOnServicePackageNames.length > 0 && (
+                    <div className="sbl-info-cell">
+                      <span className="sbl-info-label">Add-ons</span>
+                      <span className="sbl-info-value">{booking.addOnServicePackageNames.join(', ')}</span>
+                    </div>
                   )}
-                  <span className={`status ${String(booking.status || '').toLowerCase()}`}>{getStatusText(booking.status)}</span>
-                  <span className={`payment ${String(booking.paymentStatus || '').toLowerCase()}`}>
-                    {getPaymentStatusText(booking.paymentStatus)}
-                  </span>
+                  <div className="sbl-info-cell">
+                    <span className="sbl-info-label">Time</span>
+                    <span className="sbl-info-value">{formatDateTime(booking.startTime)}</span>
+                  </div>
+                  {(['CANCELED', 'CANCELLED', 'NO_SHOW'].includes(String(booking.status || '').toUpperCase())) && booking.note && (
+                    <div className="sbl-info-cell sbl-info-cell--full">
+                      <span className="sbl-info-label">
+                        {String(booking.status || '').toUpperCase() === 'NO_SHOW' ? 'No-show note' : 'Cancellation reason'}
+                      </span>
+                      <span className="sbl-info-value">{booking.note}</span>
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div className="booking-history-info">
-                <div>
-                  <span>Khách hàng</span>
-                  {formatNamedValue(booking.customerName, booking.customerId, booking.customerId ? 'Khách hàng' : 'Khách vãng lai')}
-                </div>
-                <div>
-                  <span>Xe</span>
-                  <strong>
-                    {booking.vehicleName && booking.licensePlate
-                      ? `${booking.vehicleName} · ${booking.licensePlate}`
-                      : booking.vehicleName || booking.licensePlate || 'Chưa cập nhật'}
-                  </strong>
-                </div>
-                <div>
-                  <span>Garage</span>
-                  {formatNamedValue(booking.garageName, booking.garageId, 'Garage')}
-                </div>
-                <div>
-                  <span>Gói dịch vụ</span>
-                  {formatNamedValue(booking.servicePackageName, booking.servicePackageId, 'Gói dịch vụ')}
-                </div>
-                {Array.isArray(booking.addOnServicePackageNames) && booking.addOnServicePackageNames.length > 0 && (
+
+                <div className="sbl-total-cell">
                   <div>
-                    <span>Dịch vụ thêm</span>
-                    <strong>{booking.addOnServicePackageNames.join(', ')}</strong>
+                    <span className="sbl-total-amount">{formatMoney(booking.finalPrice)}</span>
+                    <span className="sbl-total-method"> · {getPaymentMethodText(booking)}</span>
                   </div>
-                )}
-                <div><span>Thời gian</span><strong>{formatDateTime(booking.startTime)}</strong></div>
-                {(['CANCELED', 'CANCELLED', 'NO_SHOW'].includes(String(booking.status || '').toUpperCase())) && booking.note && (
-                  <div>
-                    <span>{String(booking.status || '').toUpperCase() === 'NO_SHOW' ? 'Ghi chú no-show' : 'Lý do hủy'}</span>
-                    <strong>{booking.note}</strong>
-                  </div>
-                )}
-                <div className="booking-list-total-card">
-                  <span>Tổng tiền</span>
-                  <div className="booking-list-total-row">
-                    <strong>{formatMoney(booking.finalPrice)}</strong>
-                    <span>Phương thức: {getPaymentMethodText(booking)}</span>
-                  </div>
-                  {String(booking.status || '').toUpperCase() === 'COMPLETED' &&
-                    String(booking.paymentStatus || '').toUpperCase() !== 'PAID' && (
-                      <button
-                        type="button"
-                        className="booking-payos-btn"
-                        disabled={creatingPayOSId === booking.id}
-                        onClick={() => handleCreatePayOS(booking)}
-                      >
-                        Tạo QR PayOS
-                      </button>
-                    )}
+                  {isCompleted && !isPaid && (
+                    <button
+                      type="button"
+                      className="sbl-payos-btn"
+                      disabled={creatingPayOSId === booking.id}
+                      onClick={() => handleCreatePayOS(booking)}
+                    >
+                      {creatingPayOSId === booking.id ? 'Creating...' : 'Create PayOS QR'}
+                    </button>
+                  )}
                 </div>
-              </div>
-              <div className="booking-history-actions">
-                <Link to={`/staff/bookings/${booking.id}`}>Xem chi tiết</Link>
-              </div>
-            </article>
-          ))}
-        </section>
+
+                <div className="sbl-card-foot">
+                  <Link className="sbl-detail-btn" to={`/staff/bookings/${booking.id}`}>
+                    View details
+                  </Link>
+                </div>
+              </article>
+            )
+          })}
+        </div>
       )}
     </div>
   )

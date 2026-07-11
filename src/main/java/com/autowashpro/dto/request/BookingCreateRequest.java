@@ -28,6 +28,8 @@ public class BookingCreateRequest {
 
     private Integer usedPoints = 0;
 
+    private String paymentMethod;
+
     private String note;
 
 }

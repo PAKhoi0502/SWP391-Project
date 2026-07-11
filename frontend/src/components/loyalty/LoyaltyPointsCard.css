@@ -1,36 +1,24 @@
-.lpc-root {
-  background: linear-gradient(135deg, #111116 0%, #1a1a24 100%);
-  border: 1px solid rgba(250, 204, 21, 0.22);
-  border-radius: 20px;
-  box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.38),
-    0 0 0 1px rgba(250, 204, 21, 0.06) inset;
-  color: #f8fafc;
-  padding: 24px;
-  position: relative;
-  overflow: hidden;
-}
+/* ═══════════════════════════════════════════
+   LoyaltyPointsCard — cream / navy / cyan
+   ═══════════════════════════════════════════ */
 
-.lpc-root::before {
-  content: '';
-  position: absolute;
-  top: -40px;
-  right: -40px;
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(250, 204, 21, 0.12), transparent 70%);
-  pointer-events: none;
+.lpc-root {
+  background: #FFFFFF;
+  border: 1px solid rgba(23, 32, 51, 0.08);
+  border-radius: 20px;
+  box-shadow: 0 2px 16px rgba(23, 32, 51, 0.06);
+  padding: 24px 28px;
+  position: relative;
 }
 
 .lpc-loading,
 .lpc-error {
-  color: rgba(255, 255, 255, 0.5);
+  color: #667085;
   font-size: 13px;
   padding: 8px 0;
 }
 
-/* Header */
+/* ── Section label + tier badge row ── */
 .lpc-header {
   display: flex;
   align-items: flex-start;
@@ -44,7 +32,7 @@
   font-weight: 900;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #facc15;
+  color: #2EC2F7;
   margin: 0 0 6px;
 }
 
@@ -52,20 +40,43 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(250, 204, 21, 0.12);
-  border: 1px solid rgba(250, 204, 21, 0.28);
+  background: rgba(46, 194, 247, 0.08);
+  border: 1px solid rgba(46, 194, 247, 0.28);
   border-radius: 999px;
   padding: 4px 12px;
   font-size: 13px;
   font-weight: 800;
-  color: #facc15;
+  color: #0879B8;
 }
 
 .lpc-tier-icon {
-  font-size: 15px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
-/* Points */
+/* ── History button ── */
+.lpc-history-btn {
+  background: rgba(46, 194, 247, 0.07);
+  border: 1px solid rgba(46, 194, 247, 0.22);
+  border-radius: 8px;
+  color: #0879B8;
+  cursor: pointer;
+  flex-shrink: 0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.lpc-history-btn:hover {
+  background: rgba(46, 194, 247, 0.14);
+  border-color: rgba(46, 194, 247, 0.38);
+}
+
+/* ── Points grid ── */
 .lpc-points-row {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -74,8 +85,8 @@
 }
 
 .lpc-point-block {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #F8F9FB;
+  border: 1px solid rgba(23, 32, 51, 0.07);
   border-radius: 12px;
   padding: 12px 14px;
 }
@@ -84,7 +95,7 @@
   display: block;
   font-size: 11px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.48);
+  color: #94a3b8;
   margin-bottom: 4px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -93,20 +104,20 @@
 .lpc-point-block-value {
   font-size: 20px;
   font-weight: 900;
-  color: #facc15;
+  color: #172033;
 }
 
 .lpc-point-block-value.dim {
-  color: rgba(255, 255, 255, 0.55);
+  color: #94a3b8;
   font-size: 17px;
 }
 
-/* Stats */
+/* ── Stats row ── */
 .lpc-stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  margin-bottom: 22px;
+  margin-bottom: 20px;
 }
 
 .lpc-stat {
@@ -117,7 +128,7 @@
 
 .lpc-stat-label {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.42);
+  color: #94a3b8;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -126,57 +137,71 @@
 .lpc-stat-value {
   font-size: 14px;
   font-weight: 800;
-  color: #f8fafc;
+  color: #172033;
 }
 
-/* History button — sits in the header top-right */
-.lpc-history-btn {
-  background: rgba(250, 204, 21, 0.07);
-  border: 1px solid rgba(250, 204, 21, 0.2);
-  border-radius: 8px;
-  color: rgba(250, 204, 21, 0.85);
-  cursor: pointer;
-  flex-shrink: 0;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 6px 12px;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-  white-space: nowrap;
-}
-
-.lpc-history-btn:hover {
-  background: rgba(250, 204, 21, 0.14);
-  border-color: rgba(250, 204, 21, 0.38);
-  color: #facc15;
-}
-
-/* Divider */
+/* ── Divider ── */
 .lpc-divider {
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  margin: 0 0 18px;
+  border-top: 1px solid rgba(23, 32, 51, 0.07);
+  margin: 0 0 0;
 }
 
-/* Tier rules */
+/* ── Collapsible tier rules toggle ── */
+.lpc-tiers-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  padding: 14px 0 0;
+  font: inherit;
+  gap: 8px;
+}
+
+.lpc-tiers-toggle:hover .lpc-tiers-title {
+  color: #667085;
+}
+
 .lpc-tiers-title {
   font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.1em;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
-  margin: 0 0 12px;
+  color: #94a3b8;
+  margin: 0;
+  transition: color 0.12s;
 }
 
+.lpc-tiers-chevron {
+  color: #94a3b8;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.lpc-tiers-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* ── Tier list (shown when expanded) ── */
 .lpc-tier-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-top: 12px;
+  animation: lpc-expand 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes lpc-expand {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0);    }
 }
 
 .lpc-tier-item {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: #F8F9FB;
+  border: 1px solid rgba(23, 32, 51, 0.07);
   border-radius: 12px;
   padding: 12px 14px;
   display: flex;
@@ -185,8 +210,8 @@
 }
 
 .lpc-tier-item.current {
-  border-color: rgba(250, 204, 21, 0.28);
-  background: rgba(250, 204, 21, 0.05);
+  border-color: rgba(46, 194, 247, 0.28);
+  background: rgba(46, 194, 247, 0.04);
 }
 
 .lpc-tier-item-header {
@@ -198,20 +223,20 @@
 
 .lpc-tier-item-name {
   font-size: 13px;
-  font-weight: 900;
-  color: #f8fafc;
+  font-weight: 800;
+  color: #172033;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
 .lpc-tier-item-name.current-label {
-  color: #facc15;
+  color: #0879B8;
 }
 
 .lpc-tier-current-chip {
-  background: #facc15;
-  color: #111116;
+  background: #2EC2F7;
+  color: #FFFFFF;
   font-size: 10px;
   font-weight: 900;
   padding: 2px 8px;
@@ -222,7 +247,7 @@
 .lpc-tier-multiplier {
   font-size: 12px;
   font-weight: 700;
-  color: rgba(250, 204, 21, 0.8);
+  color: #0879B8;
 }
 
 .lpc-tier-conditions {
@@ -233,18 +258,15 @@
 
 .lpc-tier-condition {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.05);
+  color: #667085;
+  background: rgba(23, 32, 51, 0.05);
   border-radius: 6px;
   padding: 2px 8px;
 }
 
+/* ── Responsive ── */
 @media (max-width: 480px) {
-  .lpc-points-row {
-    grid-template-columns: 1fr;
-  }
-
-  .lpc-stats {
-    grid-template-columns: 1fr;
-  }
+  .lpc-points-row { grid-template-columns: 1fr; }
+  .lpc-stats      { grid-template-columns: 1fr; }
+  .lpc-root       { padding: 20px; }
 }

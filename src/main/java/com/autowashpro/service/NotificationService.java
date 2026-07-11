@@ -10,9 +10,13 @@ public interface NotificationService {
 
     void notifyBookingConfirmed(Long bookingId);
 
+    void notifyBookingCanceled(Long bookingId);
+
     void notifyPaymentConfirmed(Long bookingId);
 
     void notifyRewardEarned(Long bookingId);
+
+    void notifyPaymentAndReward(Long bookingId);
 
     void notifyWaitlistOffered(Long waitlistId);
 
