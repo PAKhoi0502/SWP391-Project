@@ -4,11 +4,11 @@ import './NoShowBookingModal.css'
 const formatDateTime = (value) => {
   if (!value) return 'Chưa cập nhật'
   try {
-    return new Intl.DateTimeFormat('vi-VN', {
+    return new Intl.DateTimeFormat('en-US', {
       hour: '2-digit',
       minute: '2-digit',
+      month: 'short',
       day: '2-digit',
-      month: '2-digit',
       year: 'numeric',
     }).format(new Date(value))
   } catch {
@@ -40,16 +40,16 @@ export default function NoShowBookingModal({
   }
 
   const handleConfirm = () => {
-    if (!reason.trim() || loading) return
-    onConfirm(reason.trim())
+    if (loading) return
+    onConfirm((reason.trim() || 'Customer did not arrive at the appointment time'))
   }
 
   const vehicleMain =
-    [booking?.licensePlate, booking?.vehicleName].filter(Boolean).join(' · ') || 'Chưa cập nhật'
+    [booking?.licensePlate, booking?.vehicleName].filter(Boolean).join(' · ') || '—'
   const vehicleTypeLabel = booking?.vehicleType
     ? String(booking.vehicleType).toUpperCase().includes('BIKE')
-      ? '#Xe máy'
-      : '#Ô tô'
+      ? '#Motorbike'
+      : '#Car'
     : null
   const confirmDisabled = loading
 
@@ -63,23 +63,23 @@ export default function NoShowBookingModal({
       >
         <div className="nsm-header">
           <div className="nsm-icon" aria-hidden="true">✕</div>
-          <h2 className="nsm-title">Xác nhận no-show</h2>
-          <p className="nsm-subtitle">Khách không có mặt tại giờ hẹn đã đặt.</p>
+          <h2 className="nsm-title">Mark as no-show</h2>
+          <p className="nsm-subtitle">Customer did not appear at their scheduled appointment time.</p>
         </div>
 
         <div className="nsm-info">
           <div className="nsm-info-row">
-            <span className="nsm-info-label">Mã booking</span>
+            <span className="nsm-info-label">Booking</span>
             <span className="nsm-info-value">#{bookingId}</span>
           </div>
           {booking?.customerName && (
             <div className="nsm-info-row">
-              <span className="nsm-info-label">Khách hàng</span>
+              <span className="nsm-info-label">Customer</span>
               <span className="nsm-info-value">{booking.customerName}</span>
             </div>
           )}
           <div className="nsm-info-row">
-            <span className="nsm-info-label">Xe</span>
+            <span className="nsm-info-label">Vehicle</span>
             <span className="nsm-info-value">
               {vehicleMain}
               {vehicleTypeLabel && (
@@ -95,36 +95,36 @@ export default function NoShowBookingModal({
           )}
           {booking?.servicePackageName && (
             <div className="nsm-info-row">
-              <span className="nsm-info-label">Gói dịch vụ</span>
+              <span className="nsm-info-label">Package</span>
               <span className="nsm-info-value">{booking.servicePackageName}</span>
             </div>
           )}
           {booking?.startTime && (
             <div className="nsm-info-row">
-              <span className="nsm-info-label">Giờ hẹn</span>
+              <span className="nsm-info-label">Appointment</span>
               <span className="nsm-info-value">{formatDateTime(booking.startTime)}</span>
             </div>
           )}
           <div className="nsm-info-row">
-            <span className="nsm-info-label">Trạng thái</span>
-            <span className="nsm-info-value nsm-status-badge">Đã xác nhận</span>
+            <span className="nsm-info-label">Status</span>
+            <span className="nsm-info-value nsm-status-badge">Confirmed</span>
           </div>
         </div>
 
         <div className="nsm-body">
           <label className="nsm-label" htmlFor="no-show-note">
-            Ghi chú nội bộ <span className="nsm-optional">(tùy chọn)</span>
+            Internal note <span className="nsm-optional">(optional)</span>
           </label>
           <textarea
             id="no-show-note"
             className="nsm-textarea"
-            placeholder="Ví dụ: Gọi 2 lần không nghe máy, quá giờ hẹn 15 phút..."
+            placeholder="e.g. Called twice, no answer. Waited 15 min past appointment..."
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             disabled={loading}
             rows={3}
           />
-          <p className="nsm-hint">Ghi chú giúp quản lý biết vì sao staff đánh dấu no-show.</p>
+          <p className="nsm-hint">This note helps management understand why the no-show was flagged.</p>
         </div>
 
         {error && <p className="nsm-error">{error}</p>}
@@ -136,7 +136,7 @@ export default function NoShowBookingModal({
             onClick={handleClose}
             disabled={loading}
           >
-            Hủy
+            Cancel
           </button>
           <button
             type="button"
@@ -144,7 +144,7 @@ export default function NoShowBookingModal({
             onClick={handleConfirm}
             disabled={confirmDisabled}
           >
-            {loading ? 'Đang xử lý...' : 'Xác nhận no-show'}
+            {loading ? 'Processing...' : 'Confirm no-show'}
           </button>
         </div>
       </div>

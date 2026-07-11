@@ -9,9 +9,9 @@ const formatMoney = (value) =>
 
 const getMethodLabel = (value) => {
   const v = String(value || '').toUpperCase()
-  if (v === 'CASH') return 'Tiền mặt'
-  if (v === 'BANK_TRANSFER' || v === 'PAYOS') return 'Chuyển khoản'
-  return 'Chưa cập nhật'
+  if (v === 'CASH') return 'Cash'
+  if (v === 'BANK_TRANSFER' || v === 'PAYOS') return 'Bank transfer'
+  return '—'
 }
 
 const isBankMethod = (value) => {
@@ -44,11 +44,11 @@ export default function PaymentCollectionModal({
   const anyLoading = cashLoading || payosLoading || methodLoading
 
   const vehicleMain =
-    [booking?.licensePlate, booking?.vehicleName].filter(Boolean).join(' · ') || 'Chưa cập nhật'
+    [booking?.licensePlate, booking?.vehicleName].filter(Boolean).join(' · ') || '—'
   const vehicleTypeLabel = booking?.vehicleType
     ? String(booking.vehicleType).toUpperCase().includes('BIKE')
-      ? '#Xe máy'
-      : '#Ô tô'
+      ? '#Motorbike'
+      : '#Car'
     : null
 
   const handleClose = () => {
@@ -60,7 +60,7 @@ export default function PaymentCollectionModal({
   }
 
   const handleSelectMethod = async (newMethod) => {
-    if (newMethod === paymentMethod || newMethod === 'PAYOS' && isBankMethod(paymentMethod)) {
+    if (newMethod === paymentMethod || (newMethod === 'PAYOS' && isBankMethod(paymentMethod))) {
       setChangingMethod(false)
       return
     }
@@ -71,7 +71,7 @@ export default function PaymentCollectionModal({
       setChangingMethod(false)
       if (onMethodUpdated) onMethodUpdated(newMethod)
     } catch (err) {
-      setMethodError(err?.response?.data?.message || err?.message || 'Cập nhật phương thức thất bại.')
+      setMethodError(err?.response?.data?.message || err?.message || 'Failed to update payment method.')
     } finally {
       setMethodLoading(false)
     }
@@ -93,10 +93,10 @@ export default function PaymentCollectionModal({
                 <path className="pcm-checkmark-check" fill="none" d="M14 27l8 8 16-16" />
               </svg>
             </div>
-            <h2 className="pcm-success-title">Thanh toán thành công</h2>
-            {bookingId && <p className="pcm-success-sub">Booking #{bookingId}</p>}
+            <h2 className="pcm-success-title">Payment complete</h2>
+            {bookingId && <p className="pcm-success-sub">Booking #{bookingId} has been marked as paid.</p>}
             <button type="button" className="pcm-btn pcm-btn--close-success" onClick={handleClose}>
-              Đóng
+              Close
             </button>
           </div>
         </div>
@@ -108,23 +108,24 @@ export default function PaymentCollectionModal({
     <div className="pcm-overlay" onClick={handleClose}>
       <div className="pcm-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
         <div className="pcm-header">
-          <h2 className="pcm-title">Phiếu thu dịch vụ</h2>
-          <p className="pcm-subtitle">Xác nhận thanh toán sau khi hoàn thành dịch vụ.</p>
+          <div className="pcm-icon">₫</div>
+          <h2 className="pcm-title">Service receipt</h2>
+          <p className="pcm-subtitle">Confirm payment after service completion.</p>
         </div>
 
         <div className="pcm-info">
           <div className="pcm-info-row">
-            <span className="pcm-info-label">Mã booking</span>
+            <span className="pcm-info-label">Booking</span>
             <span className="pcm-info-value">#{bookingId}</span>
           </div>
           {booking?.customerName && (
             <div className="pcm-info-row">
-              <span className="pcm-info-label">Khách hàng</span>
+              <span className="pcm-info-label">Customer</span>
               <span className="pcm-info-value">{booking.customerName}</span>
             </div>
           )}
           <div className="pcm-info-row">
-            <span className="pcm-info-label">Xe</span>
+            <span className="pcm-info-label">Vehicle</span>
             <span className="pcm-info-value">
               {vehicleMain}
               {vehicleTypeLabel && <small className="pcm-vehicle-type"> {vehicleTypeLabel}</small>}
@@ -138,21 +139,21 @@ export default function PaymentCollectionModal({
           )}
           {booking?.servicePackageName && (
             <div className="pcm-info-row">
-              <span className="pcm-info-label">Gói dịch vụ</span>
+              <span className="pcm-info-label">Package</span>
               <span className="pcm-info-value">{booking.servicePackageName}</span>
             </div>
           )}
           <div className="pcm-info-row pcm-info-row--total">
-            <span className="pcm-info-label">Tổng tiền</span>
+            <span className="pcm-info-label">Total</span>
             <span className="pcm-info-value pcm-total-amount">{formatMoney(booking?.finalPrice)}</span>
           </div>
           <div className="pcm-info-row pcm-info-row--method">
-            <span className="pcm-info-label">Phương thức</span>
+            <span className="pcm-info-label">Method</span>
             <span className="pcm-method-row">
               {!changingMethod ? (
                 <>
                   <span className="pcm-info-value">
-                    {methodLoading ? 'Đang cập nhật...' : getMethodLabel(paymentMethod)}
+                    {methodLoading ? 'Updating...' : getMethodLabel(paymentMethod)}
                   </span>
                   <button
                     type="button"
@@ -160,7 +161,7 @@ export default function PaymentCollectionModal({
                     onClick={() => { setMethodError(''); setChangingMethod(true) }}
                     disabled={anyLoading}
                   >
-                    Đổi
+                    Change
                   </button>
                 </>
               ) : (
@@ -171,7 +172,7 @@ export default function PaymentCollectionModal({
                     onClick={() => handleSelectMethod('CASH')}
                     disabled={anyLoading}
                   >
-                    Tiền mặt
+                    Cash
                   </button>
                   <button
                     type="button"
@@ -179,7 +180,7 @@ export default function PaymentCollectionModal({
                     onClick={() => handleSelectMethod('PAYOS')}
                     disabled={anyLoading}
                   >
-                    Chuyển khoản
+                    Bank transfer
                   </button>
                   <button
                     type="button"
@@ -201,12 +202,12 @@ export default function PaymentCollectionModal({
         {!showBank && (
           <div className="pcm-cash-note">
             <label className="pcm-cash-note-label" htmlFor="pcm-note">
-              Ghi chú thanh toán <span className="pcm-cash-note-optional">(tuỳ chọn)</span>
+              Payment note <span className="pcm-cash-note-optional">(optional)</span>
             </label>
             <textarea
               id="pcm-note"
               className="pcm-cash-note-textarea"
-              placeholder="Ví dụ: Đã thu đủ tiền mặt, hoá đơn viết tay..."
+              placeholder="e.g. Cash collected in full, handwritten receipt issued..."
               value={cashNote}
               onChange={(e) => setCashNote(e.target.value)}
               disabled={anyLoading}
@@ -222,7 +223,7 @@ export default function PaymentCollectionModal({
             onClick={onPayOS}
             disabled={anyLoading}
           >
-            {payosLoading ? 'Đang tạo thanh toán...' : 'Thanh toán'}
+            {payosLoading ? 'Creating payment...' : 'Pay via PayOS'}
           </button>
         ) : (
           <button
@@ -231,7 +232,7 @@ export default function PaymentCollectionModal({
             onClick={() => onCashPay(paymentMethod || 'CASH', cashNote.trim())}
             disabled={anyLoading}
           >
-            {cashLoading ? 'Đang xác nhận...' : 'Xác nhận đã thu tiền'}
+            {cashLoading ? 'Confirming...' : 'Confirm cash collected'}
           </button>
         )}
 
@@ -241,7 +242,7 @@ export default function PaymentCollectionModal({
           onClick={handleClose}
           disabled={anyLoading}
         >
-          Để sau
+          Later
         </button>
       </div>
     </div>

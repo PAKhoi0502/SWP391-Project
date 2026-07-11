@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
+import { useRefreshBookingCount } from '../../contexts/StaffBookingCountContext'
 import { bookingApi } from '../../api/bookingApi'
 import { vehicleInspectionApi } from '../../api/vehicleInspectionApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
@@ -18,7 +19,7 @@ import PayOSQrModal from '../../components/Booking/PayOSQrModal'
 import PaymentCollectionModal from '../../components/Booking/PaymentCollectionModal'
 import ServiceStepsProgress from '../../components/Booking/ServiceStepsProgress'
 import StartServiceModal from '../../components/Booking/StartServiceModal'
-import './BookingHistoryPage.css'
+import './BookingDetailPage.css'
 
 const BOOKING_CACHE_PREFIX = 'booking-detail-cache-'
 const PAYMENT_METHOD_CACHE_PREFIX = 'booking-payment-method-'
@@ -47,75 +48,75 @@ const resolveAddOnServicePackageNames = async (addOnIds) => {
 }
 
 const TEXT = {
-  notUpdated: 'Ch\u01b0a c\u1eadp nh\u1eadt',
-  subtitle: 'Th\u00f4ng tin booking, thanh to\u00e1n v\u00e0 ti\u1ebfn tr\u00ecnh x\u1eed l\u00fd.',
-  back: 'Quay l\u1ea1i danh s\u00e1ch',
-  loading: '\u0110ang t\u1ea3i chi ti\u1ebft booking...',
-  notFound: 'Kh\u00f4ng t\u00ecm th\u1ea5y booking trong danh s\u00e1ch c\u1ee7a t\u00e0i kho\u1ea3n n\u00e0y.',
-  loadError: 'Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c chi ti\u1ebft booking.',
-  success: 'th\u00e0nh c\u00f4ng.',
-  failed: 'th\u1ea5t b\u1ea1i.',
-  code: 'M\u00e3 booking',
-  customer: 'Kh\u00e1ch h\u00e0ng',
-  guest: 'Kh\u00e1ch v\u00e3ng lai',
-  vehicle: 'Xe',
-  servicePackage: 'G\u00f3i d\u1ecbch v\u1ee5',
-  addOnServicePackages: 'D\u1ecbch v\u1ee5 th\u00eam',
-  total: 'T\u1ed5ng ti\u1ec1n',
-  createPayOS: 'T\u1ea1o QR PayOS',
-  method: 'Ph\u01b0\u01a1ng th\u1ee9c',
-  cash: 'Ti\u1ec1n m\u1eb7t',
-  bankTransfer: 'Chuy\u1ec3n kho\u1ea3n',
-  openPayment: 'M\u1edf trang thanh to\u00e1n',
-  checkCheckout: 'Ki\u1ec3m tra checkoutUrl',
-  start: 'B\u1eaft \u0111\u1ea7u',
-  end: 'K\u1ebft th\u00fac',
-  paidAt: 'Thanh to\u00e1n l\u00fac',
-  chooseCheckIn: 'Ch\u1ecdn gi\u1edd check-in',
-  chooseStatus: 'Ch\u1ecdn tr\u1ea1ng th\u00e1i booking',
-  notStarted: 'Ch\u01b0a th\u1ef1c hi\u1ec7n',
-  checkedIn: '\u0110\u00e3 check-in',
-  inProgress: '\u0110ang th\u1ef1c hi\u1ec7n',
-  completed: '\u0110\u00e3 ho\u00e0n th\u00e0nh',
-  cancel: 'H\u1ee7y booking',
-  update: 'C\u1eadp nh\u1eadt',
-  confirmCancel: 'B\u1ea1n c\u00f3 ch\u1eafc mu\u1ed1n h\u1ee7y booking',
-  cancelReason: 'L\u00fd do h\u1ee7y booking',
-  confirmNoShow: '\u0110\u00e1nh d\u1ea5u booking n\u00e0y l\u00e0 kh\u00e1ch kh\u00f4ng \u0111\u1ebfn?',
-  noShowReason: 'L\u00fd do no-show',
-  noResetApi: 'Backend hi\u1ec7n ch\u01b0a c\u00f3 API \u0111\u1ec3 \u0111\u1eb7t l\u1ea1i tr\u1ea1ng th\u00e1i Ch\u01b0a th\u1ef1c hi\u1ec7n.',
-  payosCompletedOnly: 'Ch\u1ec9 c\u00f3 th\u1ec3 t\u1ea1o QR PayOS cho booking \u0111\u00e3 ho\u00e0n th\u00e0nh.',
-  payosBankOnly: 'QR PayOS ch\u1ec9 d\u00e0nh cho ph\u01b0\u01a1ng th\u1ee9c chuy\u1ec3n kho\u1ea3n.',
-  closedBooking: 'Booking \u0111\u00e3 \u0111\u00f3ng n\u00ean kh\u00f4ng th\u1ec3 c\u1eadp nh\u1eadt check-in ho\u1eb7c status.',
-  staffProfileMissing: 'T\u00e0i kho\u1ea3n n\u00e0y ch\u01b0a c\u00f3 h\u1ed3 s\u01a1 nh\u00e2n vi\u00ean (StaffProfile), n\u00ean backend kh\u00f4ng cho c\u1eadp nh\u1eadt booking. H\u00e3y g\u1eafn StaffProfile v\u00e0 garage cho user n\u00e0y.',
-  updateBooking: 'C\u1eadp nh\u1eadt booking',
-  checkInBooking: 'Check-in booking',
-  confirmCheckIn: 'X\u00e1c nh\u1eadn check-in booking n\u00e0y?',
-  checkInNote: 'Ghi ch\u00fa check-in (t\u00f9y ch\u1ecdn)',
-  checkInSuccess: 'Check-in booking th\u00e0nh c\u00f4ng.',
-  cancelBooking: 'H\u1ee7y booking',
-  markNoShow: '\u0110\u00e1nh d\u1ea5u no-show',
-  createQr: 'T\u1ea1o QR PayOS',
-  timeline: 'Ti\u1ebfn tr\u00ecnh booking',
-  serviceSteps: 'C\u00e1c b\u01b0\u1edbc d\u1ecbch v\u1ee5',
-  serviceStepsEmpty: 'G\u00f3i d\u1ecbch v\u1ee5 ch\u01b0a c\u00f3 m\u00f4 t\u1ea3 b\u01b0\u1edbc x\u1eed l\u00fd.',
-  booked: '\u0110\u1eb7t l\u1ecbch',
-  paid: '\u0110\u00e3 thanh to\u00e1n',
-  startService: 'B\u1eaft \u0111\u1ea7u d\u1ecbch v\u1ee5',
-  startServiceSuccess: 'B\u1eaft \u0111\u1ea7u d\u1ecbch v\u1ee5 th\u00e0nh c\u00f4ng.',
-  completeService: 'Ho\u00e0n th\u00e0nh d\u1ecbch v\u1ee5',
-  completeServiceSuccess: 'D\u1ecbch v\u1ee5 \u0111\u00e3 ho\u00e0n th\u00e0nh.',
-  resources: 'T\u00e0i nguy\u00ean \u0111\u01b0\u1ee3c g\u00e1n',
-  washBay: 'Bay r\u1eeda',
-  washBayType: 'Lo\u1ea1i bay',
-  careStaff: 'Nh\u00e2n vi\u00ean ph\u1ee5 tr\u00e1ch',
-  careStaffNone: 'Kh\u00f4ng y\u00eau c\u1ea7u nh\u00e2n vi\u00ean ph\u1ee5 tr\u00e1ch',
-  careStaffPending: 'Ch\u01b0a \u0111\u01b0\u1ee3c g\u00e1n',
+  notUpdated: '\u2014',
+  subtitle: 'Booking info, payment and service progress.',
+  back: 'Back to list',
+  loading: 'Loading booking...',
+  notFound: 'Booking not found in this account.',
+  loadError: 'Failed to load booking details.',
+  success: 'successful.',
+  failed: 'failed.',
+  code: 'Booking',
+  customer: 'Customer',
+  guest: 'Walk-in guest',
+  vehicle: 'Vehicle',
+  servicePackage: 'Package',
+  addOnServicePackages: 'Add-ons',
+  total: 'Total',
+  createPayOS: 'Create PayOS QR',
+  method: 'Payment method',
+  cash: 'Cash',
+  bankTransfer: 'Bank transfer',
+  openPayment: 'Open payment page',
+  checkCheckout: 'Check checkout URL',
+  start: 'Start',
+  end: 'End',
+  paidAt: 'Paid at',
+  chooseCheckIn: 'Select check-in time',
+  chooseStatus: 'Select booking status',
+  notStarted: 'Confirmed',
+  checkedIn: 'Checked in',
+  inProgress: 'In progress',
+  completed: 'Completed',
+  cancel: 'Cancel booking',
+  update: 'Update',
+  confirmCancel: 'Are you sure you want to cancel booking',
+  cancelReason: 'Cancellation reason',
+  confirmNoShow: 'Mark this booking as no-show?',
+  noShowReason: 'No-show reason',
+  noResetApi: 'The backend does not have an API to reset the status to Confirmed.',
+  payosCompletedOnly: 'PayOS QR can only be created for completed bookings.',
+  payosBankOnly: 'PayOS QR is only for bank transfer payment method.',
+  closedBooking: 'This booking is closed and cannot be updated.',
+  staffProfileMissing: 'This account has no staff profile. Please assign a StaffProfile and garage to this user.',
+  updateBooking: 'Update booking',
+  checkInBooking: 'Check in',
+  confirmCheckIn: 'Confirm check-in for this booking?',
+  checkInNote: 'Check-in note (optional)',
+  checkInSuccess: 'Check-in successful.',
+  cancelBooking: 'Cancel booking',
+  markNoShow: 'Mark no-show',
+  createQr: 'Create PayOS QR',
+  timeline: 'Booking timeline',
+  serviceSteps: 'Service steps',
+  serviceStepsEmpty: 'No service steps defined for this package.',
+  booked: 'Booked',
+  paid: 'Paid',
+  startService: 'Start service',
+  startServiceSuccess: 'Service started.',
+  completeService: 'Complete service',
+  completeServiceSuccess: 'Service completed.',
+  resources: 'Assigned resources',
+  washBay: 'Wash bay',
+  washBayType: 'Bay type',
+  careStaff: 'Care staff',
+  careStaffNone: 'No care staff required',
+  careStaffPending: 'Not yet assigned',
 }
 
 const INSPECTION_LABELS = {
-  BEFORE_WASH: 'Tr\u01b0\u1edbc khi s\u1eed d\u1ee5ng d\u1ecbch v\u1ee5',
-  AFTER_WASH: 'Sau khi s\u1eed d\u1ee5ng d\u1ecbch v\u1ee5',
+  BEFORE_WASH: 'Before service',
+  AFTER_WASH: 'After service',
 }
 
 const blankInspectionForm = {
@@ -252,7 +253,7 @@ const getStatusText = (status) => {
   if (value === 'CHECKED_IN') return TEXT.checkedIn
   if (value === 'IN_PROGRESS') return TEXT.inProgress
   if (value === 'COMPLETED') return TEXT.completed
-  if (value === 'CANCELED' || value === 'CANCELLED') return '\u0110\u00e3 h\u1ee7y'
+  if (value === 'CANCELED' || value === 'CANCELLED') return 'Canceled'
   if (value === 'NO_SHOW') return 'No-show'
 
   return status || 'N/A'
@@ -261,12 +262,12 @@ const getStatusText = (status) => {
 const getPaymentStatusText = (status) => {
   const value = String(status || '').toUpperCase()
 
-  if (value === 'PAID') return '\u0110\u00e3 thanh to\u00e1n'
-  if (value === 'UNPAID') return 'Ch\u01b0a thanh to\u00e1n'
-  if (value === 'PENDING') return '\u0110ang ch\u1edd'
-  if (value === 'CANCELED' || value === 'CANCELLED') return '\u0110\u00e3 h\u1ee7y'
+  if (value === 'PAID') return 'Paid'
+  if (value === 'UNPAID') return 'Unpaid'
+  if (value === 'PENDING') return 'Pending'
+  if (value === 'CANCELED' || value === 'CANCELLED') return 'Canceled'
 
-  return status || 'Ch\u01b0a thanh to\u00e1n'
+  return status || 'Unpaid'
 }
 
 const getActionErrorMessage = (err) => {
@@ -281,27 +282,27 @@ const getActionErrorMessage = (err) => {
 
 const getStartServiceErrorMessage = (err) => {
   const msg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
-  if (msg.includes('wash bay')) return 'Không còn wash bay trống.'
-  if (msg.includes('care staff') || msg.includes('not enough staff')) return 'Không đủ nhân viên phụ trách.'
+  if (msg.includes('wash bay')) return 'No wash bays available.'
+  if (msg.includes('care staff') || msg.includes('not enough staff')) return 'Not enough care staff available.'
   if (msg.includes('checked-in') || msg.includes('check-in') || msg.includes('only checked')) {
-    return 'Chỉ booking đã check-in mới có thể bắt đầu dịch vụ.'
+    return 'Only checked-in bookings can start service.'
   }
-  return getActionErrorMessage(err) || 'Bắt đầu dịch vụ thất bại.'
+  return getActionErrorMessage(err) || 'Failed to start service.'
 }
 
 const getCompleteServiceErrorMessage = (err) => {
   const msg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
   if (msg.includes('in_progress') || msg.includes('only in_progress') || msg.includes('only in progress')) {
-    return 'Chỉ booking đang thực hiện mới có thể hoàn thành dịch vụ.'
+    return 'Only in-progress bookings can be completed.'
   }
   if (msg.includes('step') && (msg.includes('not completed') || msg.includes('incomplete') || msg.includes('not all'))) {
-    return 'Vui lòng hoàn thành tất cả bước dịch vụ trước khi hoàn thành booking.'
+    return 'Please complete all service steps before finishing the booking.'
   }
-  if (msg.includes('not found') || msg.includes('404')) return 'Không tìm thấy booking.'
+  if (msg.includes('not found') || msg.includes('404')) return 'Booking not found.'
   if (msg.includes('unauthorized') || msg.includes('forbidden') || msg.includes('403')) {
-    return 'Bạn không có quyền thực hiện thao tác này.'
+    return 'You do not have permission to perform this action.'
   }
-  return err?.response?.data?.message || err?.message || 'Hoàn thành dịch vụ thất bại.'
+  return err?.response?.data?.message || err?.message || 'Failed to complete service.'
 }
 
 const isStaffProfileError = (err) => {
@@ -391,7 +392,7 @@ const formatWashBayResource = (payload, id) => {
 
 const formatCareStaffResource = (payload, id) => {
   const staff = unwrapResourcePayload(payload)
-  const name = staff?.userFullName || staff?.fullName || staff?.name || staff?.staffCode || 'Nh\u00e2n vi\u00ean'
+  const name = staff?.userFullName || staff?.fullName || staff?.name || staff?.staffCode || 'Staff'
   const code = staff?.staffCode && staff?.staffCode !== name ? ` - ${staff.staffCode}` : ''
 
   return `${name}${code} #${staff?.id || id}`
@@ -422,7 +423,7 @@ const resolveAssignedResources = async (source = {}) => {
     resources.careStaffLabels = staffResults.map((result, index) =>
       result.status === 'fulfilled'
         ? formatCareStaffResource(result.value, assignedCareStaffIds[index])
-        : `Nh\u00e2n vi\u00ean #${assignedCareStaffIds[index]}`,
+        : `Staff #${assignedCareStaffIds[index]}`,
     )
   }
 
@@ -454,7 +455,7 @@ const normalizeServiceSteps = (payload) => {
         return {
           title:
             getFirstValue(item, ['title', 'name', 'stepName', 'serviceName', 'description', 'note']) ||
-            `B\u01b0\u1edbc ${index + 1}`,
+            `Step ${index + 1}`,
           description: getFirstValue(item, ['detail', 'content', 'note']),
           order: Number(getFirstValue(item, ['stepOrder', 'order', 'sequence'])) || index + 1,
         }
@@ -584,6 +585,7 @@ const getCustomerBookingNumber = (items, bookingId) => {
 function BookingDetailPage() {
   const { id } = useParams()
   const location = useLocation()
+  const refreshBookingCount = useRefreshBookingCount()
   const [booking, setBooking] = useState(null)
   const [selectedStatus, setSelectedStatus] = useState('CONFIRMED')
   const [loading, setLoading] = useState(true)
@@ -955,6 +957,7 @@ function BookingDetailPage() {
             setPayosTransaction((prev) => ({ ...prev, ...tx }))
             setPayosSuccess(true)
             loadDetail()
+            refreshBookingCount()
           }
         } else {
           const txs = await bookingApi.getPaymentTransactions(id)
@@ -963,6 +966,7 @@ function BookingDetailPage() {
             setPayosTransaction((prev) => ({ ...prev, ...paidTx }))
             setPayosSuccess(true)
             loadDetail()
+            refreshBookingCount()
           }
         }
       } catch {
@@ -977,7 +981,7 @@ function BookingDetailPage() {
   const runAction = async (label, action) => {
     try {
       setActionLoading(true)
-      setActionMessage(`${label} đang xử lý...`)
+      setActionMessage(`${label} processing...`)
       const result = await action()
       if (result?.id) {
         writeCachedBooking(result.id, result)
@@ -1105,12 +1109,12 @@ function BookingDetailPage() {
             (tx) => String(tx?.bookingId) === String(id) && tx?.type === 'REFUND',
           )
           if (refundTx) {
-            setActionMessage(`Booking đã hủy. Đã hoàn ${refundTx.points} điểm vào tài khoản của bạn.`)
+            setActionMessage(`Booking canceled. ${refundTx.points} points have been refunded to your account.`)
           } else {
-            setActionMessage(`Booking đã hủy. Nếu điểm đã được trừ, hệ thống sẽ hoàn lại ${usedPoints} điểm.`)
+            setActionMessage(`Booking canceled. If points were deducted, the system will refund ${usedPoints} points.`)
           }
         } catch {
-          setActionMessage(`Booking đã hủy. Nếu điểm đã được trừ, hệ thống sẽ hoàn lại ${usedPoints} điểm.`)
+          setActionMessage(`Booking canceled. If points were deducted, the system will refund ${usedPoints} points.`)
         }
       } else {
         setActionMessage(`${TEXT.cancelBooking} ${TEXT.success}`)
@@ -1195,7 +1199,7 @@ function BookingDetailPage() {
     )
     if (serviceSteps.length > 0 && pendingSteps.length > 0) {
       setCompleteServiceError(
-        `Vui lòng hoàn thành tất cả bước dịch vụ trước khi hoàn thành booking. Còn ${pendingSteps.length} bước chưa hoàn thành.`,
+        `${pendingSteps.length} service step(s) are still incomplete. Please finish all steps before completing the booking.`,
       )
       return
     }
@@ -1218,13 +1222,14 @@ function BookingDetailPage() {
       await loadServiceSteps()
       const updatedPaymentStatus = String(result?.paymentStatus || '').toUpperCase()
       if (updatedPaymentStatus === 'PAID') {
-        setActionMessage('Dịch vụ đã hoàn thành.')
+        setActionMessage('Service completed.')
       } else {
-        setActionMessage('Dịch vụ đã hoàn thành. Vui lòng xử lý thanh toán.')
+        setActionMessage('Service completed. Please process payment.')
       }
       setCashPayError('')
       setPaymentCollectionOpen(true)
       setSelectedStatus('COMPLETED')
+      refreshBookingCount()
     } catch (err) {
       setCompleteServiceError(getCompleteServiceErrorMessage(err))
     } finally {
@@ -1246,13 +1251,14 @@ function BookingDetailPage() {
         errMsg.includes('da thanh toan') ||
         (err?.response?.status === 400 && isPaid)
       if (!alreadyPaid) {
-        setCashPayError(err?.response?.data?.message || err?.message || 'Xác nhận thanh toán thất bại.')
+        setCashPayError(err?.response?.data?.message || err?.message || 'Failed to confirm payment.')
         setCashPayLoading(false)
         return
       }
     }
     await loadDetail()
     setShowPaymentSuccess(true)
+    refreshBookingCount()
     setCashPayLoading(false)
   }
 
@@ -1293,7 +1299,7 @@ function BookingDetailPage() {
       setPaymentCollectionOpen(false)
       setPayosQrOpen(true)
     } catch (err) {
-      setCashPayError(err?.response?.data?.message || err?.message || 'Tạo thanh toán PayOS thất bại.')
+      setCashPayError(err?.response?.data?.message || err?.message || 'Failed to create PayOS payment.')
     } finally {
       setPayosLoading(false)
     }
@@ -1309,6 +1315,7 @@ function BookingDetailPage() {
         if (String(tx?.status || '').toUpperCase() === 'PAID') {
           setPayosSuccess(true)
           await loadDetail()
+          refreshBookingCount()
         }
       } else {
         const transactions = await bookingApi.getPaymentTransactions(id)
@@ -1317,6 +1324,7 @@ function BookingDetailPage() {
           setPayosTransaction((prev) => ({ ...prev, ...paidTx }))
           setPayosSuccess(true)
           await loadDetail()
+          refreshBookingCount()
         } else {
           const pendingTx = transactions.find(
             (tx) => String(tx.orderCode) === String(payosTransaction?.orderCode),
@@ -1325,7 +1333,7 @@ function BookingDetailPage() {
         }
       }
     } catch {
-      setPayosQrError('Làm mới thất bại. Vui lòng thử lại.')
+      setPayosQrError('Refresh failed. Please try again.')
     } finally {
       setPayosRefreshLoading(false)
     }
@@ -1343,7 +1351,7 @@ function BookingDetailPage() {
       setPayosCheckoutUrl('')
       setPaymentCollectionOpen(true)
     } catch (err) {
-      setPayosQrError(err?.response?.data?.message || err?.message || 'Hủy giao dịch thất bại.')
+      setPayosQrError(err?.response?.data?.message || err?.message || 'Failed to cancel transaction.')
     } finally {
       setPayosCancelLoading(false)
     }
@@ -1365,11 +1373,11 @@ function BookingDetailPage() {
     } catch (err) {
       const msg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
       if (msg.includes('in_progress') || msg.includes('in progress')) {
-        setStepActionError('Booking phải đang thực hiện mới cập nhật được bước dịch vụ.')
+        setStepActionError('Booking must be in progress to update a service step.')
       } else if (msg.includes('already completed') || msg.includes('da hoan thanh')) {
-        setStepActionError('Bước này đã hoàn thành rồi.')
+        setStepActionError('This step has already been completed.')
       } else {
-        setStepActionError(err?.response?.data?.message || err?.message || 'Hoàn thành bước thất bại.')
+        setStepActionError(err?.response?.data?.message || err?.message || 'Failed to complete step.')
       }
     } finally {
       setStepActionLoadingId(null)
@@ -1385,11 +1393,11 @@ function BookingDetailPage() {
     } catch (err) {
       const msg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
       if (msg.includes('in_progress') || msg.includes('in progress')) {
-        setStepActionError('Booking phải đang thực hiện mới mở lại được bước dịch vụ.')
+        setStepActionError('Booking must be in progress to reopen a service step.')
       } else if (msg.includes('not completed') || msg.includes('chua hoan thanh')) {
-        setStepActionError('Bước này chưa hoàn thành, không cần mở lại.')
+        setStepActionError('This step is not completed yet, no need to reopen.')
       } else {
-        setStepActionError(err?.response?.data?.message || err?.message || 'Mở lại bước thất bại.')
+        setStepActionError(err?.response?.data?.message || err?.message || 'Failed to reopen step.')
       }
     } finally {
       setStepActionLoadingId(null)
@@ -1405,26 +1413,27 @@ function BookingDetailPage() {
   const handleNoShowConfirm = async (note) => {
     setNoShowLoading(true)
     setNoShowError('')
-    const reason = note.trim() || 'Khách không đến đúng giờ hẹn'
+    const reason = note.trim() || 'Customer did not arrive at the appointment time'
     try {
       await bookingApi.markNoShow(id, reason)
       setNoShowModalOpen(false)
-      setActionMessage('Đã đánh dấu no-show.')
+      setActionMessage('Marked as no-show.')
       await loadDetail()
+      refreshBookingCount()
     } catch (err) {
       const msg = String(err?.response?.data?.message || err?.message || '').toLowerCase()
       const status = err?.response?.status
       let errorText
       if (status === 401 || status === 403) {
-        errorText = 'Bạn không có quyền thực hiện thao tác này.'
+        errorText = 'You do not have permission to perform this action.'
       } else if (msg.includes('can only mark no-show for confirmed')) {
-        errorText = 'Chỉ booking chưa check-in mới có thể đánh dấu no-show.'
+        errorText = 'Only confirmed bookings (not yet checked in) can be marked as no-show.'
       } else if (msg.includes('staff can only mark no-show') || msg.includes('assigned garage')) {
-        errorText = 'Bạn chỉ có thể đánh dấu no-show cho booking thuộc garage được phân công.'
+        errorText = 'You can only mark no-show for bookings at your assigned garage.'
       } else if (msg.includes('booking not found')) {
-        errorText = 'Không tìm thấy booking.'
+        errorText = 'Booking not found.'
       } else {
-        errorText = err?.response?.data?.message || err?.message || 'Đánh dấu no-show thất bại.'
+        errorText = err?.response?.data?.message || err?.message || 'Failed to mark as no-show.'
       }
       setNoShowError(errorText)
     } finally {
@@ -1518,7 +1527,7 @@ function BookingDetailPage() {
         await vehicleInspectionApi.create(booking.id, { inspectionType: type, ...payload })
       }
 
-      setInspectionMessage(`\u0110\u00e3 l\u01b0u ${INSPECTION_LABELS[type].toLowerCase()}.`)
+      setInspectionMessage('')
       await loadInspections(booking)
     } catch (err) {
       setInspectionError(err?.response?.data?.message || err?.message || 'Kh\u00f4ng l\u01b0u \u0111\u01b0\u1ee3c inspection.')
@@ -1533,42 +1542,46 @@ function BookingDetailPage() {
     const isLocked = currentStatus === 'COMPLETED'
 
     return (
-      <article className="booking-inspection-card" key={type}>
-        <div className="booking-inspection-card-head">
+      <article className="bd-inspection-card" key={type}>
+        <div className="bd-inspection-head">
           <div>
-            <span>{existingInspection ? 'Đã tạo' : 'Chưa tạo'}</span>
-            <strong>{INSPECTION_LABELS[type]}</strong>
+            <span className={`bd-inspection-status ${existingInspection ? 'bd-inspection-status--created' : 'bd-inspection-status--missing'}`}>
+              {existingInspection ? 'Created' : 'Not yet created'}
+            </span>
+            <p className="bd-inspection-title">{INSPECTION_LABELS[type]}</p>
           </div>
-          {existingInspection && <small>{formatDateTime(existingInspection.updatedAt || existingInspection.createdAt)}</small>}
+          {existingInspection && (
+            <span className="bd-inspection-ts">{formatDateTime(existingInspection.updatedAt || existingInspection.createdAt)}</span>
+          )}
         </div>
 
-        <div className="booking-inspection-columns">
+        <div className="bd-inspection-cols">
           <label>
-            <span>Tình trạng ngoại thất</span>
+            <span>Exterior condition</span>
             <textarea
               value={form.exteriorCondition}
               onChange={(event) => handleInspectionChange(type, 'exteriorCondition', event.target.value)}
-              placeholder="Ví dụ: trầy nhẹ cửa phải, kính trước sạch..."
+              placeholder="e.g. light scratch on right door, front glass clean..."
               disabled={isLocked}
             />
           </label>
 
           <label>
-            <span>Tình trạng nội thất</span>
+            <span>Interior condition</span>
             <textarea
               value={form.interiorCondition}
               onChange={(event) => handleInspectionChange(type, 'interiorCondition', event.target.value)}
-              placeholder="Ví dụ: ghế sau có bụi, taplo cần vệ sinh..."
+              placeholder="e.g. rear seat dusty, dashboard needs cleaning..."
               disabled={isLocked}
             />
           </label>
 
           <label>
-            <span>Ghi chú</span>
+            <span>Notes</span>
             <textarea
               value={form.notes}
               onChange={(event) => handleInspectionChange(type, 'notes', event.target.value)}
-              placeholder="Ghi chú thêm cho inspection"
+              placeholder="Additional inspection notes..."
               disabled={isLocked}
             />
           </label>
@@ -1600,145 +1613,258 @@ function BookingDetailPage() {
     )
   }
 
+  const statusKey = String(booking?.status || '').toLowerCase().replace('cancelled', 'canceled')
+  const paymentKey = String(booking?.paymentStatus || '').toLowerCase()
   return (
-    <div className="booking-history-page">
-      <section className="booking-history-hero">
-        <div>
-          <p>Booking detail</p>
-          <h1>Booking #{displayBookingNo}</h1>
-          <span>{TEXT.subtitle}</span>
+    <div className="bd-page">
+      <section className="bd-hero">
+        <div className="bd-hero-left">
+          <p className="bd-eyebrow">Booking detail</p>
+          <h1 className="bd-title">#{displayBookingNo}</h1>
+          <p className="bd-subtitle">{TEXT.subtitle}</p>
         </div>
-        <Link to={backUrl}>{TEXT.back}</Link>
+        <Link className="bd-back-link" to={backUrl}>← {TEXT.back}</Link>
       </section>
 
       {loading ? (
-        <div className="booking-history-empty">{TEXT.loading}</div>
+        <div className="bd-state">{TEXT.loading}</div>
       ) : error ? (
-        <div className="booking-history-message">{error}</div>
+        <div className="bd-state bd-state--error">{error}</div>
       ) : !booking ? (
-        <div className="booking-history-empty">{TEXT.notFound}</div>
+        <div className="bd-state">{TEXT.notFound}</div>
       ) : (
-        <article className="booking-history-card">
-          {currentStatus === 'NO_SHOW' && (
-            <div className="booking-no-show-seal">NO SHOW</div>
-          )}
-          <div className="booking-history-card-top">
+        <article className="bd-card">
+          {currentStatus === 'NO_SHOW' && <div className="bd-no-show-seal">NO SHOW</div>}
+
+          {/* ── Header ── */}
+          <div className="bd-card-head">
             <div>
-              <p>{TEXT.code}</p>
-              <h2>#{displayBookingNo}</h2>
+              <p className="bd-card-num-label">{TEXT.code}</p>
+              <h2 className="bd-card-num">#{displayBookingNo}</h2>
             </div>
-            <div className="booking-history-badges">
-              {booking.isWalkIn && (
-                <span className="garage-walk-in">Khách đặt tại garage</span>
-              )}
-              <span className={`status ${String(booking.status || '').toLowerCase()}`}>{getStatusText(booking.status)}</span>
-              <span className={`payment ${String(booking.paymentStatus || '').toLowerCase()}`}>
-                {getPaymentStatusText(booking.paymentStatus)}
-              </span>
+            <div className="bd-badges">
+              {booking.isWalkIn && <span className="bd-badge bd-badge--walkin">Walk-in</span>}
+              <span className={`bd-badge bd-badge--${statusKey}`}>{getStatusText(booking.status)}</span>
+              <span className={`bd-badge bd-badge--${paymentKey}`}>{getPaymentStatusText(booking.paymentStatus)}</span>
             </div>
           </div>
 
-          <div className="booking-history-info">
-            <div>
-              <span>{TEXT.customer}</span>
-              {formatNamedValue(
-                booking.customerName || booking.guestName,
-                booking.customerId,
-                booking.customerId ? TEXT.customer : TEXT.guest,
-              )}
+          {/* ── Info grid ── */}
+          <div className="bd-info">
+            <div className="bd-info-cell">
+              <span className="bd-info-label">{TEXT.customer}</span>
+              <span className="bd-info-value">
+                <strong>{booking.customerName || booking.guestName || (booking.customerId ? `#${booking.customerId}` : TEXT.guest)}</strong>
+                {booking.customerId && <small>#{booking.customerId}</small>}
+              </span>
             </div>
-            <div>
-              <span>{TEXT.vehicle}</span>
-              <span className="booking-named-value">
+            <div className="bd-info-cell">
+              <span className="bd-info-label">{TEXT.vehicle}</span>
+              <span className="bd-info-value">
                 <strong>
                   {booking.vehicleName && booking.licensePlate
                     ? `${booking.vehicleName} · ${booking.licensePlate}`
-                    : booking.vehicleName || booking.licensePlate || TEXT.vehicle}
+                    : booking.vehicleName || booking.licensePlate || TEXT.notUpdated}
                 </strong>
                 {booking.vehicleId && <small>#{booking.vehicleId}</small>}
               </span>
             </div>
-            <div>
-              <span>Garage</span>
-              {formatNamedValue(booking.garageName, booking.garageId, 'Garage')}
+            <div className="bd-info-cell">
+              <span className="bd-info-label">Garage</span>
+              <span className="bd-info-value">
+                <strong>{booking.garageName || `Garage #${booking.garageId}`}</strong>
+              </span>
             </div>
-            <div>
-              <span>{TEXT.servicePackage}</span>
-              {formatNamedValue(booking.servicePackageName, booking.servicePackageId, TEXT.servicePackage)}
+            <div className="bd-info-cell">
+              <span className="bd-info-label">{TEXT.servicePackage}</span>
+              <span className="bd-info-value">
+                <strong>{booking.servicePackageName || `Package #${booking.servicePackageId}`}</strong>
+              </span>
             </div>
             {Array.isArray(booking.addOnServicePackageNames) && booking.addOnServicePackageNames.length > 0 && (
-              <div>
-                <span>{TEXT.addOnServicePackages}</span>
-                <strong>{booking.addOnServicePackageNames.join(', ')}</strong>
+              <div className="bd-info-cell bd-info-cell--full">
+                <span className="bd-info-label">{TEXT.addOnServicePackages}</span>
+                <span className="bd-info-value"><strong>{booking.addOnServicePackageNames.join(', ')}</strong></span>
               </div>
             )}
-            <div className="booking-total-card">
-              <span>{TEXT.total}</span>
-              <div className="booking-total-row">
-                <strong>{formatMoney(booking.finalPrice)}</strong>
-                <span>{TEXT.method}: {paymentMethodText}</span>
-              </div>
+            <div className="bd-info-cell">
+              <span className="bd-info-label">{TEXT.start}</span>
+              <span className="bd-info-value"><strong>{formatDateTime(booking.startTime)}</strong></span>
             </div>
-
-            <div><span>{TEXT.start}</span><strong>{formatDateTime(booking.startTime)}</strong></div>
-            <div><span>{TEXT.end}</span><strong>{formatDateTime(booking.endTime)}</strong></div>
-            <div className="booking-detail-control-card">
-              <span>Check-in</span>
-              <div className="booking-detail-inline-control">
-                <strong>{getCheckInDisplay(booking)}</strong>
-              </div>
+            <div className="bd-info-cell">
+              <span className="bd-info-label">{TEXT.end}</span>
+              <span className="bd-info-value"><strong>{formatDateTime(booking.endTime)}</strong></span>
             </div>
-            <div className="booking-detail-control-card">
-              <span>Status</span>
-              <div className="booking-detail-inline-control">
-                <strong>{getStatusText(booking.status)}</strong>
-              </div>
+            <div className="bd-info-cell">
+              <span className="bd-info-label">Check-in</span>
+              <span className="bd-info-value"><strong>{getCheckInDisplay(booking)}</strong></span>
             </div>
-            <div><span>{TEXT.paidAt}</span><strong>{formatDateTime(booking.paidAt)}</strong></div>
+            <div className="bd-info-cell">
+              <span className="bd-info-label">{TEXT.paidAt}</span>
+              <span className="bd-info-value"><strong>{formatDateTime(booking.paidAt)}</strong></span>
+            </div>
             {booking.rewardProcessed !== undefined && booking.rewardProcessed !== null && isPaid && (
-              <div>
-                <span>Điểm thưởng</span>
-                <strong className={booking.rewardProcessed ? 'booking-reward-done' : 'booking-reward-pending'}>
-                  {booking.rewardProcessed
-                    ? `Đã xử lý${booking.pointsEarned ? ` +${booking.pointsEarned}p` : ''}`
-                    : 'Chưa xử lý'}
-                </strong>
-              </div>
-            )}
-
-            {hasAssignedResources && (
-              <div className="booking-detail-resources-card">
-                <span>{TEXT.resources}</span>
-                <div className="booking-detail-resources-body">
-                  {resourceWashBayLabel && (
-                    <div className="booking-detail-resource-row">
-                      <span>{TEXT.washBay}</span>
-                      <strong>{resourceWashBayLabel}</strong>
-                    </div>
-                  )}
-                  {resourceWashBayTypeLabel && (
-                    <div className="booking-detail-resource-row">
-                      <span>{TEXT.washBayType}</span>
-                      <strong>{resourceWashBayTypeLabel}</strong>
-                    </div>
-                  )}
-                  {resourceWashBayLabel && (
-                    <div className="booking-detail-resource-row">
-                      <span>{TEXT.careStaff}</span>
-                      <strong>{resourceCareStaffText}</strong>
-                    </div>
-                  )}
-                </div>
+              <div className="bd-info-cell bd-info-cell--full">
+                <span className="bd-info-label">Loyalty points</span>
+                <span className="bd-info-value">
+                  <strong className={booking.rewardProcessed ? 'bd-reward-done' : 'bd-reward-pending'}>
+                    {booking.rewardProcessed
+                      ? `Processed${booking.pointsEarned ? ` +${booking.pointsEarned}pts` : ''}`
+                      : 'Pending'}
+                  </strong>
+                </span>
               </div>
             )}
           </div>
 
-          {canCustomerCancel && (
-            <div className="booking-detail-footer-actions">
-              <div className="booking-detail-danger-actions">
+          {/* ── Total & payment ── */}
+          <div className="bd-total-row">
+            <div>
+              <span className="bd-total-amount">{formatMoney(booking.finalPrice)}</span>
+              <span className="bd-total-method"> · {paymentMethodText}</span>
+            </div>
+            <div className="bd-total-actions">
+              {canOpenPaymentCollection && (
                 <button
                   type="button"
-                  className="booking-history-cancel-btn"
+                  className="bd-btn bd-btn--payment"
+                  onClick={() => { setCashPayError(''); setPaymentCollectionOpen(true) }}
+                >
+                  Process payment
+                </button>
+              )}
+              {canCreatePayOS && (
+                <button type="button" className="bd-btn--payos" onClick={handleCreatePayOS}>
+                  {TEXT.createQr}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* ── Assigned resources ── */}
+          {hasAssignedResources && (
+            <div className="bd-resources">
+              {resourceWashBayLabel && (
+                <div className="bd-info-cell">
+                  <span className="bd-info-label">{TEXT.washBay}</span>
+                  <span className="bd-info-value"><strong>{resourceWashBayLabel}</strong></span>
+                </div>
+              )}
+              {resourceWashBayTypeLabel && (
+                <div className="bd-info-cell">
+                  <span className="bd-info-label">{TEXT.washBayType}</span>
+                  <span className="bd-info-value"><strong>{resourceWashBayTypeLabel}</strong></span>
+                </div>
+              )}
+              <div className="bd-info-cell bd-info-cell--full">
+                <span className="bd-info-label">{TEXT.careStaff}</span>
+                <span className="bd-info-value"><strong>{resourceCareStaffText}</strong></span>
+              </div>
+            </div>
+          )}
+
+          {/* ── Customer timeline ── */}
+          {role === 'customer' && (
+            <section className="bd-section">
+              <div className="bd-section-head">
+                <div className="bd-section-head-left">
+                  <span className="bd-section-eyebrow">Timeline</span>
+                  <h3 className="bd-section-title">{TEXT.timeline}</h3>
+                </div>
+                <span className="bd-section-meta">{getStatusText(booking.status)}</span>
+              </div>
+              <div className="bd-timeline">
+                {getTimelineItems(booking).map((item, index, items) => (
+                  <div
+                    key={item.key}
+                    className={[
+                      'bd-timeline-item',
+                      item.active ? 'bd-timeline-item--active' : '',
+                      item.danger ? 'bd-timeline-item--danger' : '',
+                      index === items.length - 1 ? 'bd-timeline-item--last' : '',
+                    ].filter(Boolean).join(' ')}
+                  >
+                    <span className="bd-timeline-dot">{index + 1}</span>
+                    <div className="bd-timeline-body">
+                      <span className="bd-timeline-label">{item.label}</span>
+                      <span className="bd-timeline-time">{item.time ? formatDateTime(item.time) : TEXT.notUpdated}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── Service steps ── */}
+          <section className="bd-section">
+            <div className="bd-section-head">
+              <div className="bd-section-head-left">
+                <span className="bd-section-eyebrow">Operation</span>
+                <h3 className="bd-section-title">{TEXT.serviceSteps}</h3>
+              </div>
+              <span className="bd-section-meta">{booking.servicePackageName || TEXT.servicePackage}</span>
+            </div>
+            {serviceSteps.length > 0 ? (
+              <ServiceStepsProgress
+                steps={serviceSteps}
+                bookingStatus={currentStatus}
+                onCompleteStep={role !== 'customer' ? handleCompleteServiceStep : undefined}
+                onReopenStep={role !== 'customer' ? handleReopenServiceStep : undefined}
+                actionLoadingStepId={stepActionLoadingId}
+                error={stepActionError}
+                renderStepExtra={role === 'staff' && ['IN_PROGRESS', 'COMPLETED'].includes(currentStatus)
+                  ? (step) => step.order === 1 ? renderInspectionCard('BEFORE_WASH') : null
+                  : undefined}
+              />
+            ) : booking.servicePackageSteps?.length > 0 ? (
+              <ol className="bd-step-list">
+                {booking.servicePackageSteps.map((step, index) => (
+                  <li key={`${step.title}-${index}`} className="bd-step-item">
+                    <span className="bd-step-num">{index + 1}</span>
+                    <div className="bd-step-body">
+                      <strong>{step.title}</strong>
+                      {step.description && <small>{step.description}</small>}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="bd-step-empty">{TEXT.serviceStepsEmpty}</p>
+            )}
+
+            {role === 'staff' &&
+              ['IN_PROGRESS', 'COMPLETED'].includes(currentStatus) &&
+              getInspectionTypes(booking).includes('AFTER_WASH') &&
+              renderInspectionCard('AFTER_WASH')}
+          </section>
+
+          {/* ── Inspection messages ── */}
+          {role === 'staff' && (inspectionMessage || inspectionError) && (
+            <div className="bd-inspection-messages">
+              {inspectionMessage && <p className="bd-inspect-msg bd-inspect-msg--ok">{inspectionMessage}</p>}
+              {inspectionError && <p className="bd-inspect-msg bd-inspect-msg--err">{inspectionError}</p>}
+            </div>
+          )}
+
+          {/* ── Action message ── */}
+          {actionMessage && (
+            <div className={`bd-action-msg${actionMessage.toLowerCase().includes('fail') || actionMessage.toLowerCase().includes('không') ? ' bd-action-msg--error' : ''}`}>
+              {actionMessage}
+            </div>
+          )}
+
+          {/* ── Closed notice ── */}
+          {role !== 'customer' && isClosedBooking && (
+            <p className="bd-closed-notice">{TEXT.closedBooking}</p>
+          )}
+
+          {/* ── Customer cancel footer ── */}
+          {canCustomerCancel && (
+            <div className="bd-footer">
+              <div className="bd-danger-group">
+                <button
+                  type="button"
+                  className="bd-btn bd-btn--danger"
                   disabled={cancelLoading || actionLoading}
                   onClick={handleCancel}
                 >
@@ -1748,153 +1874,37 @@ function BookingDetailPage() {
             </div>
           )}
 
-          {role === 'customer' && (
-            <section className="booking-detail-progress-section">
-              <div className="booking-detail-section-head">
-                <div>
-                  <span>Timeline</span>
-                  <strong>{TEXT.timeline}</strong>
-                </div>
-                <small>{getStatusText(booking.status)}</small>
-              </div>
-              <div className="booking-status-timeline">
-                {getTimelineItems(booking).map((item, index, items) => (
-                  <div
-                    key={item.key}
-                    className={[
-                      'booking-timeline-item',
-                      item.active ? 'active' : '',
-                      item.danger ? 'danger' : '',
-                      index === items.length - 1 ? 'last' : '',
-                    ].join(' ')}
-                  >
-                    <span className="booking-timeline-dot">{index + 1}</span>
-                    <div>
-                      <strong>{item.label}</strong>
-                      <small>{item.time ? formatDateTime(item.time) : TEXT.notUpdated}</small>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          <section className="booking-detail-progress-section">
-            <div className="booking-detail-section-head">
-              <div>
-                <span>Operation</span>
-                <strong>{TEXT.serviceSteps}</strong>
-              </div>
-              <small>{booking.servicePackageName || TEXT.servicePackage}</small>
-            </div>
-            {role === 'staff' && ['IN_PROGRESS', 'COMPLETED'].includes(currentStatus) && renderInspectionCard('BEFORE_WASH')}
-
-            {serviceSteps.length > 0 ? (
-              <ServiceStepsProgress
-                steps={serviceSteps}
-                bookingStatus={currentStatus}
-                onCompleteStep={role !== 'customer' ? handleCompleteServiceStep : undefined}
-                onReopenStep={role !== 'customer' ? handleReopenServiceStep : undefined}
-                actionLoadingStepId={stepActionLoadingId}
-                error={stepActionError}
-              />
-            ) : booking.servicePackageSteps?.length > 0 ? (
-              <ol className="booking-service-step-list">
-                {booking.servicePackageSteps.map((step, index) => (
-                  <li key={`${step.title}-${index}`} className="booking-service-step-item">
-                    <span>{index + 1}</span>
-                    <div>
-                      <strong>{step.title}</strong>
-                      {step.description && <small>{step.description}</small>}
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="booking-service-step-empty">{TEXT.serviceStepsEmpty}</p>
-            )}
-
-            {role === 'staff' &&
-              ['IN_PROGRESS', 'COMPLETED'].includes(currentStatus) &&
-              getInspectionTypes(booking).includes('AFTER_WASH') &&
-              renderInspectionCard('AFTER_WASH')}
-          </section>
-
-          {role === 'staff' && (inspectionMessage || inspectionError) && (
-            <>
-              {inspectionMessage && <div className="booking-history-message">{inspectionMessage}</div>}
-              {inspectionError && <div className="booking-history-message">{inspectionError}</div>}
-            </>
-          )}
-
-          {role !== 'customer' && isClosedBooking && (
-            <div className="booking-history-message">{TEXT.closedBooking}</div>
-          )}
-
-          {canOpenPaymentCollection && (
-            <div className="booking-detail-footer-actions">
-              <button
-                type="button"
-                className="booking-detail-update-btn booking-detail-complete-service-btn"
-                onClick={() => { setCashPayError(''); setPaymentCollectionOpen(true) }}
-              >
-                Xử lý thanh toán
-              </button>
-            </div>
-          )}
-
-          {actionMessage && <div className="booking-history-message">{actionMessage}</div>}
-
+          {/* ── Staff/admin action footer ── */}
           {role !== 'customer' && !isClosedBooking && (
-            <div className="booking-detail-footer-actions">
-              <div className="booking-detail-danger-actions">
+            <div className="bd-footer">
+              <div className="bd-danger-group">
                 {canMarkNoShow && (
-                  <button type="button" className="booking-history-cancel-btn" disabled={actionLoading} onClick={handleNoShow}>
+                  <button type="button" className="bd-btn bd-btn--danger" disabled={actionLoading} onClick={handleNoShow}>
                     No-show
                   </button>
                 )}
-                <button type="button" className="booking-history-cancel-btn" disabled={actionLoading} onClick={handleCancel}>
+                <button type="button" className="bd-btn bd-btn--danger" disabled={actionLoading} onClick={handleCancel}>
                   {TEXT.cancel}
                 </button>
               </div>
               {canCheckIn && (
-                <button
-                  type="button"
-                  className="booking-detail-update-btn"
-                  disabled={actionLoading}
-                  onClick={handleDirectCheckIn}
-                >
+                <button type="button" className="bd-btn bd-btn--checkin" disabled={actionLoading} onClick={handleDirectCheckIn}>
                   {TEXT.checkInBooking}
                 </button>
               )}
               {canStartService && (
-                <button
-                  type="button"
-                  className="booking-detail-update-btn booking-detail-start-service-btn"
-                  disabled={actionLoading}
-                  onClick={handleStartService}
-                >
+                <button type="button" className="bd-btn bd-btn--start" disabled={actionLoading} onClick={handleStartService}>
                   {TEXT.startService}
                 </button>
               )}
               {canCompleteService && (
-                <button
-                  type="button"
-                  className="booking-detail-update-btn booking-detail-complete-service-btn"
-                  disabled={actionLoading}
-                  onClick={handleCompleteService}
-                >
-                  {actionLoading ? 'Đang hoàn thành...' : TEXT.completeService}
+                <button type="button" className="bd-btn bd-btn--complete" disabled={actionLoading} onClick={handleCompleteService}>
+                  {actionLoading ? 'Completing...' : TEXT.completeService}
                 </button>
               )}
               {hasPendingUpdate && (
-                <button
-                  type="button"
-                  className="booking-detail-update-btn"
-                  disabled={actionLoading}
-                  onClick={handleUpdateBooking}
-                >
-                  {actionLoading ? 'Đang cập nhật...' : TEXT.update}
+                <button type="button" className="bd-btn bd-btn--ghost" disabled={actionLoading} onClick={handleUpdateBooking}>
+                  {actionLoading ? 'Updating...' : TEXT.update}
                 </button>
               )}
             </div>

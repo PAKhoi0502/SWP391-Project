@@ -179,7 +179,22 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
       setSubmitting(true)
       setApiError('')
       if (isCreate) {
-        await promotionApi.createPromotion(payload)
+        const created = await promotionApi.createPromotion(payload)
+        // Auto-send VOUCHER_RECEIVED notification only if promotion is immediately active
+        // (i.e. isActive=true AND startAt is null/past — not a scheduled future promotion)
+        const startsAt = form.startAt ? new Date(toLocalDateTime(form.startAt)) : null
+        const isImmediatelyActive = form.isActive && (!startsAt || startsAt <= new Date())
+        if (created?.id && isImmediatelyActive) {
+          if (form.applicableTiers.length > 0) {
+            await Promise.allSettled(
+              form.applicableTiers.map((tier) =>
+                promotionApi.sendVoucher(created.id, { filterType: 'TIER', tier })
+              )
+            )
+          } else {
+            promotionApi.sendVoucher(created.id, { filterType: 'ALL' }).catch(() => {})
+          }
+        }
       } else {
         await promotionApi.updatePromotion(promotionId, payload)
       }

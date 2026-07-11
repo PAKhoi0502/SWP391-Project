@@ -70,6 +70,23 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
+    public void notifyBookingCanceled(Long bookingId) {
+        bookingRepository.findById(bookingId).ifPresent(booking -> {
+            if (booking.getCustomerId() == null) return;
+
+            String reason = booking.getNote() != null ? " Reason: " + booking.getNote() : "";
+            createInAppNotification(
+                    booking.getCustomerId(),
+                    bookingId,
+                    "BOOKING_CANCELED",
+                    "Booking Canceled",
+                    "Your booking #" + bookingId + " has been canceled." + reason
+            );
+        });
+    }
+
+    @Override
+    @Transactional
     public void notifyPaymentConfirmed(Long bookingId) {
         bookingRepository.findById(bookingId).ifPresent(booking -> {
             if (booking.getCustomerId() == null) return;
@@ -122,6 +139,25 @@ public class NotificationServiceImpl implements NotificationService {
                             + waitlist.getGarageId()
                             + " on " + waitlist.getDesiredStartTime().toLocalDate()
                             + ". Accept it before " + waitlist.getOfferExpiresAt() + "!"
+            );
+        });
+    }
+
+    @Override
+    @Transactional
+    public void notifyPaymentAndReward(Long bookingId) {
+        if (notificationRepository.existsByBookingIdAndEventType(bookingId, "PAYMENT_CONFIRMED")) return;
+        bookingRepository.findById(bookingId).ifPresent(booking -> {
+            if (booking.getCustomerId() == null) return;
+            String pointsPart = pointTransactionRepository.findByBookingIdAndType(bookingId, "EARN")
+                    .map(pt -> " You earned +" + pt.getPoints() + " loyalty points.")
+                    .orElse("");
+            createInAppNotification(
+                    booking.getCustomerId(),
+                    bookingId,
+                    "PAYMENT_CONFIRMED",
+                    "Payment confirmed" + (pointsPart.isEmpty() ? "" : " & points earned"),
+                    "Payment for booking #" + bookingId + " has been confirmed." + pointsPart + " Thank you!"
             );
         });
     }

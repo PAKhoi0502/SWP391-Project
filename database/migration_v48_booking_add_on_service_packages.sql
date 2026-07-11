@@ -12,3 +12,13 @@ BEGIN
 
     CREATE INDEX ix_booking_add_on_booking_id ON dbo.booking_add_on_service_packages(booking_id);
 END;
+
+select * from dbo.booking_add_on_service_packages
+
+SELECT spi.id, spi.parent_service_package_id, spi.included_service_package_id,
+       sp.name AS included_name, sp.service_type
+FROM service_package_includes spi
+JOIN service_packages sp ON sp.id = spi.included_service_package_id
+WHERE spi.parent_service_package_id = (
+    SELECT id FROM service_packages WHERE name LIKE N'%r?a xe%xóa xý?c%'
+)

@@ -22,17 +22,17 @@ const DEFAULT_FORM = {
 };
 
 const VEHICLE_TYPES = [
-  { value: "", label: "Tất cả loại xe" },
-  { value: "CAR", label: "Ô tô" },
-  { value: "BIKE", label: "Xe máy" },
+  { value: "", label: "All types" },
+  { value: "CAR", label: "Car" },
+  { value: "BIKE", label: "Motorcycle" },
 ];
 
 const STATUS_OPTIONS = [
-  { value: "", label: "Tất cả trạng thái" },
-  { value: "AVAILABLE", label: "Sẵn sàng" },
-  { value: "IN_USE", label: "Đang sử dụng" },
-  { value: "MAINTENANCE", label: "Bảo trì" },
-  { value: "INACTIVE", label: "Tạm ngưng" },
+  { value: "", label: "All statuses" },
+  { value: "AVAILABLE", label: "Available" },
+  { value: "IN_USE", label: "In use" },
+  { value: "MAINTENANCE", label: "Maintenance" },
+  { value: "INACTIVE", label: "Inactive" },
 ];
 
 const WASH_BAY_NAMES_KEY = "washBayNamesById";
@@ -133,7 +133,7 @@ export default function AdminWashBayManagementPage() {
       );
       setGarageMap(Object.fromEntries(entries));
     } catch (err) {
-      setError(err.message || "Không tải được danh sách wash bay");
+      setError(err.message || "Failed to load wash bays");
     } finally {
       setLoading(false);
     }
@@ -192,7 +192,7 @@ export default function AdminWashBayManagementPage() {
 
   async function handleCheckGarageInfo() {
     if (!filters.garageId && !form.garageId) {
-      setError("Nhập garageId trước khi xem thông tin garage");
+      setError("Enter a garage ID before viewing garage info");
       return;
     }
 
@@ -209,9 +209,9 @@ export default function AdminWashBayManagementPage() {
 
       setSupportedTypes(Array.isArray(types) ? types : types?.data || []);
       setCapacityInfo(capacity);
-      setSuccess("Đã tải thông tin garage");
+      setSuccess("Garage info loaded");
     } catch (err) {
-      setError(err.message || "Không tải được thông tin garage");
+      setError(err.message || "Failed to load garage info");
     }
   }
 
@@ -257,17 +257,17 @@ export default function AdminWashBayManagementPage() {
     e.preventDefault();
 
     if (!form.garageId) {
-      setError("Vui lòng nhập garageId");
+      setError("Please enter a garage ID");
       return;
     }
 
     if (!form.name.trim()) {
-      setError("Vui lòng nhập tên wash bay");
+      setError("Please enter a wash bay name");
       return;
     }
 
     if (!form.bayCode.trim()) {
-      setError("Vui lòng nhập mã wash bay");
+      setError("Please enter a bay code");
       return;
     }
 
@@ -289,20 +289,20 @@ export default function AdminWashBayManagementPage() {
         await updateWashBay(editingId, payload);
         writeWashBayName(editingId, form.name.trim());
         setWashBayNames(readWashBayNames());
-        setSuccess("Cập nhật wash bay thành công");
+        setSuccess("Wash bay updated successfully");
       } else {
         const created = await createWashBay(payload);
         const createdId = created?.id || created?.washBayId || created?.data?.id || created?.data?.washBayId;
         writeWashBayName(createdId, form.name.trim());
         setWashBayNames(readWashBayNames());
-        setSuccess("Tạo wash bay thành công");
+        setSuccess("Wash bay created successfully");
       }
 
       setEditingId(null);
       setForm(DEFAULT_FORM);
       await loadWashBays();
     } catch (err) {
-      setError(err.message || "Lưu wash bay thất bại");
+      setError(err.message || "Failed to save wash bay");
     } finally {
       setSaving(false);
     }
@@ -316,10 +316,10 @@ export default function AdminWashBayManagementPage() {
       setSuccess("");
 
       await updateWashBayStatus(id, nextStatus);
-      setSuccess("Cập nhật trạng thái wash bay thành công");
+      setSuccess("Wash bay status updated");
       await loadWashBays();
     } catch (err) {
-      setError(err.message || "Cập nhật trạng thái thất bại");
+      setError(err.message || "Failed to update status");
     }
   }
 
@@ -367,7 +367,7 @@ export default function AdminWashBayManagementPage() {
           <p className="wash-bay-kicker">Admin Management</p>
           <h1>Wash Bay Management</h1>
           <p>
-            Quản lý khoang rửa theo garage, loại xe, trạng thái và sức chứa.
+            Manage wash bays by garage, vehicle type, status and capacity.
           </p>
         </div>
 
@@ -402,9 +402,9 @@ export default function AdminWashBayManagementPage() {
         <section className="wash-bay-panel">
           <div className="wash-bay-panel-header">
             <div>
-              <h2>{isEditing ? "Cập nhật wash bay" : "Tạo wash bay mới"}</h2>
+              <h2>{isEditing ? "Update wash bay" : "Create new wash bay"}</h2>
               <p>
-                Admin có thể tạo mới, chỉnh sửa thông tin và trạng thái wash bay.
+                Admins can create, edit information and status for wash bays.
               </p>
             </div>
           </div>
@@ -417,12 +417,12 @@ export default function AdminWashBayManagementPage() {
                   name="garageId"
                   value={form.garageId}
                   onChange={handleChangeForm}
-                  placeholder="VD: 1"
+                  placeholder="e.g. 1"
                   type="number"
                   min="1"
                 />
                 {garageNameInfo && (
-                  <span style={{ fontSize: 12, color: "#a78bfa", marginTop: 4, display: "block" }}>
+                  <span style={{ fontSize: 12, color: "#2563eb", marginTop: 4, display: "block" }}>
                     {garageNameInfo.name}{" "}
                     <span style={{ fontSize: 10, opacity: 0.6 }}>#{garageNameInfo.id}</span>
                   </span>
@@ -430,56 +430,56 @@ export default function AdminWashBayManagementPage() {
               </label>
 
               <label>
-                Mã bay
+                Bay code
                 <input
                   name="bayCode"
                   value={form.bayCode}
                   onChange={handleChangeForm}
-                  placeholder="VD: BAY-01"
+                  placeholder="e.g. BAY-01"
                 />
               </label>
             </div>
 
             <label>
-              Tên wash bay
+              Wash bay name
               <input
                 name="name"
                 value={form.name}
                 onChange={handleChangeForm}
-                placeholder="VD: Khoang rửa số 1"
+                placeholder="e.g. Wash bay 1"
               />
             </label>
 
             <div className="wash-bay-form-row">
               <label>
-                Loại xe hỗ trợ
+                Vehicle type
                 <select
                   name="vehicleType"
                   value={form.vehicleType}
                   onChange={handleChangeForm}
                 >
-                  <option value="CAR">Ô tô</option>
-                  <option value="BIKE">Xe máy</option>
+                  <option value="CAR">Car</option>
+                  <option value="BIKE">Motorcycle</option>
                 </select>
               </label>
 
               <label>
-                Trạng thái
+                Status
                 <select
                   name="status"
                   value={form.status}
                   onChange={handleChangeForm}
                 >
-                  <option value="AVAILABLE">Sẵn sàng</option>
-                  <option value="IN_USE">Đang sử dụng</option>
-                  <option value="MAINTENANCE">Bảo trì</option>
-                  <option value="INACTIVE">Tạm ngưng</option>
+                  <option value="AVAILABLE">Available</option>
+                  <option value="IN_USE">In Use</option>
+                  <option value="MAINTENANCE">Maintenance</option>
+                  <option value="INACTIVE">Inactive</option>
                 </select>
               </label>
             </div>
 
             <label>
-              Sức chứa
+              Capacity
               <input
                 name="capacity"
                 value={1}
@@ -491,18 +491,18 @@ export default function AdminWashBayManagementPage() {
               />
               {isEditing && (
                 <small>
-                  Sức chứa garage được tính bằng số wash bay. Muốn tăng sức chứa, hãy tạo thêm wash bay mới.
+                  Garage capacity equals the number of wash bays. To increase capacity, create more wash bays.
                 </small>
               )}
             </label>
 
             <label>
-              Mô tả
+              Description
               <textarea
                 name="description"
                 value={form.description}
                 onChange={handleChangeForm}
-                placeholder="Ghi chú thêm về khoang rửa..."
+                placeholder="Additional notes about this wash bay..."
                 rows="4"
               />
             </label>
@@ -510,10 +510,10 @@ export default function AdminWashBayManagementPage() {
             <div className="wash-bay-actions">
               <button className="wash-bay-primary-btn" type="submit">
                 {saving
-                  ? "Đang lưu..."
+                  ? "Saving..."
                   : isEditing
-                    ? "Lưu cập nhật"
-                    : "Tạo wash bay"}
+                    ? "Save changes"
+                    : "Create wash bay"}
               </button>
 
               {isEditing && (
@@ -522,7 +522,7 @@ export default function AdminWashBayManagementPage() {
                   type="button"
                   onClick={handleCancelEdit}
                 >
-                  Hủy sửa
+                  Cancel
                 </button>
               )}
             </div>
@@ -532,8 +532,8 @@ export default function AdminWashBayManagementPage() {
         <section className="wash-bay-panel">
           <div className="wash-bay-panel-header">
             <div>
-              <h2>Bộ lọc</h2>
-              <p>Lọc wash bay theo garage, loại xe và trạng thái.</p>
+              <h2>Filters</h2>
+              <p>Filter wash bays by garage, vehicle type and status.</p>
             </div>
           </div>
 
@@ -548,14 +548,14 @@ export default function AdminWashBayManagementPage() {
                     garageId: e.target.value,
                   }))
                 }
-                placeholder="VD: 1"
+                placeholder="e.g. 1"
                 type="number"
                 min="1"
               />
             </label>
 
             <label>
-              Loại xe
+              Vehicle type
               <select
                 value={filters.vehicleType}
                 onChange={(e) =>
@@ -574,7 +574,7 @@ export default function AdminWashBayManagementPage() {
             </label>
 
             <label>
-              Trạng thái
+              Status
               <select
                 value={filters.status}
                 onChange={(e) =>
@@ -598,7 +598,7 @@ export default function AdminWashBayManagementPage() {
                 type="button"
                 onClick={handleApplyFilter}
               >
-                Áp dụng lọc
+                Apply filters
               </button>
 
               <button
@@ -606,7 +606,7 @@ export default function AdminWashBayManagementPage() {
                 type="button"
                 onClick={handleResetFilter}
               >
-                Xóa lọc
+                Clear filters
               </button>
             </div>
 
@@ -615,29 +615,29 @@ export default function AdminWashBayManagementPage() {
               type="button"
               onClick={handleCheckGarageInfo}
             >
-              Xem loại xe hỗ trợ & sức chứa garage
+              View garage capacity & supported types
             </button>
           </div>
 
           {(supportedTypes.length > 0 || capacityInfo) && (
             <div className="wash-bay-garage-info">
-              <h3>Thông tin garage</h3>
+              <h3>Garage info</h3>
 
               <div>
-                <span>Loại xe hỗ trợ:</span>
+                <span>Supported types:</span>
                 <strong>
                   {supportedTypes.length > 0
                     ? supportedTypes.join(", ")
-                    : "Chưa có dữ liệu"}
+                    : "No data"}
                 </strong>
               </div>
 
               <div>
-                <span>Sức chứa:</span>
+                <span>Capacity:</span>
                 <strong>
                   {typeof capacityInfo === "object"
                     ? JSON.stringify(capacityInfo)
-                    : capacityInfo || "Chưa có dữ liệu"}
+                    : capacityInfo || "No data"}
                 </strong>
               </div>
             </div>
@@ -648,8 +648,8 @@ export default function AdminWashBayManagementPage() {
       <section className="wash-bay-panel wash-bay-table-panel">
         <div className="wash-bay-panel-header">
           <div>
-            <h2>Danh sách wash bay</h2>
-            <p>Admin/staff có thể xem, lọc, sửa và đổi trạng thái.</p>
+            <h2>Wash bays</h2>
+            <p>View, filter, edit and update wash bay status.</p>
           </div>
 
           <button
@@ -667,12 +667,12 @@ export default function AdminWashBayManagementPage() {
               <tr>
                 <th>ID</th>
                 <th>Garage</th>
-                <th>Mã bay</th>
-                <th>Tên bay</th>
-                <th>Loại xe</th>
-                <th>Sức chứa</th>
-                <th>Trạng thái</th>
-                <th>Thao tác</th>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Capacity</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
 
@@ -680,13 +680,13 @@ export default function AdminWashBayManagementPage() {
               {loading ? (
                 <tr>
                   <td colSpan="8" className="wash-bay-empty">
-                    Đang tải danh sách wash bay...
+                    Loading wash bays...
                   </td>
                 </tr>
               ) : sortedWashBays.length === 0 ? (
                 <tr>
                   <td colSpan="8" className="wash-bay-empty">
-                    Chưa có wash bay nào.
+                    No wash bays found.
                   </td>
                 </tr>
               ) : (
@@ -703,10 +703,10 @@ export default function AdminWashBayManagementPage() {
                     <td>{getBayName(bay)}</td>
                     <td>
                       <span className="wash-bay-type-pill">
-                        {bay.vehicleType === "BIKE" || bay.vehicleType === "MOTORBIKE" ? "Xe máy" : "Ô tô"}
+                        {bay.vehicleType === "BIKE" || bay.vehicleType === "MOTORBIKE" ? "Motorcycle" : "Car"}
                       </span>
                     </td>
-                    <td>1 bay</td>
+                    <td>1 slot</td>
                     <td>
                       <span
                         className={`wash-bay-status ${bay.status || "UNKNOWN"
@@ -718,7 +718,7 @@ export default function AdminWashBayManagementPage() {
                     <td>
                       <div className="wash-bay-table-actions">
                         <button type="button" onClick={() => handleEdit(bay)}>
-                          Sửa
+                          Edit
                         </button>
 
                         <select

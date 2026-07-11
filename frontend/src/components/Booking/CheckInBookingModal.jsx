@@ -2,18 +2,18 @@ import { useEffect, useState } from 'react'
 import './CheckInBookingModal.css'
 
 const TEXT = {
-  notUpdated: 'Ch\u01b0a c\u1eadp nh\u1eadt',
-  title: 'X\u00e1c nh\u1eadn check-in',
-  subtitle: 'X\u00e1c nh\u1eadn kh\u00e1ch \u0111\u00e3 \u0111\u1ebfn v\u00e0 b\u1eaft \u0111\u1ea7u ph\u1ee5c v\u1ee5.',
-  customer: 'Kh\u00e1ch h\u00e0ng',
-  vehicle: 'Xe',
-  appointmentTime: 'Gi\u1edd h\u1eb9n',
-  note: 'Ghi ch\u00fa',
-  optional: '(t\u00f9y ch\u1ecdn)',
-  notePlaceholder: 'Nh\u1eadp ghi ch\u00fa check-in...',
-  cancel: 'H\u1ee7y',
-  checkingIn: '\u0110ang check-in...',
-  confirm: 'X\u00e1c nh\u1eadn check-in',
+  notUpdated: '\u2014',
+  title: 'Confirm check-in',
+  subtitle: 'Confirm the customer has arrived and service is ready to begin.',
+  customer: 'Customer',
+  vehicle: 'Vehicle',
+  appointmentTime: 'Appointment',
+  note: 'Note',
+  optional: '(optional)',
+  notePlaceholder: 'Check-in note...',
+  cancel: 'Cancel',
+  checkingIn: 'Checking in...',
+  confirm: 'Confirm check-in',
 }
 
 export default function CheckInBookingModal({ open, onClose, onConfirm, booking, bookingId, loading, error }) {
@@ -41,7 +41,7 @@ export default function CheckInBookingModal({ open, onClose, onConfirm, booking,
   }
 
   const vehicleTypeLabel = booking?.vehicleType
-    ? (String(booking.vehicleType).toUpperCase().includes('BIKE') ? '#Xe máy' : '#Ô tô')
+    ? (String(booking.vehicleType).toUpperCase().includes('BIKE') ? '#Motorbike' : '#Car')
     : null
   const vehicleMain = [booking?.licensePlate, booking?.vehicleName].filter(Boolean).join(' · ') || TEXT.notUpdated
 
