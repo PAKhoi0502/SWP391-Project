@@ -14,10 +14,10 @@ function normalizeStatus(s) {
 
 function getStatusLabel(status) {
   const n = normalizeStatus(status)
-  if (WAITING_STATUSES.has(n))   return 'Đang chờ'
-  if (OFFERED_STATUSES.has(n))   return 'Có slot'
-  if (ACCEPTED_STATUSES.has(n))  return 'Đã nhận slot'
-  if (CANCELLED_STATUSES.has(n)) return 'Đã hủy'
+  if (WAITING_STATUSES.has(n))   return 'Waiting'
+  if (OFFERED_STATUSES.has(n))   return 'Slot Available'
+  if (ACCEPTED_STATUSES.has(n))  return 'Slot Accepted'
+  if (CANCELLED_STATUSES.has(n)) return 'Cancelled'
   return n
 }
 
@@ -32,21 +32,21 @@ function getStatusTone(status) {
 function formatDate(value) {
   if (!value) return '—'
   try {
-    return new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    return new Date(value).toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' })
   } catch { return String(value) }
 }
 
 function formatTime(value) {
   if (!value) return '—'
   try {
-    return new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+    return new Date(value).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
   } catch { return String(value) }
 }
 
 function getVehicleLabel(t) {
   const v = String(t || '').toUpperCase()
-  if (v === 'CAR') return 'Ô tô'
-  if (v === 'MOTORBIKE' || v === 'BIKE' || v === 'MOTORCYCLE') return 'Xe máy'
+  if (v === 'CAR') return 'Car'
+  if (v === 'MOTORBIKE' || v === 'BIKE' || v === 'MOTORCYCLE') return 'Motorbike'
   return t || '—'
 }
 
@@ -92,7 +92,7 @@ export default function WaitlistModal({ open, onClose }) {
       const result = await waitlistApi.getMine()
       setItems(extractItems(result))
     } catch (err) {
-      setError(err?.message || err?.data?.message || 'Không thể tải waitlist của bạn.')
+      setError(err?.message || err?.data?.message || 'Could not load your waitlist.')
     } finally {
       setLoading(false)
     }
@@ -113,14 +113,14 @@ export default function WaitlistModal({ open, onClose }) {
     try {
       if (action === 'cancel') {
         await waitlistApi.cancel(id)
-        setSuccess('Đã hủy yêu cầu waitlist.')
+        setSuccess('Waitlist request cancelled.')
       } else {
         await waitlistApi.accept(id)
-        setSuccess('Đã nhận slot được offer.')
+        setSuccess('Slot accepted successfully.')
       }
       await fetchWaitlist()
     } catch (err) {
-      setError(err?.message || 'Không thể cập nhật waitlist. Vui lòng thử lại.')
+      setError(err?.message || 'Could not update waitlist. Please try again.')
     } finally {
       setActionKey('')
     }
@@ -136,12 +136,12 @@ export default function WaitlistModal({ open, onClose }) {
       <div className="wlm-dialog" role="dialog" aria-modal="true" aria-labelledby="wlm-title">
 
         <div className="wlm-header">
-          <h2 className="wlm-title" id="wlm-title">Danh sách chờ</h2>
-          <button type="button" className="wlm-close" onClick={onClose} aria-label="Đóng">✕</button>
+          <h2 className="wlm-title" id="wlm-title">Waitlist</h2>
+          <button type="button" className="wlm-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
         <div className="wlm-body">
-          {loading && <p className="wlm-state">Đang tải...</p>}
+          {loading && <p className="wlm-state">Loading...</p>}
 
           {!loading && error && <p className="wlm-error">{error}</p>}
 
@@ -156,13 +156,13 @@ export default function WaitlistModal({ open, onClose }) {
                   <polyline points="12 7 12 12 15 14"/>
                 </svg>
               </div>
-              <p className="wlm-empty-text">Bạn chưa có yêu cầu waitlist nào.</p>
+              <p className="wlm-empty-text">No waitlist requests yet.</p>
               <button
                 type="button"
                 className="wlm-book-btn"
                 onClick={() => { onClose(); navigate('/booking') }}
               >
-                Đặt lịch mới
+                Book Now
               </button>
             </div>
           )}
@@ -190,7 +190,7 @@ export default function WaitlistModal({ open, onClose }) {
                   <li key={id ?? JSON.stringify(item)} className="wlm-item">
                     <div className="wlm-item-top">
                       <span className="wlm-pkg">
-                        {packageName || `Gói #${item?.servicePackageId || '—'}`}
+                        {packageName || `Package #${item?.servicePackageId || '—'}`}
                       </span>
                       <span className={`wlm-status wlm-status--${tone}`}>
                         {getStatusLabel(status)}
@@ -203,15 +203,15 @@ export default function WaitlistModal({ open, onClose }) {
                         <dd>{garageName || `#${item?.garageId || '—'}`}</dd>
                       </div>
                       <div>
-                        <dt>Loại xe</dt>
+                        <dt>Vehicle Type</dt>
                         <dd>{getVehicleLabel(item?.vehicleType)}</dd>
                       </div>
                       <div>
-                        <dt>Ngày</dt>
+                        <dt>Date</dt>
                         <dd>{formatDate(date)}</dd>
                       </div>
                       <div>
-                        <dt>Khung giờ</dt>
+                        <dt>Time Slot</dt>
                         <dd>{formatTime(startTime)} – {formatTime(endTime)}</dd>
                       </div>
                     </dl>
@@ -225,7 +225,7 @@ export default function WaitlistModal({ open, onClose }) {
                             disabled={Boolean(actionKey)}
                             onClick={() => runAction(id, 'accept')}
                           >
-                            {isAccepting ? 'Đang xử lý...' : 'Nhận slot'}
+                            {isAccepting ? 'Processing...' : 'Accept Slot'}
                           </button>
                         )}
                         {canCancel && (
@@ -235,7 +235,7 @@ export default function WaitlistModal({ open, onClose }) {
                             disabled={Boolean(actionKey)}
                             onClick={() => runAction(id, 'cancel')}
                           >
-                            {isCancelling ? 'Đang hủy...' : 'Hủy'}
+                            {isCancelling ? 'Cancelling...' : 'Cancel'}
                           </button>
                         )}
                       </div>

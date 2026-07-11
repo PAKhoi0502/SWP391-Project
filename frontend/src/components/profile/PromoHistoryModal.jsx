@@ -12,7 +12,7 @@ const formatMoney = (value) => {
 const formatDate = (value) => {
   if (!value) return ''
   try {
-    return new Date(value).toLocaleString('vi-VN', {
+    return new Date(value).toLocaleString('en-US', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -34,19 +34,19 @@ export default function PromoHistoryModal({ open, onClose, usages = [], loading 
     >
       <div className="phm-dialog" role="dialog" aria-modal="true" aria-labelledby="phm-title">
         <div className="phm-header">
-          <h2 className="phm-title" id="phm-title">Lịch sử mã đã dùng</h2>
-          <button type="button" className="phm-close-btn" onClick={onClose} aria-label="Đóng">✕</button>
+          <h2 className="phm-title" id="phm-title">Voucher Usage History</h2>
+          <button type="button" className="phm-close-btn" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
         <div className="phm-list-wrap">
-          {loading && <p className="phm-state">Đang tải...</p>}
+          {loading && <p className="phm-state">Loading...</p>}
 
           {!loading && error && (
             <p className="phm-error">{error}</p>
           )}
 
           {!loading && !error && usages.length === 0 && (
-            <p className="phm-state">Chưa có lịch sử sử dụng mã nào.</p>
+            <p className="phm-state">No voucher usage history yet.</p>
           )}
 
           {!loading && !error && usages.length > 0 && (

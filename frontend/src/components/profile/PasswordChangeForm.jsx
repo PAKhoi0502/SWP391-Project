@@ -14,7 +14,7 @@ function getStrength(pw) {
   return 3
 }
 
-const STRENGTH_LABELS = ['', 'Yếu', 'Trung bình', 'Mạnh']
+const STRENGTH_LABELS = ['', 'Weak', 'Medium', 'Strong']
 const STRENGTH_CLASSES = ['', 'weak', 'medium', 'strong']
 
 export default function PasswordChangeForm({ onCancel }) {
@@ -31,32 +31,32 @@ export default function PasswordChangeForm({ onCancel }) {
   return (
     <div className="ps-pw-form">
       <div className="ps-pw-unavailable">
-        Chức năng đổi mật khẩu chưa khả dụng. Vui lòng liên hệ quản trị viên.
+        Password change is not available yet. Please contact an administrator.
       </div>
 
       <div className="ps-pw-field">
-        <label htmlFor="pw-old">Mật khẩu hiện tại</label>
+        <label htmlFor="pw-old">Current Password</label>
         <input
           id="pw-old"
           name="oldPw"
           type="password"
           value={form.oldPw}
           onChange={handleChange}
-          placeholder="Nhập mật khẩu hiện tại"
+          placeholder="Enter current password"
           autoComplete="current-password"
           disabled
         />
       </div>
 
       <div className="ps-pw-field">
-        <label htmlFor="pw-new">Mật khẩu mới</label>
+        <label htmlFor="pw-new">New Password</label>
         <input
           id="pw-new"
           name="newPw"
           type="password"
           value={form.newPw}
           onChange={handleChange}
-          placeholder="Nhập mật khẩu mới"
+          placeholder="Enter new password"
           autoComplete="new-password"
           disabled
         />
@@ -77,14 +77,14 @@ export default function PasswordChangeForm({ onCancel }) {
       )}
 
       <div className="ps-pw-field">
-        <label htmlFor="pw-confirm">Xác nhận mật khẩu mới</label>
+        <label htmlFor="pw-confirm">Confirm New Password</label>
         <input
           id="pw-confirm"
           name="confirmPw"
           type="password"
           value={form.confirmPw}
           onChange={handleChange}
-          placeholder="Nhập lại mật khẩu mới"
+          placeholder="Re-enter new password"
           autoComplete="new-password"
           disabled
         />
@@ -92,10 +92,10 @@ export default function PasswordChangeForm({ onCancel }) {
 
       <div className="ps-pw-actions">
         <button type="button" className="ps-pw-submit" disabled>
-          Xác nhận đổi mật khẩu
+          Confirm Password Change
         </button>
         <button type="button" className="ps-pw-cancel" onClick={onCancel}>
-          Hủy
+          Cancel
         </button>
       </div>
     </div>

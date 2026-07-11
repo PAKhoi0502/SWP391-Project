@@ -18,13 +18,13 @@ const sortByTimeDesc = (list) =>
 
 const formatDiscount = (promo) => {
   const t = String(promo.discountType || '').toUpperCase()
-  if (t === 'PERCENTAGE' || t === 'PERCENT') return `Giảm ${promo.discountValue}%`
+  if (t === 'PERCENTAGE' || t === 'PERCENT') return `${promo.discountValue}% off`
   if (t === 'FIXED_AMOUNT' || t === 'FIXED') {
-    return `Giảm ${new Intl.NumberFormat('vi-VN', {
+    return `${new Intl.NumberFormat('vi-VN', {
       style: 'currency',
       currency: 'VND',
       maximumFractionDigits: 0,
-    }).format(promo.discountValue)}`
+    }).format(promo.discountValue)} off`
   }
   return ''
 }
@@ -32,7 +32,7 @@ const formatDiscount = (promo) => {
 const formatExpiry = (endAt) => {
   if (!endAt) return ''
   try {
-    return `HSD: ${new Intl.DateTimeFormat('vi-VN', {
+    return `Expires: ${new Intl.DateTimeFormat('en-US', {
       day: '2-digit', month: '2-digit', year: 'numeric',
     }).format(new Date(endAt))}`
   } catch {
@@ -63,7 +63,7 @@ export default function VoucherModal({ open, onClose, currentTier }) {
     ])
       .then(([p, u, b]) => { setPromos(p); setUsages(u); setBookings(b) })
       .catch((err) => {
-        setError(err?.response?.data?.message || 'Không tải được voucher.')
+        setError(err?.response?.data?.message || 'Could not load vouchers.')
         setPromos([]); setUsages([]); setBookings([])
       })
       .finally(() => setLoading(false))
@@ -142,7 +142,7 @@ export default function VoucherModal({ open, onClose, currentTier }) {
         })),
       )
     } catch {
-      setHistoryError('Không thể tải lịch sử sử dụng. Vui lòng thử lại.')
+      setHistoryError('Could not load usage history. Please try again.')
     } finally {
       setHistoryLoading(false)
     }
@@ -158,17 +158,17 @@ export default function VoucherModal({ open, onClose, currentTier }) {
     >
       <div className="ps-modal-card" role="dialog" aria-modal="true" aria-labelledby="vm-title">
         <div className="ps-modal-header">
-          <h2 className="ps-modal-title" id="vm-title">Voucher & khuyến mãi</h2>
+          <h2 className="ps-modal-title" id="vm-title">Vouchers & Promotions</h2>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button type="button" className="mbm-history-btn" onClick={openHistory}>
-              Lịch sử sử dụng
+              Usage History
             </button>
-            <button type="button" className="ps-modal-close" onClick={onClose} aria-label="Đóng">✕</button>
+            <button type="button" className="ps-modal-close" onClick={onClose} aria-label="Close">✕</button>
           </div>
         </div>
 
         <div className="ps-modal-body">
-          {loading && <p className="ps-modal-state">Đang tải...</p>}
+          {loading && <p className="ps-modal-state">Loading...</p>}
 
           {!loading && error && (
             <p style={{ color: '#b91c1c', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>{error}</p>
@@ -177,8 +177,8 @@ export default function VoucherModal({ open, onClose, currentTier }) {
           {!loading && !error && display.length === 0 && (
             <div className="vm-empty">
               <div className="vm-empty-icon">🎟️</div>
-              <p className="vm-empty-title">Chưa có mã ưu đãi phù hợp</p>
-              <p className="vm-empty-sub">Các khuyến mãi phù hợp với hạng thành viên của bạn sẽ hiển thị ở đây</p>
+              <p className="vm-empty-title">No vouchers available</p>
+              <p className="vm-empty-sub">Promotions matching your membership tier will appear here</p>
             </div>
           )}
 

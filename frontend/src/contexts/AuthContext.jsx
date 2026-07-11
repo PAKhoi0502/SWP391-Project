@@ -101,7 +101,8 @@ export function AuthProvider({ children }) {
   const isAuthenticated = Boolean(accessToken && user);
 
   const loadCurrentUser = useCallback(async () => {
-    const token = authStorage.getAccessToken();
+    const token      = authStorage.getAccessToken();
+    const cachedUser = authStorage.getUser();
 
     if (!token) {
       setAccessToken(null);
@@ -110,33 +111,36 @@ export function AuthProvider({ children }) {
       return null;
     }
 
-    setAccessToken(token);
+    // Has both token and cached user — restore session immediately without hitting /users/me
+    if (cachedUser) {
+      const finalUser = normalizeUser(cachedUser, token);
+      setAccessToken(token);
+      setUser(finalUser);
+      setLoading(false);
+      return finalUser;
+    }
 
+    // No cached user — fetch from server
+    setAccessToken(token);
     try {
       const currentUser = await authService.getCurrentUser();
+      const merged = { ...currentUser };
+      if (!merged.fullName) merged.fullName = '';
+      if (!merged.email)    merged.email    = null;
 
-      // Merge API response with cached user: keep cached fullName/email if API omits them
-      const cachedUser = authStorage.getUser();
-      const merged = { ...cachedUser, ...currentUser };
-      if (!merged.fullName) merged.fullName = cachedUser?.fullName || '';
-      if (!merged.email)    merged.email    = cachedUser?.email    || null;
-
-      const finalUser = merged ? normalizeUser(merged, token) : null;
-
+      const finalUser = normalizeUser(merged, token);
       if (finalUser) {
         setUser(finalUser);
         authStorage.setAuth({ accessToken: token, user: finalUser });
       }
-
       return finalUser;
     } catch (err) {
       const status = err?.response?.status;
-      if (status === 401 || status === 403) {
+      if (status === 401) {
         authStorage.clearAuth();
         setAccessToken(null);
         setUser(null);
       }
-      // Network errors / 500s: keep existing token and cached user
       return null;
     } finally {
       setLoading(false);

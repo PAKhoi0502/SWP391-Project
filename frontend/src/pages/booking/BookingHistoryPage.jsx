@@ -149,14 +149,6 @@ const getPaymentText = (status) => {
   return status || 'Unpaid'
 }
 
-const getPaymentMethodText = (booking) => {
-  const method = String(booking?.paymentMethod || '').toUpperCase()
-  const note   = normalizeText(booking?.note)
-  if (method === 'BANK_TRANSFER' || method === 'PAYOS' || note.includes('chuyen khoan')) return 'Bank Transfer'
-  if (method === 'CASH' || note.includes('tien mat')) return 'Cash'
-  return 'N/A'
-}
-
 const isCanceledStatus = (status) => {
   const v = String(status || '').toUpperCase()
   return v === 'CANCELED' || v === 'CANCELLED'

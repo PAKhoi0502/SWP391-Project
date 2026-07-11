@@ -1804,8 +1804,6 @@ function BookingDetailPage() {
               </div>
               <span className="bd-section-meta">{booking.servicePackageName || TEXT.servicePackage}</span>
             </div>
-            {role === 'staff' && ['IN_PROGRESS', 'COMPLETED'].includes(currentStatus) && renderInspectionCard('BEFORE_WASH')}
-
             {serviceSteps.length > 0 ? (
               <ServiceStepsProgress
                 steps={serviceSteps}
@@ -1814,6 +1812,9 @@ function BookingDetailPage() {
                 onReopenStep={role !== 'customer' ? handleReopenServiceStep : undefined}
                 actionLoadingStepId={stepActionLoadingId}
                 error={stepActionError}
+                renderStepExtra={role === 'staff' && ['IN_PROGRESS', 'COMPLETED'].includes(currentStatus)
+                  ? (step) => step.order === 1 ? renderInspectionCard('BEFORE_WASH') : null
+                  : undefined}
               />
             ) : booking.servicePackageSteps?.length > 0 ? (
               <ol className="bd-step-list">

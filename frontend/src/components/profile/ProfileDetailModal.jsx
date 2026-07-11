@@ -4,8 +4,8 @@ import './ProfileSettings.css'
 
 function normalizeRole(role) {
   const raw = String(role || '').replace('ROLE_', '').toUpperCase()
-  const MAP = { CUSTOMER: 'Khách hàng', STAFF: 'Nhân viên', ADMIN: 'Quản trị viên' }
-  return MAP[raw] || raw || 'Khách hàng'
+  const MAP = { CUSTOMER: 'Customer', STAFF: 'Staff', ADMIN: 'Admin' }
+  return MAP[raw] || raw || 'Customer'
 }
 
 export default function ProfileDetailModal({ open, onClose, profile, autoOpenPw = false }) {
@@ -24,13 +24,13 @@ export default function ProfileDetailModal({ open, onClose, profile, autoOpenPw 
     >
       <div className="ps-modal-card" role="dialog" aria-modal="true" aria-labelledby="pdm-title">
         <div className="ps-modal-header">
-          <h2 className="ps-modal-title" id="pdm-title">Thông tin tài khoản</h2>
-          <button type="button" className="ps-modal-close" onClick={onClose} aria-label="Đóng">✕</button>
+          <h2 className="ps-modal-title" id="pdm-title">Account Information</h2>
+          <button type="button" className="ps-modal-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
         <div className="ps-modal-body">
           <div className="ps-info-row">
-            <span className="ps-info-label">Họ và tên</span>
+            <span className="ps-info-label">Full Name</span>
             <span className="ps-info-value">{profile?.fullName || '—'}</span>
           </div>
 
@@ -40,17 +40,17 @@ export default function ProfileDetailModal({ open, onClose, profile, autoOpenPw 
           </div>
 
           <div className="ps-info-row">
-            <span className="ps-info-label">Số điện thoại</span>
+            <span className="ps-info-label">Phone Number</span>
             <span className="ps-info-value">{profile?.phone || '—'}</span>
           </div>
 
           <div className="ps-info-row">
-            <span className="ps-info-label">Vai trò</span>
+            <span className="ps-info-label">Role</span>
             <span className="ps-info-value">{normalizeRole(profile?.role)}</span>
           </div>
 
           <div className="ps-info-row">
-            <span className="ps-info-label">Mật khẩu</span>
+            <span className="ps-info-label">Password</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
               <span className="ps-info-value dots">••••••••</span>
               <button
@@ -58,7 +58,7 @@ export default function ProfileDetailModal({ open, onClose, profile, autoOpenPw 
                 className="ps-change-pw-btn"
                 onClick={() => setShowPwForm((v) => !v)}
               >
-                {showPwForm ? 'Ẩn' : 'Đổi mật khẩu'}
+                {showPwForm ? 'Hide' : 'Change Password'}
               </button>
             </div>
           </div>

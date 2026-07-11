@@ -39,7 +39,7 @@ export default function MemberBenefitsModal({ open, onClose }) {
         setTierRules(Array.isArray(rulesData) ? rulesData : [])
       })
       .catch((err) => {
-        setError(err?.response?.data?.message || 'Không tải được thông tin thành viên.')
+        setError(err?.response?.data?.message || 'Could not load member information.')
       })
       .finally(() => setLoading(false))
   }, [open])
@@ -57,12 +57,12 @@ export default function MemberBenefitsModal({ open, onClose }) {
       >
         <div className="ps-modal-card" role="dialog" aria-modal="true" aria-labelledby="mbm-title">
           <div className="ps-modal-header">
-            <h2 className="ps-modal-title" id="mbm-title">Ưu đãi thành viên</h2>
-            <button type="button" className="ps-modal-close" onClick={onClose} aria-label="Đóng">✕</button>
+            <h2 className="ps-modal-title" id="mbm-title">Member Tier</h2>
+            <button type="button" className="ps-modal-close" onClick={onClose} aria-label="Close">✕</button>
           </div>
 
           <div className="ps-modal-body">
-            {loading && <p className="ps-modal-state">Đang tải...</p>}
+            {loading && <p className="ps-modal-state">Loading...</p>}
 
             {!loading && error && (
               <p style={{ color: '#b91c1c', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>{error}</p>
@@ -74,7 +74,7 @@ export default function MemberBenefitsModal({ open, onClose }) {
                 <div className="mbm-tier-hero">
                   <span className="mbm-tier-icon"><TierGemIcon tier={currentTierKey} size={28} /></span>
                   <div className="mbm-tier-info">
-                    <p className="mbm-tier-label">Hạng hiện tại</p>
+                    <p className="mbm-tier-label">Current Tier</p>
                     <p className="mbm-tier-name">{getTierLabel(currentTierKey)}</p>
                   </div>
                   <button
@@ -82,36 +82,36 @@ export default function MemberBenefitsModal({ open, onClose }) {
                     className="mbm-history-btn"
                     onClick={() => setTxOpen(true)}
                   >
-                    Lịch sử điểm
+                    Points History
                   </button>
                 </div>
 
                 {/* Stats grid */}
                 <div className="mbm-stats-grid">
                   <div className="mbm-stat-block">
-                    <span className="mbm-stat-label">Điểm khả dụng</span>
+                    <span className="mbm-stat-label">Available Points</span>
                     <span className="mbm-stat-value">{loyalty.availablePoints ?? 0}</span>
                   </div>
                   <div className="mbm-stat-block">
-                    <span className="mbm-stat-label">Tổng điểm</span>
+                    <span className="mbm-stat-label">Total Points</span>
                     <span className="mbm-stat-value">{loyalty.totalPoints ?? 0}</span>
                   </div>
                   <div className="mbm-stat-block">
-                    <span className="mbm-stat-label">Đã đổi</span>
+                    <span className="mbm-stat-label">Redeemed</span>
                     <span className="mbm-stat-value dim">{loyalty.redeemedPoints ?? 0}</span>
                   </div>
                   <div className="mbm-stat-block">
-                    <span className="mbm-stat-label">Hết hạn</span>
+                    <span className="mbm-stat-label">Expired</span>
                     <span className="mbm-stat-value dim">{loyalty.expiredPoints ?? 0}</span>
                   </div>
                   <div className="mbm-stat-block">
-                    <span className="mbm-stat-label">Tổng chi tiêu</span>
+                    <span className="mbm-stat-label">Total Spent</span>
                     <span className="mbm-stat-value sm">{formatMoney(loyalty.totalSpent)}</span>
                   </div>
                   <div className="mbm-stat-block">
-                    <span className="mbm-stat-label">Lượt rửa xe</span>
+                    <span className="mbm-stat-label">Wash Visits</span>
                     <span className="mbm-stat-value">{loyalty.totalVisits ?? 0}
-                      <span style={{ fontSize: 12, fontWeight: 600, color: '#667085' }}> lần</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#667085' }}> visits</span>
                     </span>
                   </div>
                 </div>
@@ -126,7 +126,7 @@ export default function MemberBenefitsModal({ open, onClose }) {
                       onClick={() => setTiersOpen((v) => !v)}
                       aria-expanded={tiersOpen}
                     >
-                      <span className="mbm-tiers-toggle-label">Điều kiện hạng thành viên</span>
+                      <span className="mbm-tiers-toggle-label">Membership Tier Requirements</span>
                       <span className={`mbm-tiers-chevron${tiersOpen ? ' open' : ''}`}>
                         <ChevronDown />
                       </span>
@@ -138,18 +138,18 @@ export default function MemberBenefitsModal({ open, onClose }) {
                           const ruleKey = String(rule.tier || '').toUpperCase()
                           const isCurrent = ruleKey === currentTierKey
                           const conditions = []
-                          if (rule.minTotalSpent)  conditions.push(`Chi tiêu ≥ ${formatMoney(rule.minTotalSpent)}`)
-                          if (rule.minTotalVisits) conditions.push(`≥ ${rule.minTotalVisits} lượt`)
-                          if (rule.minTotalPoints) conditions.push(`≥ ${rule.minTotalPoints} điểm`)
+                          if (rule.minTotalSpent)  conditions.push(`Spend ≥ ${formatMoney(rule.minTotalSpent)}`)
+                          if (rule.minTotalVisits) conditions.push(`≥ ${rule.minTotalVisits} visits`)
+                          if (rule.minTotalPoints) conditions.push(`≥ ${rule.minTotalPoints} pts`)
                           return (
                             <div key={ruleKey} className={`mbm-tier-item${isCurrent ? ' current' : ''}`}>
                               <div className="mbm-tier-item-row">
                                 <span className={`mbm-tier-item-name${isCurrent ? ' current-label' : ''}`}>
                                   <TierGemIcon tier={ruleKey} size={16} /> {getTierLabel(ruleKey)}
-                                  {isCurrent && <span className="mbm-tier-current-chip">Hiện tại</span>}
+                                  {isCurrent && <span className="mbm-tier-current-chip">Current</span>}
                                 </span>
                                 {rule.pointMultiplier && (
-                                  <span className="mbm-tier-multiplier">×{rule.pointMultiplier} điểm</span>
+                                  <span className="mbm-tier-multiplier">×{rule.pointMultiplier} pts</span>
                                 )}
                               </div>
                               {conditions.length > 0 && (

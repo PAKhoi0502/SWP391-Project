@@ -6,22 +6,21 @@ import './BookingsModal.css'
 const HIDDEN_STATUSES = new Set(['COMPLETED', 'CANCELLED', 'CANCELED', 'NO_SHOW'])
 
 const STATUS_META = {
-  PENDING:     { label: 'Chờ xác nhận', tone: 'pending' },
-  CONFIRMED:   { label: 'Đã xác nhận',  tone: 'confirmed' },
-  CHECKED_IN:  { label: 'Đã check-in',  tone: 'inprogress' },
-  IN_PROGRESS: { label: 'Đang rửa',     tone: 'inprogress' },
-  COMPLETED:   { label: 'Hoàn thành',   tone: 'completed' },
-  CANCELLED:   { label: 'Đã hủy',       tone: 'cancelled' },
-  CANCELED:    { label: 'Đã hủy',       tone: 'cancelled' },
-  NO_SHOW:     { label: 'Không đến',    tone: 'cancelled' },
+  PENDING:     { label: 'Pending',    tone: 'pending' },
+  CONFIRMED:   { label: 'Confirmed',  tone: 'confirmed' },
+  CHECKED_IN:  { label: 'Checked In', tone: 'inprogress' },
+  IN_PROGRESS: { label: 'In Progress',tone: 'inprogress' },
+  COMPLETED:   { label: 'Completed',  tone: 'completed' },
+  CANCELLED:   { label: 'Cancelled',  tone: 'cancelled' },
+  CANCELED:    { label: 'Cancelled',  tone: 'cancelled' },
+  NO_SHOW:     { label: 'No Show',    tone: 'cancelled' },
 }
 
 function getStatusMeta(status) {
   const key = String(status || '').toUpperCase()
-  return STATUS_META[key] || { label: key || 'Không rõ', tone: 'pending' }
+  return STATUS_META[key] || { label: key || 'Unknown', tone: 'pending' }
 }
 
-// Returns "YYYY-MM-DD" in LOCAL timezone — avoids UTC-shift bugs
 function toLocalDateStr(value) {
   if (!value) return null
   const d = new Date(value)
@@ -43,21 +42,21 @@ function getTodayStr() {
 function formatDate(value) {
   if (!value) return '—'
   try {
-    return new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    return new Date(value).toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' })
   } catch { return String(value) }
 }
 
 function formatTime(value) {
   if (!value) return '—'
   try {
-    return new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+    return new Date(value).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
   } catch { return String(value) }
 }
 
 function getVehicleLabel(t) {
   const v = String(t || '').toUpperCase()
-  if (v === 'CAR') return 'Ô tô'
-  if (v === 'MOTORBIKE' || v === 'BIKE' || v === 'MOTORCYCLE') return 'Xe máy'
+  if (v === 'CAR') return 'Car'
+  if (v === 'MOTORBIKE' || v === 'BIKE' || v === 'MOTORCYCLE') return 'Motorbike'
   return t || '—'
 }
 
@@ -72,10 +71,9 @@ export default function BookingsModal({ open, onClose }) {
   const [loading,     setLoading]     = useState(false)
   const [error,       setError]       = useState('')
 
-  // filter: 'all' | 'today' | 'date'
   const [filterMode, setFilterMode] = useState('all')
-  const [filterDate, setFilterDate] = useState('')   // 'YYYY-MM-DD'
-  const [sortDir,    setSortDir]    = useState('desc') // 'desc' | 'asc'
+  const [filterDate, setFilterDate] = useState('')
+  const [sortDir,    setSortDir]    = useState('desc')
 
   const fetchBookings = useCallback(async () => {
     setLoading(true)
@@ -84,7 +82,7 @@ export default function BookingsModal({ open, onClose }) {
       const data = await bookingApi.getCustomerBookings()
       setBookings(Array.isArray(data) ? data : [])
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Không thể tải lịch hẹn.')
+      setError(err?.response?.data?.message || err?.message || 'Could not load appointments.')
     } finally {
       setLoading(false)
     }
@@ -100,7 +98,6 @@ export default function BookingsModal({ open, onClose }) {
   }, [open, fetchBookings])
 
   const filtered = useMemo(() => {
-    // Always hide completed / cancelled / no-show
     let list = bookings.filter(
       (b) => !HIDDEN_STATUSES.has(String(b?.status || '').toUpperCase()),
     )
@@ -139,16 +136,13 @@ export default function BookingsModal({ open, onClose }) {
     >
       <div className="bkm-dialog" role="dialog" aria-modal="true" aria-labelledby="bkm-title">
 
-        {/* ── Header ── */}
         <div className="bkm-header">
-          <h2 className="bkm-title" id="bkm-title">Lịch hẹn</h2>
-          <button type="button" className="bkm-close" onClick={onClose} aria-label="Đóng">✕</button>
+          <h2 className="bkm-title" id="bkm-title">Appointments</h2>
+          <button type="button" className="bkm-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
-        {/* ── Filter bar (sticky, outside scroll area) ── */}
         <div className="bkm-filters">
           <div className="bkm-filter-left">
-            {/* Hôm nay pill */}
             <button
               type="button"
               className={`bkm-filter-pill${filterMode === 'today' ? ' bkm-filter-pill--active' : ''}`}
@@ -156,10 +150,9 @@ export default function BookingsModal({ open, onClose }) {
                 if (filterMode === 'today') { clearFilter() } else { setFilterMode('today'); setFilterDate('') }
               }}
             >
-              Hôm nay
+              Today
             </button>
 
-            {/* Date picker */}
             <div className="bkm-date-wrap">
               <input
                 type="date"
@@ -173,41 +166,37 @@ export default function BookingsModal({ open, onClose }) {
               />
             </div>
 
-            {/* Clear */}
             {hasFilter && (
               <button
                 type="button"
                 className="bkm-filter-clear"
                 onClick={clearFilter}
-                aria-label="Xóa bộ lọc"
+                aria-label="Clear filter"
               >
                 ✕
               </button>
             )}
           </div>
 
-          {/* Sort toggle */}
           <button
             type="button"
             className="bkm-sort-btn"
             onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
-            title={sortDir === 'desc' ? 'Đang hiện mới nhất trước' : 'Đang hiện cũ nhất trước'}
+            title={sortDir === 'desc' ? 'Showing newest first' : 'Showing oldest first'}
           >
             {sortDir === 'desc' ? (
-              <><span className="bkm-sort-arrow">↓</span> Mới nhất</>
+              <><span className="bkm-sort-arrow">↓</span> Newest</>
             ) : (
-              <><span className="bkm-sort-arrow">↑</span> Cũ nhất</>
+              <><span className="bkm-sort-arrow">↑</span> Oldest</>
             )}
           </button>
         </div>
 
-        {/* ── Scrollable body ── */}
         <div className="bkm-body">
-          {loading && <p className="bkm-state">Đang tải...</p>}
+          {loading && <p className="bkm-state">Loading...</p>}
 
           {!loading && error && <p className="bkm-error">{error}</p>}
 
-          {/* No bookings at all */}
           {isEmpty && (
             <div className="bkm-empty">
               <div className="bkm-empty-icon">
@@ -217,18 +206,17 @@ export default function BookingsModal({ open, onClose }) {
                   <path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>
                 </svg>
               </div>
-              <p className="bkm-empty-text">Bạn chưa có lịch hẹn nào.</p>
+              <p className="bkm-empty-text">No appointments yet.</p>
               <button
                 type="button"
                 className="bkm-book-btn"
                 onClick={() => { onClose(); navigate('/booking') }}
               >
-                Đặt lịch mới
+                Book Now
               </button>
             </div>
           )}
 
-          {/* Filter returned nothing */}
           {hasNoMatch && (
             <div className="bkm-empty">
               <div className="bkm-empty-icon bkm-empty-icon--filter">
@@ -239,14 +227,13 @@ export default function BookingsModal({ open, onClose }) {
                   <line x1="8" y1="11" x2="14" y2="11"/>
                 </svg>
               </div>
-              <p className="bkm-empty-text">Không có lịch hẹn phù hợp.</p>
+              <p className="bkm-empty-text">No appointments match your filter.</p>
               <button type="button" className="bkm-filter-reset-btn" onClick={clearFilter}>
-                Xóa bộ lọc
+                Clear filter
               </button>
             </div>
           )}
 
-          {/* List */}
           {!loading && !error && filtered.length > 0 && (
             <ul className="bkm-list">
               {filtered.map((booking) => {
@@ -264,7 +251,7 @@ export default function BookingsModal({ open, onClose }) {
 
                     <dl className="bkm-details">
                       <div>
-                        <dt>Khung giờ</dt>
+                        <dt>Time Slot</dt>
                         <dd>{formatTime(booking.startTime)} – {formatTime(booking.endTime)}</dd>
                       </div>
                       {garageName && (
@@ -275,13 +262,13 @@ export default function BookingsModal({ open, onClose }) {
                       )}
                       {packageName && (
                         <div>
-                          <dt>Dịch vụ</dt>
+                          <dt>Service</dt>
                           <dd>{packageName}</dd>
                         </div>
                       )}
                       {vehicleType && (
                         <div>
-                          <dt>Loại xe</dt>
+                          <dt>Vehicle Type</dt>
                           <dd>{getVehicleLabel(vehicleType)}</dd>
                         </div>
                       )}
