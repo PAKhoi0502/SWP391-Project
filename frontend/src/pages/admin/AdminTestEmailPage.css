@@ -1,69 +1,67 @@
 .ate-page {
   max-width: 560px;
-  padding: 40px 0;
-  color: #f8fafc;
+  padding: 32px 0;
+  color: #0f172a;
 }
 
-/* ── Header ── */
 .ate-kicker {
-  margin: 0 0 8px;
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.16em;
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(250, 204, 21, 0.7);
+  color: #2563eb;
 }
 
 .ate-page h1 {
-  margin: 0 0 10px;
-  font-size: 28px;
-  font-weight: 800;
-  color: #f1f5f9;
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
   line-height: 1.2;
 }
 
 .ate-desc {
-  margin: 0 0 32px;
+  margin: 0 0 28px;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
+  color: #64748b;
   line-height: 1.6;
 }
 
-/* ── Card ── */
 .ate-card {
-  background: rgba(15, 15, 22, 0.85);
-  border: 1px solid rgba(250, 204, 21, 0.12);
-  border-radius: 20px;
-  padding: 32px 36px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 28px 32px;
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.06);
 }
 
-/* ── Form ── */
 .ate-form {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
 }
 
 .ate-field {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
 }
 
 .ate-label {
   font-size: 13px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.65);
-  letter-spacing: 0.02em;
+  color: #334155;
+  letter-spacing: 0.01em;
 }
 
 .ate-input {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  color: #f1f5f9;
-  font-size: 15px;
-  padding: 12px 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  color: #0f172a;
+  font-size: 14px;
+  padding: 11px 14px;
   transition: border-color 0.15s, box-shadow 0.15s;
   outline: none;
   width: 100%;
@@ -71,51 +69,50 @@
 }
 
 .ate-input::placeholder {
-  color: rgba(255, 255, 255, 0.25);
+  color: #94a3b8;
 }
 
 .ate-input:focus {
-  border-color: rgba(250, 204, 21, 0.45);
-  box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.07);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .ate-field.has-error .ate-input {
-  border-color: rgba(239, 68, 68, 0.55);
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.07);
+  border-color: #fca5a5;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.08);
 }
 
 .ate-input:disabled {
-  opacity: 0.5;
+  background: #f8fafc;
+  opacity: 0.7;
   cursor: not-allowed;
 }
 
 .ate-field-error {
   font-size: 12.5px;
-  color: #fca5a5;
+  color: #dc2626;
   font-weight: 500;
 }
 
-/* ── Submit button ── */
 .ate-submit-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   align-self: flex-start;
-  padding: 11px 28px;
-  border-radius: 12px;
+  padding: 10px 24px;
+  border-radius: 10px;
   border: none;
-  background: linear-gradient(135deg, #facc15 0%, #f59e0b 100%);
-  color: #0b0b0f;
+  background: #2563eb;
+  color: #ffffff;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
-  transition: opacity 0.15s, transform 0.1s;
-  letter-spacing: 0.01em;
+  transition: background 0.15s, transform 0.1s;
 }
 
 .ate-submit-btn:hover:not(:disabled) {
-  opacity: 0.9;
+  background: #1d4ed8;
 }
 
 .ate-submit-btn:active:not(:disabled) {
@@ -127,12 +124,11 @@
   cursor: not-allowed;
 }
 
-/* ── Spinner ── */
 .ate-spinner {
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(0, 0, 0, 0.25);
-  border-top-color: #0b0b0f;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
   border-radius: 50%;
   animation: ate-spin 0.65s linear infinite;
   flex-shrink: 0;
@@ -142,17 +138,16 @@
   to { transform: rotate(360deg); }
 }
 
-/* ── Result messages ── */
 .ate-result {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 14px 18px;
-  border-radius: 12px;
+  padding: 14px 16px;
+  border-radius: 10px;
   font-size: 14px;
   font-weight: 500;
   line-height: 1.5;
-  margin-top: 20px;
+  margin-top: 18px;
 }
 
 .ate-result-icon {
@@ -163,29 +158,28 @@
 }
 
 .ate-result.success {
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.25);
-  color: #86efac;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
 }
 
 .ate-result.success .ate-result-icon {
-  color: #22c55e;
+  color: #16a34a;
 }
 
 .ate-result.error {
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.22);
-  color: #fca5a5;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
 }
 
 .ate-result.error .ate-result-icon {
   color: #ef4444;
 }
 
-/* ── Responsive ── */
 @media (max-width: 600px) {
   .ate-card {
-    padding: 24px 20px;
+    padding: 20px 18px;
   }
   .ate-submit-btn {
     width: 100%;

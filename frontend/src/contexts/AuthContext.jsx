@@ -85,9 +85,16 @@ export function AuthProvider({ children }) {
     return authStorage.getAccessToken() || null;
   });
 
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    return authStorage.getUser() || null;
+  });
 
-  const [loading, setLoading] = useState(true);
+  // Start non-loading if both token + cached user exist — avoids Sign in/Sign up flash on F5
+  const [loading, setLoading] = useState(() => {
+    const hasToken = Boolean(authStorage.getAccessToken())
+    const hasUser  = Boolean(authStorage.getUser())
+    return !(hasToken && hasUser)
+  });
 
   const isAuthenticated = Boolean(accessToken && user);
 
@@ -105,22 +112,29 @@ export function AuthProvider({ children }) {
 
     try {
       const currentUser = await authService.getCurrentUser();
-      const finalUser = currentUser ? normalizeUser(currentUser, token) : null;
 
-if (finalUser) {
-  setUser(finalUser);
+      // Merge API response with cached user: keep cached fullName/email if API omits them
+      const cachedUser = authStorage.getUser();
+      const merged = { ...cachedUser, ...currentUser };
+      if (!merged.fullName) merged.fullName = cachedUser?.fullName || '';
+      if (!merged.email)    merged.email    = cachedUser?.email    || null;
 
-  authStorage.setAuth({
-    accessToken: token,
-    user: finalUser,
-  });
-}
+      const finalUser = merged ? normalizeUser(merged, token) : null;
+
+      if (finalUser) {
+        setUser(finalUser);
+        authStorage.setAuth({ accessToken: token, user: finalUser });
+      }
 
       return finalUser;
-    } catch {
-      authStorage.clearAuth();
-      setAccessToken(null);
-      setUser(null);
+    } catch (err) {
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) {
+        authStorage.clearAuth();
+        setAccessToken(null);
+        setUser(null);
+      }
+      // Network errors / 500s: keep existing token and cached user
       return null;
     } finally {
       setLoading(false);
@@ -176,8 +190,15 @@ if (finalUser) {
   };
 
   const setCurrentUser = (currentUser) => {
-    setUser(currentUser);
-    authStorage.setAuth({ user: currentUser });
+    const cachedUser = authStorage.getUser();
+    // Preserve fullName/email from cache if the new data omits them
+    const merged = {
+      ...currentUser,
+      fullName: currentUser?.fullName || currentUser?.name || cachedUser?.fullName || '',
+      email:    currentUser?.email    || cachedUser?.email    || null,
+    };
+    setUser(merged);
+    authStorage.setAuth({ user: merged });
   };
 
   useEffect(() => {

@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 import {
   PACKAGE_TYPES,
-  VEHICLE_TYPES,
   extractList,
   getAvailableServicePackages,
   getErrorMessage,
@@ -14,215 +14,333 @@ import {
   getPackageType,
   getServicePackages,
 } from '../services/servicePackageApi'
-import './ServicePackagePage.css'
+import './PublicServicePackagePage.css'
 
-const money = new Intl.NumberFormat('vi-VN', {
-  style: 'currency',
-  currency: 'VND',
-})
+const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
 
-export default function ServicePackageListPage() {
-  const [packages, setPackages] = useState([])
-  const [filters, setFilters] = useState({
-  keyword: '',
-  vehicleType: 'CAR',
-  packageType: '',
-})
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  const filteredPackages = useMemo(() => {
-  return packages.filter((item) => {
-    const name = getPackageName(item).toLowerCase()
-    const keyword = filters.keyword.trim().toLowerCase()
-
-    const matchActive = getPackageActive(item)
-    const matchKeyword = !keyword || name.includes(keyword)
-    const matchType = !filters.packageType || getPackageType(item) === filters.packageType
-
-    return matchActive && matchKeyword && matchType
-  })
-}, [packages, filters.keyword, filters.packageType])
-
-  useEffect(() => {
-    const timer = setTimeout(loadPackages, 250)
-    return () => clearTimeout(timer)
-  }, [filters.keyword, filters.vehicleType, filters.packageType, filters.garageId])
-
-  async function loadPackages() {
-    try {
-      setLoading(true)
-      setError('')
-
-      const params = {
-  vehicleType: filters.vehicleType,
+function formatVehicleType(value) {
+  const v = String(value || '').toUpperCase()
+  if (v === 'CAR') return 'Car'
+  if (v === 'BIKE' || v === 'MOTORBIKE') return 'Motorbike'
+  return 'All vehicles'
 }
 
-      try {
-        const data = await getAvailableServicePackages(params)
-        setPackages(extractList(data))
-      } catch (availableError) {
-        if (availableError?.response?.status !== 404) throw availableError
+function formatPackageType(value) {
+  if (value === 'MAIN')   return 'Main'
+  if (value === 'ADD_ON') return 'Add-on'
+  if (value === 'COMBO')  return 'Combo'
+  return value || '—'
+}
 
-        const data = await getServicePackages(params)
+function badgeClass(type) {
+  if (type === 'ADD_ON') return 'spp-badge spp-badge--add_on'
+  if (type === 'COMBO')  return 'spp-badge spp-badge--combo'
+  return 'spp-badge spp-badge--main'
+}
+
+function IconSearch() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7"/>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+  )
+}
+
+function IconClock() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9"/>
+      <polyline points="12 7 12 12 15 14"/>
+    </svg>
+  )
+}
+
+function IconCar() {
+  return (
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 11l1.7-4.3A2 2 0 0 1 8.6 5.5h6.8a2 2 0 0 1 1.9 1.2L19 11"/>
+      <path d="M3 11h18v5.2a.8.8 0 0 1-.8.8H18"/>
+      <path d="M6 17H3.8a.8.8 0 0 1-.8-.8V11"/>
+      <circle cx="7.5" cy="17" r="1.7"/>
+      <circle cx="16.5" cy="17" r="1.7"/>
+    </svg>
+  )
+}
+
+const VEHICLE_ALL     = ''
+const PAGE_SIZE       = 9
+const VEHICLE_OPTIONS = [
+  { value: '',     label: 'All' },
+  { value: 'CAR',  label: 'Car' },
+  { value: 'BIKE', label: 'Motorbike' },
+]
+
+function SkeletonGrid() {
+  return (
+    <div className="spp-grid">
+      {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+        <div key={i} className="spp-skeleton-card">
+          <div className="spp-skel spp-skel--h10 spp-skel--w40" />
+          <div className="spp-skel spp-skel--h20 spp-skel--w80" />
+          <div className="spp-skel spp-skel--h10 spp-skel--w60" style={{ marginTop: 4 }} />
+          <div className="spp-skel spp-skel--h10 spp-skel--w80" />
+          <div className="spp-skel spp-skel--h10 spp-skel--w60" style={{ marginTop: 8 }} />
+          <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+            <div className="spp-skel spp-skel--h14" style={{ flex: 1 }} />
+            <div className="spp-skel spp-skel--h14" style={{ flex: 1 }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export default function ServicePackageListPage() {
+  const { isAuthenticated } = useAuth()
+
+  const [packages, setPackages] = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [error,    setError]    = useState('')
+
+  const [keyword,     setKeyword]     = useState('')
+  const [vehicleType, setVehicleType] = useState('CAR')
+  const [packageType, setPackageType] = useState('')
+
+  const debounceRef = useRef(null)
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(loadPackages, 280)
+    return () => clearTimeout(debounceRef.current)
+  }, [vehicleType])
+
+  async function loadPackages() {
+    setLoading(true)
+    setError('')
+    try {
+      if (!vehicleType) {
+        // "All" selected — /available requires vehicleType, so fall back to base endpoint
+        const data = await getServicePackages({})
         setPackages(extractList(data).filter((item) => getPackageActive(item)))
+      } else {
+        try {
+          const data = await getAvailableServicePackages({ vehicleType })
+          setPackages(extractList(data))
+        } catch (e) {
+          if (e?.response?.status !== 404) throw e
+          const data = await getServicePackages({ vehicleType })
+          setPackages(extractList(data).filter((item) => getPackageActive(item)))
+        }
       }
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể tải danh sách gói dịch vụ'))
+      setError(getErrorMessage(err, 'Could not load service packages.'))
     } finally {
       setLoading(false)
     }
   }
 
-  function updateFilter(name, value) {
-    setFilters((prev) => ({ ...prev, [name]: value }))
+  const filteredPackages = useMemo(() => {
+    const kw = keyword.trim().toLowerCase()
+    return packages.filter((item) => {
+      if (!getPackageActive(item)) return false
+      if (kw && !getPackageName(item).toLowerCase().includes(kw)) return false
+      if (packageType && getPackageType(item) !== packageType) return false
+      return true
+    })
+  }, [packages, keyword, packageType])
+
+  function clearFilters() {
+    setKeyword('')
+    setVehicleType('CAR')
+    setPackageType('')
   }
 
-  function resetFilter() {
-  setFilters({
-    keyword: '',
-    vehicleType: 'CAR',
-    packageType: '',
-  })
-}
+  const hasFilters = keyword !== '' || vehicleType !== 'CAR' || packageType !== ''
+
+  const countByType = (type) => packages.filter((p) => getPackageActive(p) && getPackageType(p) === type).length
 
   return (
-    <div className="service-package-page">
-      <section className="service-package-hero">
-        <div>
-          <p className="service-package-kicker">Service Packages</p>
-          <h1>Chọn gói chăm sóc phù hợp với xe của bạn</h1>
-          <p>
-            Xem các gói đang hoạt động, lọc theo loại xe, loại gói và garage còn khả dụng trước khi đặt lịch.
-          </p>
-        </div>
+    <div className="spp-page">
+      <div className="spp-content">
 
-        <div className="service-package-stats">
-          <div className="service-package-stat">
-            <span>Tổng gói</span>
-            <strong>{filteredPackages.length}</strong>
+        {/* ── Hero ── */}
+        <div className="spp-hero">
+          <div className="spp-hero-text">
+            <p className="spp-hero-eyebrow">Service Packages</p>
+            <h1 className="spp-hero-title">Professional Car&nbsp;Care</h1>
+            <p className="spp-hero-desc">
+              Choose the perfect package for your vehicle. Filter by vehicle type,
+              package category, or search by name — then book in seconds.
+            </p>
           </div>
-          <div className="service-package-stat">
-            <span>Combo</span>
-            <strong>{filteredPackages.filter((item) => getPackageType(item) === 'COMBO').length}</strong>
-          </div>
-          <div className="service-package-stat">
-            <span>Add-on</span>
-            <strong>{filteredPackages.filter((item) => getPackageType(item) === 'ADD_ON').length}</strong>
-          </div>
-        </div>
-      </section>
 
-      {error && <div className="service-package-alert error">{error}</div>}
-
-      <section className="service-package-panel">
-        <div className="service-package-panel-header">
-          <div>
-            <h2>Danh sách gói dịch vụ</h2>
-            <p>Filter theo loại xe và nhóm gói MAIN / ADD_ON / COMBO.</p>
+          <div className="spp-stats">
+            <div className="spp-stat">
+              <strong>{packages.filter(getPackageActive).length}</strong>
+              <span>Total</span>
+            </div>
+            <div className="spp-stat">
+              <strong>{countByType('MAIN')}</strong>
+              <span>Main</span>
+            </div>
+            <div className="spp-stat">
+              <strong>{countByType('COMBO')}</strong>
+              <span>Combo</span>
+            </div>
+            <div className="spp-stat">
+              <strong>{countByType('ADD_ON')}</strong>
+              <span>Add-on</span>
+            </div>
           </div>
         </div>
 
-        <div className="service-package-filters">
-          <input
-            className="service-package-input"
-            value={filters.keyword}
-            onChange={(e) => updateFilter('keyword', e.target.value)}
-            placeholder="Tìm tên gói dịch vụ..."
-          />
+        {/* ── Filters ── */}
+        <div className="spp-filter-section">
+          <div className="spp-search-wrap">
+            <span className="spp-search-icon"><IconSearch /></span>
+            <input
+              className="spp-search"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder="Search packages by name…"
+            />
+          </div>
 
-          <select
-            className="service-package-select"
-            value={filters.vehicleType}
-            onChange={(e) => updateFilter('vehicleType', e.target.value)}
-          >
-            <option value="">Tất cả loại xe</option>
-            {VEHICLE_TYPES.map((type) => (
-  <option key={type} value={type}>
-    {formatVehicleType(type)}
-  </option>
-))}
-          </select>
+          <div className="spp-filter-rows">
+            <div className="spp-filter-group">
+              <span className="spp-filter-label">Vehicle</span>
+              {VEHICLE_OPTIONS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`spp-pill${vehicleType === value ? ' spp-pill--active' : ''}`}
+                  onClick={() => setVehicleType(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
 
-          <select
-            className="service-package-select"
-            value={filters.packageType}
-            onChange={(e) => updateFilter('packageType', e.target.value)}
-          >
-            <option value="">Tất cả loại gói</option>
-            {PACKAGE_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {formatPackageType(type)}
-              </option>
-            ))}
-          </select>
+            <div className="spp-filter-sep" />
 
-          <button className="service-package-ghost-btn" type="button" onClick={resetFilter}>
-            Xóa lọc
-          </button>
+            <div className="spp-filter-group">
+              <span className="spp-filter-label">Type</span>
+              <button
+                type="button"
+                className={`spp-pill${packageType === '' ? ' spp-pill--active' : ''}`}
+                onClick={() => setPackageType('')}
+              >
+                All
+              </button>
+              {PACKAGE_TYPES.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  className={`spp-pill${packageType === type ? ' spp-pill--active' : ''}`}
+                  onClick={() => setPackageType(type)}
+                >
+                  {formatPackageType(type)}
+                </button>
+              ))}
+            </div>
+
+            {hasFilters && (
+              <button type="button" className="spp-clear-btn" onClick={clearFilters}>
+                Clear filters
+              </button>
+            )}
+          </div>
         </div>
 
+        {/* ── Results count ── */}
+        {!loading && !error && (
+          <div className="spp-results-head">
+            <span className="spp-results-count">
+              {filteredPackages.length} package{filteredPackages.length !== 1 ? 's' : ''} found
+            </span>
+          </div>
+        )}
+
+        {/* ── Error ── */}
+        {error && <div className="spp-error">{error}</div>}
+
+        {/* ── Grid / States ── */}
         {loading ? (
-  <div className="service-package-empty">Đang tải gói dịch vụ...</div>
-) : filteredPackages.length === 0 ? (
-  <div className="service-package-empty">Chưa có gói dịch vụ phù hợp.</div>
-) : (
-  <div className="service-package-grid">
-    {filteredPackages.map((item) => (
-      <PackageCard key={getPackageId(item)} item={item} />
-    ))}
-  </div>
-)}
-      </section>
+          <SkeletonGrid />
+        ) : !error && filteredPackages.length === 0 ? (
+          <div className="spp-grid">
+            <div className="spp-empty">
+              <div className="spp-empty-icon"><IconCar /></div>
+              <p>No packages found</p>
+              <span>Try adjusting your filters or search term.</span>
+            </div>
+          </div>
+        ) : !error ? (
+          <div className="spp-grid">
+            {filteredPackages.map((item, idx) => (
+              <PackageCard
+                key={getPackageId(item)}
+                item={item}
+                isAuthenticated={isAuthenticated}
+                delay={idx * 0.045}
+              />
+            ))}
+          </div>
+        ) : null}
+
+      </div>
     </div>
   )
 }
 
-function PackageCard({ item }) {
-  const id = getPackageId(item)
-  const price = getPackagePrice(item)
+function PackageCard({ item, isAuthenticated, delay }) {
+  const id       = getPackageId(item)
+  const price    = getPackagePrice(item)
   const duration = getPackageDuration(item)
-  const type = getPackageType(item)
+  const type     = getPackageType(item)
+  const name     = getPackageName(item)
 
   return (
-    <Link className="service-package-card" to={`/customer/service-packages/${id}`}>
-      <div className="service-package-card-top">
-        <h3>{getPackageName(item)}</h3>
-        <span className={`service-package-pill ${type === 'COMBO' ? 'green' : type === 'ADD_ON' ? 'orange' : ''}`}>
-          {formatPackageType(type)}
-        </span>
+    <div className="spp-card" style={{ animationDelay: `${delay}s` }}>
+      <div className="spp-card-head">
+        <div className="spp-card-badges">
+          <span className={badgeClass(type)}>{formatPackageType(type)}</span>
+          {item.vehicleType && (
+            <span className="spp-badge spp-badge--vehicle">{formatVehicleType(item.vehicleType)}</span>
+          )}
+        </div>
+        {duration > 0 && (
+          <span className="spp-card-duration">
+            <IconClock /> {duration} min
+          </span>
+        )}
       </div>
 
-      <p className="service-package-desc">
-        {item.description || item.shortDescription || 'Gói chăm sóc xe của AutoWash Pro.'}
+      <h3 className="spp-card-name">{name}</h3>
+      <p className="spp-card-desc">
+        {item.description || item.shortDescription || 'Professional vehicle care package.'}
       </p>
 
-      <div className="service-package-meta">
-        <span className="service-package-pill">{formatVehicleType(item.vehicleType)}</span>
-        {duration > 0 && <span className="service-package-pill">{duration} phút</span>}
-        <span className="service-package-pill green">Active</span>
+      <div className="spp-card-price">
+        <span className="spp-price-label">Starting from</span>
+        <strong className="spp-price-value">{money.format(Number(price) || 0)}</strong>
       </div>
 
-      <div className="service-package-price">
-        <div>
-          <span>Giá từ</span>
-          <strong>{money.format(Number(price) || 0)}</strong>
-        </div>
-        <span>Xem chi tiết →</span>
+      <div className="spp-card-actions">
+        <Link to={`/customer/service-packages/${id}`} className="spp-detail-btn">
+          View Details
+        </Link>
+        <Link
+          to={isAuthenticated ? '/booking' : '/login'}
+          className="spp-book-btn"
+        >
+          Book Now
+        </Link>
       </div>
-    </Link>
+    </div>
   )
-}
-
-function formatVehicleType(value) {
-  if (value === 'CAR') return 'Ô tô'
-  if (value === 'MOTORBIKE') return 'Xe máy'
-  return 'Mọi loại xe'
-}
-
-function formatPackageType(value) {
-  if (value === 'MAIN') return 'Main'
-  if (value === 'ADD_ON') return 'Add-on'
-  if (value === 'COMBO') return 'Combo'
-  return value || '-'
 }

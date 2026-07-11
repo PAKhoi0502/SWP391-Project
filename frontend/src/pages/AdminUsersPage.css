@@ -1,0 +1,121 @@
+/* ─── Admin Users Page ─── */
+.aup-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.aup-header {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 20px 24px;
+}
+
+.aup-header h1 {
+  color: #0f172a;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 3px;
+}
+
+.aup-header p {
+  color: #64748b;
+  font-size: 13.5px;
+  margin: 0;
+}
+
+.aup-panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.aup-filters {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(200px, 1fr) 160px 180px;
+  margin-bottom: 16px;
+}
+
+.aup-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 13.5px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+}
+
+.aup-loading {
+  color: #64748b;
+  font-size: 14px;
+  padding: 24px;
+  text-align: center;
+}
+
+/* Detail modal rows */
+.aup-detail-row {
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding-bottom: 10px;
+}
+
+.aup-detail-row span {
+  color: #64748b;
+  font-size: 13.5px;
+}
+
+.aup-detail-row strong {
+  color: #0f172a;
+  font-size: 13.5px;
+  text-align: right;
+}
+
+.aup-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* User cell in table */
+.aup-user-cell {
+  display: grid;
+  gap: 3px;
+}
+
+.aup-user-name {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.aup-user-email {
+  color: #64748b;
+  font-size: 12.5px;
+}
+
+.aup-user-phone {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .aup-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .aup-filters {
+    grid-template-columns: 1fr;
+  }
+}

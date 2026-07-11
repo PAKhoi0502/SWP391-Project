@@ -15,7 +15,7 @@ import {
   updateServicePackage,
   updateServicePackageStatus,
 } from '../../services/servicePackageApi'
-import '../ServicePackagePage.css'
+import './AdminServicePackagePage.css'
 
 const initialForm = {
   name: '',
@@ -36,10 +36,7 @@ const initialForm = {
   pointsEarned: '0',
 }
 
-const money = new Intl.NumberFormat('vi-VN', {
-  style: 'currency',
-  currency: 'VND',
-})
+const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
 
 export default function AdminServicePackagePage() {
   const [packages, setPackages] = useState([])
@@ -52,6 +49,9 @@ export default function AdminServicePackagePage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [alertMsg, setAlertMsg] = useState('')
+  const [confirmDialog, setConfirmDialog] = useState(null)
+  const [toggling, setToggling] = useState(false)
 
   const filteredPackages = useMemo(() => {
     return packages.filter((item) => {
@@ -59,14 +59,11 @@ export default function AdminServicePackagePage() {
       const matchKeyword = name.includes(keyword.trim().toLowerCase())
       const matchType = typeFilter === 'ALL' || getPackageType(item) === typeFilter
       const matchVehicle = vehicleFilter === 'ALL' || item.vehicleType === vehicleFilter
-
       return matchKeyword && matchType && matchVehicle
     })
   }, [packages, keyword, typeFilter, vehicleFilter])
 
-  useEffect(() => {
-    loadPackages()
-  }, [])
+  useEffect(() => { loadPackages() }, [])
 
   async function loadPackages() {
     try {
@@ -75,7 +72,7 @@ export default function AdminServicePackagePage() {
       const data = await getServicePackages()
       setPackages(extractList(data))
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể tải danh sách gói dịch vụ'))
+      setError(getErrorMessage(err, 'Failed to load service packages'))
     } finally {
       setLoading(false)
     }
@@ -108,13 +105,9 @@ export default function AdminServicePackagePage() {
 
   function buildPayload() {
     const isCombo = form.packageType === 'COMBO'
-
     const serviceIds = isCombo
       ? [form.comboMainId, ...form.comboAddOnIds].map((id) => Number(id)).filter(Boolean)
-      : form.includedServiceIds
-          .split(',')
-          .map((id) => Number(id.trim()))
-          .filter(Boolean)
+      : form.includedServiceIds.split(',').map((id) => Number(id.trim())).filter(Boolean)
 
     const steps = isCombo
       ? []
@@ -123,87 +116,73 @@ export default function AdminServicePackagePage() {
           .map((line) => line.trim())
           .filter(Boolean)
           .map((line, index) => ({
-  stepOrder: index + 1,
-  name: line,
-  description: line,
-  isRequired: true,
-  instructions: [],
-}))
+            stepOrder: index + 1,
+            name: line,
+            description: line,
+            isRequired: true,
+            instructions: [],
+          }))
+
     const cleanName = form.name.trim()
-const code = cleanName
-  .toUpperCase()
-  .normalize('NFD')
-  .replace(/[\u0300-\u036f]/g, '')
-  .replace(/[^A-Z0-9]+/g, '_')
-  .replace(/^_+|_+$/g, '')
+    const code = cleanName
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
 
-return {
-  name: cleanName,
-  packageName: cleanName,
-  code: code || `PACKAGE_${Date.now()}`,
-
-  description: form.description.trim(),
-
-  vehicleType: form.vehicleType,
-
-  serviceType: form.packageType,
-packageType: form.packageType,
-type: form.packageType,
-
-  price: Number(form.price),
-  basePrice: Number(form.price),
-
-  durationMinutes: Number(form.durationMinutes),
-estimatedDurationMinutes: Number(form.durationMinutes),
-washBayDurationMinutes: Number(form.durationMinutes),
-
-  requiresWashBay: true,
-  requiresCareStaff: false,
-
-  careStaffDurationMinutes: 0,
-  careStaffRequiredCount: 0,
-  careStaffType: 'NONE',
-
-  pointsEarned: 0,
-
-  includedServiceIds: serviceIds,
-  serviceIds,
-
-  stepsTemplate: steps,
-  steps,
-
-  isActive: true,
-  active: true,
-}
+    return {
+      name: cleanName,
+      packageName: cleanName,
+      code: code || `PACKAGE_${Date.now()}`,
+      description: form.description.trim(),
+      vehicleType: form.vehicleType,
+      serviceType: form.packageType,
+      packageType: form.packageType,
+      type: form.packageType,
+      price: Number(form.price),
+      basePrice: Number(form.price),
+      durationMinutes: Number(form.durationMinutes),
+      estimatedDurationMinutes: Number(form.durationMinutes),
+      washBayDurationMinutes: Number(form.durationMinutes),
+      requiresWashBay: true,
+      requiresCareStaff: false,
+      careStaffDurationMinutes: 0,
+      careStaffRequiredCount: 0,
+      careStaffType: 'NONE',
+      pointsEarned: 0,
+      includedServiceIds: serviceIds,
+      serviceIds,
+      stepsTemplate: steps,
+      steps,
+      isActive: true,
+      active: true,
+    }
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
-
-    if (!form.name.trim()) return alert('Vui lòng nhập tên gói dịch vụ')
-    if (!form.price || Number(form.price) < 0) return alert('Vui lòng nhập giá hợp lệ')
-    if (!form.durationMinutes || Number(form.durationMinutes) <= 0) return alert('Vui lòng nhập thời lượng hợp lệ')
+    if (!form.name.trim()) { setAlertMsg('Please enter a package name.'); return }
+    if (!form.price || Number(form.price) < 0) { setAlertMsg('Please enter a valid price.'); return }
+    if (!form.durationMinutes || Number(form.durationMinutes) <= 0) { setAlertMsg('Please enter a valid duration.'); return }
 
     try {
       setSaving(true)
       setError('')
       setSuccess('')
-
       const payload = buildPayload()
-
       if (editingId) {
         await updateServicePackage(editingId, payload)
-        setSuccess('Cập nhật gói dịch vụ thành công')
+        setSuccess('Service package updated successfully')
       } else {
         await createServicePackage(payload)
-        setSuccess('Tạo gói dịch vụ thành công')
+        setSuccess('Service package created successfully')
       }
-
       setForm(initialForm)
       setEditingId(null)
       await loadPackages()
     } catch (err) {
-      setError(getErrorMessage(err, 'Lưu gói dịch vụ thất bại'))
+      setError(getErrorMessage(err, 'Failed to save service package'))
     } finally {
       setSaving(false)
     }
@@ -228,28 +207,25 @@ washBayDurationMinutes: Number(form.durationMinutes),
 
     setEditingId(getPackageId(item))
     setForm({
-  name: getPackageName(item),
-  description: item.description || '',
-  vehicleType: item.vehicleType || 'CAR',
-  packageType: getPackageType(item) || 'MAIN',
-  price: String(getPackagePrice(item) || ''),
-  durationMinutes: String(getPackageDuration(item) || ''),
-  includedServiceIds: includedIds.join(', '),
-  comboMainId: comboMainId ? String(comboMainId) : '',
-  comboAddOnIds,
-  stepsTemplate: Array.isArray(steps)
-    ? steps
-        .map((step) => step.title || step.name || step.description || step)
-        .join('\n')
-    : '',
-  requiresWashBay: item.requiresWashBay ?? true,
-  requiresCareStaff: item.requiresCareStaff ?? false,
-  careStaffDurationMinutes: String(item.careStaffDurationMinutes ?? 0),
-  careStaffRequiredCount: String(item.careStaffRequiredCount ?? 0),
-  careStaffType: item.careStaffType || 'NONE',
-  pointsEarned: String(item.pointsEarned ?? 0),
-})
-
+      name: getPackageName(item),
+      description: item.description || '',
+      vehicleType: item.vehicleType || 'CAR',
+      packageType: getPackageType(item) || 'MAIN',
+      price: String(getPackagePrice(item) || ''),
+      durationMinutes: String(getPackageDuration(item) || ''),
+      includedServiceIds: includedIds.join(', '),
+      comboMainId: comboMainId ? String(comboMainId) : '',
+      comboAddOnIds,
+      stepsTemplate: Array.isArray(steps)
+        ? steps.map((step) => step.title || step.name || step.description || step).join('\n')
+        : '',
+      requiresWashBay: item.requiresWashBay ?? true,
+      requiresCareStaff: item.requiresCareStaff ?? false,
+      careStaffDurationMinutes: String(item.careStaffDurationMinutes ?? 0),
+      careStaffRequiredCount: String(item.careStaffRequiredCount ?? 0),
+      careStaffType: item.careStaffType || 'NONE',
+      pointsEarned: String(item.pointsEarned ?? 0),
+    })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -260,325 +236,193 @@ washBayDurationMinutes: Number(form.durationMinutes),
     setSuccess('')
   }
 
-  async function handleToggleStatus(item) {
-    const id = getPackageId(item)
+  function handleToggleStatus(item) {
     const nextActive = !getPackageActive(item)
+    setConfirmDialog({ item, nextActive })
+  }
 
-    const ok = window.confirm(
-      nextActive ? 'Bạn muốn kích hoạt gói này?' : 'Bạn muốn tạm ngưng gói này?'
-    )
-
-    if (!ok) return
-
+  async function handleConfirmToggle() {
+    if (!confirmDialog) return
+    const { item, nextActive } = confirmDialog
+    setToggling(true)
+    setConfirmDialog(null)
     try {
       setError('')
       setSuccess('')
-      await updateServicePackageStatus(id, nextActive)
-      setSuccess(nextActive ? 'Đã kích hoạt gói dịch vụ' : 'Đã tạm ngưng gói dịch vụ')
+      await updateServicePackageStatus(getPackageId(item), nextActive)
+      setSuccess(nextActive ? 'Package activated' : 'Package deactivated')
       await loadPackages()
     } catch (err) {
-      setError(getErrorMessage(err, 'Cập nhật trạng thái thất bại'))
+      setError(getErrorMessage(err, 'Failed to update status'))
+    } finally {
+      setToggling(false)
     }
   }
 
   return (
-    <div className="service-package-page">
-      <section className="service-package-hero">
+    <div className="asp-page">
+      <div className="asp-header">
         <div>
-          <p className="service-package-kicker">Admin</p>
-          <h1>Quản lý gói dịch vụ</h1>
-          <p>
-            Tạo, cập nhật, bật/tắt gói dịch vụ và quản lý MAIN / ADD_ON / COMBO.
-          </p>
+          <p className="asp-eyebrow">Admin</p>
+          <h1>Service Packages</h1>
+          <p>Create, update and toggle MAIN / ADD_ON / COMBO service packages.</p>
         </div>
-
-        <div className="service-package-stats">
-          <div className="service-package-stat">
-            <span>Tổng gói</span>
-            <strong>{packages.length}</strong>
-          </div>
-          <div className="service-package-stat">
-            <span>Active</span>
-            <strong>{packages.filter((item) => getPackageActive(item)).length}</strong>
-          </div>
-          <div className="service-package-stat">
-            <span>Combo</span>
-            <strong>{packages.filter((item) => getPackageType(item) === 'COMBO').length}</strong>
-          </div>
+        <div className="asp-stats">
+          <div className="asp-stat"><span>Total</span><strong>{packages.length}</strong></div>
+          <div className="asp-stat"><span>Active</span><strong>{packages.filter((item) => getPackageActive(item)).length}</strong></div>
+          <div className="asp-stat"><span>Combos</span><strong>{packages.filter((item) => getPackageType(item) === 'COMBO').length}</strong></div>
         </div>
-      </section>
+      </div>
 
-      {error && <div className="service-package-alert error">{error}</div>}
-      {success && <div className="service-package-alert success">{success}</div>}
+      {error && <div className="asp-alert error">{error}</div>}
+      {success && <div className="asp-alert success">{success}</div>}
 
-      <section className="service-package-panel">
-        <div className="service-package-panel-header">
+      <div className="asp-panel">
+        <div className="asp-panel-header">
           <div>
-            <h2>{editingId ? 'Cập nhật gói dịch vụ' : 'Tạo gói dịch vụ mới'}</h2>
-            <p>Nhập thông tin package, included services và steps template.</p>
+            <h2>{editingId ? 'Update package' : 'Create new package'}</h2>
+            <p>Enter package info, included services and steps template.</p>
           </div>
-
           {editingId && (
-            <button className="service-package-ghost-btn" type="button" onClick={handleCancelEdit}>
-              Hủy sửa
-            </button>
+            <button className="asp-ghost-btn" type="button" onClick={handleCancelEdit}>Cancel</button>
           )}
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="service-package-form-grid">
-            <input
-              className="service-package-input"
-              name="name"
-              value={form.name}
-              onChange={handleChange}
-              placeholder="Tên gói dịch vụ"
-            />
-
-            <input
-              className="service-package-input"
-              name="price"
-              value={form.price}
-              onChange={handleChange}
-              placeholder="Giá"
-              type="number"
-              min="0"
-            />
-
-            <select
-              className="service-package-select"
-              name="vehicleType"
-              value={form.vehicleType}
-              onChange={handleChange}
-            >
+        <form onSubmit={handleSubmit} className="asp-form">
+          <div className="asp-form-grid">
+            <input className="asp-input" name="name" value={form.name} onChange={handleChange} placeholder="Package name" />
+            <input className="asp-input" name="price" value={form.price} onChange={handleChange} placeholder="Price (VND)" type="number" min="0" />
+            <select className="asp-select" name="vehicleType" value={form.vehicleType} onChange={handleChange}>
               {VEHICLE_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {formatVehicleType(type)}
-                </option>
+                <option key={type} value={type}>{formatVehicleType(type)}</option>
               ))}
             </select>
-
-            <select
-              className="service-package-select"
-              name="packageType"
-              value={form.packageType}
-              onChange={handleChange}
-            >
+            <select className="asp-select" name="packageType" value={form.packageType} onChange={handleChange}>
               {PACKAGE_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {formatPackageType(type)}
-                </option>
+                <option key={type} value={type}>{formatPackageType(type)}</option>
               ))}
             </select>
-
-            <input
-              className="service-package-input"
-              name="durationMinutes"
-              value={form.durationMinutes}
-              onChange={handleChange}
-              placeholder="Thời lượng phút"
-              type="number"
-              min="1"
-            />
-
+            <input className="asp-input" name="durationMinutes" value={form.durationMinutes} onChange={handleChange} placeholder="Duration (minutes)" type="number" min="1" />
             {form.packageType !== 'COMBO' && (
-              <input
-                className="service-package-input"
-                name="includedServiceIds"
-                value={form.includedServiceIds}
-                onChange={handleChange}
-                placeholder="Included service IDs, ví dụ: 1,2,3"
-              />
+              <input className="asp-input" name="includedServiceIds" value={form.includedServiceIds} onChange={handleChange} placeholder="Included service IDs, e.g. 1,2,3" />
             )}
           </div>
 
-          <textarea
-            className="service-package-textarea"
-            name="description"
-            value={form.description}
-            onChange={handleChange}
-            placeholder="Mô tả gói dịch vụ"
-          />
+          <textarea className="asp-textarea" name="description" value={form.description} onChange={handleChange} placeholder="Package description" />
 
           {form.packageType === 'COMBO' ? (
-            <div className="service-package-combo-builder" style={{ marginTop: 12 }}>
-              <label>Gói MAIN</label>
-              <select
-                className="service-package-select"
-                name="comboMainId"
-                value={form.comboMainId}
-                onChange={handleChange}
-              >
-                <option value="">Chọn gói MAIN</option>
+            <div className="asp-combo-builder">
+              <label>Main package</label>
+              <select className="asp-select" name="comboMainId" value={form.comboMainId} onChange={handleChange}>
+                <option value="">Select MAIN package</option>
                 {mainPackageOptions.map((pkg) => (
-                  <option key={getPackageId(pkg)} value={getPackageId(pkg)}>
-                    {getPackageName(pkg)}
-                  </option>
+                  <option key={getPackageId(pkg)} value={getPackageId(pkg)}>{getPackageName(pkg)}</option>
                 ))}
               </select>
-
-              <label style={{ marginTop: 12, display: 'block' }}>Gói ADD_ON (có thể chọn nhiều)</label>
-              <div className="service-package-combo-addons">
+              <label style={{ marginTop: 12, display: 'block' }}>Add-on packages (multi-select)</label>
+              <div className="asp-combo-addons">
                 {addOnPackageOptions.map((pkg) => {
                   const id = String(getPackageId(pkg))
                   const active = form.comboAddOnIds.includes(id)
-
                   return (
-                    <button
-                      type="button"
-                      key={id}
-                      className={`service-package-pill${active ? ' active' : ''}`}
-                      onClick={() => toggleComboAddOn(id)}
-                    >
+                    <button type="button" key={id} className={`asp-pill${active ? ' active' : ''}`} onClick={() => toggleComboAddOn(id)}>
                       {getPackageName(pkg)}
                     </button>
                   )
                 })}
               </div>
-
-              <p style={{ marginTop: 8, color: '#64748b', fontSize: 13 }}>
-                Các bước xử lý của combo sẽ tự động lấy từ gói MAIN + ADD_ON đã chọn, không cần nhập steps template riêng.
-              </p>
+              <p className="asp-combo-note">Combo steps are derived automatically from selected MAIN + ADD_ON packages.</p>
             </div>
           ) : (
             <textarea
-              className="service-package-textarea"
+              className="asp-textarea"
               name="stepsTemplate"
               value={form.stepsTemplate}
               onChange={handleChange}
-              placeholder={'Steps template, mỗi dòng là 1 bước\nVí dụ:\nKiểm tra xe\nRửa ngoại thất\nLau khô và bàn giao'}
+              placeholder={'Steps template — one step per line\ne.g.:\nInspect vehicle\nExterior wash\nDry and hand over'}
               style={{ marginTop: 12 }}
             />
           )}
 
-          <div className="service-package-actions" style={{ marginTop: 16 }}>
-            <button className="service-package-primary-btn" disabled={saving}>
-              {saving ? 'Đang lưu...' : editingId ? 'Cập nhật gói' : 'Tạo gói'}
+          <div className="asp-form-actions">
+            <button className="asp-primary-btn" disabled={saving || toggling}>
+              {saving ? 'Saving...' : editingId ? 'Save changes' : 'Create package'}
             </button>
-
             {editingId && (
-              <button className="service-package-ghost-btn" type="button" onClick={handleCancelEdit}>
-                Hủy
-              </button>
+              <button className="asp-ghost-btn" type="button" onClick={handleCancelEdit}>Cancel</button>
             )}
           </div>
         </form>
-      </section>
+      </div>
 
-      <section className="service-package-panel">
-        <div className="service-package-panel-header">
+      <div className="asp-panel">
+        <div className="asp-panel-header">
           <div>
-            <h2>Danh sách service packages</h2>
-            <p>Lọc và quản lý trạng thái hiển thị cho customer.</p>
+            <h2>Service packages</h2>
+            <p>Filter and manage package visibility for customers.</p>
           </div>
         </div>
 
-        <div className="service-package-filters">
-          <input
-            className="service-package-input"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            placeholder="Tìm tên gói..."
-          />
-
-          <select
-            className="service-package-select"
-            value={vehicleFilter}
-            onChange={(e) => setVehicleFilter(e.target.value)}
-          >
-            <option value="ALL">Tất cả loại xe</option>
-            {VEHICLE_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {formatVehicleType(type)}
-              </option>
-            ))}
+        <div className="asp-filters">
+          <input className="asp-input" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Search package name..." />
+          <select className="asp-select" value={vehicleFilter} onChange={(e) => setVehicleFilter(e.target.value)}>
+            <option value="ALL">All vehicle types</option>
+            {VEHICLE_TYPES.map((type) => (<option key={type} value={type}>{formatVehicleType(type)}</option>))}
           </select>
-
-          <select
-            className="service-package-select"
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-          >
-            <option value="ALL">Tất cả loại gói</option>
-            {PACKAGE_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {formatPackageType(type)}
-              </option>
-            ))}
+          <select className="asp-select" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <option value="ALL">All package types</option>
+            {PACKAGE_TYPES.map((type) => (<option key={type} value={type}>{formatPackageType(type)}</option>))}
           </select>
-
-          <button
-            className="service-package-ghost-btn"
-            type="button"
-            onClick={() => {
-              setKeyword('')
-              setVehicleFilter('ALL')
-              setTypeFilter('ALL')
-            }}
-          >
-            Xóa lọc
+          <button className="asp-ghost-btn" type="button" onClick={() => { setKeyword(''); setVehicleFilter('ALL'); setTypeFilter('ALL') }}>
+            Clear
           </button>
         </div>
 
         {loading ? (
-          <div className="service-package-empty">Đang tải service packages...</div>
+          <div className="asp-empty">Loading service packages...</div>
         ) : filteredPackages.length === 0 ? (
-          <div className="service-package-empty">Chưa có gói dịch vụ.</div>
+          <div className="asp-empty">No service packages found.</div>
         ) : (
-          <div className="service-package-table-wrap">
-            <table className="service-package-table">
+          <div className="asp-table-wrap">
+            <table className="asp-table">
               <thead>
                 <tr>
-                  <th>Tên gói</th>
-                  <th>Loại xe</th>
+                  <th>Name</th>
+                  <th>Vehicle</th>
                   <th>Type</th>
-                  <th>Giá</th>
-                  <th>Thời lượng</th>
-                  <th>Trạng thái</th>
-                  <th>Thao tác</th>
+                  <th>Price</th>
+                  <th>Duration</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
-
               <tbody>
                 {filteredPackages.map((item) => {
                   const id = getPackageId(item)
                   const active = getPackageActive(item)
-
                   return (
                     <tr key={id}>
                       <td>
-                        <strong>{getPackageName(item)}</strong>
-                        <div style={{ color: '#64748b', fontSize: 13 }}>
-                          {item.description || '-'}
-                        </div>
+                        <strong className="asp-pkg-name">{getPackageName(item)}</strong>
+                        {item.description && <div className="asp-pkg-desc">{item.description}</div>}
                       </td>
                       <td>{formatVehicleType(item.vehicleType)}</td>
-                      <td>
-                        <span className="service-package-pill">
-                          {formatPackageType(getPackageType(item))}
-                        </span>
-                      </td>
+                      <td><span className="asp-type-pill">{formatPackageType(getPackageType(item))}</span></td>
                       <td>{money.format(Number(getPackagePrice(item)) || 0)}</td>
-                      <td>{getPackageDuration(item) || '-'} phút</td>
+                      <td>{getPackageDuration(item) || '-'} min</td>
                       <td>
-                        <span className={`service-package-pill ${active ? 'green' : 'orange'}`}>
+                        <span className={`asp-status-pill ${active ? 'active' : 'inactive'}`}>
                           {active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
                       <td>
-                        <div className="service-package-actions">
+                        <div className="asp-row-actions">
+                          <button className="asp-action-btn" type="button" onClick={() => handleEdit(item)}>Edit</button>
                           <button
-                            className="service-package-ghost-btn"
-                            type="button"
-                            onClick={() => handleEdit(item)}
-                          >
-                            Sửa
-                          </button>
-
-                          <button
-                            className="service-package-ghost-btn"
+                            className={`asp-action-btn${active ? ' danger' : ''}`}
                             type="button"
                             onClick={() => handleToggleStatus(item)}
+                            disabled={toggling}
                           >
                             {active ? 'Deactivate' : 'Activate'}
                           </button>
@@ -591,14 +435,43 @@ washBayDurationMinutes: Number(form.durationMinutes),
             </table>
           </div>
         )}
-      </section>
+      </div>
+
+      {alertMsg && (
+        <div className="asp-overlay" onClick={() => setAlertMsg('')}>
+          <div className="asp-dialog" onClick={(e) => e.stopPropagation()}>
+            <p>{alertMsg}</p>
+            <div className="asp-dialog-actions">
+              <button className="asp-dialog-ok" onClick={() => setAlertMsg('')}>OK</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDialog && (
+        <div className="asp-overlay" onClick={() => setConfirmDialog(null)}>
+          <div className="asp-dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>{confirmDialog.nextActive ? 'Activate package?' : 'Deactivate package?'}</h3>
+            <p><strong>{getPackageName(confirmDialog.item)}</strong></p>
+            <div className="asp-dialog-actions">
+              <button className="asp-dialog-cancel" onClick={() => setConfirmDialog(null)}>Cancel</button>
+              <button
+                className={`asp-dialog-ok${!confirmDialog.nextActive ? ' danger' : ''}`}
+                onClick={handleConfirmToggle}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 function formatVehicleType(value) {
-  if (value === 'CAR') return 'Ô tô'
-  if (value === 'MOTORBIKE') return 'Xe máy'
+  if (value === 'CAR') return 'Car'
+  if (value === 'MOTORBIKE' || value === 'BIKE') return 'Motorcycle'
   return value || '-'
 }
 

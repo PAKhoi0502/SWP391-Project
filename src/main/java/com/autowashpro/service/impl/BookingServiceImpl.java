@@ -612,6 +612,7 @@ public class BookingServiceImpl implements BookingService {
                 booking.setRewardProcessed(false);
                 booking.setUsedPoints(usedPoints);
                 booking.setNote(request.getNote());
+                booking.setPaymentMethod(request.getPaymentMethod());
 
                 Booking saved = bookingRepository.save(booking);
 
@@ -1267,6 +1268,7 @@ public class BookingServiceImpl implements BookingService {
                 booking.setRewardProcessed(false);
 
                 Booking saved = bookingRepository.save(booking);
+                notificationService.notifyBookingCanceled(saved.getId());
                 // Hoàn điểm nếu có — không hoàn khi đã CHECKED_IN (điểm bị giữ làm phí)
                 if (!"CHECKED_IN".equals(status)) {
                         loyaltyService.refundPointsForCanceledBooking(saved.getId());
@@ -1655,8 +1657,7 @@ loyaltyService.updateBookingStatistics(saved.getId());
 promotionService.recordPromotionUsageAfterPaidBooking(saved.getId());
 loyaltyService.earnPointsAfterPaidBooking(saved.getId());
 washHistoryService.createWashHistoryAfterPaidBooking(saved.getId());
-notificationService.notifyPaymentConfirmed(saved.getId());
-notificationService.notifyRewardEarned(saved.getId());
+notificationService.notifyPaymentAndReward(saved.getId());
 return toResponse(saved);
         }
         // ===================== UPDATE PAYMENT METHOD =====================
@@ -1844,6 +1845,7 @@ return toResponse(saved);
                                 .endTime(b.getEndTime())
                                 .status(b.getStatus())
                                 .paymentStatus(b.getPaymentStatus())
+                                .paymentMethod(b.getPaymentMethod())
                                 .finalPrice(b.getFinalPrice())
                                 .isWalkIn(b.getIsWalkIn())
                                 .guestName(b.getGuestName())
@@ -1856,6 +1858,10 @@ return toResponse(saved);
                                                                 .map(PointTransaction::getPoints)
                                                                 .orElse(null)
                                                 : null)
+                                .note(b.getNote())
+                                .checkedInAt(b.getCheckedInAt())
+                                .completedAt(b.getCompletedAt())
+                                .paidAt(b.getPaidAt())
                                 .build();
         }
 

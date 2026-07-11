@@ -1,380 +1,346 @@
-import { Component, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { userService } from '../services/userService'
-import LoyaltyPointsCard from '../components/loyalty/LoyaltyPointsCard'
+import { loyaltyApi } from '../api/loyaltyApi'
+import ProfileDetailModal from '../components/profile/ProfileDetailModal'
+import MemberBenefitsModal from '../components/profile/MemberBenefitsModal'
+import VoucherModal from '../components/profile/VoucherModal'
+import BookingsModal from '../components/profile/BookingsModal'
+import WaitlistModal from '../components/profile/WaitlistModal'
+import VehiclesModal from '../components/profile/VehiclesModal'
+import '../components/profile/ProfileSettings.css'
 
-// Error boundary to prevent LoyaltyPointsCard crash from taking down the whole profile
-class LoyaltyBoundary extends Component {
-  constructor(props) {
-    super(props)
-    this.state = { failed: false }
-  }
-
-  static getDerivedStateFromError() {
-    return { failed: true }
-  }
-
-  render() {
-    if (this.state.failed) {
-      return (
-        <div style={loyaltyErrorStyle}>
-          Không tải được thông tin điểm thưởng. Vui lòng thử lại sau.
-        </div>
-      )
-    }
-    return this.props.children
-  }
+const TIER_META = {
+  BRONZE:   { label: 'Thành viên mới', icon: '🥉' },
+  SILVER:   { label: 'Bạc',            icon: '🥈' },
+  GOLD:     { label: 'Vàng',           icon: '🥇' },
+  PLATINUM: { label: 'Bạch kim',       icon: '💎' },
 }
 
-const emptyForm = { fullName: '', email: '', phone: '' }
+function getTierMeta(tier) {
+  const key = String(tier || '').toUpperCase()
+  return TIER_META[key] || null
+}
+
+function getInitial(profile) {
+  return String(profile?.fullName || profile?.email || 'U').trim().charAt(0).toUpperCase()
+}
+
+/* ── Inline SVG icons ── */
+function IconStar() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+    </svg>
+  )
+}
+
+function IconTicket() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z"/>
+      <path d="M13 5v2M13 17v2M13 11v2"/>
+    </svg>
+  )
+}
+
+function IconCalendar() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4.5" width="18" height="16" rx="2.5"/>
+      <path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>
+    </svg>
+  )
+}
+
+function IconUser() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4"/>
+      <path d="M4 20c0-4 3.58-7 8-7s8 3 8 7"/>
+    </svg>
+  )
+}
+
+function IconLock() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2.5"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+  )
+}
+
+function IconChevron() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+  )
+}
+
+function IconWaitlist() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9"/>
+      <polyline points="12 7 12 12 15 14"/>
+    </svg>
+  )
+}
+
+function IconCar() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 11l1.7-4.3A2 2 0 0 1 8.6 5.5h6.8a2 2 0 0 1 1.9 1.2L19 11"/>
+      <path d="M3 11h18v5.2a.8.8 0 0 1-.8.8H18"/>
+      <path d="M6 17H3.8a.8.8 0 0 1-.8-.8V11"/>
+      <circle cx="7.5" cy="17" r="1.7"/>
+      <circle cx="16.5" cy="17" r="1.7"/>
+    </svg>
+  )
+}
 
 export default function ProfilePage() {
   const { user, setCurrentUser } = useAuth()
-  const initialProfile = user || getStoredUser()
-  const [form, setForm] = useState(() => toForm(initialProfile))
-  const [profile, setProfile] = useState(initialProfile)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [profile, setProfile]     = useState(user || null)
+  const [loyalty, setLoyalty]     = useState(null)
+  const [loading, setLoading]     = useState(true)
   const [loadError, setLoadError] = useState('')
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+
+  const [detailOpen, setDetailOpen]             = useState(false)
+  const [detailAutoOpenPw, setDetailAutoOpenPw] = useState(false)
+  const [memberOpen, setMemberOpen]             = useState(false)
+  const [voucherOpen, setVoucherOpen]           = useState(false)
+
+  const [bookingsOpen, setBookingsOpen]   = useState(false)
+  const [waitlistOpen, setWaitlistOpen]   = useState(false)
+  const [vehiclesOpen, setVehiclesOpen]   = useState(false)
 
   useEffect(() => {
     let ignore = false
-
     userService.getMe()
       .then((data) => {
         if (ignore) return
         setProfile(data)
-        setForm(toForm(data))
         setCurrentUser(data)
+        const role = String(data?.role || '').toUpperCase().replace('ROLE_', '')
+        if (role === 'CUSTOMER') {
+          loyaltyApi.getMyLoyalty()
+            .then((ld) => { if (!ignore) setLoyalty(ld) })
+            .catch(() => {})
+        }
       })
       .catch((err) => {
-        if (!ignore) setLoadError(getErrorMessage(err, 'Không thể tải hồ sơ.'))
+        if (!ignore) setLoadError(err?.response?.data?.message || 'Không thể tải hồ sơ.')
       })
-      .finally(() => {
-        if (!ignore) setLoading(false)
-      })
-
+      .finally(() => { if (!ignore) setLoading(false) })
     return () => { ignore = true }
   }, [setCurrentUser])
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
-    setError('')
-    setSuccess('')
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    const validationError = validate(form)
-
-    if (validationError) {
-      setError(validationError)
-      return
-    }
-
-    setSaving(true)
-    setError('')
-    setSuccess('')
-
-    try {
-      const updated = await userService.updateMe({
-        fullName: form.fullName.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-      })
-      setProfile(updated)
-      setForm(toForm(updated))
-      setCurrentUser(updated)
-      setSuccess('Cập nhật hồ sơ thành công.')
-    } catch (err) {
-      setError(getErrorMessage(err, 'Không thể cập nhật hồ sơ.'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const isCustomer = String(profile?.role || user?.role || '').toUpperCase().replace('ROLE_', '') === 'CUSTOMER'
-  const isActive = profile?.isActive !== false
-  const hasProfileContent = Boolean(form.fullName || form.email || form.phone)
+  const isActive   = profile?.isActive !== false
+  const tier       = loyalty ? getTierMeta(loyalty.currentTier) : null
+  const sub        = profile?.email || profile?.phone || ''
 
-  if (loading) return <StateCard message="Đang tải hồ sơ..." />
+  const openDetail   = () => { setDetailAutoOpenPw(false); setDetailOpen(true) }
+  const openPassword = () => { setDetailAutoOpenPw(true);  setDetailOpen(true) }
 
-  if (loadError && !profile) return <StateCard message={loadError} tone="error" />
-
-  return (
-    <div style={pageStyle}>
-      <style>{`
-        .profile-input:focus {
-          border-color: #0369a1 !important;
-          box-shadow: 0 0 0 3px rgba(3,105,161,0.12) !important;
-          outline: none;
-        }
-        .profile-grid {
-          display: grid;
-          gap: 20px;
-          grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.8fr);
-        }
-        @media (max-width: 900px) {
-          .profile-grid { grid-template-columns: 1fr; }
-        }
-      `}</style>
-
-      <div style={heroStyle}>
-        <div style={avatarStyle}>{getInitial(profile)}</div>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 26 }}>
-            {profile?.fullName || profile?.email || 'Hồ sơ của tôi'}
-          </h1>
-          <p style={{ margin: '6px 0 0', color: '#64748b' }}>Xem và cập nhật thông tin tài khoản hiện tại.</p>
+  if (loading) {
+    return (
+      <div className="ps-page">
+        <div className="ps-bg">
+          <img src="/images/Hero1.jpg" className="ps-bg-img" alt="" aria-hidden="true" />
+          <div className="ps-bg-overlay" />
+        </div>
+        <div className="ps-content">
+          <p className="ps-state">Đang tải...</p>
         </div>
       </div>
+    )
+  }
 
-      <div className="profile-grid">
-        <section style={cardStyle}>
-          {/* Status badge top-right */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18 }}>
-            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Thông tin tài khoản</h2>
-            <span style={isActive ? activeBadgeStyle : inactiveBadgeStyle}>
-              {isActive ? 'Đang hoạt động' : 'Không hoạt động'}
-            </span>
-          </div>
-
-          <InfoRow label="Vai trò" value={normalizeRole(profile?.role)} />
-
-          <div style={{ marginTop: 16 }}>
-            <Field label="Họ và tên" name="fullName" value={form.fullName} onChange={handleChange} autoComplete="name" readOnly />
-            <Field label="Email" name="email" type="email" value={form.email} onChange={handleChange} autoComplete="email" readOnly />
-            <Field label="Số điện thoại" name="phone" value={form.phone} onChange={handleChange} autoComplete="tel" readOnly />
-
-            {loadError && !hasProfileContent && <div style={warnStyle}>{loadError}</div>}
-            {error && <div style={errorStyle}>{error}</div>}
-            {success && <div style={successStyle}>{success}</div>}
-          </div>
-        </section>
-
-        <aside style={{ display: 'grid', gap: 20, alignContent: 'start' }}>
-          {isCustomer && (
-            <LoyaltyBoundary>
-              <LoyaltyPointsCard />
-            </LoyaltyBoundary>
-          )}
-        </aside>
+  if (loadError && !profile) {
+    return (
+      <div className="ps-page">
+        <div className="ps-bg">
+          <img src="/images/Hero1.jpg" className="ps-bg-img" alt="" aria-hidden="true" />
+          <div className="ps-bg-overlay" />
+        </div>
+        <div className="ps-content">
+          <p className="ps-state" style={{ color: '#fca5a5' }}>{loadError}</p>
+        </div>
       </div>
-    </div>
-  )
-}
-
-function Field({ label, ...props }) {
-  return (
-    <label style={fieldStyle}>
-      <span style={labelStyle}>{label}</span>
-      <input className="profile-input" required style={inputStyle} {...props} />
-    </label>
-  )
-}
-
-function InfoRow({ label, value }) {
-  return (
-    <div style={infoRowStyle}>
-      <span style={{ color: '#64748b', fontSize: 13 }}>{label}</span>
-      <strong style={{ color: '#0f172a' }}>{value}</strong>
-    </div>
-  )
-}
-
-function StateCard({ message, tone }) {
-  const bg = tone === 'error' ? '#fef2f2' : '#f8fafc'
-  const color = tone === 'error' ? '#b91c1c' : '#0f172a'
-  return (
-    <div style={{ ...cardStyle, margin: 24, background: bg, color }}>
-      {message}
-    </div>
-  )
-}
-
-function toForm(data) {
-  return {
-    fullName: data?.fullName || '',
-    email: data?.email || '',
-    phone: data?.phone || '',
+    )
   }
-}
 
-function getStoredUser() {
-  try {
-    const raw = localStorage.getItem('user') || localStorage.getItem('currentUser')
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
+  return (
+    <div className="ps-page">
+      {/* Hero background */}
+      <div className="ps-bg" aria-hidden="true">
+        <img src="/images/Hero1.jpg" className="ps-bg-img" alt="" />
+        <div className="ps-bg-overlay" />
+      </div>
 
-function validate(data) {
-  const email = data.email.trim()
-  const phone = data.phone.trim()
+      {/* Content */}
+      <div className="ps-content">
 
-  if (!data.fullName.trim()) return 'Vui lòng nhập họ và tên.'
-  if (!email) return 'Vui lòng nhập email.'
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Email không hợp lệ.'
-  if (!phone) return 'Vui lòng nhập số điện thoại.'
-  if (!/^[0-9+\-\s()]{8,20}$/.test(phone)) return 'Số điện thoại không hợp lệ.'
+        {/* ── Single merged card ── */}
+        <div className="ps-main-card">
 
-  return ''
-}
+          {/* User header section */}
+          <div className="ps-main-card-user">
+            <div className="ps-avatar">{getInitial(profile)}</div>
 
-function getErrorMessage(err, fallback) {
-  const raw = err.response?.data?.message || err.response?.data || fallback
-  if (String(raw).includes('Email already exists')) return 'Email đã được sử dụng.'
-  if (String(raw).includes('Phone already exists')) return 'Số điện thoại đã được sử dụng.'
-  return raw
-}
+            <div className="ps-user-meta">
+              <div className="ps-user-name-row">
+                <h1 className="ps-user-name">
+                  {profile?.fullName || profile?.email || 'Người dùng'}
+                </h1>
+                {tier && (
+                  <span className="ps-tier-chip">
+                    {tier.icon} {tier.label}
+                  </span>
+                )}
+              </div>
+              {sub && <p className="ps-user-email">{sub}</p>}
+            </div>
 
-function normalizeRole(role) {
-  return String(role || 'CUSTOMER').replace('ROLE_', '')
-}
+            <div className="ps-user-right">
+              <span className={isActive ? 'ps-badge-active' : 'ps-badge-inactive'}>
+                {isActive ? 'Đang hoạt động' : 'Không hoạt động'}
+              </span>
+            </div>
+          </div>
 
-function getInitial(user) {
-  return String(user?.fullName || user?.email || 'U').trim().charAt(0).toUpperCase()
-}
+          {/* Divider between user header and settings */}
+          <div className="ps-main-card-divider" />
 
-const pageStyle = {
-  display: 'grid',
-  gap: 24,
-}
+          {/* Section: Tài khoản */}
+          <p className="ps-section-label">Tài khoản</p>
 
-const heroStyle = {
-  alignItems: 'center',
-  background: 'linear-gradient(135deg, #ffffff, #e0f2fe)',
-  border: '1px solid #dbeafe',
-  borderRadius: 20,
-  display: 'flex',
-  gap: 18,
-  padding: 24,
-}
+          <button type="button" className="ps-row" onClick={openDetail}>
+            <span className="ps-row-icon ps-row-icon--navy"><IconUser /></span>
+            <span className="ps-row-body">
+              <span className="ps-row-label">Thông tin chi tiết</span>
+              <span className="ps-row-desc">Họ tên, email, số điện thoại</span>
+            </span>
+            <span className="ps-row-chevron"><IconChevron /></span>
+          </button>
 
-const avatarStyle = {
-  alignItems: 'center',
-  background: '#0369a1',
-  borderRadius: '50%',
-  color: '#fff',
-  display: 'flex',
-  flexShrink: 0,
-  fontSize: 28,
-  fontWeight: 800,
-  height: 64,
-  justifyContent: 'center',
-  width: 64,
-}
+          <div className="ps-row-sep" />
 
-const cardStyle = {
-  background: '#fff',
-  border: '1px solid #e2e8f0',
-  borderRadius: 18,
-  boxShadow: '0 18px 40px rgba(15,23,42,0.08)',
-  padding: 24,
-}
+          <button type="button" className="ps-row" onClick={openPassword}>
+            <span className="ps-row-icon ps-row-icon--amber"><IconLock /></span>
+            <span className="ps-row-body">
+              <span className="ps-row-label">Đổi mật khẩu</span>
+              <span className="ps-row-desc">Thay đổi mật khẩu đăng nhập</span>
+            </span>
+            <span className="ps-row-chevron"><IconChevron /></span>
+          </button>
 
-const sectionTitleStyle = {
-  fontSize: 18,
-  margin: '0 0 18px',
-}
+          <div className="ps-row-sep" />
 
-const fieldStyle = {
-  display: 'grid',
-  gap: 8,
-  marginBottom: 16,
-}
+          <button type="button" className="ps-row" onClick={() => setVehiclesOpen(true)}>
+            <span className="ps-row-icon ps-row-icon--navy"><IconCar /></span>
+            <span className="ps-row-body">
+              <span className="ps-row-label">Xe của tôi</span>
+              <span className="ps-row-desc">Quản lý xe, đặt xe mặc định</span>
+            </span>
+            <span className="ps-row-chevron"><IconChevron /></span>
+          </button>
 
-const labelStyle = {
-  color: '#334155',
-  fontSize: 13,
-  fontWeight: 700,
-}
+          {/* Section: Thành viên (customer only) */}
+          {isCustomer && (
+            <>
+              <div className="ps-section-sep" />
 
-const inputStyle = {
-  border: '1px solid #cbd5e1',
-  borderRadius: 12,
-  boxSizing: 'border-box',
-  color: '#0f172a',
-  font: 'inherit',
-  padding: '11px 12px',
-  width: '100%',
-}
+              <p className="ps-section-label">Thành viên</p>
 
-const buttonStyle = {
-  background: '#0369a1',
-  border: 0,
-  borderRadius: 12,
-  color: '#fff',
-  font: 'inherit',
-  fontWeight: 800,
-  padding: '12px 18px',
-}
+              <button type="button" className="ps-row" onClick={() => setMemberOpen(true)}>
+                <span className="ps-row-icon ps-row-icon--blue"><IconStar /></span>
+                <span className="ps-row-body">
+                  <span className="ps-row-label">Ưu đãi thành viên</span>
+                  <span className="ps-row-desc">Điểm tích lũy, hạng, lịch sử</span>
+                </span>
+                <span className="ps-row-chevron"><IconChevron /></span>
+              </button>
 
-const infoRowStyle = {
-  borderBottom: '1px solid #e2e8f0',
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: 16,
-  padding: '11px 0',
-}
+              <div className="ps-row-sep" />
 
-const activeBadgeStyle = {
-  background: '#f0fdf4',
-  border: '1px solid #bbf7d0',
-  borderRadius: 999,
-  color: '#15803d',
-  fontSize: 12,
-  fontWeight: 700,
-  padding: '4px 12px',
-  whiteSpace: 'nowrap',
-}
+              <button type="button" className="ps-row" onClick={() => setVoucherOpen(true)}>
+                <span className="ps-row-icon ps-row-icon--green"><IconTicket /></span>
+                <span className="ps-row-body">
+                  <span className="ps-row-label">Voucher & khuyến mãi</span>
+                  <span className="ps-row-desc">Mã giảm giá phù hợp với bạn</span>
+                </span>
+                <span className="ps-row-chevron"><IconChevron /></span>
+              </button>
 
-const inactiveBadgeStyle = {
-  background: '#fef2f2',
-  border: '1px solid #fecaca',
-  borderRadius: 999,
-  color: '#b91c1c',
-  fontSize: 12,
-  fontWeight: 700,
-  padding: '4px 12px',
-  whiteSpace: 'nowrap',
-}
+              <div className="ps-row-sep" />
 
-const errorStyle = {
-  background: '#fef2f2',
-  border: '1px solid #fecaca',
-  borderRadius: 12,
-  color: '#b91c1c',
-  marginBottom: 16,
-  padding: '10px 12px',
-}
+              <button type="button" className="ps-row" onClick={() => setBookingsOpen(true)}>
+                <span className="ps-row-icon ps-row-icon--indigo"><IconCalendar /></span>
+                <span className="ps-row-body">
+                  <span className="ps-row-label">Lịch hẹn</span>
+                  <span className="ps-row-desc">Lịch đặt xe và trạng thái booking</span>
+                </span>
+                <span className="ps-row-chevron"><IconChevron /></span>
+              </button>
 
-const warnStyle = {
-  background: '#fffbeb',
-  border: '1px solid #fde68a',
-  borderRadius: 12,
-  color: '#92400e',
-  marginBottom: 16,
-  padding: '10px 12px',
-}
+              <div className="ps-row-sep" />
 
-const successStyle = {
-  background: '#f0fdf4',
-  border: '1px solid #bbf7d0',
-  borderRadius: 12,
-  color: '#15803d',
-  marginBottom: 16,
-  padding: '10px 12px',
-}
+              <button type="button" className="ps-row" onClick={() => setWaitlistOpen(true)}>
+                <span className="ps-row-icon ps-row-icon--teal"><IconWaitlist /></span>
+                <span className="ps-row-body">
+                  <span className="ps-row-label">Danh sách chờ</span>
+                  <span className="ps-row-desc">Theo dõi yêu cầu waitlist của bạn</span>
+                </span>
+                <span className="ps-row-chevron"><IconChevron /></span>
+              </button>
+            </>
+          )}
 
-const loyaltyErrorStyle = {
-  background: '#fef9c3',
-  border: '1px solid #fde68a',
-  borderRadius: 12,
-  color: '#92400e',
-  fontSize: 13,
-  padding: '12px 16px',
+          <div style={{ height: 8 }} />
+        </div>
+
+      </div>
+
+      {/* ── Modals ── */}
+      <ProfileDetailModal
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        profile={profile}
+        autoOpenPw={detailAutoOpenPw}
+      />
+      <MemberBenefitsModal
+        open={memberOpen}
+        onClose={() => setMemberOpen(false)}
+      />
+      <VoucherModal
+        open={voucherOpen}
+        onClose={() => setVoucherOpen(false)}
+        currentTier={loyalty?.currentTier ?? null}
+      />
+      <BookingsModal
+        open={bookingsOpen}
+        onClose={() => setBookingsOpen(false)}
+      />
+      <WaitlistModal
+        open={waitlistOpen}
+        onClose={() => setWaitlistOpen(false)}
+      />
+      <VehiclesModal
+        open={vehiclesOpen}
+        onClose={() => setVehiclesOpen(false)}
+      />
+    </div>
+  )
 }

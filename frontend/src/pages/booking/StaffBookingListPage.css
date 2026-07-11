@@ -1,0 +1,457 @@
+.sbl-page {
+  color: #1e293b;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Hero ── */
+.sbl-hero {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 28px 32px;
+}
+
+.sbl-eyebrow {
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+}
+
+.sbl-hero h1 {
+  color: #0f172a;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
+}
+
+.sbl-hero p {
+  color: #64748b;
+  font-size: 14px;
+  margin: 0;
+}
+
+/* ── Filter bar ── */
+.sbl-filters {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 20px;
+  align-items: center;
+}
+
+.sbl-search {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.sbl-search label {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sbl-search input {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #1e293b;
+  font-size: 14px;
+  outline: none;
+  padding: 9px 12px;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sbl-search input:focus {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.sbl-search input::placeholder {
+  color: #cbd5e1;
+}
+
+.sbl-status-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sbl-pill {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.sbl-pill:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #2563eb;
+}
+
+.sbl-pill--active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.sbl-date-wrap {
+  position: relative;
+}
+
+.sbl-date-btn {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 14px;
+  transition: border-color 0.14s ease;
+  white-space: nowrap;
+}
+
+.sbl-date-btn:hover,
+.sbl-date-wrap.open .sbl-date-btn {
+  border-color: #93c5fd;
+  color: #2563eb;
+}
+
+.sbl-date-panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  display: none;
+  min-width: 220px;
+  padding: 16px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 100;
+}
+
+.sbl-date-wrap.open .sbl-date-panel {
+  display: block;
+}
+
+.sbl-date-panel-head {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.sbl-date-panel input[type="date"] {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #1e293b;
+  font-size: 14px;
+  outline: none;
+  padding: 8px 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sbl-date-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sbl-date-actions button {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  color: #475569;
+  cursor: pointer;
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 0;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.sbl-date-actions button:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #2563eb;
+}
+
+.sbl-refresh {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 6px;
+  padding: 9px 16px;
+  transition: background 0.14s ease, border-color 0.14s ease;
+  white-space: nowrap;
+}
+
+.sbl-refresh:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #2563eb;
+}
+
+/* ── Messages ── */
+.sbl-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  color: #dc2626;
+  font-size: 14px;
+  padding: 12px 16px;
+}
+
+.sbl-empty {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  color: #94a3b8;
+  font-size: 14px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+/* ── Booking cards ── */
+.sbl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sbl-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  position: relative;
+  transition: box-shadow 0.14s ease;
+}
+
+.sbl-card:hover {
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+}
+
+.sbl-card--confirmed  { border-left-color: #3b82f6; }
+.sbl-card--checked_in { border-left-color: #8b5cf6; }
+.sbl-card--in_progress { border-left-color: #f59e0b; }
+.sbl-card--completed  { border-left-color: #22c55e; }
+.sbl-card--canceled,
+.sbl-card--cancelled  { border-left-color: #ef4444; }
+.sbl-card--no_show    { border-left-color: #94a3b8; }
+
+.sbl-no-show-seal {
+  background: linear-gradient(135deg, #7f1d1d, #dc2626);
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  color: #fee2e2;
+  font-size: 10px;
+  font-weight: 900;
+  left: -38px;
+  letter-spacing: 2px;
+  padding: 5px 0;
+  pointer-events: none;
+  position: absolute;
+  text-align: center;
+  text-transform: uppercase;
+  top: 18px;
+  transform: rotate(-32deg);
+  width: 150px;
+  z-index: 1;
+}
+
+/* Card head */
+.sbl-card-head {
+  align-items: flex-start;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 14px 18px 12px;
+}
+
+.sbl-card-num-label {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0 0 2px;
+  text-transform: uppercase;
+}
+
+.sbl-card-num {
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.sbl-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.sbl-badge {
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.sbl-badge--walkin       { background: #eff6ff; border: 1px dashed #93c5fd; color: #1d4ed8; }
+.sbl-badge--confirmed    { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; }
+.sbl-badge--checked_in   { background: #f5f3ff; border: 1px solid #ddd6fe; color: #5b21b6; }
+.sbl-badge--in_progress  { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+.sbl-badge--completed    { background: #f0fdf4; border: 1px solid #bbf7d0; color: #14532d; }
+.sbl-badge--canceled,
+.sbl-badge--cancelled    { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+.sbl-badge--no_show      { background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; }
+.sbl-badge--paid         { background: #f0fdf4; border: 1px solid #bbf7d0; color: #14532d; }
+.sbl-badge--unpaid       { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+.sbl-badge--pending      { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; }
+
+/* Info grid */
+.sbl-info {
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.sbl-info-cell {
+  border-right: 1px solid #f1f5f9;
+  padding: 11px 15px;
+}
+
+.sbl-info-cell:last-child,
+.sbl-info-cell--full {
+  border-right: none;
+}
+
+.sbl-info-cell--full {
+  grid-column: 1 / -1;
+  border-top: 1px solid #f1f5f9;
+}
+
+.sbl-info-label {
+  color: #94a3b8;
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+}
+
+.sbl-info-value {
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+/* Total row */
+.sbl-total-cell {
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+}
+
+.sbl-total-amount {
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.sbl-total-method {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.sbl-payos-btn {
+  background: #2563eb;
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 14px;
+  transition: background 0.14s ease;
+}
+
+.sbl-payos-btn:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.sbl-payos-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Card footer */
+.sbl-card-foot {
+  align-items: center;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 18px;
+}
+
+.sbl-detail-btn {
+  background: transparent;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 16px;
+  text-decoration: none;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.sbl-detail-btn:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+@media (max-width: 700px) {
+  .sbl-info {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

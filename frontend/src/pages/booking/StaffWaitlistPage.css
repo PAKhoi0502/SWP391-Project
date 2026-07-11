@@ -1,166 +1,224 @@
 .staff-waitlist-page {
-  display: grid;
-  gap: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
+/* ── Hero ── */
 .staff-waitlist-hero {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
   display: flex;
-  justify-content: space-between;
   gap: 20px;
-  padding: 30px;
-  border-radius: 24px;
-  background: linear-gradient(135deg, #07111f, #12345a);
-  color: #ffffff;
-  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.14);
+  justify-content: space-between;
+  padding: 28px 32px;
 }
 
 .staff-waitlist-eyebrow {
-  margin: 0 0 8px;
-  color: #67e8f9;
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 0.18em;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  margin: 0 0 6px;
   text-transform: uppercase;
 }
 
 .staff-waitlist-hero h1 {
+  color: #0f172a;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   margin: 0;
-  color: #ffffff;
-  font-size: 34px;
-  font-weight: 900;
 }
 
 .staff-waitlist-hero p:last-child {
-  max-width: 680px;
-  margin: 12px 0 0;
-  color: #dbeafe;
-  line-height: 1.7;
+  color: #64748b;
+  font-size: 14px;
+  margin: 6px 0 0;
 }
 
 .staff-waitlist-filter {
-  min-width: 220px;
+  flex-shrink: 0;
+  min-width: 200px;
 }
 
+/* ── Messages ── */
 .staff-waitlist-message {
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
   margin: 0;
-  padding: 13px 15px;
-  border-radius: 14px;
-  font-weight: 800;
+  padding: 12px 16px;
 }
 
 .staff-waitlist-message-success {
-  background: rgba(34, 197, 94, 0.16);
-  color: #bbf7d0;
-  border: 1px solid rgba(134, 239, 172, 0.4);
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
 }
 
 .staff-waitlist-message-error {
-  background: rgba(239, 68, 68, 0.16);
-  color: #fecaca;
-  border: 1px solid rgba(248, 113, 113, 0.4);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
 }
 
+/* ── Cards grid ── */
 .staff-waitlist-grid {
   display: grid;
+  gap: 14px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
 }
 
 .staff-waitlist-card {
-  padding: 20px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 16px 35px rgba(15, 23, 42, 0.12);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  transition: box-shadow 0.14s ease;
 }
 
+.staff-waitlist-card:hover {
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+}
+
+/* Card header */
 .staff-waitlist-card-header {
+  align-items: flex-start;
+  border-bottom: 1px solid #f1f5f9;
   display: flex;
+  gap: 12px;
   justify-content: space-between;
-  gap: 14px;
+  padding: 16px 18px 14px;
 }
 
 .staff-waitlist-label {
+  color: #94a3b8;
   display: block;
-  color: #67e8f9;
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.12em;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 3px;
   text-transform: uppercase;
 }
 
 .staff-waitlist-card h2 {
-  margin: 6px 0 0;
-  color: #ffffff;
-  font-size: 20px;
+  color: #0f172a;
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0;
 }
 
+/* Status badges */
 .staff-waitlist-status {
-  align-self: flex-start;
-  min-width: 96px;
-  padding: 7px 11px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 900;
+  font-size: 11.5px;
+  font-weight: 700;
+  min-width: 86px;
+  padding: 5px 12px;
   text-align: center;
+  white-space: nowrap;
 }
 
-.staff-waitlist-status-waiting {
-  background: rgba(250, 204, 21, 0.13);
-  color: #fde68a;
-  border: 1px solid rgba(250, 204, 21, 0.32);
-}
+.staff-waitlist-status-waiting  { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+.staff-waitlist-status-accepted { background: #f0fdf4; border: 1px solid #bbf7d0; color: #14532d; }
+.staff-waitlist-status-rejected { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
 
-.staff-waitlist-status-accepted {
-  background: rgba(34, 197, 94, 0.13);
-  color: #bbf7d0;
-  border: 1px solid rgba(34, 197, 94, 0.32);
-}
-
-.staff-waitlist-status-rejected {
-  background: rgba(239, 68, 68, 0.13);
-  color: #fecaca;
-  border: 1px solid rgba(239, 68, 68, 0.32);
-}
-
+/* Details grid */
 .staff-waitlist-details {
   display: grid;
+  gap: 1px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin: 18px 0 0;
+  background: #f1f5f9;
 }
 
 .staff-waitlist-details div {
+  background: #ffffff;
   min-width: 0;
-  padding: 12px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.06);
+  padding: 11px 16px;
 }
 
 .staff-waitlist-details dt {
-  color: #bfdbfe;
-  font-size: 12px;
-  font-weight: 900;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-bottom: 3px;
+  text-transform: uppercase;
 }
 
 .staff-waitlist-details dd {
-  margin: 5px 0 0;
-  color: #ffffff;
-  font-weight: 800;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
   overflow-wrap: anywhere;
 }
 
+/* Reason / actions */
 .staff-waitlist-reason {
-  margin: 14px 0 0;
-  color: #fecaca;
-  font-weight: 800;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+  padding: 10px 18px;
+  border-top: 1px solid #f1f5f9;
 }
 
 .staff-waitlist-actions {
+  border-top: 1px solid #f1f5f9;
   display: flex;
   flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 18px;
+}
+
+/* ── Reject modal ── */
+.staff-waitlist-reject-modal {
+  background: #ffffff;
+  border: 1px solid #fecaca;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+}
+
+.staff-waitlist-reject-modal-title {
+  color: #dc2626;
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.staff-waitlist-reject-textarea {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-sizing: border-box;
+  color: #1e293b;
+  font-size: 14px;
+  outline: none;
+  padding: 10px 13px;
+  resize: vertical;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+  width: 100%;
+}
+
+.staff-waitlist-reject-textarea:focus {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.staff-waitlist-reject-textarea::placeholder {
+  color: #cbd5e1;
+}
+
+.staff-waitlist-reject-actions {
+  display: flex;
   gap: 10px;
-  margin-top: 18px;
 }
 
 @media (max-width: 980px) {
@@ -170,21 +228,22 @@
 }
 
 @media (max-width: 640px) {
-  .staff-waitlist-hero,
-  .staff-waitlist-card-header {
-    flex-direction: column;
-  }
-
   .staff-waitlist-hero {
-    padding: 24px;
+    flex-direction: column;
+    padding: 22px;
   }
 
   .staff-waitlist-hero h1 {
-    font-size: 28px;
+    font-size: 22px;
   }
 
   .staff-waitlist-filter {
     min-width: 0;
+    width: 100%;
+  }
+
+  .staff-waitlist-card-header {
+    flex-direction: column;
   }
 
   .staff-waitlist-details {

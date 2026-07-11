@@ -1,0 +1,126 @@
+.staff-home {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.32s ease, transform 0.32s ease;
+}
+
+.staff-home--in {
+  opacity: 1;
+  transform: none;
+}
+
+/* Greeting */
+.staff-home-greeting {
+  margin-bottom: 36px;
+}
+
+.staff-home-date {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.staff-home h1 {
+  color: #0f172a;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+
+.staff-home-sub {
+  color: #64748b;
+  font-size: 15px;
+}
+
+/* Action cards */
+.staff-home-actions {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  max-width: 740px;
+}
+
+.staff-home-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  opacity: 0;
+  padding: 20px;
+  text-decoration: none;
+  transform: translateY(10px);
+  transition:
+    opacity 0.28s ease calc(var(--i, 0) * 0.07s + 0.12s),
+    transform 0.28s ease calc(var(--i, 0) * 0.07s + 0.12s),
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.staff-home--in .staff-home-card {
+  opacity: 1;
+  transform: none;
+}
+
+.staff-home-card:hover {
+  box-shadow: 0 4px 18px rgba(37, 99, 235, 0.1);
+}
+
+.staff-home-card--blue:hover  { border-color: #93c5fd; }
+.staff-home-card--indigo:hover { border-color: #a5b4fc; }
+.staff-home-card--violet:hover { border-color: #c4b5fd; }
+
+.staff-home-card-icon {
+  align-items: center;
+  border-radius: 10px;
+  display: flex;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+  flex-shrink: 0;
+}
+
+.staff-home-card--blue   .staff-home-card-icon { background: #dbeafe; color: #2563eb; }
+.staff-home-card--indigo .staff-home-card-icon { background: #e0e7ff; color: #4f46e5; }
+.staff-home-card--violet .staff-home-card-icon { background: #ede9fe; color: #7c3aed; }
+
+.staff-home-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.staff-home-card-body h2 {
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 0;
+}
+
+.staff-home-card-badge {
+  background: #ef4444;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.staff-home-card-body p {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.55;
+}

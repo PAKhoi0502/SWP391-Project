@@ -1,0 +1,199 @@
+.spp-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── State messages ── */
+.spp-state {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  color: #64748b;
+  font-size: 14px;
+  padding: 48px;
+  text-align: center;
+}
+
+.spp-state--error {
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+/* ── Single card ── */
+.spp-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+/* ── Header (blue gradient) ── */
+.spp-header {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 60%, #3b82f6 100%);
+  padding: 28px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.spp-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.spp-eyebrow {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ── Identity row ── */
+.spp-identity {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.spp-avatar {
+  flex-shrink: 0;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spp-identity-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.spp-name {
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.spp-code {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.spp-sub {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12.5px;
+  margin-top: 2px;
+}
+
+/* ── Status badge (in header) ── */
+.spp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 14px;
+}
+
+.spp-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.spp-badge--active {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}
+
+.spp-badge--active .spp-badge-dot {
+  background: #4ade80;
+}
+
+.spp-badge--inactive {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.spp-badge--inactive .spp-badge-dot {
+  background: #f87171;
+}
+
+/* ── Details grid ── */
+.spp-details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  background: #f1f5f9;
+  gap: 1px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.spp-detail-cell {
+  background: #ffffff;
+  padding: 20px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.spp-detail-cell--full {
+  grid-column: 1 / -1;
+}
+
+.spp-detail-label {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.spp-detail-value {
+  color: #1e293b;
+  font-size: 15px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+@media (max-width: 600px) {
+  .spp-header {
+    padding: 22px 20px 26px;
+  }
+
+  .spp-avatar {
+    width: 56px;
+    height: 56px;
+    font-size: 22px;
+  }
+
+  .spp-name {
+    font-size: 18px;
+  }
+
+  .spp-details {
+    grid-template-columns: 1fr;
+  }
+
+  .spp-detail-cell--full {
+    grid-column: 1;
+  }
+}

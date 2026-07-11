@@ -8,10 +8,10 @@ const formatMoney = (value) =>
 
 const getStatusLabel = (status) => {
   const s = String(status || '').toUpperCase()
-  if (s === 'PAID') return 'Đã thanh toán'
-  if (s === 'CANCELLED' || s === 'CANCELED') return 'Đã hủy'
-  if (s === 'EXPIRED') return 'Hết hạn'
-  return 'Chờ thanh toán'
+  if (s === 'PAID') return 'Paid'
+  if (s === 'CANCELLED' || s === 'CANCELED') return 'Canceled'
+  if (s === 'EXPIRED') return 'Expired'
+  return 'Awaiting payment'
 }
 
 const getStatusClass = (status) => {
@@ -67,10 +67,10 @@ export default function PayOSQrModal({
                 <path className="pqm-checkmark-check" fill="none" d="M14 27l8 8 16-16" />
               </svg>
             </div>
-            <h2 className="pqm-success-title">Thanh toán thành công!</h2>
-            {booking?.id && <p className="pqm-success-sub">Booking #{booking.id}</p>}
+            <h2 className="pqm-success-title">Payment successful!</h2>
+            {booking?.id && <p className="pqm-success-sub">Booking #{booking.id} has been marked as paid.</p>}
             <button type="button" className="pqm-btn pqm-btn--close-success" onClick={onClose}>
-              Đóng
+              Close
             </button>
           </div>
         </div>
@@ -87,7 +87,8 @@ export default function PayOSQrModal({
         aria-modal="true"
       >
         <div className="pqm-header">
-          <h2 className="pqm-title">QR Thanh toán</h2>
+          <div className="pqm-icon">QR</div>
+          <h2 className="pqm-title">QR Payment</h2>
           {booking?.id && <p className="pqm-subtitle">Booking #{booking.id}</p>}
         </div>
 
@@ -99,25 +100,25 @@ export default function PayOSQrModal({
           ) : (
             <div className="pqm-qr-placeholder">
               <span className="pqm-qr-placeholder-icon">QR</span>
-              <p className="pqm-qr-placeholder-text">Không có mã QR</p>
+              <p className="pqm-qr-placeholder-text">No QR code available</p>
             </div>
           )}
-          <p className="pqm-qr-hint">Quét mã QR bằng ứng dụng ngân hàng để thanh toán</p>
+          <p className="pqm-qr-hint">Scan the QR code with your banking app to complete payment</p>
         </div>
 
         <div className="pqm-info">
           {orderCode && (
             <div className="pqm-info-row">
-              <span className="pqm-info-label">Mã đơn hàng</span>
+              <span className="pqm-info-label">Order code</span>
               <span className="pqm-info-value">#{orderCode}</span>
             </div>
           )}
           <div className="pqm-info-row">
-            <span className="pqm-info-label">Số tiền</span>
+            <span className="pqm-info-label">Amount</span>
             <span className="pqm-info-value pqm-amount">{formatMoney(amount)}</span>
           </div>
           <div className="pqm-info-row">
-            <span className="pqm-info-label">Trạng thái</span>
+            <span className="pqm-info-label">Status</span>
             <span className={`pqm-info-value pqm-status ${getStatusClass(status)}`}>
               {getStatusLabel(status)}
             </span>
@@ -132,7 +133,7 @@ export default function PayOSQrModal({
           onClick={onRefresh}
           disabled={anyLoading}
         >
-          {refreshLoading ? 'Đang kiểm tra...' : 'Làm mới trạng thái'}
+          {refreshLoading ? 'Checking...' : 'Refresh status'}
         </button>
 
         {effectiveCheckoutUrl && (
@@ -142,7 +143,7 @@ export default function PayOSQrModal({
             rel="noopener noreferrer"
             className="pqm-btn pqm-btn--link"
           >
-            Mở trang PayOS ↗
+            Open PayOS page ↗
           </a>
         )}
 
@@ -153,7 +154,7 @@ export default function PayOSQrModal({
             onClick={onCancelTransaction}
             disabled={anyLoading}
           >
-            {cancelLoading ? 'Đang hủy...' : 'Hủy giao dịch'}
+            {cancelLoading ? 'Canceling...' : 'Cancel transaction'}
           </button>
           <button
             type="button"
@@ -161,7 +162,7 @@ export default function PayOSQrModal({
             onClick={onClose}
             disabled={anyLoading}
           >
-            Đóng
+            Close
           </button>
         </div>
       </div>

@@ -1,27 +1,37 @@
 .ltm-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(0, 0, 0, 0.48);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
   padding: 16px;
+  animation: ltm-overlay-in 0.18s ease;
+}
+
+@keyframes ltm-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes ltm-dialog-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
 }
 
 .ltm-dialog {
-  background: linear-gradient(135deg, #111116 0%, #1a1a24 100%);
-  border: 1px solid rgba(250, 204, 21, 0.22);
+  background: #ffffff;
+  border: 1px solid rgba(23, 32, 51, 0.08);
   border-radius: 20px;
-  box-shadow:
-    0 32px 80px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(250, 204, 21, 0.06) inset;
-  color: #f8fafc;
+  box-shadow: 0 24px 60px rgba(10, 18, 36, 0.20);
+  color: #172033;
   width: 100%;
   max-width: 620px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
+  animation: ltm-dialog-in 0.24s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* ── Header ─────────────────────────────── */
@@ -31,21 +41,22 @@
   justify-content: space-between;
   padding: 20px 24px 16px;
   flex-shrink: 0;
+  border-bottom: 1px solid rgba(23, 32, 51, 0.07);
 }
 
 .ltm-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 900;
-  color: #facc15;
+  color: #172033;
   letter-spacing: -0.01em;
 }
 
 .ltm-close-btn {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  border: 1px solid rgba(23, 32, 51, 0.12);
   border-radius: 8px;
-  color: rgba(255, 255, 255, 0.55);
+  color: #94a3b8;
   cursor: pointer;
   font-size: 14px;
   font-weight: 700;
@@ -60,13 +71,13 @@
 }
 
 .ltm-close-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #f8fafc;
+  background: rgba(23, 32, 51, 0.05);
+  color: #172033;
 }
 
 /* ── Tabs ────────────────────────────────── */
 .ltm-tabs-wrap {
-  padding: 0 24px 12px;
+  padding: 12px 24px 10px;
   overflow-x: auto;
   flex-shrink: 0;
   scrollbar-width: none;
@@ -83,10 +94,10 @@
 }
 
 .ltm-tab {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(23, 32, 51, 0.04);
+  border: 1px solid rgba(23, 32, 51, 0.08);
   border-radius: 999px;
-  color: rgba(255, 255, 255, 0.5);
+  color: #94a3b8;
   cursor: pointer;
   font: inherit;
   font-size: 12px;
@@ -97,55 +108,46 @@
 }
 
 .ltm-tab:hover {
-  background: rgba(250, 204, 21, 0.06);
-  border-color: rgba(250, 204, 21, 0.2);
-  color: rgba(250, 204, 21, 0.8);
+  background: rgba(46, 194, 247, 0.06);
+  border-color: rgba(46, 194, 247, 0.25);
+  color: #0879B8;
 }
 
 .ltm-tab.active {
-  background: rgba(250, 204, 21, 0.12);
-  border-color: rgba(250, 204, 21, 0.4);
-  color: #facc15;
+  background: rgba(46, 194, 247, 0.10);
+  border-color: rgba(46, 194, 247, 0.35);
+  color: #0879B8;
 }
 
 /* ── List area ───────────────────────────── */
 .ltm-list-wrap {
   flex: 1;
   overflow-y: auto;
-  padding: 0 24px 20px;
+  padding: 4px 24px 20px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  scrollbar-color: rgba(23, 32, 51, 0.10) transparent;
 }
 
-.ltm-list-wrap::-webkit-scrollbar {
-  width: 4px;
-}
-
-.ltm-list-wrap::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.ltm-list-wrap::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 2px;
-}
+.ltm-list-wrap::-webkit-scrollbar       { width: 4px; }
+.ltm-list-wrap::-webkit-scrollbar-track { background: transparent; }
+.ltm-list-wrap::-webkit-scrollbar-thumb { background: rgba(23, 32, 51, 0.10); border-radius: 2px; }
 
 /* ── States ──────────────────────────────── */
 .ltm-state {
-  color: rgba(255, 255, 255, 0.4);
+  color: #94a3b8;
   font-size: 14px;
   margin: 24px 0;
   text-align: center;
 }
 
 .ltm-error {
-  color: #f87171;
+  color: #b91c1c;
   font-size: 13px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
   border-radius: 8px;
   padding: 10px 14px;
   margin: 8px 0;
@@ -162,13 +164,18 @@
 }
 
 .ltm-item {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: #F8F9FB;
+  border: 1px solid rgba(23, 32, 51, 0.07);
   border-radius: 12px;
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  transition: background 0.12s;
+}
+
+.ltm-item:hover {
+  background: #f1f5f9;
 }
 
 .ltm-item-row {
@@ -189,61 +196,55 @@
 }
 
 .ltm-type--earn {
-  background: rgba(74, 222, 128, 0.12);
-  border: 1px solid rgba(74, 222, 128, 0.22);
-  color: #4ade80;
+  background: rgba(21, 128, 61, 0.08);
+  border: 1px solid rgba(21, 128, 61, 0.20);
+  color: #15803d;
 }
 
 .ltm-type--redeem {
-  background: rgba(250, 204, 21, 0.1);
-  border: 1px solid rgba(250, 204, 21, 0.22);
-  color: #facc15;
+  background: rgba(217, 119, 6, 0.08);
+  border: 1px solid rgba(217, 119, 6, 0.20);
+  color: #d97706;
 }
 
 .ltm-type--refund {
-  background: rgba(96, 165, 250, 0.1);
-  border: 1px solid rgba(96, 165, 250, 0.22);
-  color: #93c5fd;
+  background: rgba(8, 121, 184, 0.08);
+  border: 1px solid rgba(8, 121, 184, 0.20);
+  color: #0879B8;
 }
 
 .ltm-type--expire {
-  background: rgba(248, 113, 113, 0.1);
-  border: 1px solid rgba(248, 113, 113, 0.2);
-  color: #f87171;
+  background: rgba(185, 28, 28, 0.07);
+  border: 1px solid rgba(185, 28, 28, 0.18);
+  color: #b91c1c;
 }
 
 .ltm-type--adjust {
-  background: rgba(167, 139, 250, 0.1);
-  border: 1px solid rgba(167, 139, 250, 0.2);
-  color: #c4b5fd;
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.18);
+  color: #7c3aed;
 }
 
 .ltm-type--default {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.6);
+  background: rgba(23, 32, 51, 0.05);
+  border: 1px solid rgba(23, 32, 51, 0.10);
+  color: #667085;
 }
-
 
 /* ── Points value ────────────────────────── */
 .ltm-points {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 900;
-  color: rgba(255, 255, 255, 0.8);
+  color: #334155;
 }
 
-.ltm-points.positive {
-  color: #4ade80;
-}
-
-.ltm-points.negative {
-  color: #f87171;
-}
+.ltm-points.positive { color: #15803d; }
+.ltm-points.negative { color: #b91c1c; }
 
 /* ── Description ─────────────────────────── */
 .ltm-desc {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.45);
+  color: #94a3b8;
   margin: 0;
   line-height: 1.4;
 }
@@ -268,18 +269,18 @@
 
 .ltm-date {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.35);
+  color: #94a3b8;
 }
 
 .ltm-booking-ref {
   font-size: 11px;
-  color: rgba(250, 204, 21, 0.6);
+  color: #0879B8;
   font-weight: 600;
 }
 
 .ltm-balance {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
+  color: #94a3b8;
 }
 
 .ltm-status {
@@ -292,28 +293,28 @@
 
 .ltm-status--active,
 .ltm-status--valid {
-  background: rgba(74, 222, 128, 0.1);
-  color: #4ade80;
+  background: rgba(21, 128, 61, 0.08);
+  color: #15803d;
 }
 
 .ltm-status--expired,
 .ltm-status--inactive {
-  background: rgba(248, 113, 113, 0.1);
-  color: #f87171;
+  background: rgba(185, 28, 28, 0.07);
+  color: #b91c1c;
 }
 
 .ltm-status--used,
 .ltm-status--redeemed {
-  background: rgba(250, 204, 21, 0.1);
-  color: #facc15;
+  background: rgba(217, 119, 6, 0.08);
+  color: #d97706;
 }
 
 /* ── Load more ───────────────────────────── */
 .ltm-load-more {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(23, 32, 51, 0.04);
+  border: 1px solid rgba(23, 32, 51, 0.08);
   border-radius: 10px;
-  color: rgba(255, 255, 255, 0.5);
+  color: #667085;
   cursor: pointer;
   font: inherit;
   font-size: 13px;
@@ -325,8 +326,8 @@
 }
 
 .ltm-load-more:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
-  color: #f8fafc;
+  background: rgba(23, 32, 51, 0.08);
+  color: #172033;
 }
 
 .ltm-load-more:disabled {
@@ -335,19 +336,8 @@
 }
 
 @media (max-width: 480px) {
-  .ltm-dialog {
-    max-height: 90vh;
-  }
-
-  .ltm-header {
-    padding: 16px 16px 12px;
-  }
-
-  .ltm-tabs-wrap {
-    padding: 0 16px 10px;
-  }
-
-  .ltm-list-wrap {
-    padding: 0 16px 16px;
-  }
+  .ltm-dialog      { max-height: 90vh; }
+  .ltm-header      { padding: 16px 16px 12px; }
+  .ltm-tabs-wrap   { padding: 10px 16px 8px; }
+  .ltm-list-wrap   { padding: 4px 16px 16px; }
 }

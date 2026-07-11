@@ -12,8 +12,8 @@ export default function AdminTestEmailPage() {
   const [error, setError] = useState(null)       // null | string
 
   const validate = (val) => {
-    if (!val.trim()) return 'Email không được bỏ trống.'
-    if (!EMAIL_RE.test(val.trim())) return 'Email không đúng định dạng.'
+    if (!val.trim()) return 'Email is required.'
+    if (!EMAIL_RE.test(val.trim())) return 'Please enter a valid email address.'
     return ''
   }
 
@@ -29,12 +29,12 @@ export default function AdminTestEmailPage() {
 
     try {
       await adminNotificationApi.sendTestEmail(email.trim())
-      setSuccess(`Email test đã được gửi đến ${email.trim()}.`)
+      setSuccess(`Test email sent to ${email.trim()}.`)
     } catch (caught) {
       const msg =
         caught?.response?.data?.message ||
         caught?.message ||
-        'Không thể gửi email test. Vui lòng thử lại.'
+        'Failed to send test email. Please try again.'
       setError(msg)
     } finally {
       setSending(false)
@@ -49,10 +49,10 @@ export default function AdminTestEmailPage() {
   return (
     <div className="ate-page">
       <div className="ate-header">
-        <p className="ate-kicker">Quản trị viên</p>
-        <h1>Kiểm tra email</h1>
+        <p className="ate-kicker">Admin</p>
+        <h1>Test Email</h1>
         <p className="ate-desc">
-          Gửi email thử để kiểm tra cấu hình gửi mail của hệ thống.
+          Send a test email to verify your mail server configuration.
         </p>
       </div>
 
@@ -60,7 +60,7 @@ export default function AdminTestEmailPage() {
         <form className="ate-form" onSubmit={handleSubmit} noValidate>
           <div className={`ate-field${fieldError ? ' has-error' : ''}`}>
             <label className="ate-label" htmlFor="test-email-input">
-              Địa chỉ email nhận
+              Recipient email
             </label>
             <input
               id="test-email-input"
@@ -85,10 +85,10 @@ export default function AdminTestEmailPage() {
             {sending ? (
               <>
                 <span className="ate-spinner" aria-hidden="true" />
-                Đang gửi...
+                Sending...
               </>
             ) : (
-              'Gửi email test'
+              'Send test email'
             )}
           </button>
         </form>
