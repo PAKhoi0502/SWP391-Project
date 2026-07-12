@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { userService } from '../../services/userService'
 import './ProfileSettings.css'
 
 function getStrength(pw) {
@@ -17,8 +18,15 @@ function getStrength(pw) {
 const STRENGTH_LABELS = ['', 'Weak', 'Medium', 'Strong']
 const STRENGTH_CLASSES = ['', 'weak', 'medium', 'strong']
 
+function getErrorMessage(err, fallback) {
+  return err?.response?.data?.message || err?.response?.data || err?.message || fallback
+}
+
 export default function PasswordChangeForm({ onCancel }) {
   const [form, setForm] = useState({ oldPw: '', newPw: '', confirmPw: '' })
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   const strength = getStrength(form.newPw)
   const strengthLabel = form.newPw ? STRENGTH_LABELS[strength] : ''
@@ -26,14 +34,46 @@ export default function PasswordChangeForm({ onCancel }) {
 
   const handleChange = (e) => {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }))
+    setError('')
+    setSuccess('')
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+
+    if (!form.oldPw) {
+      setError('Please enter your current password.')
+      return
+    }
+    if (form.newPw.length < 6) {
+      setError('New password must be at least 6 characters.')
+      return
+    }
+    if (form.newPw !== form.confirmPw) {
+      setError('Passwords do not match.')
+      return
+    }
+
+    setSubmitting(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      await userService.changePassword({
+        currentPassword: form.oldPw,
+        newPassword: form.newPw,
+      })
+      setSuccess('Password changed successfully.')
+      setForm({ oldPw: '', newPw: '', confirmPw: '' })
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not change password.'))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
-    <div className="ps-pw-form">
-      <div className="ps-pw-unavailable">
-        Password change is not available yet. Please contact an administrator.
-      </div>
-
+    <form className="ps-pw-form" onSubmit={handleSubmit}>
       <div className="ps-pw-field">
         <label htmlFor="pw-old">Current Password</label>
         <input
@@ -44,7 +84,7 @@ export default function PasswordChangeForm({ onCancel }) {
           onChange={handleChange}
           placeholder="Enter current password"
           autoComplete="current-password"
-          disabled
+          disabled={submitting}
         />
       </div>
 
@@ -58,7 +98,7 @@ export default function PasswordChangeForm({ onCancel }) {
           onChange={handleChange}
           placeholder="Enter new password"
           autoComplete="new-password"
-          disabled
+          disabled={submitting}
         />
       </div>
 
@@ -86,18 +126,21 @@ export default function PasswordChangeForm({ onCancel }) {
           onChange={handleChange}
           placeholder="Re-enter new password"
           autoComplete="new-password"
-          disabled
+          disabled={submitting}
         />
       </div>
 
+      {error && <div className="ps-pw-error">{error}</div>}
+      {success && <div className="ps-pw-success">{success}</div>}
+
       <div className="ps-pw-actions">
-        <button type="button" className="ps-pw-submit" disabled>
-          Confirm Password Change
+        <button type="submit" className="ps-pw-submit" disabled={submitting}>
+          {submitting ? 'Saving…' : 'Confirm Password Change'}
         </button>
-        <button type="button" className="ps-pw-cancel" onClick={onCancel}>
+        <button type="button" className="ps-pw-cancel" onClick={onCancel} disabled={submitting}>
           Cancel
         </button>
       </div>
-    </div>
+    </form>
   )
 }

@@ -1,5 +1,6 @@
 package com.autowashpro.service.impl;
 
+import com.autowashpro.common.UploadFolder;
 import com.autowashpro.dto.request.VehicleCreateRequest;
 import com.autowashpro.dto.request.VehicleStatusUpdateRequest;
 import com.autowashpro.dto.request.VehicleUpdateRequest;
@@ -7,6 +8,7 @@ import com.autowashpro.dto.response.PageResponse;
 import com.autowashpro.dto.response.VehicleResponse;
 import com.autowashpro.entity.User;
 import com.autowashpro.entity.Vehicle;
+import com.autowashpro.repository.UploadRepository;
 import com.autowashpro.repository.UserRepository;
 import com.autowashpro.repository.VehicleRepository;
 import com.autowashpro.repository.spec.VehicleSpecifications;
@@ -29,6 +31,7 @@ public class VehicleServiceImpl implements VehicleService {
 
     private final VehicleRepository vehicleRepository;
     private final UserRepository userRepository;
+    private final UploadRepository uploadRepository;
 
     // Chuẩn hóa biển số: uppercase, xóa dấu chấm/gạch/khoảng trắng
     private String normalizePlate(String raw) {
@@ -178,7 +181,7 @@ public class VehicleServiceImpl implements VehicleService {
     }
 
     private VehicleResponse toResponse(Vehicle v) {
-        return VehicleResponse.builder()
+        VehicleResponse.VehicleResponseBuilder builder = VehicleResponse.builder()
                 .id(v.getId())
                 .customerId(v.getCustomer() != null ? v.getCustomer().getId() : null)
                 .rawLicensePlate(v.getRawLicensePlate())
@@ -193,7 +196,17 @@ public class VehicleServiceImpl implements VehicleService {
                 .isDefault(v.getIsDefault())
                 .isActive(v.getIsActive())
                 .createdAt(v.getCreatedAt())
-                .updatedAt(v.getUpdatedAt())
-                .build();
+                .updatedAt(v.getUpdatedAt());
+
+        if (v.getCustomer() != null) {
+            uploadRepository
+                    .findFirstByOwnerIdAndEntityTypeAndEntityIdOrderByCreatedAtDesc(
+                            v.getCustomer().getId(),
+                            UploadFolder.VEHICLES.getEntityType(),
+                            v.getId())
+                    .ifPresent(image -> builder.imageUrl(image.getFileUrl()).imagePublicId(image.getPublicId()));
+        }
+
+        return builder.build();
     }
 }

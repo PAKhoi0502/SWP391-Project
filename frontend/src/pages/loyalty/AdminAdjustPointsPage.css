@@ -1,0 +1,177 @@
+.aap-page {
+  color: #1e293b;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.aap-hero {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 28px 32px;
+}
+
+.aap-hero h1 {
+  margin: 0 0 4px;
+  color: #0f172a;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.aap-hero p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.aap-panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.aap-panel h2 {
+  margin: 0 0 16px;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.aap-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.aap-label {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.aap-input,
+.aap-textarea {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #1e293b;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  padding: 10px 12px;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.aap-textarea {
+  resize: vertical;
+}
+
+.aap-input:focus,
+.aap-textarea:focus {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.aap-input::placeholder,
+.aap-textarea::placeholder {
+  color: #cbd5e1;
+}
+
+.aap-lookup-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.aap-lookup-row .aap-field {
+  min-width: 220px;
+}
+
+.aap-btn {
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px 18px;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+  white-space: nowrap;
+}
+
+.aap-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.aap-btn--primary {
+  background: #2563eb;
+  border: 1px solid #2563eb;
+  color: #ffffff;
+}
+
+.aap-btn--primary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.aap-btn--ghost {
+  background: transparent;
+  border: 1px solid #bfdbfe;
+  color: #2563eb;
+}
+
+.aap-btn--ghost:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.aap-customer-card {
+  display: grid;
+  gap: 4px;
+  margin-top: 16px;
+  padding: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  max-width: 360px;
+}
+
+.aap-customer-card strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.aap-customer-card span {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.aap-form {
+  display: grid;
+  gap: 14px;
+  max-width: 480px;
+}
+
+.aap-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 13px;
+  padding: 10px 12px;
+}
+
+.aap-success {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  color: #15803d;
+  font-size: 13px;
+  padding: 10px 12px;
+}

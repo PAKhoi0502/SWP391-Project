@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AUDIT_ACTIONS, AUDIT_TARGET_TYPES, auditLogApi } from '../../api/auditLogApi'
-import { Button, Input, Modal, Pagination, Select, Table } from '../../components/common/ui'
 import { userService } from '../../services/userService'
+import './AdminAuditLogPage.css'
 
 const INITIAL_FILTERS = { actorId: '', action: '', targetType: '', from: '', to: '' }
 const PAGE_SIZE = 10
@@ -74,83 +74,150 @@ export default function AdminAuditLogPage() {
     }
   }
 
-  const columns = [
-    { title: 'Thời gian', key: 'createdAt', render: (log) => formatDateTime(log.createdAt) },
-    { title: 'Actor', key: 'actorId', render: (log) => <ActorCell actorId={log.actorId} usersById={usersById} /> },
-    { title: 'Hành động', key: 'action', render: (log) => formatEnumLabel(log.action) },
-    {
-      title: 'Đối tượng',
-      key: 'target',
-      render: (log) => (
-        <span>
-          {formatEnumLabel(log.targetType)} <small style={{ color: 'rgba(200,220,255,0.5)' }}>#{log.targetId}</small>
-        </span>
-      ),
-    },
-    { title: 'Thao tác', key: 'actions', render: (log) => <Button size="sm" variant="ghost" onClick={() => handleViewDetail(log)}>Chi tiết</Button> },
-  ]
-
   return (
-    <div style={pageStyle}>
-      <style>{`
-        .audit-log-filters {
-          display: grid;
-          gap: 12px;
-          grid-template-columns: repeat(5, minmax(0, 1fr));
-          align-items: end;
-          margin-bottom: 18px;
-        }
-        @media (max-width: 1100px) {
-          .audit-log-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        }
-      `}</style>
+    <div className="aal-page">
+      <section className="aal-hero">
+        <h1>Nhật ký hệ thống</h1>
+        <p>Theo dõi hành động của người dùng trên hệ thống, lọc theo actor và hành động.</p>
+      </section>
 
-      <div style={headerStyle}>
-        <div>
-          <h1 style={{ margin: 0, color: '#fff', marginBottom: 8 }}>Nhật ký hệ thống</h1>
-          <p style={{ margin: 0, color: 'rgba(200,220,255,0.58)' }}>
-            Theo dõi hành động của người dùng trên hệ thống, lọc theo actor và hành động.
-          </p>
+      <section className="aal-panel">
+        <div className="aal-filters">
+          <div className="aal-field">
+            <span className="aal-label">Actor ID</span>
+            <input
+              className="aal-input"
+              value={filters.actorId}
+              onChange={(e) => setFilters((prev) => ({ ...prev, actorId: e.target.value }))}
+              placeholder="Nhập Actor ID"
+            />
+          </div>
+
+          <div className="aal-field">
+            <span className="aal-label">Hành động</span>
+            <select
+              className="aal-select"
+              value={filters.action}
+              onChange={(e) => setFilters((prev) => ({ ...prev, action: e.target.value }))}
+            >
+              <option value="">Tất cả hành động</option>
+              {AUDIT_ACTIONS.map((action) => (
+                <option key={action} value={action}>{formatEnumLabel(action)}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="aal-field">
+            <span className="aal-label">Đối tượng</span>
+            <select
+              className="aal-select"
+              value={filters.targetType}
+              onChange={(e) => setFilters((prev) => ({ ...prev, targetType: e.target.value }))}
+            >
+              <option value="">Tất cả đối tượng</option>
+              {AUDIT_TARGET_TYPES.map((type) => (
+                <option key={type} value={type}>{formatEnumLabel(type)}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="aal-field">
+            <span className="aal-label">Từ ngày</span>
+            <input
+              className="aal-input"
+              type="date"
+              value={filters.from}
+              onChange={(e) => setFilters((prev) => ({ ...prev, from: e.target.value }))}
+            />
+          </div>
+
+          <div className="aal-field">
+            <span className="aal-label">Đến ngày</span>
+            <input
+              className="aal-input"
+              type="date"
+              value={filters.to}
+              onChange={(e) => setFilters((prev) => ({ ...prev, to: e.target.value }))}
+            />
+          </div>
         </div>
-      </div>
 
-      <div style={panelStyle}>
-        <div className="audit-log-filters">
-          <Input label="Actor ID" value={filters.actorId} onChange={(e) => setFilters((prev) => ({ ...prev, actorId: e.target.value }))} placeholder="Nhập Actor ID" />
-          <Select
-            label="Hành động"
-            value={filters.action}
-            onChange={(e) => setFilters((prev) => ({ ...prev, action: e.target.value }))}
-            options={[{ value: '', label: 'Tất cả hành động' }, ...AUDIT_ACTIONS.map((action) => ({ value: action, label: formatEnumLabel(action) }))]}
-          />
-          <Select
-            label="Đối tượng"
-            value={filters.targetType}
-            onChange={(e) => setFilters((prev) => ({ ...prev, targetType: e.target.value }))}
-            options={[{ value: '', label: 'Tất cả đối tượng' }, ...AUDIT_TARGET_TYPES.map((type) => ({ value: type, label: formatEnumLabel(type) }))]}
-          />
-          <Input label="Từ ngày" type="date" value={filters.from} onChange={(e) => setFilters((prev) => ({ ...prev, from: e.target.value }))} />
-          <Input label="Đến ngày" type="date" value={filters.to} onChange={(e) => setFilters((prev) => ({ ...prev, to: e.target.value }))} />
+        <div className="aal-actions">
+          <button type="button" className="aal-btn aal-btn--primary" onClick={handleApplyFilters}>Áp dụng</button>
+          <button type="button" className="aal-btn aal-btn--ghost" onClick={handleClearFilters}>Xóa lọc</button>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
-          <Button variant="secondary" onClick={handleApplyFilters}>Áp dụng</Button>
-          <Button variant="ghost" onClick={handleClearFilters}>Xóa lọc</Button>
-        </div>
-
-        {error && <div style={errorStyle}>{error}</div>}
+        {error && <div className="aal-error">{error}</div>}
 
         {loading ? (
-          <div style={stateStyle}>Đang tải nhật ký hệ thống...</div>
+          <div className="aal-state">Đang tải nhật ký hệ thống...</div>
+        ) : logs.length === 0 ? (
+          <div className="aal-state">Không tìm thấy nhật ký phù hợp</div>
         ) : (
           <>
-            <Table columns={columns} data={logs} emptyText="Không tìm thấy nhật ký phù hợp" />
-            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+            <div className="aal-table-wrap">
+              <table className="aal-table">
+                <thead>
+                  <tr>
+                    <th>Thời gian</th>
+                    <th>Actor</th>
+                    <th>Hành động</th>
+                    <th>Đối tượng</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map((log) => {
+                    const user = usersById[String(log.actorId)]
+                    return (
+                      <tr key={log.id}>
+                        <td>{formatDateTime(log.createdAt)}</td>
+                        <td>
+                          <span className="aal-actor-name">{user?.fullName || user?.email || 'Không xác định'}</span>
+                          <span className="aal-actor-id">#{log.actorId}</span>
+                        </td>
+                        <td>{formatEnumLabel(log.action)}</td>
+                        <td>
+                          {formatEnumLabel(log.targetType)} <span className="aal-target-id">#{log.targetId}</span>
+                        </td>
+                        <td>
+                          <button type="button" className="aal-btn aal-btn--ghost aal-btn--sm" onClick={() => handleViewDetail(log)}>
+                            Chi tiết
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="aal-pagination">
+                <button
+                  type="button"
+                  className="aal-page-btn"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  ← Trước
+                </button>
+                <span className="aal-page-info">Trang {page} / {totalPages}</span>
+                <button
+                  type="button"
+                  className="aal-page-btn"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                >
+                  Sau →
+                </button>
+              </div>
+            )}
           </>
         )}
-      </div>
+      </section>
 
-      <AuditLogDetailModal
+      <AuditLogDetailDialog
         log={selectedLog}
         loading={detailLoading}
         error={detailError}
@@ -161,49 +228,36 @@ export default function AdminAuditLogPage() {
   )
 }
 
-function ActorCell({ actorId, usersById }) {
-  const user = usersById[String(actorId)]
-  return (
-    <div style={{ display: 'grid', gap: 2 }}>
-      <strong style={{ color: '#fff' }}>{user?.fullName || user?.email || 'Không xác định'}</strong>
-      <span style={{ color: 'rgba(200,220,255,0.5)', fontSize: 12 }}>#{actorId}</span>
-    </div>
-  )
-}
-
-function AuditLogDetailModal({ log, loading, error, usersById, onClose }) {
+function AuditLogDetailDialog({ log, loading, error, usersById, onClose }) {
   if (!log) return null
   const user = usersById[String(log.actorId)]
 
   return (
-    <Modal open={Boolean(log)} title="Chi tiết nhật ký" onClose={onClose}>
-      {loading ? (
-        <div style={stateStyle}>Đang tải chi tiết...</div>
-      ) : error ? (
-        <div style={errorStyle}>{error}</div>
-      ) : (
-        <div style={{ display: 'grid', gap: 14 }}>
-          <DetailRow label="ID" value={log.id} />
-          <DetailRow label="Thời gian" value={formatDateTime(log.createdAt)} />
-          <DetailRow label="Actor" value={`${user?.fullName || user?.email || 'Không xác định'} (#${log.actorId})`} />
-          <DetailRow label="Hành động" value={formatEnumLabel(log.action)} />
-          <DetailRow label="Loại đối tượng" value={formatEnumLabel(log.targetType)} />
-          <DetailRow label="ID đối tượng" value={log.targetId} />
-          <div>
-            <span style={{ color: 'rgba(200,220,255,0.55)', display: 'block', marginBottom: 8 }}>Metadata</span>
-            <pre style={metadataStyle}>{JSON.stringify(log.metadata || {}, null, 2)}</pre>
-          </div>
+    <div className="aal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="aal-dialog" role="dialog" aria-modal="true">
+        <div className="aal-dialog-header">
+          <h3>Chi tiết nhật ký</h3>
+          <button type="button" className="aal-dialog-close" onClick={onClose} aria-label="Đóng">✕</button>
         </div>
-      )}
-    </Modal>
-  )
-}
 
-function DetailRow({ label, value }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 10 }}>
-      <span style={{ color: 'rgba(200,220,255,0.55)' }}>{label}</span>
-      <strong style={{ color: '#fff', textAlign: 'right' }}>{value}</strong>
+        {loading ? (
+          <div className="aal-state">Đang tải chi tiết...</div>
+        ) : error ? (
+          <div className="aal-error">{error}</div>
+        ) : (
+          <div>
+            <div className="aal-detail-row"><span>ID</span><strong>{log.id}</strong></div>
+            <div className="aal-detail-row"><span>Thời gian</span><strong>{formatDateTime(log.createdAt)}</strong></div>
+            <div className="aal-detail-row"><span>Actor</span><strong>{user?.fullName || user?.email || 'Không xác định'} (#{log.actorId})</strong></div>
+            <div className="aal-detail-row"><span>Hành động</span><strong>{formatEnumLabel(log.action)}</strong></div>
+            <div className="aal-detail-row"><span>Loại đối tượng</span><strong>{formatEnumLabel(log.targetType)}</strong></div>
+            <div className="aal-detail-row"><span>ID đối tượng</span><strong>{log.targetId}</strong></div>
+
+            <span className="aal-metadata-label">Metadata</span>
+            <pre className="aal-metadata">{JSON.stringify(log.metadata || {}, null, 2)}</pre>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -220,57 +274,4 @@ function formatEnumLabel(value) {
 
 function getErrorMessage(err, fallback) {
   return err?.response?.data?.message || err?.response?.data || err?.message || fallback
-}
-
-const pageStyle = {
-  display: 'grid',
-  gap: 20,
-  fontFamily: "'Be Vietnam Pro', sans-serif",
-}
-
-const headerStyle = {
-  alignItems: 'center',
-  background: 'linear-gradient(135deg, #0f172a, #1e1b4b)',
-  borderRadius: 24,
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: 18,
-  padding: 24,
-}
-
-const panelStyle = {
-  background: 'radial-gradient(circle at 90% 0%, rgba(167,139,250,0.16) 0%, transparent 40%), linear-gradient(145deg, rgba(18,16,26,0.94), rgba(38,34,52,0.88))',
-  border: '1px solid rgba(167,139,250,0.25)',
-  borderRadius: 24,
-  boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
-  padding: 20,
-}
-
-const errorStyle = {
-  background: 'rgba(239,68,68,0.15)',
-  border: '1px solid rgba(239,68,68,0.35)',
-  borderRadius: 12,
-  color: '#fca5a5',
-  marginBottom: 16,
-  padding: '10px 12px',
-}
-
-const stateStyle = {
-  color: 'rgba(200,220,255,0.72)',
-  padding: 24,
-  textAlign: 'center',
-}
-
-const metadataStyle = {
-  background: 'rgba(0,0,0,0.35)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: 12,
-  color: 'rgba(226,232,240,0.85)',
-  fontSize: 13,
-  margin: 0,
-  maxHeight: 260,
-  overflow: 'auto',
-  padding: 14,
-  whiteSpace: 'pre-wrap',
-  wordBreak: 'break-all',
 }

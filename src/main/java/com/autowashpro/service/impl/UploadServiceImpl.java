@@ -4,10 +4,12 @@ import com.autowashpro.common.UploadFolder;
 import com.autowashpro.dto.response.UploadImageResponse;
 import com.autowashpro.entity.Booking;
 import com.autowashpro.entity.Upload;
+import com.autowashpro.entity.Vehicle;
 import com.autowashpro.entity.VehicleInspectionImage;
 import com.autowashpro.repository.BookingRepository;
 import com.autowashpro.repository.UploadRepository;
 import com.autowashpro.repository.VehicleInspectionImageRepository;
+import com.autowashpro.repository.VehicleRepository;
 import com.autowashpro.service.ImageStorageProvider;
 import com.autowashpro.service.UploadService;
 import com.autowashpro.service.support.ImageFileValidator;
@@ -35,6 +37,7 @@ public class UploadServiceImpl implements UploadService {
 
     private final UploadRepository uploadRepository;
     private final BookingRepository bookingRepository;
+    private final VehicleRepository vehicleRepository;
     private final VehicleInspectionImageRepository inspectionImageRepository;
     private final ImageStorageProvider storageProvider;
     private final ImageFileValidator imageFileValidator;
@@ -71,7 +74,7 @@ public class UploadServiceImpl implements UploadService {
             throw exception;
         }
 
-        cleanupReplacedAvatar(persisted.replacedPublicId());
+        cleanupReplacedImage(persisted.replacedPublicId());
 
         return UploadImageResponse.builder()
                 .imageUrl(persisted.upload().getFileUrl())
@@ -159,7 +162,14 @@ public class UploadServiceImpl implements UploadService {
         }
 
         if (requestedEntityId == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "entity_id is required for inspections");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "entity_id is required for " + folder.getValue());
+        }
+
+        if (folder == UploadFolder.VEHICLES) {
+            vehicleRepository.findByIdAndCustomer_Id(requestedEntityId, currentUserId)
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND, "Vehicle not found or not owned by current user"));
+            return requestedEntityId;
         }
 
         Booking booking = bookingRepository.findById(requestedEntityId)
@@ -178,7 +188,7 @@ public class UploadServiceImpl implements UploadService {
         Upload upload;
         String replacedPublicId = null;
 
-        if (folder == UploadFolder.AVATARS) {
+        if (folder == UploadFolder.AVATARS || folder == UploadFolder.VEHICLES) {
             upload = uploadRepository
                     .findFirstByOwnerIdAndEntityTypeAndEntityIdOrderByCreatedAtDesc(
                             currentUserId,
@@ -221,6 +231,15 @@ public class UploadServiceImpl implements UploadService {
             return;
         }
 
+        if (UploadFolder.VEHICLES.getEntityType().equals(upload.getEntityType())) {
+            Vehicle vehicle = vehicleRepository.findById(upload.getEntityId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vehicle not found"));
+            if (vehicle.getCustomer() == null || !currentUserId.equals(vehicle.getCustomer().getId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot delete another user's vehicle photo");
+            }
+            return;
+        }
+
         throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Uploaded image cannot be managed");
     }
 
@@ -236,7 +255,7 @@ public class UploadServiceImpl implements UploadService {
         }
     }
 
-    private void cleanupReplacedAvatar(String publicId) {
+    private void cleanupReplacedImage(String publicId) {
         if (publicId == null || publicId.isBlank()) {
             return;
         }
@@ -244,7 +263,7 @@ public class UploadServiceImpl implements UploadService {
         try {
             storageProvider.delete(publicId);
         } catch (RuntimeException exception) {
-            log.warn("Could not delete replaced avatar from image storage");
+            log.warn("Could not delete replaced image from image storage");
         }
     }
 

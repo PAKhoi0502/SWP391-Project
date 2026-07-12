@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import notificationApi from '../../api/notificationApi'
 import './CustomerNotificationListPage.css'
 
-const VISIBLE_TYPES = new Set(['TIER_UPGRADED', 'VOUCHER_RECEIVED', 'REWARD_EARNED'])
+const VISIBLE_TYPES = new Set([
+  'TIER_UPGRADED', 'VOUCHER_RECEIVED', 'REWARD_EARNED',
+  'BOOKING_CONFIRMED', 'BOOKING_CANCELED', 'PAYMENT_CONFIRMED',
+])
 const isVisible = (t) => VISIBLE_TYPES.has(String(t || '').toUpperCase())
 
 const formatTime = (value) => {
@@ -24,21 +27,27 @@ const formatTime = (value) => {
 }
 
 const buildTitle = (notif) => {
-  if (notif.eventType === 'TIER_UPGRADED')    return 'Tier upgraded'
-  if (notif.eventType === 'VOUCHER_RECEIVED') return 'New voucher received'
-  if (notif.eventType === 'REWARD_EARNED')    return 'Reward points earned'
+  if (notif.eventType === 'TIER_UPGRADED')      return 'Tier upgraded'
+  if (notif.eventType === 'VOUCHER_RECEIVED')   return 'New voucher received'
+  if (notif.eventType === 'REWARD_EARNED')      return 'Reward points earned'
+  if (notif.eventType === 'BOOKING_CONFIRMED')  return 'Booking confirmed'
+  if (notif.eventType === 'BOOKING_CANCELED')   return 'Booking canceled'
+  if (notif.eventType === 'PAYMENT_CONFIRMED')  return 'Payment confirmed'
   return notif.title || notif.eventType || ''
 }
 
 const getTypeKey = (eventType) => {
-  if (eventType === 'REWARD_EARNED')    return 'reward'
-  if (eventType === 'TIER_UPGRADED')    return 'tier'
-  if (eventType === 'VOUCHER_RECEIVED') return 'voucher'
+  if (eventType === 'REWARD_EARNED')     return 'reward'
+  if (eventType === 'TIER_UPGRADED')     return 'tier'
+  if (eventType === 'VOUCHER_RECEIVED')  return 'voucher'
+  if (eventType === 'BOOKING_CONFIRMED') return 'booking'
+  if (eventType === 'BOOKING_CANCELED')  return 'booking-canceled'
+  if (eventType === 'PAYMENT_CONFIRMED') return 'payment'
   return 'default'
 }
 
-const TYPE_ICON  = { reward: '★', tier: '▲', voucher: '%', default: '•' }
-const TYPE_LABEL = { reward: 'Reward', tier: 'Membership tier', voucher: 'Voucher', default: 'Notification' }
+const TYPE_ICON  = { reward: '★', tier: '▲', voucher: '%', booking: '✓', 'booking-canceled': '✕', payment: '$', default: '•' }
+const TYPE_LABEL = { reward: 'Reward', tier: 'Membership tier', voucher: 'Voucher', booking: 'Booking', 'booking-canceled': 'Booking', payment: 'Payment', default: 'Notification' }
 
 export default function CustomerNotificationListPage() {
   const navigate = useNavigate()

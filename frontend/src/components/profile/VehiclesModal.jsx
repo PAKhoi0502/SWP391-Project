@@ -1,7 +1,21 @@
 import { useEffect, useState } from 'react'
 import { ENGINE_TYPES, MOTORBIKE_GROUPS, VEHICLE_TYPES } from '../../constants/vehicleTypes'
 import { vehicleService } from '../../services/vehicleService'
+import ImageUpload from '../upload/ImageUpload'
 import './VehiclesModal.css'
+
+function VehiclePhotoFallback() {
+  return (
+    <div className="vm-item-photo-fallback">
+      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 11l1.7-4.3A2 2 0 0 1 8.6 5.5h6.8a2 2 0 0 1 1.9 1.2L19 11"/>
+        <path d="M3 11h18v5.2a.8.8 0 0 1-.8.8H18"/>
+        <path d="M6 17H3.8a.8.8 0 0 1-.8-.8V11"/>
+        <circle cx="7.5" cy="17" r="1.7"/><circle cx="16.5" cy="17" r="1.7"/>
+      </svg>
+    </div>
+  )
+}
 
 const emptyForm = {
   rawLicensePlate: '',
@@ -209,56 +223,73 @@ export default function VehiclesModal({ open, onClose }) {
                     const active = v.isActive !== false
                     return (
                       <li key={v.id} className={`vm-item${!active ? ' vm-item--inactive' : ''}`}>
-                        <div className="vm-item-top">
-                          <div className="vm-plate-wrap">
-                            <span className="vm-plate">{v.rawLicensePlate}</span>
-                            {v.isDefault && <span className="vm-default-chip">Default</span>}
-                            {!active   && <span className="vm-inactive-chip">Inactive</span>}
+                        <div className="vm-item-row">
+                          <ImageUpload
+                            avatarMode
+                            className="image-upload--square"
+                            folder="vehicles"
+                            entityId={v.id}
+                            images={v.imageUrl ? [{ publicId: v.imagePublicId, imageUrl: v.imageUrl }] : []}
+                            onUploaded={loadVehicles}
+                            onDeleted={loadVehicles}
+                            multiple={false}
+                            disabled={saving}
+                            avatarFallback={<VehiclePhotoFallback />}
+                          />
+
+                          <div className="vm-item-body">
+                            <div className="vm-item-top">
+                              <div className="vm-plate-wrap">
+                                <span className="vm-plate">{v.rawLicensePlate}</span>
+                                {v.isDefault && <span className="vm-default-chip">Default</span>}
+                                {!active   && <span className="vm-inactive-chip">Inactive</span>}
+                              </div>
+                              <span className="vm-type-chip">{formatType(v.vehicleType)}</span>
+                            </div>
+
+                            <dl className="vm-details">
+                              {(v.brand || v.model) && (
+                                <div>
+                                  <dt>Brand / Model</dt>
+                                  <dd>{[v.brand, v.model].filter(Boolean).join(' ') || '—'}</dd>
+                                </div>
+                              )}
+                              {v.engineType && (
+                                <div>
+                                  <dt>Engine</dt>
+                                  <dd>{formatEngine(v.engineType)}</dd>
+                                </div>
+                              )}
+                              {v.color && (
+                                <div>
+                                  <dt>Color</dt>
+                                  <dd>{v.color}</dd>
+                                </div>
+                              )}
+                              {v.normalizedLicensePlate && v.normalizedLicensePlate !== v.rawLicensePlate && (
+                                <div>
+                                  <dt>Normalized</dt>
+                                  <dd>{v.normalizedLicensePlate}</dd>
+                                </div>
+                              )}
+                            </dl>
+
+                            <div className="vm-item-actions">
+                              <button type="button" className="vm-action-btn" onClick={() => openEdit(v)}>Edit</button>
+                              <button
+                                type="button"
+                                className={`vm-action-btn ${active ? 'vm-action-btn--danger' : 'vm-action-btn--ghost'}`}
+                                onClick={() => setConfirm({ type: 'status', vehicle: v, nextValue: !active })}
+                              >
+                                {active ? 'Deactivate' : 'Reactivate'}
+                              </button>
+                              {!v.isDefault && active && (
+                                <button type="button" className="vm-action-btn vm-action-btn--set-default" onClick={() => setConfirm({ type: 'default', vehicle: v })}>
+                                  Set default
+                                </button>
+                              )}
+                            </div>
                           </div>
-                          <span className="vm-type-chip">{formatType(v.vehicleType)}</span>
-                        </div>
-
-                        <dl className="vm-details">
-                          {(v.brand || v.model) && (
-                            <div>
-                              <dt>Brand / Model</dt>
-                              <dd>{[v.brand, v.model].filter(Boolean).join(' ') || '—'}</dd>
-                            </div>
-                          )}
-                          {v.engineType && (
-                            <div>
-                              <dt>Engine</dt>
-                              <dd>{formatEngine(v.engineType)}</dd>
-                            </div>
-                          )}
-                          {v.color && (
-                            <div>
-                              <dt>Color</dt>
-                              <dd>{v.color}</dd>
-                            </div>
-                          )}
-                          {v.normalizedLicensePlate && v.normalizedLicensePlate !== v.rawLicensePlate && (
-                            <div>
-                              <dt>Normalized</dt>
-                              <dd>{v.normalizedLicensePlate}</dd>
-                            </div>
-                          )}
-                        </dl>
-
-                        <div className="vm-item-actions">
-                          <button type="button" className="vm-action-btn" onClick={() => openEdit(v)}>Edit</button>
-                          <button
-                            type="button"
-                            className={`vm-action-btn ${active ? 'vm-action-btn--danger' : 'vm-action-btn--ghost'}`}
-                            onClick={() => setConfirm({ type: 'status', vehicle: v, nextValue: !active })}
-                          >
-                            {active ? 'Deactivate' : 'Reactivate'}
-                          </button>
-                          {!v.isDefault && active && (
-                            <button type="button" className="vm-action-btn vm-action-btn--set-default" onClick={() => setConfirm({ type: 'default', vehicle: v })}>
-                              Set default
-                            </button>
-                          )}
                         </div>
                       </li>
                     )

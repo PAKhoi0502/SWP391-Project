@@ -430,6 +430,14 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.ppn-drop-avatar-sm img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .ppn-drop-avatar-sm span {
@@ -588,6 +596,14 @@
   transition: background 0.18s ease, box-shadow 0.18s ease;
   flex-shrink: 0;
   user-select: none;
+  overflow: hidden;
+}
+
+.ppn-chip-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 /* Name text inside chip */
