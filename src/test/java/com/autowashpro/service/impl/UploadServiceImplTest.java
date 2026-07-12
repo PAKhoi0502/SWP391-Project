@@ -6,6 +6,7 @@ import com.autowashpro.entity.VehicleInspectionImage;
 import com.autowashpro.repository.BookingRepository;
 import com.autowashpro.repository.UploadRepository;
 import com.autowashpro.repository.VehicleInspectionImageRepository;
+import com.autowashpro.repository.VehicleRepository;
 import com.autowashpro.service.ImageStorageProvider;
 import com.autowashpro.service.support.ImageFileValidator;
 import com.autowashpro.service.support.InspectionAccessPolicy;
@@ -44,6 +45,9 @@ class UploadServiceImplTest {
     private BookingRepository bookingRepository;
 
     @Mock
+    private VehicleRepository vehicleRepository;
+
+    @Mock
     private VehicleInspectionImageRepository inspectionImageRepository;
 
     @Mock
@@ -69,6 +73,7 @@ class UploadServiceImplTest {
         uploadService = new UploadServiceImpl(
                 uploadRepository,
                 bookingRepository,
+                vehicleRepository,
                 inspectionImageRepository,
                 storageProvider,
                 imageFileValidator,

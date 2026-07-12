@@ -23,6 +23,8 @@ public interface NotificationService {
     void notifyTierUpgraded(Long customerId, String oldTier, String newTier);
     
     void notifyVoucherReceived(Long customerId, String promotionCode, String promotionName);
+
+    void notifyPointsAdjusted(Long customerId, Integer points, String reason);
     
     // ===================== API =====================
     Page<NotificationResponse> getMyNotifications(Long userId, Boolean isRead, int page, int limit);
