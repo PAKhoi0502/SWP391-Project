@@ -1604,6 +1604,7 @@ function BookingDetailPage() {
 
         <button
           type="button"
+          className="bd-inspection-save-btn"
           disabled={inspectionSavingType === type}
           onClick={() => handleSaveInspection(type)}
         >

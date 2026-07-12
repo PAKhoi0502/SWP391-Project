@@ -21,6 +21,8 @@ public class VehicleResponse {
     private String motorbikeGroup;
     private Boolean isDefault;
     private Boolean isActive;
+    private String imageUrl;
+    private String imagePublicId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

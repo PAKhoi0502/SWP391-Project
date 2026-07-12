@@ -1,5 +1,6 @@
 package com.autowashpro.controller;
 
+import com.autowashpro.dto.request.GoogleAuthRequest;
 import com.autowashpro.dto.request.LoginRequest;
 import com.autowashpro.dto.request.RefreshTokenRequest;
 import com.autowashpro.dto.request.RegisterRequest;
@@ -32,6 +33,13 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request) {
 
         return authService.login(request);
+    }
+
+    @PostMapping("/google")
+    public AuthResponse googleAuth(
+            @Valid @RequestBody GoogleAuthRequest request) {
+
+        return authService.googleAuth(request.getIdToken());
     }
     @GetMapping("/me")
 public UserResponse me(

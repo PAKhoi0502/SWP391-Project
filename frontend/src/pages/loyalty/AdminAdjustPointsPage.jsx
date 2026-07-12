@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import loyaltyApi from '../../api/loyaltyApi'
-import { Button, Input, Textarea } from '../../components/common/ui'
 import { userService } from '../../services/userService'
+import './AdminAdjustPointsPage.css'
 
 export default function AdminAdjustPointsPage() {
   const [customerId, setCustomerId] = useState('')
@@ -72,126 +72,82 @@ export default function AdminAdjustPointsPage() {
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={headerStyle}>
-        <div>
-          <h1 style={{ margin: 0, color: '#fff', marginBottom: 8 }}>Điều chỉnh điểm loyalty</h1>
-          <p style={{ margin: 0, color: 'rgba(200,220,255,0.58)' }}>
-            Cộng hoặc trừ điểm thủ công cho một khách hàng, kèm lý do.
-          </p>
-        </div>
-      </div>
+    <div className="aap-page">
+      <section className="aap-hero">
+        <h1>Điều chỉnh điểm loyalty</h1>
+        <p>Cộng hoặc trừ điểm thủ công cho một khách hàng, kèm lý do.</p>
+      </section>
 
-      <div style={panelStyle}>
-        <h2 style={{ margin: '0 0 16px', color: '#fff', fontSize: 18 }}>1. Xác nhận khách hàng</h2>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div style={{ minWidth: 220 }}>
-            <Input
-              label="Customer ID"
+      <section className="aap-panel">
+        <h2>1. Xác nhận khách hàng</h2>
+        <div className="aap-lookup-row">
+          <div className="aap-field">
+            <span className="aap-label">Customer ID</span>
+            <input
+              className="aap-input"
               value={customerId}
               onChange={(e) => { setCustomerId(e.target.value); setCustomer(null) }}
               placeholder="Nhập Customer ID"
             />
           </div>
-          <Button variant="secondary" onClick={handleLookupCustomer} loading={lookupLoading}>Tìm khách hàng</Button>
+          <button type="button" className="aap-btn aap-btn--primary" onClick={handleLookupCustomer} disabled={lookupLoading}>
+            {lookupLoading ? 'Đang tìm...' : 'Tìm khách hàng'}
+          </button>
         </div>
 
-        {lookupError && <div style={errorStyle}>{lookupError}</div>}
+        {lookupError && <div className="aap-error" style={{ marginTop: 12 }}>{lookupError}</div>}
 
         {customer && (
-          <div style={customerCardStyle}>
-            <strong style={{ color: '#fff' }}>{customer.fullName || 'Chưa có tên'}</strong>
-            <span style={{ color: 'rgba(200,220,255,0.6)' }}>{customer.email || '-'}</span>
-            <span style={{ color: 'rgba(200,220,255,0.45)', fontSize: 13 }}>ID #{customer.id} · {String(customer.role || '').replace('ROLE_', '')}</span>
+          <div className="aap-customer-card">
+            <strong>{customer.fullName || 'Chưa có tên'}</strong>
+            <span>{customer.email || '-'}</span>
+            <span>ID #{customer.id} · {String(customer.role || '').replace('ROLE_', '')}</span>
           </div>
         )}
-      </div>
+      </section>
 
-      <div style={panelStyle}>
-        <h2 style={{ margin: '0 0 16px', color: '#fff', fontSize: 18 }}>2. Số điểm điều chỉnh</h2>
-        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 14, maxWidth: 480 }}>
-          <Input
-            label="Số điểm (âm để trừ, dương để cộng)"
-            type="number"
-            step="1"
-            value={points}
-            onChange={(e) => setPoints(e.target.value)}
-            error={errors.points}
-            placeholder="VD: 50 hoặc -20"
-          />
-          <Textarea
-            label="Lý do (khuyến nghị)"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="VD: Bù điểm do lỗi hệ thống booking #123"
-            rows={3}
-          />
+      <section className="aap-panel">
+        <h2>2. Số điểm điều chỉnh</h2>
+        <form onSubmit={handleSubmit} className="aap-form">
+          <div className="aap-field">
+            <span className="aap-label">Số điểm (âm để trừ, dương để cộng)</span>
+            <input
+              className="aap-input"
+              type="number"
+              step="1"
+              value={points}
+              onChange={(e) => setPoints(e.target.value)}
+              placeholder="VD: 50 hoặc -20"
+            />
+            {errors.points && <div className="aap-error">{errors.points}</div>}
+          </div>
 
-          {errors.customer && <div style={errorStyle}>{errors.customer}</div>}
-          {submitError && <div style={errorStyle}>{submitError}</div>}
-          {success && <div style={successStyle}>{success}</div>}
+          <div className="aap-field">
+            <span className="aap-label">Lý do (khuyến nghị)</span>
+            <textarea
+              className="aap-textarea"
+              rows={3}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="VD: Bù điểm do lỗi hệ thống booking #123"
+            />
+          </div>
+
+          {errors.customer && <div className="aap-error">{errors.customer}</div>}
+          {submitError && <div className="aap-error">{submitError}</div>}
+          {success && <div className="aap-success">{success}</div>}
 
           <div>
-            <Button type="submit" loading={submitting}>Áp dụng điều chỉnh</Button>
+            <button type="submit" className="aap-btn aap-btn--primary" disabled={submitting}>
+              {submitting ? 'Đang xử lý...' : 'Áp dụng điều chỉnh'}
+            </button>
           </div>
         </form>
-      </div>
+      </section>
     </div>
   )
 }
 
 function getErrorMessage(err, fallback) {
   return err?.response?.data?.message || err?.response?.data || err?.message || fallback
-}
-
-const pageStyle = {
-  display: 'grid',
-  gap: 20,
-  fontFamily: "'Be Vietnam Pro', sans-serif",
-}
-
-const headerStyle = {
-  alignItems: 'center',
-  background: 'linear-gradient(135deg, #0f172a, #1e1b4b)',
-  borderRadius: 24,
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: 18,
-  padding: 24,
-}
-
-const panelStyle = {
-  background: 'radial-gradient(circle at 90% 0%, rgba(167,139,250,0.16) 0%, transparent 40%), linear-gradient(145deg, rgba(18,16,26,0.94), rgba(38,34,52,0.88))',
-  border: '1px solid rgba(167,139,250,0.25)',
-  borderRadius: 24,
-  boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
-  padding: 20,
-}
-
-const customerCardStyle = {
-  display: 'grid',
-  gap: 4,
-  marginTop: 16,
-  padding: 14,
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: 14,
-  maxWidth: 360,
-}
-
-const errorStyle = {
-  background: 'rgba(239,68,68,0.15)',
-  border: '1px solid rgba(239,68,68,0.35)',
-  borderRadius: 12,
-  color: '#fca5a5',
-  marginTop: 12,
-  padding: '10px 12px',
-}
-
-const successStyle = {
-  background: 'rgba(34,197,94,0.15)',
-  border: '1px solid rgba(34,197,94,0.35)',
-  borderRadius: 12,
-  color: '#86efac',
-  padding: '10px 12px',
 }

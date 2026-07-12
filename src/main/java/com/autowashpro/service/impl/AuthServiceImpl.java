@@ -1,5 +1,7 @@
 package com.autowashpro.service.impl;
 
+import com.autowashpro.common.AuthProvider;
+import com.autowashpro.config.GoogleAuthProperties;
 import com.autowashpro.dto.request.LoginRequest;
 import com.autowashpro.dto.request.RegisterRequest;
 import com.autowashpro.dto.response.AuthResponse;
@@ -11,12 +13,18 @@ import com.autowashpro.repository.UserRepository;
 import com.autowashpro.security.JwtService;
 import com.autowashpro.service.AuthService;
 import com.autowashpro.service.EmailService;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import com.autowashpro.entity.PasswordReset;
 import com.autowashpro.repository.PasswordResetRepository;
 
+import java.security.GeneralSecurityException;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -31,6 +39,8 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final EmailService emailService;
+    private final GoogleIdTokenVerifier googleIdTokenVerifier;
+    private final GoogleAuthProperties googleAuthProperties;
 
     @Override
     public AuthResponse register(RegisterRequest request) {
@@ -49,6 +59,7 @@ public class AuthServiceImpl implements AuthService {
                 .phone(request.getPhone())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .role("CUSTOMER")
+                .authProvider(AuthProvider.LOCAL)
                 .isActive(true)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -116,6 +127,88 @@ public class AuthServiceImpl implements AuthService {
                                 .build()
                 )
                 .build();
+    }
+
+    @Override
+    public AuthResponse googleAuth(String idToken) {
+
+        if (!googleAuthProperties.isConfigured()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Google sign-in is not configured");
+        }
+
+        GoogleIdToken.Payload payload = verifyGoogleToken(idToken);
+        String googleId = payload.getSubject();
+        String email = payload.getEmail();
+        String fullName = payload.get("name") != null ? payload.get("name").toString() : email;
+
+        User user = userRepository.findByGoogleId(googleId).orElse(null);
+
+        if (user == null) {
+            user = userRepository.findByEmail(email).orElse(null);
+
+            if (user != null) {
+                user.setGoogleId(googleId);
+                userRepository.save(user);
+            } else {
+                user = User.builder()
+                        .fullName(fullName)
+                        .email(email)
+                        .googleId(googleId)
+                        .role("CUSTOMER")
+                        .authProvider(AuthProvider.GOOGLE)
+                        .isActive(true)
+                        .createdAt(LocalDateTime.now())
+                        .updatedAt(LocalDateTime.now())
+                        .build();
+                user = userRepository.save(user);
+                emailService.sendWelcomeEmail(user.getEmail(), user.getFullName());
+            }
+        }
+
+        if (!user.getIsActive()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User is inactive");
+        }
+
+        String accessToken = jwtService.generateToken(user.getId(), user.getRole());
+        String refreshTokenValue = jwtService.generateRefreshToken(user.getId());
+
+        RefreshToken refreshToken = RefreshToken.builder()
+                .user(user)
+                .token(refreshTokenValue)
+                .isRevoked(false)
+                .expiresAt(LocalDateTime.now().plusDays(30))
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        refreshTokenRepository.save(refreshToken);
+
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshTokenValue)
+                .user(
+                        UserResponse.builder()
+                                .id(user.getId())
+                                .fullName(user.getFullName())
+                                .email(user.getEmail())
+                                .phone(user.getPhone())
+                                .role(user.getRole())
+                                .build()
+                )
+                .build();
+    }
+
+    private GoogleIdToken.Payload verifyGoogleToken(String idTokenString) {
+        try {
+            GoogleIdToken idToken = googleIdTokenVerifier.verify(idTokenString);
+            if (idToken == null) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid Google token");
+            }
+            return idToken.getPayload();
+        } catch (ResponseStatusException exception) {
+            throw exception;
+        } catch (GeneralSecurityException | IOException | IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid Google token");
+        }
     }
 
     @Override

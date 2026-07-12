@@ -278,7 +278,9 @@ export default function PublicPillNavbar() {
                   aria-haspopup="true"
                   aria-label="Account menu"
                 >
-                  <span className="ppn-chip-avatar" aria-hidden="true">{initials}</span>
+                  <span className="ppn-chip-avatar" aria-hidden="true">
+                    {user?.avatarUrl ? <img src={user.avatarUrl} alt="" /> : initials}
+                  </span>
                   <span className="ppn-chip-name">{displayName}</span>
                 </button>
 
@@ -288,7 +290,7 @@ export default function PublicPillNavbar() {
                 >
                   <div className="ppn-drop-header">
                     <div className="ppn-drop-avatar-sm" aria-hidden="true">
-                      <span>{initials}</span>
+                      {user?.avatarUrl ? <img src={user.avatarUrl} alt="" /> : <span>{initials}</span>}
                     </div>
                     <div className="ppn-drop-userinfo">
                       <span className="ppn-drop-name">{displayName}</span>

@@ -16,6 +16,10 @@ function NavIcon({ name }) {
     star:     <><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></>,
     tag:      <><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></>,
     mail:     <><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></>,
+    list:     <><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>,
+    dollar:   <><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>,
+    download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
+    shield:   <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></>,
   }
   return (
     <svg
@@ -39,9 +43,13 @@ const NAV_ITEMS = [
   { to: '/admin/service-packages',         label: 'Service Packages', icon: 'package' },
   { to: '/admin/bookings',                 label: 'Bookings',         icon: 'calendar' },
   { to: '/admin/wash-histories',           label: 'Wash History',     icon: 'clock' },
+  { to: '/admin/waitlist',                 label: 'Waitlist',         icon: 'list' },
   { to: '/admin/loyalty/tier-rules',       label: 'Loyalty Tiers',    icon: 'star' },
+  { to: '/admin/loyalty/adjust-points',    label: 'Adjust Points',    icon: 'dollar' },
   { to: '/admin/promotions',               label: 'Promotions',       icon: 'tag' },
   { to: '/admin/notifications/test-email', label: 'Test Email',       icon: 'mail' },
+  { to: '/admin/research/export',          label: 'Research Export',  icon: 'download' },
+  { to: '/admin/audit-logs',               label: 'Audit Logs',       icon: 'shield' },
 ]
 
 export default function AdminLayout() {

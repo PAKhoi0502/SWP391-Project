@@ -11,6 +11,11 @@ export const userService = {
     return res.data
   },
 
+  async changePassword(payload) {
+    const res = await api.patch('/users/me/password', payload)
+    return res.data
+  },
+
   async getUsers() {
     const res = await api.get('/users')
     return res.data

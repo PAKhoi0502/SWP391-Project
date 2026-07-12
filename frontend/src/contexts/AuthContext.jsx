@@ -147,9 +147,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
- const login = async (payload) => {
-  const authData = await authService.login(payload);
-
+ const applyAuthData = async (authData) => {
   const token =
     authData.accessToken ||
     authData.token ||
@@ -189,6 +187,17 @@ export function AuthProvider({ children }) {
 
   return loggedUser;
 };
+
+ const login = async (payload) => {
+  const authData = await authService.login(payload);
+  return applyAuthData(authData);
+};
+
+ const loginWithGoogle = async (idToken) => {
+  const authData = await authService.googleAuth(idToken);
+  return applyAuthData(authData);
+};
+
   const register = async (payload) => {
     return authService.register(payload);
   };
@@ -225,6 +234,7 @@ export function AuthProvider({ children }) {
       loading,
       isAuthenticated,
       login,
+      loginWithGoogle,
       register,
       logout,
       loadCurrentUser,
