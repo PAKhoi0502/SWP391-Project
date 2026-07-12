@@ -1540,75 +1540,79 @@ function BookingDetailPage() {
     const existingInspection = getInspectionByType(inspections, type)
     const form = inspectionForms[type] || blankInspectionForm
     const isLocked = currentStatus === 'COMPLETED'
+    const typeLabel = type === 'BEFORE_WASH' ? 'Before service' : 'After service'
+    const typeClass = type === 'BEFORE_WASH' ? 'bd-inspection-card--before' : 'bd-inspection-card--after'
 
     return (
-      <article className="bd-inspection-card" key={type}>
+      <article className={`bd-inspection-card ${typeClass}`} key={type}>
         <div className="bd-inspection-head">
-          <div>
-            <span className={`bd-inspection-status ${existingInspection ? 'bd-inspection-status--created' : 'bd-inspection-status--missing'}`}>
-              {existingInspection ? 'Created' : 'Not yet created'}
+          <div className="bd-inspection-head-left">
+            <span className={`bd-inspection-type${type === 'AFTER_WASH' ? ' bd-inspection-type--after' : ''}`}>
+              {typeLabel}
             </span>
-            <p className="bd-inspection-title">{INSPECTION_LABELS[type]}</p>
+            <span className={`bd-inspection-status ${existingInspection ? 'bd-inspection-status--created' : 'bd-inspection-status--missing'}`}>
+              {existingInspection ? '✓ Created' : 'Not yet created'}
+            </span>
           </div>
           {existingInspection && (
             <span className="bd-inspection-ts">{formatDateTime(existingInspection.updatedAt || existingInspection.createdAt)}</span>
           )}
         </div>
 
-        <div className="bd-inspection-cols">
-          <label>
-            <span>Exterior condition</span>
-            <textarea
-              value={form.exteriorCondition}
-              onChange={(event) => handleInspectionChange(type, 'exteriorCondition', event.target.value)}
-              placeholder="e.g. light scratch on right door, front glass clean..."
-              disabled={isLocked}
-            />
-          </label>
+        <div className="bd-inspection-body">
+          <div className="bd-inspection-cols">
+            <label>
+              <span>Exterior condition</span>
+              <textarea
+                value={form.exteriorCondition}
+                onChange={(event) => handleInspectionChange(type, 'exteriorCondition', event.target.value)}
+                placeholder="e.g. light scratch on right door, front glass clean..."
+                disabled={isLocked}
+              />
+            </label>
+            <label>
+              <span>Interior condition</span>
+              <textarea
+                value={form.interiorCondition}
+                onChange={(event) => handleInspectionChange(type, 'interiorCondition', event.target.value)}
+                placeholder="e.g. rear seat dusty, dashboard needs cleaning..."
+                disabled={isLocked}
+              />
+            </label>
+            <label className="bd-inspection-col-full">
+              <span>Notes</span>
+              <textarea
+                value={form.notes}
+                onChange={(event) => handleInspectionChange(type, 'notes', event.target.value)}
+                placeholder="Additional inspection notes..."
+                disabled={isLocked}
+              />
+            </label>
+          </div>
 
-          <label>
-            <span>Interior condition</span>
-            <textarea
-              value={form.interiorCondition}
-              onChange={(event) => handleInspectionChange(type, 'interiorCondition', event.target.value)}
-              placeholder="e.g. rear seat dusty, dashboard needs cleaning..."
-              disabled={isLocked}
-            />
-          </label>
-
-          <label>
-            <span>Notes</span>
-            <textarea
-              value={form.notes}
-              onChange={(event) => handleInspectionChange(type, 'notes', event.target.value)}
-              placeholder="Additional inspection notes..."
-              disabled={isLocked}
-            />
-          </label>
+          <ImageUpload
+            folder="inspections"
+            entityId={booking?.id}
+            images={form.images || []}
+            onUploaded={(uploaded) => handleInspectionImageUploaded(type, uploaded)}
+            onDeleted={(publicId) => handleInspectionImageDeleted(type, publicId)}
+            multiple
+          />
         </div>
 
-        <ImageUpload
-          folder="inspections"
-          entityId={booking?.id}
-          images={form.images || []}
-          onUploaded={(uploaded) => handleInspectionImageUploaded(type, uploaded)}
-          onDeleted={(publicId) => handleInspectionImageDeleted(type, publicId)}
-          multiple
-        />
-
-        {isLocked && (
-          <p className="booking-inspection-locked-hint">
-            Dịch vụ đã hoàn thành, không thể chỉnh sửa tình trạng/ghi chú. Vẫn có thể thêm ảnh.
-          </p>
-        )}
-
-        <button
-          type="button"
-          disabled={inspectionSavingType === type}
-          onClick={() => handleSaveInspection(type)}
-        >
-          {inspectionSavingType === type ? 'Đang lưu...' : existingInspection ? 'Cập nhật inspection' : 'Tạo inspection'}
-        </button>
+        <div className="bd-inspection-foot">
+          {isLocked && (
+            <p className="bd-inspection-locked-hint">Dịch vụ đã hoàn thành, không thể sửa ghi chú. Vẫn có thể thêm ảnh.</p>
+          )}
+          <button
+            type="button"
+            className="bd-inspection-save-btn"
+            disabled={inspectionSavingType === type}
+            onClick={() => handleSaveInspection(type)}
+          >
+            {inspectionSavingType === type ? 'Đang lưu…' : existingInspection ? 'Cập nhật' : 'Tạo inspection'}
+          </button>
+        </div>
       </article>
     )
   }
@@ -1813,7 +1817,26 @@ function BookingDetailPage() {
                 actionLoadingStepId={stepActionLoadingId}
                 error={stepActionError}
                 renderStepExtra={role === 'staff' && ['IN_PROGRESS', 'COMPLETED'].includes(currentStatus)
-                  ? (step) => step.order === 1 ? renderInspectionCard('BEFORE_WASH') : null
+                  ? (step) => {
+                      if (step.order === 1) return renderInspectionCard('BEFORE_WASH')
+                      const isLastStep = !serviceSteps.some((s, i) =>
+                        Number(s.stepOrder || s.order || s.sequence || i + 1) > step.order,
+                      )
+                      if (isLastStep && getInspectionTypes(booking).includes('AFTER_WASH')) {
+                        return renderInspectionCard('AFTER_WASH')
+                      }
+                      return null
+                    }
+                  : undefined}
+                isStepBlocked={role === 'staff'
+                  ? (step) => {
+                      if (step.order === 1 && !getInspectionByType(inspections, 'BEFORE_WASH')) return true
+                      const isLastStep = !serviceSteps.some((s, i) =>
+                        Number(s.stepOrder || s.order || s.sequence || i + 1) > step.order,
+                      )
+                      if (isLastStep && getInspectionTypes(booking).includes('AFTER_WASH') && !getInspectionByType(inspections, 'AFTER_WASH')) return true
+                      return false
+                    }
                   : undefined}
               />
             ) : booking.servicePackageSteps?.length > 0 ? (
@@ -1831,11 +1854,6 @@ function BookingDetailPage() {
             ) : (
               <p className="bd-step-empty">{TEXT.serviceStepsEmpty}</p>
             )}
-
-            {role === 'staff' &&
-              ['IN_PROGRESS', 'COMPLETED'].includes(currentStatus) &&
-              getInspectionTypes(booking).includes('AFTER_WASH') &&
-              renderInspectionCard('AFTER_WASH')}
           </section>
 
           {/* ── Inspection messages ── */}

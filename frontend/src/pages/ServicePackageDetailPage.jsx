@@ -74,12 +74,6 @@ function SkeletonDetail() {
   )
 }
 
-function formatVehicleType(value) {
-  const normalized = String(value || '').toUpperCase()
-  if (normalized === 'CAR') return 'Ô tô'
-  if (normalized === 'BIKE' || normalized === 'MOTORBIKE') return 'Xe máy'
-  return 'Mọi loại xe'
-}
 
 export default function ServicePackageDetailPage() {
   const { id } = useParams()
