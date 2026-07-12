@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { waitlistApi } from '../../api/waitlistApi'
 import { useAuth } from '../../contexts/AuthContext'
-import { Button, EmptyState, ErrorState, LoadingSpinner, Pagination, Select } from '../../components/common/ui'
 import './StaffWaitlistPage.css'
 
 const STATUS_OPTIONS = [
@@ -139,14 +138,24 @@ function StaffWaitlistCard({ item, actionKey, onOffer, onExpire }) {
       {(canOffer || canExpire) && (
         <div className="staff-waitlist-actions">
           {canOffer && (
-            <Button loading={isOffering} disabled={Boolean(actionKey)} onClick={() => onOffer(item)}>
-              Offer slot
-            </Button>
+            <button
+              type="button"
+              className="staff-waitlist-btn staff-waitlist-btn--primary"
+              disabled={Boolean(actionKey)}
+              onClick={() => onOffer(item)}
+            >
+              {isOffering ? 'Đang xử lý...' : 'Offer slot'}
+            </button>
           )}
           {canExpire && (
-            <Button variant="ghost" loading={isExpiring} disabled={Boolean(actionKey)} onClick={() => onExpire(item)}>
-              Đánh dấu hết hạn
-            </Button>
+            <button
+              type="button"
+              className="staff-waitlist-btn staff-waitlist-btn--ghost"
+              disabled={Boolean(actionKey)}
+              onClick={() => onExpire(item)}
+            >
+              {isExpiring ? 'Đang xử lý...' : 'Đánh dấu hết hạn'}
+            </button>
           )}
         </div>
       )}
@@ -235,39 +244,50 @@ export default function StaffWaitlistPage() {
           <h1>Quản lý danh sách chờ</h1>
           <p>Xem hàng chờ, offer slot trống hoặc đánh dấu hết hạn các yêu cầu waitlist của khách.</p>
         </div>
+      </section>
 
-        <div className="staff-waitlist-filters-row">
-          {isAdmin && (
-            <label className="staff-waitlist-garage-filter">
-              <span>Garage ID</span>
-              <input
-                placeholder="Tất cả garage"
-                value={garageId}
-                onChange={(event) => setGarageId(event.target.value)}
-                onBlur={handleApplyGarageFilter}
-                onKeyDown={(event) => event.key === 'Enter' && handleApplyGarageFilter()}
-              />
-            </label>
-          )}
-
-          <div className="staff-waitlist-filter">
-            <Select
-              label="Trạng thái"
-              value={status}
-              options={STATUS_OPTIONS}
-              onChange={(e) => { setStatus(e.target.value); setPage(1) }}
+      <section className="staff-waitlist-filters">
+        {isAdmin && (
+          <label className="staff-waitlist-garage-filter">
+            <span>Garage ID</span>
+            <input
+              placeholder="Tất cả garage"
+              value={garageId}
+              onChange={(event) => setGarageId(event.target.value)}
+              onBlur={handleApplyGarageFilter}
+              onKeyDown={(event) => event.key === 'Enter' && handleApplyGarageFilter()}
             />
-          </div>
-        </div>
+          </label>
+        )}
+
+        <label className="staff-waitlist-status-filter">
+          <span>Trạng thái</span>
+          <select
+            value={status}
+            onChange={(e) => { setStatus(e.target.value); setPage(1) }}
+          >
+            {STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </label>
       </section>
 
       {success && <p className="staff-waitlist-message staff-waitlist-message-success">{success}</p>}
       {error && !loading && <p className="staff-waitlist-message staff-waitlist-message-error">{error}</p>}
 
-      {loading && <LoadingSpinner text="Đang tải waitlist..." />}
-      {!loading && error && <ErrorState title="Không thể tải waitlist" description={error} onRetry={fetchQueue} />}
+      {loading && <div className="staff-waitlist-state">Đang tải waitlist...</div>}
+      {!loading && error && (
+        <div className="staff-waitlist-state staff-waitlist-state--error">
+          <p>{error}</p>
+          <button type="button" className="staff-waitlist-btn staff-waitlist-btn--ghost" onClick={fetchQueue}>Thử lại</button>
+        </div>
+      )}
       {!loading && !error && items.length === 0 && (
-        <EmptyState icon="WL" title="Không có yêu cầu waitlist" description="Các yêu cầu khách tham gia waitlist sẽ hiển thị tại đây." />
+        <div className="staff-waitlist-state">
+          <p className="staff-waitlist-state-title">Không có yêu cầu waitlist</p>
+          <p>Các yêu cầu khách tham gia waitlist sẽ hiển thị tại đây.</p>
+        </div>
       )}
       {!loading && !error && items.length > 0 && (
         <>
@@ -283,7 +303,27 @@ export default function StaffWaitlistPage() {
             ))}
           </div>
 
-          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+          {totalPages > 1 && (
+            <div className="staff-waitlist-pagination">
+              <button
+                type="button"
+                className="staff-waitlist-page-btn"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                ← Trước
+              </button>
+              <span className="staff-waitlist-page-info">Trang {page} / {totalPages}</span>
+              <button
+                type="button"
+                className="staff-waitlist-page-btn"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+              >
+                Sau →
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

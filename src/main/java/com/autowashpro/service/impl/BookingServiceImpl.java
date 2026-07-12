@@ -1946,10 +1946,7 @@ return toResponse(saved);
                 }
 
                 if ("CAR".equals(vehicleType)) {
-                        if (servicePackage.getSeatCount() == null) {
-                                return true;
-                        }
-                        return Objects.equals(vehicle.getSeatCount(), servicePackage.getSeatCount());
+                        return isSeatCountCompatible(vehicle.getSeatCount(), servicePackage.getSeatCount());
                 }
 
                 if ("BIKE".equals(vehicleType)) {
@@ -1960,6 +1957,18 @@ return toResponse(saved);
                 }
 
                 return true;
+        }
+
+        /**
+         * A package's seatCount is treated as its base tier: it also covers vehicles
+         * with one extra seat (e.g. a package for seatCount=4 also fits 5-seat cars).
+         * A null package seatCount means "any seat count" (wildcard).
+         */
+        private boolean isSeatCountCompatible(Integer vehicleSeatCount, Integer packageSeatCount) {
+                if (packageSeatCount == null) {
+                        return true;
+                }
+                return vehicleSeatCount != null && vehicleSeatCount <= packageSeatCount + 1;
         }
 
         private boolean isWalkInVehicleCompatible(
@@ -1978,10 +1987,7 @@ return toResponse(saved);
                 }
 
                 if ("CAR".equals(requestVehicleType)) {
-                        if (servicePackage.getSeatCount() == null) {
-                                return true;
-                        }
-                        return Objects.equals(request.getSeatCount(), servicePackage.getSeatCount());
+                        return isSeatCountCompatible(request.getSeatCount(), servicePackage.getSeatCount());
                 }
 
                 if ("BIKE".equals(requestVehicleType)) {

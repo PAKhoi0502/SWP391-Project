@@ -597,6 +597,16 @@
   margin-top: 8px;
 }
 
+.ps-pw-success {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 7px;
+  color: #15803d;
+  font-size: 12px;
+  padding: 7px 11px;
+  margin-top: 8px;
+}
+
 /* ── Member benefits modal ── */
 .mbm-tier-hero {
   display: flex;

@@ -140,8 +140,15 @@
 }
 
 @keyframes iau-modal-in {
-  from { opacity: 0; transform: scale(0.92) translateY(12px); }
-  to   { opacity: 1; transform: scale(1)    translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .image-upload-avatar-modal-title {
@@ -286,7 +293,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
   transition: background 0.15s;
 }
 
@@ -297,4 +304,29 @@
 .image-upload-avatar-delete:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* ── Square variant (e.g. vehicle photos) ── */
+.image-upload--square .image-upload-avatar-circle {
+  width: 200px;
+  height: 200px;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+
+.image-upload--square .image-upload-avatar-overlay {
+  border-radius: 14px;
+}
+
+.image-upload--square .image-upload-avatar-modal-img {
+  border-radius: 14px;
+}
+
+.image-upload--square .image-upload-avatar-overlay svg {
+  width: 24px;
+  height: 24px;
+}
+
+.image-upload--square .image-upload-avatar-overlay span {
+  font-size: 11px;
 }

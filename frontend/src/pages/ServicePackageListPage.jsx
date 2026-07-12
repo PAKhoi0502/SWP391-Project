@@ -20,9 +20,9 @@ const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND
 
 function formatVehicleType(value) {
   const v = String(value || '').toUpperCase()
-  if (v === 'CAR') return 'Car'
-  if (v === 'BIKE' || v === 'MOTORBIKE') return 'Motorbike'
-  return 'All vehicles'
+  if (v === 'CAR') return 'Ô tô'
+  if (v === 'BIKE' || v === 'MOTORBIKE') return 'Xe máy'
+  return 'Mọi loại xe'
 }
 
 function formatPackageType(value) {
@@ -344,4 +344,3 @@ function PackageCard({ item, isAuthenticated, delay }) {
     </div>
   )
 }
-

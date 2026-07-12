@@ -213,10 +213,13 @@
   font-size: 18px;
   flex-shrink: 0;
 }
-.cn-item-icon--reward  { background: rgba(5, 150, 105, 0.10); }
-.cn-item-icon--tier    { background: rgba(234, 179, 8, 0.12); }
-.cn-item-icon--voucher { background: rgba(46, 194, 247, 0.12); }
-.cn-item-icon--default { background: rgba(23, 32, 51, 0.07); }
+.cn-item-icon--reward            { background: rgba(5, 150, 105, 0.10); }
+.cn-item-icon--tier              { background: rgba(234, 179, 8, 0.12); }
+.cn-item-icon--voucher           { background: rgba(46, 194, 247, 0.12); }
+.cn-item-icon--booking           { background: rgba(34, 197, 94, 0.10); }
+.cn-item-icon--booking-canceled  { background: rgba(239, 68, 68, 0.10); }
+.cn-item-icon--payment           { background: rgba(37, 99, 235, 0.10); }
+.cn-item-icon--default           { background: rgba(23, 32, 51, 0.07); }
 
 /* Item body */
 .cn-item-body {
@@ -253,10 +256,13 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.cn-type-badge--reward  { background: rgba(5, 150, 105, 0.10); color: #059669; }
-.cn-type-badge--tier    { background: rgba(234, 179, 8, 0.12); color: #b45309; }
-.cn-type-badge--voucher { background: rgba(46, 194, 247, 0.12); color: #0879B8; }
-.cn-type-badge--default { background: rgba(23, 32, 51, 0.07); color: #475569; }
+.cn-type-badge--reward           { background: rgba(5, 150, 105, 0.10); color: #059669; }
+.cn-type-badge--tier             { background: rgba(234, 179, 8, 0.12); color: #b45309; }
+.cn-type-badge--voucher          { background: rgba(46, 194, 247, 0.12); color: #0879B8; }
+.cn-type-badge--booking          { background: rgba(34, 197, 94, 0.10); color: #15803d; }
+.cn-type-badge--booking-canceled { background: rgba(239, 68, 68, 0.10); color: #b91c1c; }
+.cn-type-badge--payment          { background: rgba(37, 99, 235, 0.10); color: #1d4ed8; }
+.cn-type-badge--default          { background: rgba(23, 32, 51, 0.07); color: #475569; }
 
 .cn-item-msg {
   font-size: 13px;

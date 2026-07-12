@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { getRedirectPathByRole, useAuth } from '../../contexts/AuthContext'
+import GoogleSignInButton from './GoogleSignInButton'
 import './AnimatedAuthShell.css'
 
 /* ── Validators ─────────────────────────────────── */
@@ -19,11 +20,11 @@ const V = {
 }
 
 /* ── Icons ───────────────────────────────────────── */
-function EyeOn()  { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> }
-function EyeOff() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg> }
+export function EyeOn()  { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> }
+export function EyeOff() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg> }
 
 /* ── Logo mark (single version — works on both cream and white) ── */
-function LogoMark() {
+export function LogoMark() {
   return (
     <div className="aas-logo">
       <svg width="30" height="20" viewBox="0 0 48 32" fill="none">
@@ -74,12 +75,13 @@ function SuccessOverlay({ show }) {
 /* ── Login form ──────────────────────────────────── */
 function LoginForm({ active, justRegistered }) {
   const navigate  = useNavigate()
-  const { login } = useAuth()
+  const { login, loginWithGoogle } = useAuth()
 
   const [form,     setForm]     = useState({ identifier: '', password: '' })
   const [showPass, setShowPass] = useState(false)
   const [error,    setError]    = useState('')
   const [loading,  setLoading]  = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
 
   const getRole = (u) =>
     u?.role || u?.roleName || u?.accountRole || u?.authorities?.[0]?.authority || 'CUSTOMER'
@@ -101,6 +103,19 @@ function LoginForm({ active, justRegistered }) {
       setError(err.response?.data?.message || err.response?.data?.error || 'Incorrect phone or password.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleGoogleCredential = async (idToken) => {
+    setGoogleLoading(true)
+    setError('')
+    try {
+      const user = await loginWithGoogle(idToken)
+      navigate(getRedirectPathByRole(getRole(user)), { replace: true, state: { loginSuccess: true } })
+    } catch (err) {
+      setError(err.response?.data?.message || err.response?.data?.error || 'Could not sign in with Google.')
+    } finally {
+      setGoogleLoading(false)
     }
   }
 
@@ -151,6 +166,9 @@ function LoginForm({ active, justRegistered }) {
           {loading ? 'Signing in…' : 'SIGN IN'}
         </button>
       </form>
+
+      <div className="aas-divider"><span>OR</span></div>
+      <GoogleSignInButton onCredential={handleGoogleCredential} disabled={googleLoading} text="signin_with" />
     </div>
   )
 }
@@ -158,7 +176,7 @@ function LoginForm({ active, justRegistered }) {
 /* ── Register form ───────────────────────────────── */
 function RegisterForm({ active }) {
   const navigate     = useNavigate()
-  const { register } = useAuth()
+  const { register, loginWithGoogle } = useAuth()
 
   const [form,        setForm]        = useState({ fullName: '', email: '', phone: '', password: '', confirmPassword: '' })
   const [errors,      setErrors]      = useState({})
@@ -168,6 +186,10 @@ function RegisterForm({ active }) {
   const [serverError, setServerError] = useState('')
   const [loading,     setLoading]     = useState(false)
   const [success,     setSuccess]     = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
+
+  const getRole = (u) =>
+    u?.role || u?.roleName || u?.accountRole || u?.authorities?.[0]?.authority || 'CUSTOMER'
 
   const validate = (name, value) =>
     name === 'confirmPassword' ? V.confirmPassword(value, form.password) : V[name]?.(value) ?? ''
@@ -217,6 +239,20 @@ function RegisterForm({ active }) {
   }
 
   const showErr = (n) => touched[n] && errors[n]
+
+  const handleGoogleCredential = async (idToken) => {
+    setGoogleLoading(true)
+    setServerError('')
+    try {
+      const user = await loginWithGoogle(idToken)
+      navigate(getRedirectPathByRole(getRole(user)), { replace: true, state: { loginSuccess: true } })
+    } catch (err) {
+      const d = err.response?.data
+      setServerError(d?.message || d?.error || 'Could not sign up with Google.')
+    } finally {
+      setGoogleLoading(false)
+    }
+  }
 
   return (
     <div className={`aas-form-content${active ? ' aas-visible' : ' aas-hidden'}`}>
@@ -287,6 +323,9 @@ function RegisterForm({ active }) {
           {loading ? 'Creating account…' : 'CREATE ACCOUNT'}
         </button>
       </form>
+
+      <div className="aas-divider"><span>OR</span></div>
+      <GoogleSignInButton onCredential={handleGoogleCredential} disabled={googleLoading} text="signup_with" />
     </div>
   )
 }
