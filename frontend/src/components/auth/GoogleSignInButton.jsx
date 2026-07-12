@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 const SCRIPT_SRC = 'https://accounts.google.com/gsi/client'
 let scriptLoadPromise = null
+let googleInitialized = false
 
 function loadGoogleScript() {
   if (window.google?.accounts?.id) return Promise.resolve()
@@ -39,10 +40,13 @@ export default function GoogleSignInButton({ onCredential, disabled = false, tex
       .then(() => {
         if (cancelled || !buttonRef.current) return
 
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: (response) => onCredential(response.credential),
-        })
+        if (!googleInitialized) {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: (response) => onCredential(response.credential),
+          })
+          googleInitialized = true
+        }
 
         window.google.accounts.id.renderButton(buttonRef.current, {
           type: 'standard',

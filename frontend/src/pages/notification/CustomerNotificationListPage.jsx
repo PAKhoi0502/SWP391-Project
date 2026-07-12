@@ -6,6 +6,7 @@ import './CustomerNotificationListPage.css'
 const VISIBLE_TYPES = new Set([
   'TIER_UPGRADED', 'VOUCHER_RECEIVED', 'REWARD_EARNED',
   'BOOKING_CONFIRMED', 'BOOKING_CANCELED', 'PAYMENT_CONFIRMED',
+  'POINTS_ADJUSTED',
 ])
 const isVisible = (t) => VISIBLE_TYPES.has(String(t || '').toUpperCase())
 
@@ -33,6 +34,7 @@ const buildTitle = (notif) => {
   if (notif.eventType === 'BOOKING_CONFIRMED')  return 'Booking confirmed'
   if (notif.eventType === 'BOOKING_CANCELED')   return 'Booking canceled'
   if (notif.eventType === 'PAYMENT_CONFIRMED')  return 'Payment confirmed'
+  if (notif.eventType === 'POINTS_ADJUSTED')    return notif.title || 'Points adjusted'
   return notif.title || notif.eventType || ''
 }
 

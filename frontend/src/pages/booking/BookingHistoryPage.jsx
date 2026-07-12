@@ -266,6 +266,10 @@ const getHistoryTimelineItems = (booking, serviceSteps = [], inspections = []) =
 
   const checkinActive = ['CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'].includes(status) || Boolean(checkedInAt)
   const beforeWashInspection = getInspectionByType(inspections, 'BEFORE_WASH')
+  const inspectionActive = Boolean(beforeWashInspection) || ['IN_PROGRESS', 'COMPLETED'].includes(status)
+
+  const normLabel = (v) => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+
   const stepItems = Array.isArray(serviceSteps) && serviceSteps.length > 0
     ? serviceSteps
         .map((step, index) => ({
@@ -274,13 +278,14 @@ const getHistoryTimelineItems = (booking, serviceSteps = [], inspections = []) =
           time:   step.completedAt || null,
           order:  Number(step.stepOrder || step.order || step.sequence || index + 1),
         }))
+        .filter((item) => !normLabel(item.label).startsWith('kiem tra'))
         .sort((a, b) => a.order - b.order)
     : []
 
   return [
     { label: 'Đặt lịch', active: true, time: booking?.startTime },
     { label: 'Check-in', active: checkinActive, time: checkedInAt },
-    { label: 'Kiểm tra', active: Boolean(beforeWashInspection), time: beforeWashInspection?.createdAt },
+    { label: 'Kiểm tra', active: inspectionActive, time: beforeWashInspection?.createdAt },
     ...stepItems,
     { label: 'Bàn giao', active: status === 'COMPLETED', time: booking?.completedAt },
     { label: 'Thanh toán', active: paymentStatus === 'PAID', time: booking?.paidAt },

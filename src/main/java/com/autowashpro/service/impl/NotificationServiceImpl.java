@@ -185,6 +185,16 @@ public void notifyVoucherReceived(Long customerId, String promotionCode, String 
             "You received a voucher: " + promotionName + " (Code: " + promotionCode + "). Use it on your next booking!"
     );
 }
+    @Override
+    @Transactional
+    public void notifyPointsAdjusted(Long customerId, Integer points, String reason) {
+        String sign = points > 0 ? "+" : "";
+        String title = points > 0 ? "Points Added" : "Points Deducted";
+        String body = sign + points + " loyalty points have been adjusted to your account"
+                + (reason != null && !reason.isBlank() ? ": " + reason : "") + ".";
+        createInAppNotification(customerId, null, "POINTS_ADJUSTED", title, body);
+    }
+
     // ===================== API =====================
 
     @Override

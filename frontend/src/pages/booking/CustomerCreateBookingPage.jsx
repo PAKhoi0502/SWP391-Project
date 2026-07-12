@@ -397,7 +397,10 @@ export default function CustomerCreateBookingPage() {
       } catch (error) {
         if (mounted) {
           setSlots([])
-          setMessage(error.message || 'Failed to load available time slots.')
+          const status = error?.response?.status
+          if (status !== 400) {
+            setMessage(error.message || 'Failed to load available time slots.')
+          }
         }
       } finally {
         if (mounted) setLoadingSlots(false)
