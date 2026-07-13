@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { userService } from '../services/userService'
 import { loyaltyApi } from '../api/loyaltyApi'
@@ -9,19 +10,8 @@ import BookingsModal from '../components/profile/BookingsModal'
 import WaitlistModal from '../components/profile/WaitlistModal'
 import VehiclesModal from '../components/profile/VehiclesModal'
 import ImageUpload from '../components/upload/ImageUpload'
+import { TierGemIcon, getTierLabel, getTierColor } from '../components/common/TierGem'
 import '../components/profile/ProfileSettings.css'
-
-const TIER_META = {
-  BRONZE:   { label: 'Bronze',   icon: '🥉' },
-  SILVER:   { label: 'Silver',   icon: '🥈' },
-  GOLD:     { label: 'Gold',     icon: '🥇' },
-  PLATINUM: { label: 'Platinum', icon: '💎' },
-}
-
-function getTierMeta(tier) {
-  const key = String(tier || '').toUpperCase()
-  return TIER_META[key] || null
-}
 
 function getInitial(profile) {
   return String(profile?.fullName || profile?.email || 'U').trim().charAt(0).toUpperCase()
@@ -111,6 +101,8 @@ function IconCar() {
 
 export default function ProfilePage() {
   const { user, setCurrentUser } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [profile, setProfile]     = useState(user || null)
   const [loyalty, setLoyalty]     = useState(null)
   const [loading, setLoading]     = useState(true)
@@ -124,6 +116,14 @@ export default function ProfilePage() {
   const [bookingsOpen, setBookingsOpen]   = useState(false)
   const [waitlistOpen, setWaitlistOpen]   = useState(false)
   const [vehiclesOpen, setVehiclesOpen]   = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get('open') === 'waitlist') {
+      setWaitlistOpen(true)
+      navigate('/customer/profile', { replace: true })
+    }
+  }, [location.search])
 
   useEffect(() => {
     let ignore = false
@@ -162,8 +162,8 @@ export default function ProfilePage() {
 
   const isCustomer = String(profile?.role || user?.role || '').toUpperCase().replace('ROLE_', '') === 'CUSTOMER'
   const isActive   = profile?.isActive !== false
-  const tier       = loyalty ? getTierMeta(loyalty.currentTier) : null
-  const sub        = profile?.email || profile?.phone || ''
+  const currentTier = loyalty?.currentTier || null
+  const sub         = profile?.email || profile?.phone || ''
 
   const openDetail   = () => { setDetailAutoOpenPw(false); setDetailOpen(true) }
   const openPassword = () => { setDetailAutoOpenPw(true);  setDetailOpen(true) }
@@ -227,9 +227,10 @@ export default function ProfilePage() {
                 <h1 className="ps-user-name">
                   {profile?.fullName || profile?.email || 'User'}
                 </h1>
-                {tier && (
-                  <span className="ps-tier-chip">
-                    {tier.icon} {tier.label}
+                {currentTier && (
+                  <span className="ps-tier-chip" style={{ '--tier-color': getTierColor(currentTier) }}>
+                    <TierGemIcon tier={currentTier} size={14} />
+                    {getTierLabel(currentTier)}
                   </span>
                 )}
               </div>
