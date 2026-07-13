@@ -16,4 +16,6 @@ public class SlotResponse {
     private LocalDateTime endTime;
 
     private Boolean available;
+
+    private String fullReason; // NO_BAY | NO_CARE_STAFF — populated when available=false
 }

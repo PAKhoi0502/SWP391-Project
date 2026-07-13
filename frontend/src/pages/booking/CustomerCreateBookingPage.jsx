@@ -1,11 +1,12 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   bookingFlowUtils,
   customerBookingFlowApi,
 } from '../../api/customerBookingFlowApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
 import promotionApi from '../../api/promotionApi'
+import { waitlistApi } from '../../api/waitlistApi'
 import './CustomerCreateBookingPage.css'
 import { getPackageType } from '../../services/servicePackageApi'
 
@@ -194,6 +195,10 @@ export default function CustomerCreateBookingPage() {
   const [loyaltyPoints, setLoyaltyPoints] = useState('')
   const [loyaltyPreview, setLoyaltyPreview] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('')
+
+  const [waitlistModal, setWaitlistModal]           = useState(null)
+  const [waitlistSubmitting, setWaitlistSubmitting] = useState(false)
+  const [waitlistResult, setWaitlistResult]         = useState(null)
 
   const [loadingInitial, setLoadingInitial] = useState(true)
   const [loadingPackages, setLoadingPackages] = useState(false)
@@ -594,40 +599,29 @@ export default function CustomerCreateBookingPage() {
   }
 
   const handleJoinWaitlist = (slot) => {
-    const confirmJoin = window.confirm(
-      `The ${getSlotLabel(slot)} slot is full. Would you like to join the waitlist?`,
-    )
+    setWaitlistResult(null)
+    setWaitlistModal(slot)
+  }
 
-    if (!confirmJoin) return
-
-    const waitlistDraft = {
-      garageId: getId(selectedGarage),
-      garageName: getName(selectedGarage, 'Garage'),
-      servicePackageId: getId(selectedPackage),
-      servicePackageName: getName(selectedPackage, 'Service Package'),
-      vehicleId: getId(selectedVehicle),
-      vehicleName: getName(selectedVehicle, 'Vehicle'),
-      vehicleType: bookingFlowUtils.getVehicleType(selectedVehicle),
-      date: selectedDate,
-      startTime: slot?.startTime || slot?.start || '',
-      endTime: slot?.endTime || slot?.end || '',
+  const handleConfirmWaitlist = async () => {
+    if (!waitlistModal) return
+    setWaitlistSubmitting(true)
+    setWaitlistResult(null)
+    try {
+      await waitlistApi.join({
+        garageId: getId(selectedGarage),
+        vehicleId: getId(selectedVehicle),
+        servicePackageId: getId(selectedPackage),
+        desiredStartTime: waitlistModal?.startTime || waitlistModal?.start || waitlistModal?.from,
+        reason: 'NO_BAY',
+      })
+      setWaitlistResult({ ok: true })
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Không thể tham gia danh sách chờ.'
+      setWaitlistResult({ ok: false, msg })
+    } finally {
+      setWaitlistSubmitting(false)
     }
-
-    localStorage.setItem('waitlistDraft', JSON.stringify(waitlistDraft))
-
-    const params = new URLSearchParams({
-      garageId: String(waitlistDraft.garageId || ''),
-      garageName: waitlistDraft.garageName || '',
-      servicePackageId: String(waitlistDraft.servicePackageId || ''),
-      servicePackageName: waitlistDraft.servicePackageName || '',
-      vehicleId: String(waitlistDraft.vehicleId || ''),
-      vehicleType: waitlistDraft.vehicleType || '',
-      date: waitlistDraft.date || '',
-      startTime: waitlistDraft.startTime || '',
-      endTime: waitlistDraft.endTime || '',
-    })
-
-    navigate(`/customer/waitlist?${params.toString()}`)
   }
 
   const canSubmit =
@@ -1377,6 +1371,56 @@ export default function CustomerCreateBookingPage() {
         )}
 
       </div>
+
+      {/* Waitlist modal */}
+      {waitlistModal && (
+        <div className="bk-wl-overlay" onClick={() => !waitlistSubmitting && !waitlistResult?.ok && setWaitlistModal(null)}>
+          <div className="bk-wl-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="bk-wl-head">
+              <h2 className="bk-wl-title">Slot đã đầy</h2>
+              <button className="bk-wl-close" disabled={waitlistSubmitting} onClick={() => setWaitlistModal(null)}>✕</button>
+            </div>
+
+            {waitlistResult?.ok ? (
+              <div className="bk-wl-success">
+                <span className="bk-wl-success-icon">✓</span>
+                <p>Đã tham gia danh sách chờ thành công!</p>
+                <p className="bk-wl-success-sub">Bạn sẽ nhận thông báo khi có slot trống.</p>
+                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                  <button className="bk-wl-btn bk-wl-btn--ghost" onClick={() => setWaitlistModal(null)}>Đóng</button>
+                  <Link className="bk-wl-btn bk-wl-btn--primary" to="/customer/profile?open=waitlist" onClick={() => setWaitlistModal(null)}>Xem danh sách chờ</Link>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="bk-wl-desc">
+                  Slot <strong>{getSlotLabel(waitlistModal)}</strong> ngày <strong>{selectedDate}</strong> hiện đã đầy.
+                  Bạn có muốn tham gia danh sách chờ không?
+                </p>
+
+                <div className="bk-wl-info">
+                  <div className="bk-wl-info-row"><span>Garage</span><strong>{getName(selectedGarage, '—')}</strong></div>
+                  <div className="bk-wl-info-row"><span>Dịch vụ</span><strong>{getName(selectedPackage, '—')}</strong></div>
+                  <div className="bk-wl-info-row"><span>Xe</span><strong>{getVehicleDisplayName(selectedVehicle) || getName(selectedVehicle, '—')}</strong></div>
+                </div>
+
+                {waitlistResult?.ok === false && (
+                  <p className="bk-wl-error">{waitlistResult.msg}</p>
+                )}
+
+                <div className="bk-wl-actions">
+                  <button className="bk-wl-btn bk-wl-btn--ghost" disabled={waitlistSubmitting} onClick={() => setWaitlistModal(null)}>
+                    Huỷ
+                  </button>
+                  <button className="bk-wl-btn bk-wl-btn--primary" disabled={waitlistSubmitting} onClick={handleConfirmWaitlist}>
+                    {waitlistSubmitting ? 'Đang đăng ký…' : 'Tham gia danh sách chờ'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   )
 }

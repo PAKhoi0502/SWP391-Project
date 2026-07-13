@@ -20,10 +20,10 @@ export function getTierColor(tier) {
 }
 
 export const TIER_LABELS = {
-  BRONZE:   'Thành viên mới',
-  SILVER:   'Hạng Bạc',
-  GOLD:     'Hạng Vàng',
-  PLATINUM: 'Hạng Bạch Kim',
+  BRONZE:   'Bronze',
+  SILVER:   'Silver',
+  GOLD:     'Gold',
+  PLATINUM: 'Platinum',
 }
 
 export function getTierLabel(tier) {
