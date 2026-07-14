@@ -1,19 +1,19 @@
-// Các API kiểm tra "sức khỏe" / liên thông backend.
-// Dùng để xác minh frontend gọi được server và proxy hoạt động.
+// APIs for checking backend "health" / connectivity.
+// Used to verify the frontend can reach the server and the proxy is working.
 import axiosClient from './axiosClient'
 
 export const healthApi = {
-  // GET /health -> backend trả ApiResponse { data: "UP" } (đã được interceptor bóc).
+  // GET /health -> backend returns ApiResponse { data: "UP" } (already unwrapped by the interceptor).
   checkHealth() {
     return axiosClient.get('/health')
   },
 
-  // GET /api/v1 -> endpoint gốc của nhóm API version 1 (BaseController).
+  // GET /api/v1 -> root endpoint of the API version 1 group (BaseController).
   getApiV1() {
     return axiosClient.get('/api/v1')
   },
 
-  // GET /api-docs -> tài liệu OpenAPI (springdoc). Trả nguyên JSON, không qua ApiResponse.
+  // GET /api-docs -> OpenAPI documentation (springdoc). Returns raw JSON, not wrapped in ApiResponse.
   getApiDocs() {
     return axiosClient.get('/api-docs')
   },

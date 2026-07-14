@@ -46,7 +46,7 @@ export async function getGarages({ page = 1, limit = 10, isActive, keyword } = {
     headers: authHeaders(),
   });
 
-  return handleResponse(res, "Không thể tải danh sách garage");
+  return handleResponse(res, "Could not load the garage list");
 }
 
 export async function getGarageById(id) {
@@ -55,7 +55,7 @@ export async function getGarageById(id) {
     headers: authHeaders(),
   });
 
-  return handleResponse(res, "Không thể tải chi tiết garage");
+  return handleResponse(res, "Could not load garage details");
 }
 
 export async function getGarageCapabilities(id) {
@@ -64,7 +64,7 @@ export async function getGarageCapabilities(id) {
     headers: authHeaders(),
   });
 
-  return handleResponse(res, "Không thể tải khả năng phục vụ của garage");
+  return handleResponse(res, "Could not load the garage's service capabilities");
 }
 
 export async function createGarage(data) {
@@ -74,7 +74,7 @@ export async function createGarage(data) {
     body: JSON.stringify(data),
   });
 
-  return handleResponse(res, "Tạo garage thất bại");
+  return handleResponse(res, "Failed to create garage");
 }
 
 export async function updateGarage(id, data) {
@@ -84,7 +84,7 @@ export async function updateGarage(id, data) {
     body: JSON.stringify(data),
   });
 
-  return handleResponse(res, "Cập nhật garage thất bại");
+  return handleResponse(res, "Failed to update garage");
 }
 
 export async function updateGarageStatus(id, isActive) {
@@ -94,5 +94,5 @@ export async function updateGarageStatus(id, isActive) {
     body: JSON.stringify({ isActive }),
   });
 
-  return handleResponse(res, "Cập nhật trạng thái garage thất bại");
+  return handleResponse(res, "Failed to update garage status");
 }

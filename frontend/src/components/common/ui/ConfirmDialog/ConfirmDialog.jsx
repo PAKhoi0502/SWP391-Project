@@ -4,10 +4,10 @@ import Button from "../Button/Button";
 
 function ConfirmDialog({
   open,
-  title = "Xác nhận hành động",
-  message = "Bạn có chắc muốn tiếp tục không?",
-  confirmText = "Xác nhận",
-  cancelText = "Hủy",
+  title = "Confirm action",
+  message = "Are you sure you want to continue?",
+  confirmText = "Confirm",
+  cancelText = "Cancel",
   danger = false,
   onConfirm,
   onCancel,

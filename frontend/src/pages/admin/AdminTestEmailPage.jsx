@@ -53,8 +53,8 @@ export default function AdminTestEmailPage() {
   }
 
   const validateBookingId = (val) => {
-    if (!val.trim()) return 'Booking ID không được bỏ trống.'
-    if (!/^\d+$/.test(val.trim())) return 'Booking ID phải là số nguyên dương.'
+    if (!val.trim()) return 'Booking ID is required.'
+    if (!/^\d+$/.test(val.trim())) return 'Booking ID must be a positive integer.'
     return ''
   }
 
@@ -70,12 +70,12 @@ export default function AdminTestEmailPage() {
 
     try {
       await adminNotificationApi.sendTestReminder(bookingId.trim())
-      setReminderSuccess(`Email nhắc lịch đã được gửi cho booking #${bookingId.trim()}.`)
+      setReminderSuccess(`Reminder email sent for booking #${bookingId.trim()}.`)
     } catch (caught) {
       const msg =
         caught?.response?.data?.message ||
         caught?.message ||
-        'Không thể gửi email nhắc lịch. Vui lòng thử lại.'
+        'Failed to send reminder email. Please try again.'
       setReminderError(msg)
     } finally {
       setSendingReminder(false)
@@ -150,9 +150,9 @@ export default function AdminTestEmailPage() {
       </div>
 
       <div className="ate-header" style={{ marginTop: 40 }}>
-        <h1 style={{ fontSize: 22 }}>Test email nhắc lịch</h1>
+        <h1 style={{ fontSize: 22 }}>Test Reminder Email</h1>
         <p className="ate-desc">
-          Gửi thử email nhắc lịch cho một booking cụ thể để kiểm tra nội dung/cấu hình.
+          Send a test reminder email for a specific booking to verify content and configuration.
         </p>
       </div>
 
@@ -167,7 +167,7 @@ export default function AdminTestEmailPage() {
               type="text"
               inputMode="numeric"
               className="ate-input"
-              placeholder="VD: 123"
+              placeholder="e.g. 123"
               value={bookingId}
               onChange={handleBookingIdChange}
               autoComplete="off"
@@ -186,10 +186,10 @@ export default function AdminTestEmailPage() {
             {sendingReminder ? (
               <>
                 <span className="ate-spinner" aria-hidden="true" />
-                Đang gửi...
+                Sending...
               </>
             ) : (
-              'Gửi email nhắc lịch'
+              'Send reminder email'
             )}
           </button>
         </form>

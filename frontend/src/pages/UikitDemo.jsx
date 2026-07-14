@@ -27,25 +27,25 @@ function UiKitDemo() {
     const [page, setPage] = useState(1);
 
     const columns = [
-        { title: "Mã", key: "id" },
-        { title: "Khách hàng", key: "customer" },
+        { title: "ID", key: "id" },
+        { title: "Customer", key: "customer" },
         {
-            title: "Trạng thái",
+            title: "Status",
             key: "status",
             render: (row) => <StatusBadge status={row.status} />,
         },
     ];
 
     const data = [
-        { id: "B001", customer: "Nguyễn Văn A", status: "pending" },
-        { id: "B002", customer: "Trần Văn B", status: "paid" },
-        { id: "B003", customer: "Lê Văn C", status: "completed" },
+        { id: "B001", customer: "John Smith", status: "pending" },
+        { id: "B002", customer: "Jane Doe", status: "paid" },
+        { id: "B003", customer: "Michael Lee", status: "completed" },
     ];
 
     return (
         <div style={{ padding: "40px", minHeight: "100vh" }}>
             <h1>AutoWash Pro UI Kit</h1>
-            <p>Demo reusable frontend components cho issue #2.</p>
+            <p>Demo reusable frontend components for issue #2.</p>
 
             <section style={{ marginTop: 30 }}>
                 <h2>Button</h2>
@@ -61,20 +61,20 @@ function UiKitDemo() {
             <section style={{ marginTop: 30, maxWidth: 520 }}>
                 <h2>Form</h2>
 
-                <Input label="Tên khách hàng" placeholder="Nhập tên khách hàng" />
+                <Input label="Customer name" placeholder="Enter customer name" />
 
                 <div style={{ marginTop: 16 }}>
                     <Select
-                        label="Loại phương tiện"
+                        label="Vehicle type"
                         options={[
-                            { label: "Ô tô", value: "car" },
-                            { label: "Xe máy", value: "motorbike" },
+                            { label: "Car", value: "car" },
+                            { label: "Motorbike", value: "motorbike" },
                         ]}
                     />
                 </div>
 
                 <div style={{ marginTop: 16 }}>
-                    <Textarea label="Ghi chú" placeholder="Nhập ghi chú đặt lịch" />
+                    <Textarea label="Note" placeholder="Enter booking note" />
                 </div>
             </section>
 
@@ -84,7 +84,7 @@ function UiKitDemo() {
                 <SearchBox
                     value={search}
                     onChange={setSearch}
-                    placeholder="Tìm booking..."
+                    placeholder="Search bookings..."
                 />
 
                 <div style={{ marginTop: 16 }}>
@@ -92,10 +92,10 @@ function UiKitDemo() {
                         value={filter}
                         onChange={setFilter}
                         options={[
-                            { label: "Tất cả", value: "all" },
-                            { label: "Chờ xử lý", value: "pending" },
-                            { label: "Đã thanh toán", value: "paid" },
-                            { label: "Hoàn thành", value: "completed" },
+                            { label: "All", value: "all" },
+                            { label: "Pending", value: "pending" },
+                            { label: "Paid", value: "paid" },
+                            { label: "Completed", value: "completed" },
                         ]}
                     />
                 </div>
@@ -129,12 +129,12 @@ function UiKitDemo() {
                 <h2>Modal / Confirm / Toast</h2>
 
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                    <Button onClick={() => setModalOpen(true)}>Mở Modal</Button>
+                    <Button onClick={() => setModalOpen(true)}>Open Modal</Button>
                     <Button variant="danger" onClick={() => setConfirmOpen(true)}>
-                        Mở Confirm
+                        Open Confirm
                     </Button>
                     <Button variant="secondary" onClick={() => setToastOpen(true)}>
-                        Hiện Toast
+                        Show Toast
                     </Button>
                 </div>
             </section>
@@ -143,16 +143,16 @@ function UiKitDemo() {
                 <h2>States</h2>
 
                 <div style={{ display: "grid", gap: 18 }}>
-                    <LoadingSpinner text="Đang tải danh sách booking..." />
+                    <LoadingSpinner text="Loading booking list..." />
 
                     <EmptyState
-                        title="Chưa có booking"
-                        description="Khi khách hàng đặt lịch, booking sẽ hiển thị tại đây."
+                        title="No bookings yet"
+                        description="When customers make a booking, it will appear here."
                     />
 
                     <ErrorState
-                        title="Không thể tải dữ liệu"
-                        description="Vui lòng kiểm tra kết nối máy chủ và thử lại."
+                        title="Unable to load data"
+                        description="Please check the server connection and try again."
                         onRetry={() => alert("Retry")}
                     />
                 </div>
@@ -160,27 +160,27 @@ function UiKitDemo() {
 
             <Modal
                 open={modalOpen}
-                title="Thêm xe mới"
+                title="Add new vehicle"
                 onClose={() => setModalOpen(false)}
                 footer={
                     <>
                         <Button variant="ghost" onClick={() => setModalOpen(false)}>
-                            Hủy
+                            Cancel
                         </Button>
-                        <Button onClick={() => setModalOpen(false)}>Lưu xe</Button>
+                        <Button onClick={() => setModalOpen(false)}>Save vehicle</Button>
                     </>
                 }
             >
-                <Input label="Biển số xe" placeholder="Nhập biển số xe" />
+                <Input label="License plate" placeholder="Enter license plate" />
             </Modal>
 
             <ConfirmDialog
                 open={confirmOpen}
-                title="Xác nhận hủy lịch"
-                message="Bạn có chắc chắn muốn hủy lịch rửa xe này không?"
+                title="Confirm cancellation"
+                message="Are you sure you want to cancel this wash booking?"
                 danger
-                confirmText="Hủy lịch"
-                cancelText="Đóng"
+                confirmText="Cancel booking"
+                cancelText="Close"
                 onCancel={() => setConfirmOpen(false)}
                 onConfirm={() => setConfirmOpen(false)}
             />
@@ -188,8 +188,8 @@ function UiKitDemo() {
             <Toast
                 open={toastOpen}
                 type="success"
-                title="Thành công"
-                message="UI Kit hoạt động bình thường."
+                title="Success"
+                message="UI Kit is working normally."
                 onClose={() => setToastOpen(false)}
             />
         </div>

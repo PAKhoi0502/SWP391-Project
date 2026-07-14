@@ -625,7 +625,7 @@
   --ui-display: 'Be Vietnam Pro', system-ui, sans-serif;
 }
 
-/* Fix font tiếng Việt bị méo / lệch dấu */
+/* Fix Vietnamese font rendering distortion / misaligned diacritics */
 .ui-btn,
 .ui-input,
 .ui-select,
@@ -645,14 +645,14 @@
   font-family: var(--ui-font) !important;
 }
 
-/* Title trong state không dùng Syne nữa vì tiếng Việt dễ lỗi */
+/* State title no longer uses Syne since Vietnamese text renders poorly with it */
 .ui-state-title,
 .ui-modal-title {
   letter-spacing: -0.02em !important;
   line-height: 1.25 !important;
 }
 
-/* Fix table bị lệch cột */
+/* Fix table column misalignment */
 .ui-table {
   width: 100%;
   table-layout: auto;
@@ -667,7 +667,7 @@
 
 
 
-/* Header table đồng bộ hơn */
+/* More consistent table header */
 .ui-table th {
   padding: 17px 18px !important;
   color: #facc15 !important;
@@ -676,7 +676,7 @@
   text-transform: uppercase;
 }
 
-/* Body table đỡ bị chữ dính / lệch */
+/* Table body — less crowded / misaligned text */
 .ui-table td {
   padding: 18px 18px !important;
   color: rgba(255, 255, 255, 0.78) !important;
@@ -684,18 +684,18 @@
   font-weight: 700 !important;
 }
 
-/* Badge trong table nằm giữa đẹp hơn */
+/* Center badges in table cells more nicely */
 .ui-table td .ui-badge {
   margin: 0 auto;
 }
 
-/* Fix pagination bị sát / tụt dưới */
+/* Fix pagination being too tight / sinking too low */
 .ui-pagination {
   margin-top: 18px !important;
   padding-bottom: 12px;
 }
 
-/* Fix section demo đỡ bị ép sát */
+/* Fix demo section being too cramped */
 .ui-table-wrap {
   margin-top: 10px;
 }

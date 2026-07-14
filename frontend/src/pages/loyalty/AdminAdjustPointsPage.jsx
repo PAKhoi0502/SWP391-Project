@@ -23,7 +23,7 @@ export default function AdminAdjustPointsPage() {
 
     const id = customerId.trim()
     if (!id || Number.isNaN(Number(id))) {
-      setLookupError('Vui lòng nhập Customer ID hợp lệ.')
+      setLookupError('Please enter a valid Customer ID.')
       return
     }
 
@@ -31,7 +31,7 @@ export default function AdminAdjustPointsPage() {
     try {
       setCustomer(await userService.getUser(id))
     } catch (err) {
-      setLookupError(getErrorMessage(err, 'Không tìm thấy khách hàng.'))
+      setLookupError(getErrorMessage(err, 'Customer not found.'))
     } finally {
       setLookupLoading(false)
     }
@@ -39,10 +39,10 @@ export default function AdminAdjustPointsPage() {
 
   const validate = () => {
     const fieldErrors = {}
-    if (!customer) fieldErrors.customer = 'Vui lòng tìm và xác nhận khách hàng trước.'
+    if (!customer) fieldErrors.customer = 'Please look up and confirm a customer first.'
     const pointsValue = Number(points)
     if (!points || Number.isNaN(pointsValue) || !Number.isInteger(pointsValue) || pointsValue === 0) {
-      fieldErrors.points = 'Vui lòng nhập số điểm nguyên khác 0 (âm để trừ, dương để cộng).'
+      fieldErrors.points = 'Please enter a non-zero whole number of points (negative to deduct, positive to add).'
     }
     return fieldErrors
   }
@@ -61,11 +61,11 @@ export default function AdminAdjustPointsPage() {
     setSubmitting(true)
     try {
       await loyaltyApi.adjustPoints({ customerId: customer.id, points: pointsValue, reason: reason.trim() || undefined })
-      setSuccess(`Đã ${pointsValue > 0 ? 'cộng' : 'trừ'} ${Math.abs(pointsValue)} điểm cho ${customer.fullName || customer.email}.`)
+      setSuccess(`${pointsValue > 0 ? 'Added' : 'Deducted'} ${Math.abs(pointsValue)} points ${pointsValue > 0 ? 'to' : 'from'} ${customer.fullName || customer.email}.`)
       setPoints('')
       setReason('')
     } catch (err) {
-      setSubmitError(getErrorMessage(err, 'Không thể điều chỉnh điểm.'))
+      setSubmitError(getErrorMessage(err, 'Unable to adjust points.'))
     } finally {
       setSubmitting(false)
     }
@@ -74,12 +74,12 @@ export default function AdminAdjustPointsPage() {
   return (
     <div className="aap-page">
       <section className="aap-hero">
-        <h1>Điều chỉnh điểm loyalty</h1>
-        <p>Cộng hoặc trừ điểm thủ công cho một khách hàng, kèm lý do.</p>
+        <h1>Adjust Loyalty Points</h1>
+        <p>Manually add or deduct points for a customer, with a reason.</p>
       </section>
 
       <section className="aap-panel">
-        <h2>1. Xác nhận khách hàng</h2>
+        <h2>1. Confirm customer</h2>
         <div className="aap-lookup-row">
           <div className="aap-field">
             <span className="aap-label">Customer ID</span>
@@ -87,11 +87,11 @@ export default function AdminAdjustPointsPage() {
               className="aap-input"
               value={customerId}
               onChange={(e) => { setCustomerId(e.target.value); setCustomer(null) }}
-              placeholder="Nhập Customer ID"
+              placeholder="Enter Customer ID"
             />
           </div>
           <button type="button" className="aap-btn aap-btn--primary" onClick={handleLookupCustomer} disabled={lookupLoading}>
-            {lookupLoading ? 'Đang tìm...' : 'Tìm khách hàng'}
+            {lookupLoading ? 'Searching...' : 'Look up customer'}
           </button>
         </div>
 
@@ -99,7 +99,7 @@ export default function AdminAdjustPointsPage() {
 
         {customer && (
           <div className="aap-customer-card">
-            <strong>{customer.fullName || 'Chưa có tên'}</strong>
+            <strong>{customer.fullName || 'No name yet'}</strong>
             <span>{customer.email || '-'}</span>
             <span>ID #{customer.id} · {String(customer.role || '').replace('ROLE_', '')}</span>
           </div>
@@ -107,29 +107,29 @@ export default function AdminAdjustPointsPage() {
       </section>
 
       <section className="aap-panel">
-        <h2>2. Số điểm điều chỉnh</h2>
+        <h2>2. Points adjustment</h2>
         <form onSubmit={handleSubmit} className="aap-form">
           <div className="aap-field">
-            <span className="aap-label">Số điểm (âm để trừ, dương để cộng)</span>
+            <span className="aap-label">Points (negative to deduct, positive to add)</span>
             <input
               className="aap-input"
               type="number"
               step="1"
               value={points}
               onChange={(e) => setPoints(e.target.value)}
-              placeholder="VD: 50 hoặc -20"
+              placeholder="e.g. 50 or -20"
             />
             {errors.points && <div className="aap-error">{errors.points}</div>}
           </div>
 
           <div className="aap-field">
-            <span className="aap-label">Lý do (khuyến nghị)</span>
+            <span className="aap-label">Reason (recommended)</span>
             <textarea
               className="aap-textarea"
               rows={3}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="VD: Bù điểm do lỗi hệ thống booking #123"
+              placeholder="e.g. Points compensation for booking #123 system error"
             />
           </div>
 
@@ -139,7 +139,7 @@ export default function AdminAdjustPointsPage() {
 
           <div>
             <button type="submit" className="aap-btn aap-btn--primary" disabled={submitting}>
-              {submitting ? 'Đang xử lý...' : 'Áp dụng điều chỉnh'}
+              {submitting ? 'Processing...' : 'Apply adjustment'}
             </button>
           </div>
         </form>

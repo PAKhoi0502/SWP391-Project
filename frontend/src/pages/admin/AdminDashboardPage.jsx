@@ -25,7 +25,7 @@ const currencyFormat = (value) =>
     Number(value || 0)
   )
 
-const numberFormat = (value) => new Intl.NumberFormat('vi-VN').format(Number(value || 0))
+const numberFormat = (value) => new Intl.NumberFormat('en-US').format(Number(value || 0))
 
 const todayIso = () => new Date().toISOString().slice(0, 10)
 
@@ -85,7 +85,7 @@ function AdminDashboardPage() {
       })
       .catch((err) => {
         if (cancelled) return
-        setError(err?.response?.data?.message || err.message || 'Không thể tải dữ liệu thống kê')
+        setError(err?.response?.data?.message || err.message || 'Unable to load statistics data')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -121,13 +121,13 @@ function AdminDashboardPage() {
       <div className="admin-dashboard-hero">
         <div>
           <p className="admin-dashboard-kicker">Analytics</p>
-          <h1>Tổng quan hệ thống</h1>
-          <p>Booking, doanh thu, hạng thành viên, khuyến mãi và hiệu suất khoang rửa xe.</p>
+          <h1>System Overview</h1>
+          <p>Bookings, revenue, membership tiers, promotions, and wash bay performance.</p>
         </div>
 
         <form className="admin-dashboard-filter-box" onSubmit={handleApplyFilters}>
           <label>
-            Từ ngày
+            From date
             <input
               type="date"
               value={filters.from}
@@ -136,7 +136,7 @@ function AdminDashboardPage() {
             />
           </label>
           <label>
-            Đến ngày
+            To date
             <input
               type="date"
               value={filters.to}
@@ -150,7 +150,7 @@ function AdminDashboardPage() {
               value={filters.garageId}
               onChange={(e) => setFilters((prev) => ({ ...prev, garageId: e.target.value }))}
             >
-              <option value="">Tất cả garage</option>
+              <option value="">All garages</option>
               {garages.map((garage) => (
                 <option key={garage.id} value={garage.id}>
                   {garage.name}
@@ -160,37 +160,37 @@ function AdminDashboardPage() {
           </label>
           <div className="admin-dashboard-filter-actions">
             <button className="admin-dashboard-primary-btn" type="submit">
-              Áp dụng
+              Apply
             </button>
             <button className="admin-dashboard-ghost-btn" type="button" onClick={handleReset}>
-              Đặt lại
+              Reset
             </button>
           </div>
         </form>
       </div>
 
       {error && <div className="admin-dashboard-alert error">{error}</div>}
-      {loading && <div className="admin-dashboard-alert loading">Đang tải dữ liệu...</div>}
+      {loading && <div className="admin-dashboard-alert loading">Loading data...</div>}
 
       {overview && (
         <div className="admin-dashboard-stat-grid">
-          <StatCard label="Tổng booking" value={numberFormat(overview.totalBookings)} />
-          <StatCard label="Hoàn thành" value={numberFormat(overview.completedBookings)} tone="active" />
-          <StatCard label="Đã huỷ" value={numberFormat(overview.canceledBookings)} tone="inactive" />
+          <StatCard label="Total bookings" value={numberFormat(overview.totalBookings)} />
+          <StatCard label="Completed" value={numberFormat(overview.completedBookings)} tone="active" />
+          <StatCard label="Canceled" value={numberFormat(overview.canceledBookings)} tone="inactive" />
           <StatCard label="No-show" value={numberFormat(overview.noShowBookings)} tone="maintenance" />
-          <StatCard label="Doanh thu" value={currencyFormat(overview.totalRevenue)} />
-          <StatCard label="Thành viên loyalty" value={numberFormat(overview.loyaltyMembers)} />
-          <StatCard label="Điểm khả dụng" value={numberFormat(overview.totalAvailablePoints)} />
-          <StatCard label="Lượt dùng khuyến mãi" value={numberFormat(overview.promotionUsages)} />
-          <StatCard label="Lượt dùng khoang rửa" value={numberFormat(overview.washBayUsages)} />
+          <StatCard label="Revenue" value={currencyFormat(overview.totalRevenue)} />
+          <StatCard label="Loyalty members" value={numberFormat(overview.loyaltyMembers)} />
+          <StatCard label="Available points" value={numberFormat(overview.totalAvailablePoints)} />
+          <StatCard label="Promotion uses" value={numberFormat(overview.promotionUsages)} />
+          <StatCard label="Wash bay uses" value={numberFormat(overview.washBayUsages)} />
         </div>
       )}
 
       <div className="admin-dashboard-grid">
         <section className="admin-dashboard-panel">
           <header className="admin-dashboard-panel-header">
-            <h2>Booking theo ngày</h2>
-            <p>Số lượng booking trong khoảng thời gian đã chọn</p>
+            <h2>Bookings by Day</h2>
+            <p>Number of bookings within the selected date range</p>
           </header>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={bookings?.byDate || []}>
@@ -205,8 +205,8 @@ function AdminDashboardPage() {
 
         <section className="admin-dashboard-panel">
           <header className="admin-dashboard-panel-header">
-            <h2>Booking theo trạng thái</h2>
-            <p>Phân bổ trạng thái booking</p>
+            <h2>Bookings by Status</h2>
+            <p>Booking status distribution</p>
           </header>
           <ResponsiveContainer width="100%" height={280}>
             <PieChart margin={{ top: 12, right: 24, bottom: 8, left: 24 }}>
@@ -223,8 +223,8 @@ function AdminDashboardPage() {
 
         <section className="admin-dashboard-panel">
           <header className="admin-dashboard-panel-header">
-            <h2>Doanh thu theo ngày</h2>
-            <p>Tổng: {currencyFormat(revenue?.totalRevenue)} · Trung bình: {currencyFormat(revenue?.averageRevenue)}</p>
+            <h2>Revenue by Day</h2>
+            <p>Total: {currencyFormat(revenue?.totalRevenue)} · Average: {currencyFormat(revenue?.averageRevenue)}</p>
           </header>
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={revenue?.byDate || []}>
@@ -232,21 +232,21 @@ function AdminDashboardPage() {
               <XAxis dataKey="date" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => numberFormat(v)} />
               <Tooltip formatter={(value) => currencyFormat(value)} />
-              <Line type="monotone" dataKey="revenue" name="Doanh thu" stroke="#2563eb" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#2563eb" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </section>
 
         <section className="admin-dashboard-panel">
           <header className="admin-dashboard-panel-header">
-            <h2>Doanh thu theo phương thức thanh toán</h2>
+            <h2>Revenue by Payment Method</h2>
           </header>
           <table className="admin-dashboard-table">
             <thead>
               <tr>
-                <th>Phương thức</th>
-                <th>Số booking đã thanh toán</th>
-                <th>Doanh thu</th>
+                <th>Method</th>
+                <th>Paid bookings</th>
+                <th>Revenue</th>
               </tr>
             </thead>
             <tbody>
@@ -259,7 +259,7 @@ function AdminDashboardPage() {
               ))}
               {!revenue?.byPaymentMethod?.length && (
                 <tr>
-                  <td colSpan={3}>Không có dữ liệu</td>
+                  <td colSpan={3}>No data</td>
                 </tr>
               )}
             </tbody>
@@ -268,20 +268,20 @@ function AdminDashboardPage() {
 
         <section className="admin-dashboard-panel">
           <header className="admin-dashboard-panel-header">
-            <h2>Hạng thành viên (Loyalty)</h2>
+            <h2>Membership Tiers (Loyalty)</h2>
             <p>
-              {numberFormat(loyalty?.totalMembers)} thành viên · {numberFormat(loyalty?.totalAvailablePoints)} điểm khả
-              dụng
+              {numberFormat(loyalty?.totalMembers)} members · {numberFormat(loyalty?.totalAvailablePoints)} available
+              points
             </p>
           </header>
           <table className="admin-dashboard-table">
             <thead>
               <tr>
-                <th>Hạng</th>
-                <th>Thành viên</th>
-                <th>Điểm khả dụng</th>
-                <th>Điểm đã đổi</th>
-                <th>Tổng chi tiêu</th>
+                <th>Tier</th>
+                <th>Members</th>
+                <th>Available points</th>
+                <th>Redeemed points</th>
+                <th>Total spent</th>
               </tr>
             </thead>
             <tbody>
@@ -296,7 +296,7 @@ function AdminDashboardPage() {
               ))}
               {!loyalty?.byTier?.length && (
                 <tr>
-                  <td colSpan={5}>Không có dữ liệu</td>
+                  <td colSpan={5}>No data</td>
                 </tr>
               )}
             </tbody>
@@ -305,19 +305,19 @@ function AdminDashboardPage() {
 
         <section className="admin-dashboard-panel">
           <header className="admin-dashboard-panel-header">
-            <h2>Hiệu suất khuyến mãi</h2>
+            <h2>Promotion Performance</h2>
             <p>
-              {numberFormat(promotions?.totalUsages)} lượt dùng · {currencyFormat(promotions?.totalDiscountAmount)} đã
-              giảm
+              {numberFormat(promotions?.totalUsages)} uses · {currencyFormat(promotions?.totalDiscountAmount)} total
+              discounted
             </p>
           </header>
           <table className="admin-dashboard-table">
             <thead>
               <tr>
-                <th>Mã</th>
-                <th>Tên</th>
-                <th>Lượt dùng</th>
-                <th>Số tiền giảm</th>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Uses</th>
+                <th>Discount amount</th>
               </tr>
             </thead>
             <tbody>
@@ -331,7 +331,7 @@ function AdminDashboardPage() {
               ))}
               {!promotions?.promotions?.length && (
                 <tr>
-                  <td colSpan={4}>Không có dữ liệu</td>
+                  <td colSpan={4}>No data</td>
                 </tr>
               )}
             </tbody>
@@ -340,20 +340,20 @@ function AdminDashboardPage() {
 
         <section className="admin-dashboard-panel admin-dashboard-panel-wide">
           <header className="admin-dashboard-panel-header">
-            <h2>Hiệu suất khoang rửa xe</h2>
+            <h2>Wash Bay Performance</h2>
             <p>
-              {numberFormat(washBays?.totalUsages)} lượt · {numberFormat(washBays?.totalUsageMinutes)} phút · trung
-              bình {Math.round(washBays?.averageUsageMinutes || 0)} phút/lượt
+              {numberFormat(washBays?.totalUsages)} uses · {numberFormat(washBays?.totalUsageMinutes)} minutes · average
+              {' '}{Math.round(washBays?.averageUsageMinutes || 0)} min/use
             </p>
           </header>
           <table className="admin-dashboard-table">
             <thead>
               <tr>
-                <th>Khoang</th>
-                <th>Loại xe</th>
-                <th>Lượt dùng</th>
-                <th>Tổng phút</th>
-                <th>TB phút/lượt</th>
+                <th>Bay</th>
+                <th>Vehicle type</th>
+                <th>Uses</th>
+                <th>Total minutes</th>
+                <th>Avg min/use</th>
               </tr>
             </thead>
             <tbody>
@@ -368,7 +368,7 @@ function AdminDashboardPage() {
               ))}
               {!washBays?.washBays?.length && (
                 <tr>
-                  <td colSpan={5}>Không có dữ liệu</td>
+                  <td colSpan={5}>No data</td>
                 </tr>
               )}
             </tbody>

@@ -92,7 +92,7 @@
   background: #0a1224;
 }
 
-/* img full width, kéo dài theo chiều ngang, không crop */
+/* img full width, stretched horizontally, no crop */
 .pcd-hero-img {
   display: block;
   width: 100%;

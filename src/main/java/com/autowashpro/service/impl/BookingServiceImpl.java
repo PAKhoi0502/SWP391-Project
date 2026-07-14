@@ -498,9 +498,12 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 CustomerLoyalty loyalty = customerLoyaltyRepository.findByCustomerId(customerId).orElse(null);
-                String tier = loyalty != null ? loyalty.getCurrentTier() : "BRONZE";
+                String tier = loyalty != null ? loyalty.getCurrentTier() : "NEW";
 
+                // "NEW" (not yet ranked) has no rule row of its own — booking limits fall back
+                // to BRONZE, the baseline tier, until the customer earns an actual rank.
                 LoyaltyTierRule tierRule = loyaltyTierRuleRepository.findByTierAndIsActiveTrue(tier)
+                                .or(() -> loyaltyTierRuleRepository.findByTierAndIsActiveTrue("BRONZE"))
                                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                                                 "Loyalty tier rule not found for tier: " + tier));
 

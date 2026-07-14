@@ -32,7 +32,7 @@ export default function CustomerVehiclesPage() {
     try {
       setVehicles(await vehicleService.listOwn())
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể tải danh sách xe.'))
+      setError(getErrorMessage(err, 'Could not load the vehicle list.'))
     } finally {
       setLoading(false)
     }
@@ -81,7 +81,7 @@ export default function CustomerVehiclesPage() {
       setFormOpen(false)
       await loadVehicles()
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể lưu xe.'))
+      setError(getErrorMessage(err, 'Could not save the vehicle.'))
     } finally {
       setSaving(false)
     }
@@ -102,18 +102,18 @@ export default function CustomerVehiclesPage() {
       setConfirmAction(null)
       await loadVehicles()
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể cập nhật xe.'))
+      setError(getErrorMessage(err, 'Could not update the vehicle.'))
     } finally {
       setSaving(false)
     }
   }
 
   const columns = [
-    { title: 'Biển số', key: 'rawLicensePlate', render: (vehicle) => <PlateCell vehicle={vehicle} /> },
-    { title: 'Xe', key: 'brand', render: (vehicle) => `${vehicle.brand || '-'} ${vehicle.model || ''}`.trim() },
-    { title: 'Loại', key: 'vehicleType', render: (vehicle) => formatVehicleType(vehicle.vehicleType) },
-    { title: 'Trạng thái', key: 'isActive', render: (vehicle) => <StatusBadge status={vehicle.isActive === false ? 'Inactive' : 'Active'} /> },
-    { title: 'Thao tác', key: 'actions', render: (vehicle) => <Actions vehicle={vehicle} onEdit={openEdit} onAction={setConfirmAction} /> },
+    { title: 'License Plate', key: 'rawLicensePlate', render: (vehicle) => <PlateCell vehicle={vehicle} /> },
+    { title: 'Vehicle', key: 'brand', render: (vehicle) => `${vehicle.brand || '-'} ${vehicle.model || ''}`.trim() },
+    { title: 'Type', key: 'vehicleType', render: (vehicle) => formatVehicleType(vehicle.vehicleType) },
+    { title: 'Status', key: 'isActive', render: (vehicle) => <StatusBadge status={vehicle.isActive === false ? 'Inactive' : 'Active'} /> },
+    { title: 'Actions', key: 'actions', render: (vehicle) => <Actions vehicle={vehicle} onEdit={openEdit} onAction={setConfirmAction} /> },
   ]
 
   return (
@@ -127,30 +127,30 @@ export default function CustomerVehiclesPage() {
 
       <div className="vehicle-header" style={headerStyle}>
         <div>
-          <h1 style={{ margin: 0, color: '#fff', marginBottom: '20px' }}>Xe của tôi</h1>
-          <p style={{ margin: 0, color: 'rgba(200,220,255,0.58)' }}>Quản lý xe, đặt xe mặc định và kiểm tra biển số chuẩn hóa.</p>
+          <h1 style={{ margin: 0, color: '#fff', marginBottom: '20px' }}>My Vehicles</h1>
+          <p style={{ margin: 0, color: 'rgba(200,220,255,0.58)' }}>Manage your vehicles, set a default vehicle, and check normalized license plates.</p>
         </div>
-        <Button onClick={openCreate}>Thêm xe</Button>
+        <Button onClick={openCreate}>Add Vehicle</Button>
       </div>
 
       <div style={panelStyle}>
         {error && <div style={errorStyle}>{error}</div>}
-        {loading ? <div style={stateStyle}>Đang tải danh sách xe...</div> : <Table columns={columns} data={vehicles} emptyText="Bạn chưa có xe nào" />}
+        {loading ? <div style={stateStyle}>Loading vehicle list...</div> : <Table columns={columns} data={vehicles} emptyText="You don't have any vehicles yet" />}
       </div>
 
-      <Modal open={formOpen} title={editing ? 'Cập nhật xe' : 'Thêm xe'} onClose={() => saving ? null : setFormOpen(false)}>
+      <Modal open={formOpen} title={editing ? 'Update Vehicle' : 'Add Vehicle'} onClose={() => saving ? null : setFormOpen(false)}>
         <form className="vehicle-form" onSubmit={handleSave}>
-          {!editing && <Input required label="Biển số" value={form.rawLicensePlate} onChange={(e) => setForm({ ...form, rawLicensePlate: e.target.value })} placeholder="VD: 51A-123.45" />}
-          {!editing && <Select required label="Loại xe" value={form.vehicleType} onChange={(e) => setForm({ ...form, vehicleType: e.target.value })} options={VEHICLE_TYPES.map((type) => ({ value: type, label: formatVehicleType(type) }))} />}
+          {!editing && <Input required label="License Plate" value={form.rawLicensePlate} onChange={(e) => setForm({ ...form, rawLicensePlate: e.target.value })} placeholder="e.g. 51A-123.45" />}
+          {!editing && <Select required label="Vehicle Type" value={form.vehicleType} onChange={(e) => setForm({ ...form, vehicleType: e.target.value })} options={VEHICLE_TYPES.map((type) => ({ value: type, label: formatVehicleType(type) }))} />}
           <div className="vehicle-form-grid">
-            <Input required label="Hãng" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
-            <Input required label="Dòng xe" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
-            <Input label="Màu" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
-            <Select label="Động cơ" value={form.engineType} onChange={(e) => setForm({ ...form, engineType: e.target.value })} options={[{ value: '', label: 'Chưa chọn' }, ...ENGINE_TYPES.map((type) => ({ value: type, label: formatVehicleType(type) }))]} />
+            <Input required label="Brand" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
+            <Input required label="Model" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
+            <Input label="Color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} />
+            <Select label="Engine Type" value={form.engineType} onChange={(e) => setForm({ ...form, engineType: e.target.value })} options={[{ value: '', label: 'Not selected' }, ...ENGINE_TYPES.map((type) => ({ value: type, label: formatVehicleType(type) }))]} />
             {form.vehicleType === 'CAR' && (
               <Input
                 required
-                label="Số ghế"
+                label="Seat Count"
                 type="number"
                 min="1"
                 value={form.seatCount}
@@ -160,26 +160,26 @@ export default function CustomerVehiclesPage() {
             {form.vehicleType === 'BIKE' && (
               <Select
                 required
-                label="Nhóm xe máy"
+                label="Motorbike Group"
                 value={form.motorbikeGroup}
                 onChange={(e) => setForm({ ...form, motorbikeGroup: e.target.value })}
-                options={[{ value: '', label: 'Chọn nhóm xe máy' }, ...MOTORBIKE_GROUPS]}
+                options={[{ value: '', label: 'Select motorbike group' }, ...MOTORBIKE_GROUPS]}
               />
             )}
           </div>
-          {!editing && <label style={checkStyle}><input type="checkbox" checked={form.isDefault} onChange={(e) => setForm({ ...form, isDefault: e.target.checked })} /> Đặt làm xe mặc định</label>}
+          {!editing && <label style={checkStyle}><input type="checkbox" checked={form.isDefault} onChange={(e) => setForm({ ...form, isDefault: e.target.checked })} /> Set as default vehicle</label>}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <Button variant="ghost" onClick={() => setFormOpen(false)} disabled={saving}>Hủy</Button>
-            <Button type="submit" loading={saving}>Lưu</Button>
+            <Button variant="ghost" onClick={() => setFormOpen(false)} disabled={saving}>Cancel</Button>
+            <Button type="submit" loading={saving}>Save</Button>
           </div>
         </form>
       </Modal>
 
       <ConfirmDialog
         open={Boolean(confirmAction)}
-        title={confirmAction?.type === 'default' ? 'Đặt xe mặc định?' : (confirmAction?.nextValue ? 'Kích hoạt xe?' : 'Vô hiệu hóa xe?')}
-        message={confirmAction?.type === 'default' ? `Đặt ${confirmAction?.vehicle.rawLicensePlate} làm xe mặc định?` : `${confirmAction?.nextValue ? 'Kích hoạt' : 'Vô hiệu hóa'} xe ${confirmAction?.vehicle.rawLicensePlate}?`}
-        confirmText={saving ? 'Đang xử lý...' : 'Xác nhận'}
+        title={confirmAction?.type === 'default' ? 'Set default vehicle?' : (confirmAction?.nextValue ? 'Activate vehicle?' : 'Deactivate vehicle?')}
+        message={confirmAction?.type === 'default' ? `Set ${confirmAction?.vehicle.rawLicensePlate} as the default vehicle?` : `${confirmAction?.nextValue ? 'Activate' : 'Deactivate'} vehicle ${confirmAction?.vehicle.rawLicensePlate}?`}
+        confirmText={saving ? 'Processing...' : 'Confirm'}
         danger={confirmAction?.nextValue === false}
         onConfirm={handleConfirm}
         onCancel={() => saving ? null : setConfirmAction(null)}
@@ -189,12 +189,12 @@ export default function CustomerVehiclesPage() {
 }
 
 function PlateCell({ vehicle }) {
-  return <div style={{ display: 'grid', gap: 4 }}><strong style={{ color: '#fff' }}>{vehicle.rawLicensePlate}</strong><span style={{ color: 'rgba(200,220,255,0.52)', fontSize: 12 }}>Chuẩn hóa: {vehicle.normalizedLicensePlate || '-'}</span>{vehicle.isDefault && <span style={defaultStyle}>Mặc định</span>}</div>
+  return <div style={{ display: 'grid', gap: 4 }}><strong style={{ color: '#fff' }}>{vehicle.rawLicensePlate}</strong><span style={{ color: 'rgba(200,220,255,0.52)', fontSize: 12 }}>Normalized: {vehicle.normalizedLicensePlate || '-'}</span>{vehicle.isDefault && <span style={defaultStyle}>Default</span>}</div>
 }
 
 function Actions({ vehicle, onEdit, onAction }) {
   const active = vehicle.isActive !== false
-  return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}><Button size="sm" variant="ghost" onClick={() => onEdit(vehicle)}>Sửa</Button>{!vehicle.isDefault && active && <Button size="sm" variant="secondary" onClick={() => onAction({ type: 'default', vehicle })}>Đặt mặc định</Button>}<Button size="sm" variant={active ? 'danger' : 'secondary'} onClick={() => onAction({ type: 'status', vehicle, nextValue: !active })}>{active ? 'Vô hiệu hóa' : 'Kích hoạt'}</Button></div>
+  return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}><Button size="sm" variant="ghost" onClick={() => onEdit(vehicle)}>Edit</Button>{!vehicle.isDefault && active && <Button size="sm" variant="secondary" onClick={() => onAction({ type: 'default', vehicle })}>Set as Default</Button>}<Button size="sm" variant={active ? 'danger' : 'secondary'} onClick={() => onAction({ type: 'status', vehicle, nextValue: !active })}>{active ? 'Deactivate' : 'Activate'}</Button></div>
 }
 
 function cleanPayload(form) {

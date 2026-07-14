@@ -38,13 +38,13 @@ export default function LoyaltyPointsCard() {
       })
       .catch((err) => {
         if (!mounted) return
-        setError(err?.response?.data?.message || 'Không tải được thông tin điểm.')
+        setError(err?.response?.data?.message || 'Could not load points information.')
       })
       .finally(() => { if (mounted) setLoading(false) })
     return () => { mounted = false }
   }, [])
 
-  if (loading) return <div className="lpc-root"><p className="lpc-loading">Đang tải thông tin hạng...</p></div>
+  if (loading) return <div className="lpc-root"><p className="lpc-loading">Loading tier information...</p></div>
   if (error)   return <div className="lpc-root"><p className="lpc-error">{error}</p></div>
   if (!loyalty) return null
 
@@ -56,33 +56,33 @@ export default function LoyaltyPointsCard() {
       {/* Header */}
       <div className="lpc-header">
         <div>
-          <p className="lpc-label">Hạng thành viên</p>
+          <p className="lpc-label">Membership Tier</p>
           <div className="lpc-tier-badge">
             <span className="lpc-tier-icon"><TierGemIcon tier={currentTierKey} size={22} /></span>
             <span>{getTierLabel(currentTierKey)}</span>
           </div>
         </div>
         <button type="button" className="lpc-history-btn" onClick={() => setTxModalOpen(true)}>
-          Lịch sử điểm
+          Points History
         </button>
       </div>
 
       {/* Points grid */}
       <div className="lpc-points-row">
         <div className="lpc-point-block">
-          <span className="lpc-point-block-label">Điểm khả dụng</span>
+          <span className="lpc-point-block-label">Available Points</span>
           <span className="lpc-point-block-value">{loyalty.availablePoints ?? 0}</span>
         </div>
         <div className="lpc-point-block">
-          <span className="lpc-point-block-label">Tổng điểm</span>
+          <span className="lpc-point-block-label">Total Points</span>
           <span className="lpc-point-block-value">{loyalty.totalPoints ?? 0}</span>
         </div>
         <div className="lpc-point-block">
-          <span className="lpc-point-block-label">Đã đổi</span>
+          <span className="lpc-point-block-label">Redeemed</span>
           <span className="lpc-point-block-value dim">{loyalty.redeemedPoints ?? 0}</span>
         </div>
         <div className="lpc-point-block">
-          <span className="lpc-point-block-label">Hết hạn</span>
+          <span className="lpc-point-block-label">Expired</span>
           <span className="lpc-point-block-value dim">{loyalty.expiredPoints ?? 0}</span>
         </div>
       </div>
@@ -90,12 +90,12 @@ export default function LoyaltyPointsCard() {
       {/* Stats */}
       <div className="lpc-stats">
         <div className="lpc-stat">
-          <span className="lpc-stat-label">Tổng chi tiêu</span>
+          <span className="lpc-stat-label">Total Spent</span>
           <span className="lpc-stat-value">{formatMoney(loyalty.totalSpent)}</span>
         </div>
         <div className="lpc-stat">
-          <span className="lpc-stat-label">Lượt rửa xe</span>
-          <span className="lpc-stat-value">{loyalty.totalVisits ?? 0} lần</span>
+          <span className="lpc-stat-label">Wash Visits</span>
+          <span className="lpc-stat-value">{loyalty.totalVisits ?? 0} visits</span>
         </div>
       </div>
 
@@ -109,7 +109,7 @@ export default function LoyaltyPointsCard() {
             onClick={() => setTiersOpen((v) => !v)}
             aria-expanded={tiersOpen}
           >
-            <span className="lpc-tiers-title">Điều kiện hạng</span>
+            <span className="lpc-tiers-title">Tier Requirements</span>
             <span className={`lpc-tiers-chevron${tiersOpen ? ' open' : ''}`}>
               <ChevronDown />
             </span>
@@ -121,19 +121,19 @@ export default function LoyaltyPointsCard() {
                 const ruleKey = String(rule.tier || '').toUpperCase()
                 const isCurrent = ruleKey === currentTierKey
                 const conditions = []
-                if (rule.minTotalSpent)  conditions.push(`Chi tiêu ≥ ${formatMoney(rule.minTotalSpent)}`)
-                if (rule.minTotalVisits) conditions.push(`≥ ${rule.minTotalVisits} lượt`)
-                if (rule.minTotalPoints) conditions.push(`≥ ${rule.minTotalPoints} điểm tích lũy`)
+                if (rule.minTotalSpent)  conditions.push(`Spending ≥ ${formatMoney(rule.minTotalSpent)}`)
+                if (rule.minTotalVisits) conditions.push(`≥ ${rule.minTotalVisits} visits`)
+                if (rule.minTotalPoints) conditions.push(`≥ ${rule.minTotalPoints} points earned`)
 
                 return (
                   <div key={ruleKey} className={`lpc-tier-item${isCurrent ? ' current' : ''}`}>
                     <div className="lpc-tier-item-header">
                       <span className={`lpc-tier-item-name${isCurrent ? ' current-label' : ''}`}>
                         <TierGemIcon tier={ruleKey} size={16} /> {getTierLabel(ruleKey)}
-                        {isCurrent && <span className="lpc-tier-current-chip">Hiện tại</span>}
+                        {isCurrent && <span className="lpc-tier-current-chip">Current</span>}
                       </span>
                       {rule.pointMultiplier && (
-                        <span className="lpc-tier-multiplier">×{rule.pointMultiplier} điểm</span>
+                        <span className="lpc-tier-multiplier">×{rule.pointMultiplier} points</span>
                       )}
                     </div>
                     {conditions.length > 0 && (

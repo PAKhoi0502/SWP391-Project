@@ -402,7 +402,7 @@ public class PromotionServiceImpl implements PromotionService {
                 .orElse(null);
 
         String customerTier = loyalty == null
-                ? "BRONZE"
+                ? "NEW"
                 : loyalty.getCurrentTier();
 
         if (!tiers.contains(customerTier)) {

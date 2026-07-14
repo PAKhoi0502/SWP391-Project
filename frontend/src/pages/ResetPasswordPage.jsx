@@ -20,17 +20,17 @@ export default function ResetPasswordPage() {
     e.preventDefault()
 
     if (!token) {
-      setError('Link không hợp lệ hoặc đã hết hạn.')
+      setError('Invalid or expired link.')
       return
     }
 
     if (form.newPassword.length < 6) {
-      setError('Mật khẩu phải có ít nhất 6 ký tự.')
+      setError('Password must be at least 6 characters.')
       return
     }
 
     if (form.newPassword !== form.confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp.')
+      setError('Password confirmation does not match.')
       return
     }
 
@@ -42,7 +42,7 @@ export default function ResetPasswordPage() {
       setSuccess(true)
       setTimeout(() => navigate('/login'), 2500)
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data || 'Link đã hết hạn hoặc không hợp lệ.')
+      setError(err.response?.data?.message || err.response?.data || 'This link has expired or is invalid.')
     } finally {
       setLoading(false)
     }
@@ -54,19 +54,19 @@ export default function ResetPasswordPage() {
         <div className="aas-panel">
           <div className="aas-form-content aas-visible">
             <LogoMark />
-            <p className="aas-eyebrow">Khôi phục tài khoản</p>
-            <h2 className="aas-form-title">Đặt lại mật khẩu</h2>
-            <p className="aas-form-sub">Nhập mật khẩu mới cho tài khoản của bạn</p>
+            <p className="aas-eyebrow">Account Recovery</p>
+            <h2 className="aas-form-title">Reset password</h2>
+            <p className="aas-form-sub">Enter a new password for your account</p>
 
             {!token ? (
               <div style={{ textAlign: 'center' }}>
-                <div className="aas-alert aas-alert--error">Link không hợp lệ hoặc đã hết hạn.</div>
-                <Link to="/forgot-password" className="aas-back-link">Gửi lại email</Link>
+                <div className="aas-alert aas-alert--error">Invalid or expired link.</div>
+                <Link to="/forgot-password" className="aas-back-link">Resend email</Link>
               </div>
             ) : success ? (
               <div style={{ textAlign: 'center' }}>
                 <div className="aas-alert aas-alert--success">
-                  Mật khẩu đã được đặt lại thành công! Đang chuyển về trang đăng nhập...
+                  Password reset successfully! Redirecting to the login page...
                 </div>
               </div>
             ) : (
@@ -76,8 +76,8 @@ export default function ResetPasswordPage() {
                 <form onSubmit={handleSubmit} className="aas-form">
                   <PasswordField
                     id="reset-new-password"
-                    label="Mật khẩu mới"
-                    placeholder="Tối thiểu 6 ký tự"
+                    label="New password"
+                    placeholder="At least 6 characters"
                     shown={showNew}
                     onToggle={() => setShowNew((p) => !p)}
                     value={form.newPassword}
@@ -86,8 +86,8 @@ export default function ResetPasswordPage() {
 
                   <PasswordField
                     id="reset-confirm-password"
-                    label="Xác nhận mật khẩu mới"
-                    placeholder="Nhập lại mật khẩu mới"
+                    label="Confirm new password"
+                    placeholder="Re-enter your new password"
                     shown={showConfirm}
                     onToggle={() => setShowConfirm((p) => !p)}
                     value={form.confirmPassword}
@@ -95,11 +95,11 @@ export default function ResetPasswordPage() {
                   />
 
                   <button type="submit" className="aas-submit-btn" disabled={loading}>
-                    {loading ? 'Đang xử lý...' : 'Đặt lại mật khẩu'}
+                    {loading ? 'Processing...' : 'Reset password'}
                   </button>
                 </form>
 
-                <Link to="/login" className="aas-back-link">Quay lại đăng nhập</Link>
+                <Link to="/login" className="aas-back-link">Back to sign in</Link>
               </>
             )}
           </div>
@@ -123,7 +123,7 @@ function PasswordField({ id, label, placeholder, shown, onToggle, value, onChang
           onChange={(e) => onChange(e.target.value)}
           required
         />
-        <button type="button" className="aas-eye-btn" onClick={onToggle} tabIndex={-1} aria-label={shown ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>
+        <button type="button" className="aas-eye-btn" onClick={onToggle} tabIndex={-1} aria-label={shown ? 'Hide password' : 'Show password'}>
           {shown ? <EyeOff /> : <EyeOn />}
         </button>
       </div>

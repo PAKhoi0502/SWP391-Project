@@ -6,25 +6,25 @@ import '../booking/BookingHistoryPage.css'
 
 const TEXT = {
   eyebrow: 'Customer',
-  title: 'Lịch sử rửa xe',
-  subtitle: 'Xem lại các lượt rửa xe đã hoàn thành của bạn.',
-  refresh: 'Làm mới',
-  loading: 'Đang tải lịch sử rửa xe...',
-  empty: 'Bạn chưa có lượt rửa xe nào hoàn thành.',
-  loadError: 'Không tải được lịch sử rửa xe.',
-  vehicle: 'Xe',
+  title: 'Wash History',
+  subtitle: 'Review your completed wash visits.',
+  refresh: 'Refresh',
+  loading: 'Loading wash history...',
+  empty: "You don't have any completed washes yet.",
+  loadError: 'Failed to load wash history.',
+  vehicle: 'Vehicle',
   garage: 'Garage',
-  servicePackage: 'Gói dịch vụ',
-  completedAt: 'Hoàn thành lúc',
-  total: 'Số tiền',
-  points: 'Điểm nhận được',
-  detail: 'Xem chi tiết',
-  notUpdated: 'Chưa cập nhật',
+  servicePackage: 'Service package',
+  completedAt: 'Completed at',
+  total: 'Amount',
+  points: 'Points earned',
+  detail: 'View details',
+  notUpdated: 'Not updated',
 }
 
 const formatDateTime = (value) => {
   if (!value) return TEXT.notUpdated
-  return new Date(value).toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' })
+  return new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 const formatMoney = (value) =>

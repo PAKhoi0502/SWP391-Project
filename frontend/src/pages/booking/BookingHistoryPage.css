@@ -4,7 +4,7 @@
    ═══════════════════════════════════════════════════ */
 
 /* ── Page wrapper ──
-   background-attachment: fixed gắn ảnh với viewport → không bao giờ mất sau re-render
+   background-attachment: fixed pins the image to the viewport → never lost after re-render
 ── */
 .bhp-page {
   min-height: 100vh;

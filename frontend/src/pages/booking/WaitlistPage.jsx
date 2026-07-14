@@ -8,9 +8,9 @@ const WAITING_STATUSES = new Set(['WAITING'])
 const OFFERED_STATUSES = new Set(['OFFERED'])
 
 function formatDate(date) {
-  if (!date) return 'Chưa có ngày'
+  if (!date) return 'No date'
 
-  return new Date(date).toLocaleDateString('vi-VN', {
+  return new Date(date).toLocaleDateString('en-US', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -18,9 +18,9 @@ function formatDate(date) {
 }
 
 function formatTime(dateTime) {
-  if (!dateTime) return 'Chưa có giờ'
+  if (!dateTime) return 'No time'
 
-  return new Date(dateTime).toLocaleTimeString('vi-VN', {
+  return new Date(dateTime).toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
   })
@@ -29,21 +29,21 @@ function formatTime(dateTime) {
 function getVehicleTypeLabel(vehicleType) {
   const value = String(vehicleType || '').toUpperCase()
 
-  if (value === 'CAR') return 'Ô tô'
+  if (value === 'CAR') return 'Car'
   if (value === 'MOTORBIKE' || value === 'BIKE' || value === 'MOTORCYCLE') {
-    return 'Xe máy'
+    return 'Motorbike'
   }
 
-  return vehicleType || 'Chưa có loại xe'
+  return vehicleType || 'No vehicle type'
 }
 
 function getStatusLabel(status) {
   const value = String(status || 'WAITING').toUpperCase()
-  if (value === 'WAITING') return 'Đang chờ'
-  if (value === 'OFFERED') return 'Có slot trống'
-  if (value === 'ACCEPTED') return 'Đã nhận slot'
-  if (value === 'CANCELED' || value === 'CANCELLED') return 'Đã hủy'
-  if (value === 'EXPIRED') return 'Hết hạn'
+  if (value === 'WAITING') return 'Waiting'
+  if (value === 'OFFERED') return 'Slot available'
+  if (value === 'ACCEPTED') return 'Slot accepted'
+  if (value === 'CANCELED' || value === 'CANCELLED') return 'Cancelled'
+  if (value === 'EXPIRED') return 'Expired'
   return value
 }
 
@@ -55,7 +55,7 @@ function InfoRow({ label, value }) {
   return (
     <div className="waitlist-info-row">
       <span>{label}</span>
-      <strong>{value || 'Không có'}</strong>
+      <strong>{value || 'None'}</strong>
     </div>
   )
 }
@@ -90,7 +90,7 @@ export default function WaitlistPage() {
       const content = Array.isArray(result?.content) ? result.content : []
       setItems([...content].sort((left, right) => new Date(right?.createdAt || 0) - new Date(left?.createdAt || 0)))
     } catch (err) {
-      setError(getErrorMessage(err, 'Không tải được danh sách chờ.'))
+      setError(getErrorMessage(err, 'Failed to load the waitlist.'))
     } finally {
       setLoadingItems(false)
     }
@@ -103,7 +103,7 @@ export default function WaitlistPage() {
 
   const handleConfirmJoinWaitlist = async () => {
     if (!garageId || !servicePackageId || !vehicleId || !date) {
-      setError('Thiếu thông tin slot. Vui lòng quay lại trang chọn slot và chọn lại.')
+      setError('Missing slot information. Please go back to the slot picker and select again.')
       return
     }
 
@@ -119,7 +119,7 @@ export default function WaitlistPage() {
       })
       setJoinedEntry(createdEntry)
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể tham gia waitlist. Vui lòng thử lại.'))
+      setError(getErrorMessage(err, 'Unable to join the waitlist. Please try again.'))
     } finally {
       setLoading(false)
     }
@@ -141,7 +141,7 @@ export default function WaitlistPage() {
       await fetchMine()
       window.alert(successMessage)
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể cập nhật waitlist. Vui lòng thử lại.'))
+      setError(getErrorMessage(err, 'Unable to update the waitlist. Please try again.'))
     } finally {
       setActionKey('')
     }
@@ -152,17 +152,17 @@ export default function WaitlistPage() {
       <div className="waitlist-page">
         <section className="waitlist-hero waitlist-hero-wide">
           <p className="waitlist-eyebrow">Waitlist</p>
-          <h1>Danh sách chờ của tôi</h1>
+          <h1>My Waitlist</h1>
           <p>
-            Các yêu cầu waitlist sẽ nằm ở đây. Khi được offer slot, bạn có thể nhận slot đó,
-            lịch hẹn mới sẽ xuất hiện ở trang Lịch hẹn.
+            Your waitlist requests will appear here. When a slot is offered, you can accept it
+            and the new appointment will show up on the Appointments page.
           </p>
 
           {error && <p className="waitlist-message waitlist-message-error">{error}</p>}
           {loadingItems ? (
-            <p className="waitlist-empty">Đang tải danh sách chờ...</p>
+            <p className="waitlist-empty">Loading waitlist...</p>
           ) : items.length === 0 ? (
-            <div className="waitlist-empty">Bạn chưa có yêu cầu waitlist nào.</div>
+            <div className="waitlist-empty">You have no waitlist requests yet.</div>
           ) : (
             <div className="waitlist-list">
               {items.map((item) => {
@@ -175,14 +175,14 @@ export default function WaitlistPage() {
                 return (
                   <article className="waitlist-card" key={item.id}>
                     <div className="waitlist-card-header">
-                      <strong>{item.servicePackageName || `Gói #${item.servicePackageId || '-'}`}</strong>
+                      <strong>{item.servicePackageName || `Package #${item.servicePackageId || '-'}`}</strong>
                       <span>{getStatusLabel(status)}</span>
                     </div>
                     <div className="waitlist-card-details">
                       <div>Garage: {item.garageName || `Garage #${item.garageId || '-'}`}</div>
-                      <div>Xe: {item.vehicleName || `Xe #${item.vehicleId || '-'}`}</div>
-                      <div>Ngày: {formatDate(item.desiredStartTime)}</div>
-                      <div>Khung giờ: {formatTime(item.desiredStartTime)} - {formatTime(item.desiredEndTime)}</div>
+                      <div>Vehicle: {item.vehicleName || `Vehicle #${item.vehicleId || '-'}`}</div>
+                      <div>Date: {formatDate(item.desiredStartTime)}</div>
+                      <div>Time slot: {formatTime(item.desiredStartTime)} - {formatTime(item.desiredEndTime)}</div>
                     </div>
 
                     {(canCancel || canAccept) && (
@@ -191,9 +191,9 @@ export default function WaitlistPage() {
                           <Button
                             loading={isAccepting}
                             disabled={Boolean(actionKey)}
-                            onClick={() => runAction(item.id, 'accept', 'Đã nhận slot. Booking mới đã được tạo.')}
+                            onClick={() => runAction(item.id, 'accept', 'Slot accepted. A new booking has been created.')}
                           >
-                            Nhận slot
+                            Accept slot
                           </Button>
                         )}
                         {canCancel && (
@@ -201,9 +201,9 @@ export default function WaitlistPage() {
                             variant="ghost"
                             loading={isCancelling}
                             disabled={Boolean(actionKey)}
-                            onClick={() => runAction(item.id, 'cancel', 'Đã hủy waitlist.')}
+                            onClick={() => runAction(item.id, 'cancel', 'Waitlist entry cancelled.')}
                           >
-                            Hủy waitlist
+                            Cancel waitlist
                           </Button>
                         )}
                       </div>
@@ -216,10 +216,10 @@ export default function WaitlistPage() {
 
           <div className="waitlist-actions">
             <Link className="waitlist-primary-link" to="/booking">
-              Đặt lịch mới
+              New Booking
             </Link>
             <Link className="waitlist-link-button" to="/customer/bookings">
-              Xem lịch hẹn
+              View appointments
             </Link>
           </div>
         </section>
@@ -234,62 +234,62 @@ export default function WaitlistPage() {
 
         {!joinedEntry ? (
           <>
-            <h1>Danh sách chờ</h1>
+            <h1>Waitlist</h1>
 
             <p>
-              Slot bạn chọn hiện đã đầy. Xác nhận tham gia danh sách chờ để hệ thống ghi nhận
-              yêu cầu của bạn.
+              The slot you selected is currently full. Confirm to join the waitlist so the
+              system can record your request.
             </p>
 
             <div className="waitlist-summary">
-              <h2>Thông tin slot đã chọn</h2>
+              <h2>Selected slot information</h2>
 
               <InfoRow label="Garage" value={garageName || `Garage #${garageId}`} />
               <InfoRow
-                label="Dịch vụ"
-                value={servicePackageName || `Gói dịch vụ #${servicePackageId}`}
+                label="Service"
+                value={servicePackageName || `Service package #${servicePackageId}`}
               />
-              <InfoRow label="Loại xe" value={getVehicleTypeLabel(vehicleType)} />
-              <InfoRow label="Ngày" value={formatDate(date)} />
-              <InfoRow label="Khung giờ" value={`${formatTime(startTime)} - ${formatTime(endTime)}`} />
+              <InfoRow label="Vehicle type" value={getVehicleTypeLabel(vehicleType)} />
+              <InfoRow label="Date" value={formatDate(date)} />
+              <InfoRow label="Time slot" value={`${formatTime(startTime)} - ${formatTime(endTime)}`} />
             </div>
 
             {error && <p className="waitlist-message waitlist-message-error">{error}</p>}
 
             <div className="waitlist-actions">
               <Button onClick={handleConfirmJoinWaitlist} loading={loading}>
-                Xác nhận tham gia waitlist
+                Confirm join waitlist
               </Button>
 
               <Link className="waitlist-link-button" to={backToBookingUrl}>
-                Quay lại chọn slot
+                Back to slot selection
               </Link>
             </div>
           </>
         ) : (
           <>
-            <h1>Đã tham gia danh sách chờ</h1>
+            <h1>Joined the waitlist</h1>
 
             <p>
-              Hệ thống đã ghi nhận yêu cầu của bạn. Khi slot này có khách hủy hoặc garage mở
-              thêm chỗ, trạng thái sẽ được cập nhật trong waitlist của bạn.
+              Your request has been recorded. When a slot opens up due to a cancellation or the
+              garage adding capacity, the status will be updated in your waitlist.
             </p>
 
             <div className="waitlist-success-box">
-              <strong>Thành công</strong>
+              <strong>Success</strong>
               <p>
-                Bạn đã được thêm vào waitlist cho {formatTime(startTime)} - {formatTime(endTime)} ngày{' '}
+                You've been added to the waitlist for {formatTime(startTime)} - {formatTime(endTime)} on{' '}
                 {formatDate(date)}.
               </p>
             </div>
 
             <div className="waitlist-actions">
               <Link className="waitlist-primary-link" to="/customer/waitlist">
-                Xem waitlist của tôi
+                View my waitlist
               </Link>
 
               <Link className="waitlist-link-button" to={backToBookingUrl}>
-                Quay lại chọn slot
+                Back to slot selection
               </Link>
             </div>
           </>

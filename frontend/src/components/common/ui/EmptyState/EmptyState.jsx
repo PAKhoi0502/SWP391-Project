@@ -1,8 +1,8 @@
 import "../ui.css";
 
 function EmptyState({
-  title = "Chưa có dữ liệu",
-  description = "Dữ liệu sẽ được hiển thị tại đây khi có thông tin.",
+  title = "No data yet",
+  description = "Data will be displayed here once available.",
   icon = "🫧",
 }) {
   return (

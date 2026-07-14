@@ -1,21 +1,21 @@
-// Axios client dùng chung cho toàn bộ ứng dụng.
+// Shared axios client used across the entire application.
 //
-// baseURL để trống ('') => mỗi API tự ghi full path ('/api/v1', '/health',
-// '/auth/login'...). Lý do: backend hiện đặt prefix không đồng nhất giữa các
-// controller, nên không gom được về một base chung. Ở môi trường dev, Vite proxy
-// (xem vite.config.js) sẽ forward '/api', '/health', '/api-docs' về localhost:8080.
+// baseURL is left empty ('') => each API writes its own full path ('/api/v1', '/health',
+// '/auth/login'...). Reason: the backend currently uses inconsistent prefixes across
+// controllers, so they can't be consolidated under one common base. In the dev environment,
+// the Vite proxy (see vite.config.js) forwards '/api', '/health', '/api-docs' to localhost:8080.
 import axios from 'axios'
 import { storage } from '../utils/storage'
 
 const axiosClient = axios.create({
-  // Cho phép cấu hình qua biến môi trường; mặc định '' = đường dẫn tương đối.
+  // Configurable via environment variable; defaults to '' = relative path.
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
   headers: {
     'Content-Type': 'application/json',
   },
 })
 
-// --- Request interceptor: tự đính kèm access token (nếu có) ---
+// --- Request interceptor: automatically attaches the access token (if present) ---
 axiosClient.interceptors.request.use(
   (config) => {
     const token = storage.getToken()
@@ -27,11 +27,11 @@ axiosClient.interceptors.request.use(
   (error) => Promise.reject(error),
 )
 
-// --- Response interceptor: chuẩn hóa dữ liệu trả về và xử lý lỗi tập trung ---
+// --- Response interceptor: normalizes the returned data and handles errors centrally ---
 //
-// Backend bọc kết quả trong ApiResponse { success, message, data }. Interceptor
-// này trả thẳng phần `data` của ApiResponse cho nơi gọi, để component không phải
-// bóc tách nhiều tầng. Nếu response không theo định dạng đó thì trả nguyên body.
+// The backend wraps results in an ApiResponse { success, message, data }. This interceptor
+// returns the ApiResponse's `data` field directly to the caller, so components don't have to
+// unwrap multiple layers. If the response doesn't follow that format, the raw body is returned.
 axiosClient.interceptors.response.use(
   (response) => {
     const body = response.data
@@ -41,17 +41,17 @@ axiosClient.interceptors.response.use(
     return body
   },
   (error) => {
-    // Chuẩn hóa lỗi thành một object thống nhất để UI dễ hiển thị.
+    // Normalize the error into a consistent object so the UI can display it easily.
     const normalized = {
       status: error.response?.status ?? 0,
       message:
         error.response?.data?.message ||
         error.message ||
-        'Đã có lỗi xảy ra, vui lòng thử lại.',
+        'An error occurred, please try again.',
       data: error.response?.data ?? null,
     }
 
-    // 401 => phiên đăng nhập hết hạn/không hợp lệ: dọn sạch thông tin auth.
+    // 401 => login session expired/invalid: clear auth information.
     if (normalized.status === 401) {
       storage.clearAuth()
     }

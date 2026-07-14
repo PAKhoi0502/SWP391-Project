@@ -31,7 +31,7 @@ export default function GarageDetailPage() {
                 setGarage(garageData);
                 setCapabilities(capabilityData.supportedVehicleTypes || []);
             } catch (err) {
-                setError(err.message || "Không thể tải chi tiết garage");
+                setError(err.message || "Could not load garage details");
             } finally {
                 setLoading(false);
             }
@@ -41,7 +41,7 @@ export default function GarageDetailPage() {
     }, [id]);
 
     if (loading) {
-        return <div className="garage-page">Đang tải chi tiết garage...</div>;
+        return <div className="garage-page">Loading garage details...</div>;
     }
 
     if (error) {
@@ -49,13 +49,13 @@ export default function GarageDetailPage() {
     }
 
     if (!garage) {
-        return <div className="garage-page">Không tìm thấy garage.</div>;
+        return <div className="garage-page">Garage not found.</div>;
     }
 
     return (
         <div className="garage-page">
             <Link to={backPath} className="garage-back">
-                ← Quay lại danh sách garage
+                ← Back to garage list
             </Link>
 
             <div className="garage-detail-card">
@@ -63,29 +63,29 @@ export default function GarageDetailPage() {
                 <h1>{garage.name}</h1>
 
                 <div className="garage-detail-info">
-                    <p><strong>Mã garage:</strong> {garage.garageCode}</p>
-                    <p><strong>Địa chỉ:</strong> {garage.address}, {garage.city}</p>
-                    <p><strong>Số điện thoại:</strong> {garage.phone}</p>
-                    <p><strong>Giờ hoạt động:</strong> {garage.openingTime} - {garage.closingTime}</p>
-                    <p><strong>Khoảng cách slot:</strong> {garage.slotIntervalMinutes} phút</p>
+                    <p><strong>Garage code:</strong> {garage.garageCode}</p>
+                    <p><strong>Address:</strong> {garage.address}, {garage.city}</p>
+                    <p><strong>Phone number:</strong> {garage.phone}</p>
+                    <p><strong>Opening hours:</strong> {garage.openingTime} - {garage.closingTime}</p>
+                    <p><strong>Slot interval:</strong> {garage.slotIntervalMinutes} min</p>
                     <p>
-                        <strong>Trạng thái:</strong>{" "}
-                        {garage.isActive ? "Đang hoạt động" : "Tạm ngưng"}
+                        <strong>Status:</strong>{" "}
+                        {garage.isActive ? "Active" : "Suspended"}
                     </p>
                 </div>
             </div>
 
             <div className="garage-section">
-                <h2>Khả năng phục vụ</h2>
+                <h2>Service Capabilities</h2>
 
                 {capabilities.length === 0 ? (
-                    <p className="garage-muted">Garage này chưa có wash bay hoặc chưa có loại xe hỗ trợ.</p>
+                    <p className="garage-muted">This garage has no wash bays or supported vehicle types yet.</p>
                 ) : (
                     <div className="capability-grid">
                         {capabilities.map((type) => (
                             <div className="capability-card" key={type}>
                                 <h3>{type}</h3>
-                                <p>Garage này hỗ trợ phục vụ loại phương tiện này.</p>
+                                <p>This garage supports servicing this vehicle type.</p>
                             </div>
                         ))}
                     </div>

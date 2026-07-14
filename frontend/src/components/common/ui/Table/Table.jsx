@@ -3,7 +3,7 @@ import "../ui.css";
 function Table({
   columns = [],
   data = [],
-  emptyText = "Không có dữ liệu",
+  emptyText = "No data available",
 }) {
   return (
     <div className="ui-table-wrap">

@@ -14,7 +14,7 @@ const api = axios.create({
   },
 });
 
-// Gắn access token vào mọi request
+// Attach the access token to every request
 api.interceptors.request.use(
   (config) => {
     const accessToken =
@@ -30,7 +30,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Tự refresh token nếu token hết hạn
+// Automatically refresh the token if it has expired
 api.interceptors.response.use(
   (response) => response,
   async (error) => {

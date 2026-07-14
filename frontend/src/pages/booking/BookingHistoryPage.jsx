@@ -201,14 +201,14 @@ const getPaymentMethodText = (booking) => {
   const note = normalizeText(booking?.note)
 
   if (method === 'BANK_TRANSFER' || method === 'PAYOS' || note.includes('chuyen khoan')) {
-    return 'Chuyển khoản'
+    return 'Bank Transfer'
   }
 
   if (method === 'CASH' || note.includes('tien mat')) {
-    return 'Tiền mặt'
+    return 'Cash'
   }
 
-  return 'Chưa cập nhật'
+  return 'Not updated'
 }
 
 let pkgStepsCache = {}
@@ -283,12 +283,12 @@ const getHistoryTimelineItems = (booking, serviceSteps = [], inspections = []) =
     : []
 
   return [
-    { label: 'Đặt lịch', active: true, time: booking?.startTime },
+    { label: 'Booked', active: true, time: booking?.startTime },
     { label: 'Check-in', active: checkinActive, time: checkedInAt },
-    { label: 'Kiểm tra', active: inspectionActive, time: beforeWashInspection?.createdAt },
+    { label: 'Inspection', active: inspectionActive, time: beforeWashInspection?.createdAt },
     ...stepItems,
-    { label: 'Bàn giao', active: status === 'COMPLETED', time: booking?.completedAt },
-    { label: 'Thanh toán', active: paymentStatus === 'PAID', time: booking?.paidAt },
+    { label: 'Completed', active: status === 'COMPLETED', time: booking?.completedAt },
+    { label: 'Paid', active: paymentStatus === 'PAID', time: booking?.paidAt },
   ]
 }
 
@@ -811,7 +811,7 @@ export default function BookingHistoryPage() {
                   </div>
 
                   <div className="booking-history-mini-timeline-card">
-                    <span>Tiến trình</span>
+                    <span>Progress</span>
                     <div className="booking-history-mini-timeline">
                       {getHistoryTimelineItems(
                         booking,
@@ -825,7 +825,7 @@ export default function BookingHistoryPage() {
                             item.active ? 'active' : '',
                             item.danger ? 'danger' : '',
                           ].join(' ')}
-                          title={`${item.label}: ${item.time ? formatDateTime(item.time) : 'Chưa cập nhật'}`}
+                          title={`${item.label}: ${item.time ? formatDateTime(item.time) : 'Not updated'}`}
                         >
                           <i>{index + 1}</i>
                           <small>{item.label}</small>

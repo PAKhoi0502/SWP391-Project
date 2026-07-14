@@ -34,7 +34,7 @@ function getTomorrow() {
 function formatTime(dateTime) {
   if (!dateTime) return "";
 
-  return new Date(dateTime).toLocaleTimeString("vi-VN", {
+  return new Date(dateTime).toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -111,14 +111,14 @@ function getVehicleTypeLabel(type) {
   const value = normalizeVehicleType(type);
 
   if (value === "CAR") {
-    return "Ô tô";
+    return "Car";
   }
 
   if (value === "MOTORBIKE") {
-    return "Xe máy";
+    return "Motorbike";
   }
 
-  return type || "Loại xe";
+  return type || "Vehicle type";
 }
 
 function buildVehicleTypeOptions(packages) {
@@ -147,8 +147,8 @@ function buildVehicleTypeOptions(packages) {
   }
 
   return [
-    { value: "CAR", label: "Ô tô" },
-    { value: "MOTORBIKE", label: "Xe máy" },
+    { value: "CAR", label: "Car" },
+    { value: "MOTORBIKE", label: "Motorbike" },
   ];
 }
 
@@ -280,7 +280,7 @@ export default function AvailableSlotsPickerPage() {
           }
         }
       } catch (err) {
-        setInitialError(err?.message || "Không thể tải garage hoặc gói dịch vụ.");
+        setInitialError(err?.message || "Failed to load garages or service packages.");
       } finally {
         setInitialLoading(false);
       }
@@ -334,7 +334,7 @@ export default function AvailableSlotsPickerPage() {
         setError(
           err?.response?.data?.message ||
             err?.message ||
-            "Không thể tải khung giờ khả dụng."
+            "Failed to load available time slots."
         );
       }
     } finally {
@@ -396,28 +396,28 @@ export default function AvailableSlotsPickerPage() {
     localStorage.setItem("bookingSlotDraft", JSON.stringify(bookingDraft));
     console.log("BOOKING DRAFT:", bookingDraft);
 
-    alert("Đã lưu slot đã chọn. Phần tạo booking sẽ làm ở bước tiếp theo.");
+    alert("Selected slot saved. Booking creation happens in the next step.");
   };
 
   return (
     <div className="available-slots-page">
       <section className="slots-hero">
         <p className="slots-eyebrow">Booking</p>
-        <h1>Chọn khung giờ còn trống</h1>
+        <h1>Select an Available Time Slot</h1>
         <p>
-          Chọn garage, gói dịch vụ, loại xe và ngày để hệ thống tải danh sách
-          slot khả dụng.
+          Choose a garage, service package, vehicle type, and date to load
+          the list of available slots.
         </p>
       </section>
 
       <section className="slots-card">
         {initialLoading && (
-          <LoadingSpinner text="Đang tải garage và gói dịch vụ..." />
+          <LoadingSpinner text="Loading garages and service packages..." />
         )}
 
         {initialError && (
           <ErrorState
-            title="Không thể tải dữ liệu ban đầu"
+            title="Failed to load initial data"
             description={initialError}
           />
         )}
@@ -429,20 +429,20 @@ export default function AvailableSlotsPickerPage() {
                 label="Garage"
                 value={garageId}
                 options={garageOptions}
-                placeholder="Chọn garage"
+                placeholder="Select a garage"
                 onChange={(e) => setGarageId(e.target.value)}
               />
 
               <Select
-                label="Gói dịch vụ"
+                label="Service package"
                 value={servicePackageId}
                 options={servicePackageOptions}
-                placeholder="Chọn gói dịch vụ"
+                placeholder="Select a service package"
                 onChange={(e) => setServicePackageId(e.target.value)}
               />
 
               <Input
-                label="Ngày"
+                label="Date"
                 type="date"
                 value={date}
                 min={getToday()}
@@ -451,7 +451,7 @@ export default function AvailableSlotsPickerPage() {
             </div>
 
             <div className="vehicle-filter">
-              <label>Loại xe</label>
+              <label>Vehicle type</label>
               <FilterBar
                 options={vehicleTypeOptions}
                 value={vehicleType}
@@ -462,30 +462,30 @@ export default function AvailableSlotsPickerPage() {
             <div className="slots-panel">
               <div className="slots-panel-header">
                 <div>
-                  <h2>Khung giờ khả dụng</h2>
-                  <p>Slot sáng màu là còn trống, slot mờ là đã đầy hoặc không khả dụng.</p>
+                  <h2>Available Time Slots</h2>
+                  <p>Bright slots are available; dimmed slots are full or unavailable.</p>
                 </div>
 
                 {slots.length > 0 && (
-                  <span className="slots-count">Còn {availableCount} slot</span>
+                  <span className="slots-count">{availableCount} slot(s) available</span>
                 )}
               </div>
 
               {!canLoadSlots && (
                 <EmptyState
                   icon="🫧"
-                  title="Chưa đủ thông tin"
-                  description="Vui lòng chọn garage, gói dịch vụ, loại xe và ngày."
+                  title="Missing information"
+                  description="Please select a garage, service package, vehicle type, and date."
                 />
               )}
 
               {canLoadSlots && loading && (
-                <LoadingSpinner text="Đang tải khung giờ khả dụng..." />
+                <LoadingSpinner text="Loading available time slots..." />
               )}
 
               {canLoadSlots && !loading && error && (
                 <ErrorState
-                  title="Không thể tải slot"
+                  title="Failed to load slots"
                   description={error}
                   onRetry={fetchAvailableSlots}
                 />
@@ -494,12 +494,12 @@ export default function AvailableSlotsPickerPage() {
               {canLoadSlots && !loading && !error && slots.length === 0 && (
                 <div className="waitlist-box">
                   <div>
-                    <strong>Không có slot khả dụng</strong>
-                    <p>Bạn có thể chọn ngày khác hoặc tham gia danh sách chờ.</p>
+                    <strong>No available slots</strong>
+                    <p>You can choose a different date or join the waitlist.</p>
                   </div>
 
                   <Button variant="secondary" onClick={() => handleJoinWaitlist(null)}>
-                    Tham gia waitlist
+                    Join waitlist
                   </Button>
                 </div>
               )}
@@ -531,7 +531,7 @@ export default function AvailableSlotsPickerPage() {
                             {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
                           </strong>
                           <span>
-                            {slot.available ? "Còn trống" : "Đã đầy - Join waitlist"}
+                            {slot.available ? "Available" : "Full - Join waitlist"}
                           </span>
                         </button>
                       );
@@ -541,12 +541,12 @@ export default function AvailableSlotsPickerPage() {
                   {availableCount === 0 && (
                     <div className="waitlist-box">
                       <div>
-                        <strong>Tất cả slot trong ngày này đã đầy</strong>
-                        <p>Bạn có thể tham gia danh sách chờ để được thông báo.</p>
+                        <strong>All slots for this day are full</strong>
+                        <p>You can join the waitlist to be notified.</p>
                       </div>
 
                       <Button variant="secondary" onClick={() => handleJoinWaitlist(slots[0] || null)}>
-                        Tham gia waitlist
+                        Join waitlist
                       </Button>
                     </div>
                   )}
@@ -554,13 +554,13 @@ export default function AvailableSlotsPickerPage() {
                   {selectedSlot && (
                     <div className="selected-slot-box">
                       <div>
-                        <span>Đã chọn slot</span>
+                        <span>Selected slot</span>
                         <strong>
                           {formatTime(selectedSlot.startTime)} - {formatTime(selectedSlot.endTime)}
                         </strong>
                       </div>
 
-                      <Button onClick={handleContinue}>Tiếp tục đặt lịch</Button>
+                      <Button onClick={handleContinue}>Continue booking</Button>
                     </div>
                   )}
                 </>

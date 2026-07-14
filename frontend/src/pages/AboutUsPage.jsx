@@ -23,7 +23,7 @@ function CountUp({ num, suffix = '', decimals = 0 }) {
   const ref = useRef(null)
   const ran = useRef(false)
   const fmt = (n) =>
-    decimals > 0 ? n.toFixed(decimals) + suffix : Math.round(n).toLocaleString('vi-VN') + suffix
+    decimals > 0 ? n.toFixed(decimals) + suffix : Math.round(n).toLocaleString('en-US') + suffix
 
   useEffect(() => {
     const el = ref.current
@@ -222,7 +222,7 @@ export default function AboutUsPage() {
         </div>
       </section>
 
-      {/* ══ SPLIT — Cách chúng tôi nghĩ ══ */}
+      {/* ══ SPLIT — How we think ══ */}
       <section className="au-split">
         <div className="au-section-inner">
           <div className="au-split-grid">

@@ -40,7 +40,7 @@ export default function AdminAuditLogPage() {
       .catch((err) => {
         if (ignore) return
         setLogs([])
-        setError(getErrorMessage(err, 'Không thể tải nhật ký hệ thống.'))
+        setError(getErrorMessage(err, 'Unable to load system audit logs.'))
       })
       .finally(() => {
         if (!ignore) setLoading(false)
@@ -68,7 +68,7 @@ export default function AdminAuditLogPage() {
     try {
       setSelectedLog(await auditLogApi.getById(log.id))
     } catch (err) {
-      setDetailError(getErrorMessage(err, 'Không thể tải chi tiết nhật ký.'))
+      setDetailError(getErrorMessage(err, 'Unable to load log details.'))
     } finally {
       setDetailLoading(false)
     }
@@ -77,8 +77,8 @@ export default function AdminAuditLogPage() {
   return (
     <div className="aal-page">
       <section className="aal-hero">
-        <h1>Nhật ký hệ thống</h1>
-        <p>Theo dõi hành động của người dùng trên hệ thống, lọc theo actor và hành động.</p>
+        <h1>System Audit Log</h1>
+        <p>Track user actions across the system, filterable by actor and action.</p>
       </section>
 
       <section className="aal-panel">
@@ -89,18 +89,18 @@ export default function AdminAuditLogPage() {
               className="aal-input"
               value={filters.actorId}
               onChange={(e) => setFilters((prev) => ({ ...prev, actorId: e.target.value }))}
-              placeholder="Nhập Actor ID"
+              placeholder="Enter Actor ID"
             />
           </div>
 
           <div className="aal-field">
-            <span className="aal-label">Hành động</span>
+            <span className="aal-label">Action</span>
             <select
               className="aal-select"
               value={filters.action}
               onChange={(e) => setFilters((prev) => ({ ...prev, action: e.target.value }))}
             >
-              <option value="">Tất cả hành động</option>
+              <option value="">All actions</option>
               {AUDIT_ACTIONS.map((action) => (
                 <option key={action} value={action}>{formatEnumLabel(action)}</option>
               ))}
@@ -108,13 +108,13 @@ export default function AdminAuditLogPage() {
           </div>
 
           <div className="aal-field">
-            <span className="aal-label">Đối tượng</span>
+            <span className="aal-label">Target</span>
             <select
               className="aal-select"
               value={filters.targetType}
               onChange={(e) => setFilters((prev) => ({ ...prev, targetType: e.target.value }))}
             >
-              <option value="">Tất cả đối tượng</option>
+              <option value="">All targets</option>
               {AUDIT_TARGET_TYPES.map((type) => (
                 <option key={type} value={type}>{formatEnumLabel(type)}</option>
               ))}
@@ -122,7 +122,7 @@ export default function AdminAuditLogPage() {
           </div>
 
           <div className="aal-field">
-            <span className="aal-label">Từ ngày</span>
+            <span className="aal-label">From date</span>
             <input
               className="aal-input"
               type="date"
@@ -132,7 +132,7 @@ export default function AdminAuditLogPage() {
           </div>
 
           <div className="aal-field">
-            <span className="aal-label">Đến ngày</span>
+            <span className="aal-label">To date</span>
             <input
               className="aal-input"
               type="date"
@@ -143,27 +143,27 @@ export default function AdminAuditLogPage() {
         </div>
 
         <div className="aal-actions">
-          <button type="button" className="aal-btn aal-btn--primary" onClick={handleApplyFilters}>Áp dụng</button>
-          <button type="button" className="aal-btn aal-btn--ghost" onClick={handleClearFilters}>Xóa lọc</button>
+          <button type="button" className="aal-btn aal-btn--primary" onClick={handleApplyFilters}>Apply</button>
+          <button type="button" className="aal-btn aal-btn--ghost" onClick={handleClearFilters}>Clear filters</button>
         </div>
 
         {error && <div className="aal-error">{error}</div>}
 
         {loading ? (
-          <div className="aal-state">Đang tải nhật ký hệ thống...</div>
+          <div className="aal-state">Loading system audit logs...</div>
         ) : logs.length === 0 ? (
-          <div className="aal-state">Không tìm thấy nhật ký phù hợp</div>
+          <div className="aal-state">No matching logs found</div>
         ) : (
           <>
             <div className="aal-table-wrap">
               <table className="aal-table">
                 <thead>
                   <tr>
-                    <th>Thời gian</th>
+                    <th>Time</th>
                     <th>Actor</th>
-                    <th>Hành động</th>
-                    <th>Đối tượng</th>
-                    <th>Thao tác</th>
+                    <th>Action</th>
+                    <th>Target</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -173,7 +173,7 @@ export default function AdminAuditLogPage() {
                       <tr key={log.id}>
                         <td>{formatDateTime(log.createdAt)}</td>
                         <td>
-                          <span className="aal-actor-name">{user?.fullName || user?.email || 'Không xác định'}</span>
+                          <span className="aal-actor-name">{user?.fullName || user?.email || 'Unknown'}</span>
                           <span className="aal-actor-id">#{log.actorId}</span>
                         </td>
                         <td>{formatEnumLabel(log.action)}</td>
@@ -182,7 +182,7 @@ export default function AdminAuditLogPage() {
                         </td>
                         <td>
                           <button type="button" className="aal-btn aal-btn--ghost aal-btn--sm" onClick={() => handleViewDetail(log)}>
-                            Chi tiết
+                            Details
                           </button>
                         </td>
                       </tr>
@@ -200,16 +200,16 @@ export default function AdminAuditLogPage() {
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
                 >
-                  ← Trước
+                  ← Previous
                 </button>
-                <span className="aal-page-info">Trang {page} / {totalPages}</span>
+                <span className="aal-page-info">Page {page} / {totalPages}</span>
                 <button
                   type="button"
                   className="aal-page-btn"
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
                 >
-                  Sau →
+                  Next →
                 </button>
               </div>
             )}
@@ -236,22 +236,22 @@ function AuditLogDetailDialog({ log, loading, error, usersById, onClose }) {
     <div className="aal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="aal-dialog" role="dialog" aria-modal="true">
         <div className="aal-dialog-header">
-          <h3>Chi tiết nhật ký</h3>
-          <button type="button" className="aal-dialog-close" onClick={onClose} aria-label="Đóng">✕</button>
+          <h3>Log details</h3>
+          <button type="button" className="aal-dialog-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
         {loading ? (
-          <div className="aal-state">Đang tải chi tiết...</div>
+          <div className="aal-state">Loading details...</div>
         ) : error ? (
           <div className="aal-error">{error}</div>
         ) : (
           <div>
             <div className="aal-detail-row"><span>ID</span><strong>{log.id}</strong></div>
-            <div className="aal-detail-row"><span>Thời gian</span><strong>{formatDateTime(log.createdAt)}</strong></div>
-            <div className="aal-detail-row"><span>Actor</span><strong>{user?.fullName || user?.email || 'Không xác định'} (#{log.actorId})</strong></div>
-            <div className="aal-detail-row"><span>Hành động</span><strong>{formatEnumLabel(log.action)}</strong></div>
-            <div className="aal-detail-row"><span>Loại đối tượng</span><strong>{formatEnumLabel(log.targetType)}</strong></div>
-            <div className="aal-detail-row"><span>ID đối tượng</span><strong>{log.targetId}</strong></div>
+            <div className="aal-detail-row"><span>Time</span><strong>{formatDateTime(log.createdAt)}</strong></div>
+            <div className="aal-detail-row"><span>Actor</span><strong>{user?.fullName || user?.email || 'Unknown'} (#{log.actorId})</strong></div>
+            <div className="aal-detail-row"><span>Action</span><strong>{formatEnumLabel(log.action)}</strong></div>
+            <div className="aal-detail-row"><span>Target type</span><strong>{formatEnumLabel(log.targetType)}</strong></div>
+            <div className="aal-detail-row"><span>Target ID</span><strong>{log.targetId}</strong></div>
 
             <span className="aal-metadata-label">Metadata</span>
             <pre className="aal-metadata">{JSON.stringify(log.metadata || {}, null, 2)}</pre>
@@ -264,7 +264,7 @@ function AuditLogDetailDialog({ log, loading, error, usersById, onClose }) {
 
 function formatDateTime(value) {
   if (!value) return '-'
-  return new Date(value).toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' })
+  return new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 function formatEnumLabel(value) {

@@ -1,9 +1,10 @@
-// Lớp bọc (wrapper) quanh localStorage.
-// Gom toàn bộ thao tác đọc/ghi storage về một chỗ, dùng STORAGE_KEYS để tránh gõ
-// sai key, tự xử lý JSON.parse/stringify và bọc try/catch cho an toàn.
+// Wrapper around localStorage.
+// Centralizes all storage read/write operations, uses STORAGE_KEYS to avoid
+// mistyped keys, handles JSON.parse/stringify automatically, and wraps everything
+// in try/catch for safety.
 import { STORAGE_KEYS } from '../constants/storageKeys'
 
-// Đọc giá trị thô (chuỗi) theo key. Trả về null nếu không có hoặc lỗi.
+// Reads a raw (string) value by key. Returns null if missing or on error.
 function getRaw(key) {
   try {
     return localStorage.getItem(key)
@@ -12,21 +13,21 @@ function getRaw(key) {
   }
 }
 
-// Ghi giá trị thô (chuỗi) theo key.
+// Writes a raw (string) value by key.
 function setRaw(key, value) {
   try {
     localStorage.setItem(key, value)
   } catch {
-    // Bỏ qua: localStorage có thể không khả dụng (ẩn danh, đầy bộ nhớ...)
+    // Ignore: localStorage may be unavailable (private mode, storage full...)
   }
 }
 
-// Xóa một key.
+// Removes a key.
 function remove(key) {
   try {
     localStorage.removeItem(key)
   } catch {
-    // Bỏ qua
+    // Ignore
   }
 }
 
@@ -44,7 +45,7 @@ function removeToken() {
   remove('token')
 }
 
-// --- User (lưu dưới dạng JSON) ---
+// --- User (stored as JSON) ---
 function getUser() {
   const raw = getRaw(STORAGE_KEYS.USER)
   if (!raw) return null
@@ -63,7 +64,7 @@ function removeUser() {
   remove(STORAGE_KEYS.USER)
 }
 
-// Xóa sạch thông tin phiên đăng nhập (dùng khi logout hoặc token hết hạn).
+// Clears all login session data (used on logout or when the token expires).
 function clearAuth() {
   removeToken()
   removeUser()

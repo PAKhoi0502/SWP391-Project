@@ -162,8 +162,8 @@ export default function ProfilePage() {
 
   const isCustomer = String(profile?.role || user?.role || '').toUpperCase().replace('ROLE_', '') === 'CUSTOMER'
   const isActive   = profile?.isActive !== false
-  const currentTier = loyalty?.currentTier || null
-  const sub         = profile?.email || profile?.phone || ''
+  const tierKey    = loyalty?.currentTier ? String(loyalty.currentTier).toUpperCase() : null
+  const sub        = profile?.email || profile?.phone || ''
 
   const openDetail   = () => { setDetailAutoOpenPw(false); setDetailOpen(true) }
   const openPassword = () => { setDetailAutoOpenPw(true);  setDetailOpen(true) }
@@ -227,10 +227,10 @@ export default function ProfilePage() {
                 <h1 className="ps-user-name">
                   {profile?.fullName || profile?.email || 'User'}
                 </h1>
-                {currentTier && (
-                  <span className="ps-tier-chip" style={{ '--tier-color': getTierColor(currentTier) }}>
-                    <TierGemIcon tier={currentTier} size={14} />
-                    {getTierLabel(currentTier)}
+                {tierKey && (
+                  <span className="ps-tier-chip" style={{ '--tier-color': getTierColor(tierKey) }}>
+                    <TierGemIcon tier={tierKey} size={14} />
+                    {getTierLabel(tierKey)}
                   </span>
                 )}
               </div>
@@ -247,7 +247,7 @@ export default function ProfilePage() {
           {/* Divider between user header and settings */}
           <div className="ps-main-card-divider" />
 
-          {/* Section: Tài khoản */}
+          {/* Section: Account */}
           <p className="ps-section-label">Account</p>
 
           <button type="button" className="ps-row" onClick={openDetail}>

@@ -19,17 +19,17 @@ export default function ProfileHeader({ profile, onViewDetails }) {
 
       <div className="ps-header-info">
         <h1 className="ps-header-name">
-          {profile?.fullName || profile?.email || 'Người dùng'}
+          {profile?.fullName || profile?.email || 'User'}
         </h1>
         {sub && <p className="ps-header-sub">{sub}</p>}
       </div>
 
       <div className="ps-header-actions">
         <span className={isActive ? 'ps-badge-active' : 'ps-badge-inactive'}>
-          {isActive ? 'Đang hoạt động' : 'Không hoạt động'}
+          {isActive ? 'Active' : 'Inactive'}
         </span>
         <button type="button" className="ps-detail-btn" onClick={onViewDetails}>
-          Xem thông tin chi tiết
+          View Details
         </button>
       </div>
     </div>
