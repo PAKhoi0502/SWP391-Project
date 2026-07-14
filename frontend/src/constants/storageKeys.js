@@ -1,5 +1,5 @@
-// Tên các key dùng để lưu trong localStorage.
-// Cả nhóm dùng chung file này để đảm bảo đọc/ghi đúng chỗ.
+// Names of the keys used for storing data in localStorage.
+// The whole team shares this file to ensure reads/writes go to the right place.
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'accessToken',
   USER: 'user',

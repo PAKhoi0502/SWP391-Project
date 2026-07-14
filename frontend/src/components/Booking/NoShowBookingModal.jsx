@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import './NoShowBookingModal.css'
 
 const formatDateTime = (value) => {
-  if (!value) return 'Chưa cập nhật'
+  if (!value) return 'Not updated'
   try {
     return new Intl.DateTimeFormat('en-US', {
       hour: '2-digit',

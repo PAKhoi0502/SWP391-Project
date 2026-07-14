@@ -42,11 +42,11 @@ function ImageUpload({
     setError('')
 
     if (!acceptedTypes.includes(file.type)) {
-      setError('Định dạng ảnh không được hỗ trợ.')
+      setError('This image format is not supported.')
       return
     }
     if (file.size > maxSizeMB * 1024 * 1024) {
-      setError(`Ảnh không được vượt quá ${maxSizeMB} MB.`)
+      setError(`Image must not exceed ${maxSizeMB} MB.`)
       return
     }
 
@@ -72,7 +72,7 @@ function ImageUpload({
       onUploaded?.(uploaded)
       handleCancelPreview()
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Không tải được ảnh lên.')
+      setError(err?.response?.data?.message || err?.message || 'Failed to upload image.')
     } finally {
       setUploading(false)
     }
@@ -86,7 +86,7 @@ function ImageUpload({
       await uploadService.deleteImage(publicId)
       onDeleted?.(publicId)
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Không xóa được ảnh.')
+      setError(err?.response?.data?.message || err?.message || 'Failed to delete image.')
     } finally {
       setDeletingPublicId('')
     }
@@ -110,7 +110,7 @@ function ImageUpload({
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                   <circle cx="12" cy="13" r="4"/>
                 </svg>
-                <span>{currentImage ? 'Đổi ảnh' : 'Thêm ảnh'}</span>
+                <span>{currentImage ? 'Change photo' : 'Add photo'}</span>
               </div>
             )}
           </div>
@@ -131,7 +131,7 @@ function ImageUpload({
             className="image-upload-avatar-delete"
             disabled={deletingPublicId === currentImage.publicId}
             onClick={() => handleDelete(currentImage.publicId)}
-            aria-label="Xóa ảnh"
+            aria-label="Delete image"
           >
             {deletingPublicId === currentImage.publicId ? '…' : '✕'}
           </button>
@@ -173,7 +173,7 @@ function ImageUpload({
                 className="image-upload-remove"
                 disabled={deletingPublicId === image.publicId}
                 onClick={() => handleDelete(image.publicId)}
-                aria-label="Xóa ảnh"
+                aria-label="Delete image"
               >
                 {deletingPublicId === image.publicId ? '...' : '✕'}
               </button>
@@ -183,7 +183,7 @@ function ImageUpload({
 
         {canAddMore && (
           <label className="image-upload-add">
-            <span>+ Thêm ảnh</span>
+            <span>+ Add photo</span>
             <input
               ref={inputRef}
               type="file"
@@ -198,20 +198,20 @@ function ImageUpload({
 
       <Modal
         open={Boolean(pendingFile)}
-        title="Xem trước ảnh"
+        title="Image preview"
         onClose={uploading ? undefined : handleCancelPreview}
         footer={
           <>
             <Button variant="ghost" disabled={uploading} onClick={handleCancelPreview}>
-              Hủy
+              Cancel
             </Button>
             <Button variant="primary" loading={uploading} onClick={handleConfirmUpload}>
-              Tải lên
+              Upload
             </Button>
           </>
         }
       >
-        {previewUrl && <img src={previewUrl} alt="Xem trước" className="image-upload-preview-img" />}
+        {previewUrl && <img src={previewUrl} alt="Preview" className="image-upload-preview-img" />}
       </Modal>
     </div>
   )

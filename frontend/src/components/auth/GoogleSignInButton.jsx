@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 
-const SCRIPT_SRC = 'https://accounts.google.com/gsi/client'
+const SCRIPT_SRC = 'https://accounts.google.com/gsi/client?hl=en'
 let scriptLoadPromise = null
+let initialized = false
+let activeCredentialHandler = null
 
 function loadGoogleScript() {
   if (window.google?.accounts?.id) return Promise.resolve()
@@ -21,10 +23,28 @@ function loadGoogleScript() {
   return scriptLoadPromise
 }
 
-export default function GoogleSignInButton({ onCredential, disabled = false, text = 'continue_with' }) {
+// google.accounts.id.initialize() is a single global registration — calling it
+// more than once makes Google warn that only the last call "wins". Since every
+// rendered button (login panel + register panel) shares the same page, we
+// initialize exactly once and route credentials to whichever button is
+// currently the active/visible one.
+function ensureInitialized(clientId) {
+  if (initialized) return
+  initialized = true
+  window.google.accounts.id.initialize({
+    client_id: clientId,
+    callback: (response) => activeCredentialHandler?.(response.credential),
+  })
+}
+
+export default function GoogleSignInButton({ onCredential, active = true, disabled = false, text = 'continue_with' }) {
   const buttonRef = useRef(null)
   const [error, setError] = useState('')
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+
+  useEffect(() => {
+    if (active) activeCredentialHandler = onCredential
+  }, [active, onCredential])
 
   useEffect(() => {
     if (!clientId) {
@@ -39,10 +59,7 @@ export default function GoogleSignInButton({ onCredential, disabled = false, tex
       .then(() => {
         if (cancelled || !buttonRef.current) return
 
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: (response) => onCredential(response.credential),
-        })
+        ensureInitialized(clientId)
 
         window.google.accounts.id.renderButton(buttonRef.current, {
           type: 'standard',
@@ -57,7 +74,7 @@ export default function GoogleSignInButton({ onCredential, disabled = false, tex
       })
 
     return () => { cancelled = true }
-  }, [clientId, disabled, onCredential, text])
+  }, [clientId, disabled, text])
 
   if (error) return <p className="aas-field-err" style={{ textAlign: 'center' }}>{error}</p>
 

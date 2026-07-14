@@ -11,7 +11,7 @@ const toastIcon = {
 function Toast({
   open,
   type = "success",
-  title = "Thông báo",
+  title = "Notification",
   message,
   duration = 3000,
   onClose,

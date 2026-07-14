@@ -31,7 +31,7 @@ export default function StaffProfilePage() {
         setGarage((garages.data || []).find((item) => item.id === staff.garageId) || null)
       })
       .catch((err) => {
-        if (!ignore) setError(getError(err, 'Không thể tải hồ sơ nhân viên.'))
+        if (!ignore) setError(getError(err, 'Could not load staff profile.'))
       })
       .finally(() => {
         if (!ignore) setLoading(false)
@@ -51,9 +51,9 @@ export default function StaffProfilePage() {
     setMessage('')
     try {
       await refreshAccount()
-      setMessage('Cập nhật ảnh đại diện thành công.')
+      setMessage('Avatar updated successfully.')
     } catch (err) {
-      setError(getError(err, 'Không thể tải lại hồ sơ.'))
+      setError(getError(err, 'Could not reload profile.'))
     }
   }
 
@@ -62,13 +62,13 @@ export default function StaffProfilePage() {
     setMessage('')
     try {
       await refreshAccount()
-      setMessage('Đã xóa ảnh đại diện.')
+      setMessage('Avatar deleted.')
     } catch (err) {
-      setError(getError(err, 'Không thể tải lại hồ sơ.'))
+      setError(getError(err, 'Could not reload profile.'))
     }
   }
 
-  if (loading) return <div style={cardStyle}>Đang tải hồ sơ nhân viên...</div>
+  if (loading) return <div style={cardStyle}>Loading staff profile...</div>
   if (!profile) return <div style={{ ...cardStyle, color: '#dc2626' }}>{error}</div>
 
   const isActive = profile.isActive !== false
@@ -76,32 +76,28 @@ export default function StaffProfilePage() {
   return (
     <div style={cardStyle}>
       <div style={profileHeadStyle}>
-        {!account?.avatarUrl && <div style={avatarStyle}>{getInitial(account)}</div>}
-        <div>
-          <h1 style={pageTitleStyle}>Hồ sơ của tôi</h1>
-          <div style={avatarActionsStyle}>
-            <ImageUpload
-              className="image-upload--round image-upload--sm image-upload--pill"
-              folder="avatars"
-              images={account?.avatarUrl ? [{ publicId: account.avatarPublicId, imageUrl: account.avatarUrl }] : []}
-              onUploaded={handleAvatarUploaded}
-              onDeleted={handleAvatarDeleted}
-              multiple={false}
-            />
-          </div>
-        </div>
+        <ImageUpload
+          avatarMode
+          avatarFallback={<div style={avatarStyle}>{getInitial(account)}</div>}
+          folder="avatars"
+          images={account?.avatarUrl ? [{ publicId: account.avatarPublicId, imageUrl: account.avatarUrl }] : []}
+          onUploaded={handleAvatarUploaded}
+          onDeleted={handleAvatarDeleted}
+          multiple={false}
+        />
+        <h1 style={pageTitleStyle}>My Profile</h1>
       </div>
 
       {error && <p style={errorStyle}>{error}</p>}
       {message && <p style={messageStyle}>{message}</p>}
 
       <div style={gridStyle}>
-        <Row label="Tên nhân viên" value={profile.userFullName || `User #${profile.userId}`} />
-        <Row label="Mã nhân viên" value={profile.staffCode} />
+        <Row label="Staff Name" value={profile.userFullName || `User #${profile.userId}`} />
+        <Row label="Staff Code" value={profile.staffCode} />
         <Row label="Garage" value={garage?.name || `Garage #${profile.garageId}`} />
-        <Row label="Loại staff" value={formatStaffType(profile.staffType)} />
+        <Row label="Staff Type" value={formatStaffType(profile.staffType)} />
         <Row
-          label="Trạng thái"
+          label="Status"
           value={
             <span style={isActive ? statusBadgeActiveStyle : statusBadgeInactiveStyle}>
               {isActive ? 'Active' : 'Inactive'}
@@ -134,8 +130,7 @@ const cardStyle = { background: '#ffffff', border: '1px solid #e2e8f0', borderRa
 const gridStyle = { display: 'grid', gap: 14, maxWidth: 720 }
 const rowStyle = { alignItems: 'center', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', gap: 16, paddingBottom: 12 }
 const profileHeadStyle = { alignItems: 'center', display: 'flex', gap: 16, marginBottom: 24 }
-const avatarStyle = { alignItems: 'center', background: '#2563eb', borderRadius: '50%', color: '#fff', display: 'flex', flex: '0 0 72px', fontSize: 28, fontWeight: 800, height: 72, justifyContent: 'center', overflow: 'hidden', width: 72 }
-const avatarActionsStyle = { display: 'flex', gap: 8, marginTop: 10 }
+const avatarStyle = { alignItems: 'center', background: '#2563eb', borderRadius: '50%', color: '#fff', display: 'flex', flex: '0 0 52px', fontSize: 21, fontWeight: 800, height: 52, justifyContent: 'center', overflow: 'hidden', width: 52 }
 const errorStyle = { background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, color: '#dc2626', padding: 10 }
 const messageStyle = { background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, color: '#15803d', padding: 10 }
 const statusBadgeActiveStyle = { background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 999, color: '#14532d', fontSize: 12, fontWeight: 700, padding: '4px 12px' }

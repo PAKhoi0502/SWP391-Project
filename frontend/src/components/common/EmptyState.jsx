@@ -1,8 +1,8 @@
-// Trạng thái rỗng dùng chung.
-// Hiển thị khi API trả về thành công nhưng không có dữ liệu nào để hiện.
+// Shared empty state.
+// Displayed when the API call succeeds but there is no data to show.
 function EmptyState({
-  title = 'Chưa có dữ liệu',
-  message = 'Hiện chưa có nội dung nào để hiển thị.',
+  title = 'No data yet',
+  message = 'There is no content to display yet.',
   action,
 }) {
   return (
@@ -23,7 +23,7 @@ function EmptyState({
       <h3 style={{ margin: 0, color: '#374151' }}>{title}</h3>
       <p style={{ margin: 0, color: '#777' }}>{message}</p>
 
-      {/* action: phần tử tùy chọn (ví dụ nút "Tạo mới"). */}
+      {/* action: optional element (e.g. a "Create new" button). */}
       {action && <div style={{ marginTop: 8 }}>{action}</div>}
     </div>
   )

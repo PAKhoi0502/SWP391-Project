@@ -23,7 +23,7 @@ export default function GarageListPage() {
 
             setGarages(result.data || []);
         } catch (err) {
-            setError(err.message || "Không thể tải danh sách garage");
+            setError(err.message || "Could not load the garage list");
         } finally {
             setLoading(false);
         }
@@ -42,20 +42,20 @@ export default function GarageListPage() {
         <div className="garage-page">
             <div className="garage-header">
                 <p className="garage-eyebrow">AutoWash Pro</p>
-                <h1>Danh sách garage</h1>
-                <p>Chọn garage phù hợp để xem địa chỉ, thời gian mở cửa và khả năng phục vụ.</p>
+                <h1>Garage List</h1>
+                <p>Choose the right garage to view its address, opening hours, and service capabilities.</p>
             </div>
 
             <form className="garage-search" onSubmit={handleSearch}>
                 <input
                     value={keyword}
                     onChange={(e) => setKeyword(e.target.value)}
-                    placeholder="Tìm theo tên, địa chỉ, thành phố..."
+                    placeholder="Search by name, address, city..."
                 />
-                <button type="submit">Tìm kiếm</button>
+                <button type="submit">Search</button>
             </form>
 
-            {loading && <p>Đang tải garage...</p>}
+            {loading && <p>Loading garages...</p>}
             {error && <div className="garage-error">{error}</div>}
 
             {!loading && !error && (
@@ -65,7 +65,7 @@ export default function GarageListPage() {
                             <div className="garage-card-top">
                                 <h3>{garage.name}</h3>
                                 <span className={garage.isActive ? "garage-status on" : "garage-status off"}>
-                                    {garage.isActive ? "Đang hoạt động" : "Tạm ngưng"}
+                                    {garage.isActive ? "Active" : "Suspended"}
                                 </span>
                             </div>
 
@@ -73,13 +73,13 @@ export default function GarageListPage() {
                             <p className="garage-address">
                                 {garage.address}, {garage.city}
                             </p>
-                            <p className="garage-info">SĐT: {garage.phone}</p>
+                            <p className="garage-info">Phone: {garage.phone}</p>
                             <p className="garage-info">
-                                Giờ mở cửa: {garage.openingTime} - {garage.closingTime}
+                                Opening hours: {garage.openingTime} - {garage.closingTime}
                             </p>
 
                             <Link className="garage-btn" to={`/customer/garages/${garage.id}`}>
-                                Xem chi tiết
+                                View Details
                             </Link>
                         </div>
                     ))}

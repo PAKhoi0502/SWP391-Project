@@ -9,19 +9,8 @@ import BookingsModal from '../components/profile/BookingsModal'
 import WaitlistModal from '../components/profile/WaitlistModal'
 import VehiclesModal from '../components/profile/VehiclesModal'
 import ImageUpload from '../components/upload/ImageUpload'
+import { TierGemIcon, getTierLabel } from '../components/common/TierGem'
 import '../components/profile/ProfileSettings.css'
-
-const TIER_META = {
-  BRONZE:   { label: 'Bronze',   icon: '🥉' },
-  SILVER:   { label: 'Silver',   icon: '🥈' },
-  GOLD:     { label: 'Gold',     icon: '🥇' },
-  PLATINUM: { label: 'Platinum', icon: '💎' },
-}
-
-function getTierMeta(tier) {
-  const key = String(tier || '').toUpperCase()
-  return TIER_META[key] || null
-}
 
 function getInitial(profile) {
   return String(profile?.fullName || profile?.email || 'U').trim().charAt(0).toUpperCase()
@@ -162,7 +151,7 @@ export default function ProfilePage() {
 
   const isCustomer = String(profile?.role || user?.role || '').toUpperCase().replace('ROLE_', '') === 'CUSTOMER'
   const isActive   = profile?.isActive !== false
-  const tier       = loyalty ? getTierMeta(loyalty.currentTier) : null
+  const tierKey    = loyalty?.currentTier ? String(loyalty.currentTier).toUpperCase() : null
   const sub        = profile?.email || profile?.phone || ''
 
   const openDetail   = () => { setDetailAutoOpenPw(false); setDetailOpen(true) }
@@ -227,9 +216,9 @@ export default function ProfilePage() {
                 <h1 className="ps-user-name">
                   {profile?.fullName || profile?.email || 'User'}
                 </h1>
-                {tier && (
+                {tierKey && (
                   <span className="ps-tier-chip">
-                    {tier.icon} {tier.label}
+                    <TierGemIcon tier={tierKey} size={14} /> {getTierLabel(tierKey)}
                   </span>
                 )}
               </div>
@@ -246,7 +235,7 @@ export default function ProfilePage() {
           {/* Divider between user header and settings */}
           <div className="ps-main-card-divider" />
 
-          {/* Section: Tài khoản */}
+          {/* Section: Account */}
           <p className="ps-section-label">Account</p>
 
           <button type="button" className="ps-row" onClick={openDetail}>

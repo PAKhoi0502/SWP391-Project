@@ -3,6 +3,7 @@
 // When admin adds a new tier, unknown names get a deterministic fallback color.
 
 export const TIER_COLORS = {
+  NEW:      '#94a3b8',
   BRONZE:   '#cd7f32',
   SILVER:   '#94a3b8',
   GOLD:     '#f59e0b',
@@ -20,16 +21,17 @@ export function getTierColor(tier) {
 }
 
 export const TIER_LABELS = {
-  BRONZE:   'Thành viên mới',
-  SILVER:   'Hạng Bạc',
-  GOLD:     'Hạng Vàng',
-  PLATINUM: 'Hạng Bạch Kim',
+  NEW:      'New Member',
+  BRONZE:   'Bronze',
+  SILVER:   'Silver',
+  GOLD:     'Gold',
+  PLATINUM: 'Platinum',
 }
 
 export function getTierLabel(tier) {
   const key = String(tier || '').toUpperCase()
   if (TIER_LABELS[key]) return TIER_LABELS[key]
-  return key ? key.charAt(0) + key.slice(1).toLowerCase() : 'Thành viên'
+  return key ? key.charAt(0) + key.slice(1).toLowerCase() : 'Member'
 }
 
 export function TierGemIcon({ tier, size = 32 }) {

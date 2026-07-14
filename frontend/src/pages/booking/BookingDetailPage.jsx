@@ -41,7 +41,7 @@ const resolveAddOnServicePackageNames = async (addOnIds) => {
         addOnPackageNameCache.set(id, name)
         return name
       } catch {
-        return `Gói #${id}`
+        return `Package #${id}`
       }
     }),
   )
@@ -128,7 +128,7 @@ const blankInspectionForm = {
 
 const formatDateTime = (value) => {
   if (!value) return TEXT.notUpdated
-  return new Date(value).toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' })
+  return new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 const readCachedBooking = (bookingId) => {
@@ -374,8 +374,8 @@ const unwrapResourcePayload = (payload) => payload?.data?.data || payload?.data 
 
 const getVehicleTypeText = (value) => {
   const normalized = String(value || '').toUpperCase()
-  if (normalized === 'CAR') return '\u00d4 t\u00f4'
-  if (normalized.includes('BIKE') || normalized.includes('MOTOR')) return 'Xe m\u00e1y'
+  if (normalized === 'CAR') return 'Car'
+  if (normalized.includes('BIKE') || normalized.includes('MOTOR')) return 'Motorbike'
   return value || ''
 }
 
@@ -521,7 +521,7 @@ const getTimelineItems = (booking) => {
       { key: 'booked', label: TEXT.booked, active: true, time: booking?.startTime || booking?.createdAt },
       {
         key: status.toLowerCase(),
-        label: isNoShow ? 'No-show' : '\u0110\u00e3 h\u1ee7y',
+        label: isNoShow ? 'No-show' : 'Cancelled',
         active: true,
         danger: true,
         time: booking?.updatedAt || booking?.canceledAt || booking?.cancelledAt,
@@ -829,7 +829,7 @@ function BookingDetailPage() {
     } catch (err) {
       setInspections([])
       setInspectionForms(buildInspectionForms(detail, []))
-      setInspectionError(err?.response?.data?.message || err?.message || 'Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c inspection.')
+      setInspectionError(err?.response?.data?.message || err?.message || 'Failed to load inspection.')
     }
   }
 
@@ -1205,11 +1205,11 @@ function BookingDetailPage() {
     }
 
     if (!getInspectionByType(inspections, 'BEFORE_WASH')) {
-      setCompleteServiceError('Vui lòng tạo inspection "Trước khi sử dụng dịch vụ" trước khi hoàn thành booking.')
+      setCompleteServiceError('Please create the "Before service" inspection before completing the booking.')
       return
     }
     if (getInspectionTypes(booking).includes('AFTER_WASH') && !getInspectionByType(inspections, 'AFTER_WASH')) {
-      setCompleteServiceError('Vui lòng tạo inspection "Sau khi sử dụng dịch vụ" trước khi hoàn thành booking.')
+      setCompleteServiceError('Please create the "After service" inspection before completing the booking.')
       return
     }
 
@@ -1465,7 +1465,7 @@ function BookingDetailPage() {
       ? assignedResources.careStaffLabels
       : booking?.careStaffLabels?.length > 0
         ? booking.careStaffLabels
-        : rawCareStaffIds.map((staffId) => `Nh\u00e2n vi\u00ean #${staffId}`)
+        : rawCareStaffIds.map((staffId) => `Staff #${staffId}`)
   const hasAssignedResources = Boolean(resourceWashBayLabel || resourceCareStaffLabels.length > 0)
   const resourceCareStaffText = resourceCareStaffLabels.length > 0
     ? resourceCareStaffLabels.join(', ')
@@ -1491,7 +1491,7 @@ function BookingDetailPage() {
         images: [...(current[type]?.images || []), uploaded],
       },
     }))
-    setInspectionMessage('Đã tải ảnh lên. Lưu inspection để liên kết ảnh.')
+    setInspectionMessage('Image uploaded. Save the inspection to link the image.')
   }
 
   const handleInspectionImageDeleted = (type, publicId) => {
@@ -1530,7 +1530,7 @@ function BookingDetailPage() {
       setInspectionMessage('')
       await loadInspections(booking)
     } catch (err) {
-      setInspectionError(err?.response?.data?.message || err?.message || 'Kh\u00f4ng l\u01b0u \u0111\u01b0\u1ee3c inspection.')
+      setInspectionError(err?.response?.data?.message || err?.message || 'Failed to save inspection.')
     } finally {
       setInspectionSavingType('')
     }
@@ -1598,7 +1598,7 @@ function BookingDetailPage() {
 
         {isLocked && (
           <p className="booking-inspection-locked-hint">
-            Dịch vụ đã hoàn thành, không thể chỉnh sửa tình trạng/ghi chú. Vẫn có thể thêm ảnh.
+            Service is complete — condition/notes can no longer be edited. Images can still be added.
           </p>
         )}
 
@@ -1608,7 +1608,7 @@ function BookingDetailPage() {
           disabled={inspectionSavingType === type}
           onClick={() => handleSaveInspection(type)}
         >
-          {inspectionSavingType === type ? 'Đang lưu...' : existingInspection ? 'Cập nhật inspection' : 'Tạo inspection'}
+          {inspectionSavingType === type ? 'Saving...' : existingInspection ? 'Update inspection' : 'Create inspection'}
         </button>
       </article>
     )
@@ -1849,7 +1849,7 @@ function BookingDetailPage() {
 
           {/* ── Action message ── */}
           {actionMessage && (
-            <div className={`bd-action-msg${actionMessage.toLowerCase().includes('fail') || actionMessage.toLowerCase().includes('không') ? ' bd-action-msg--error' : ''}`}>
+            <div className={`bd-action-msg${actionMessage.toLowerCase().includes('fail') ? ' bd-action-msg--error' : ''}`}>
               {actionMessage}
             </div>
           )}

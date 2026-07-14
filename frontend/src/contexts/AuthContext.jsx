@@ -165,7 +165,7 @@ export function AuthProvider({ children }) {
 
   let loggedUser = normalizeUser(rawLoggedUser, token);
 
-  // QUAN TRỌNG: xóa session cũ trước khi lưu tài khoản mới
+  // IMPORTANT: clear the old session before saving the new account
   authStorage.clearAuth();
 
   authStorage.setAuth({

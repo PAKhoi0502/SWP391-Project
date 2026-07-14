@@ -7,7 +7,7 @@ function ProtectedRoute({ allowedRoles = [] }) {
   if (loading) {
     return (
       <div style={{ padding: 32 }}>
-        Đang kiểm tra đăng nhập...
+        Checking authentication...
       </div>
     )
   }

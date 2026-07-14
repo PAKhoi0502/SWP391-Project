@@ -15,7 +15,7 @@ export default function ForgotPasswordPage() {
     const trimmedEmail = email.trim()
 
     if (!trimmedEmail) {
-      setError('Vui lòng nhập email.')
+      setError('Please enter your email.')
       return
     }
 
@@ -26,7 +26,7 @@ export default function ForgotPasswordPage() {
       await authService.forgotPassword({ email: trimmedEmail })
       setSuccess(true)
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data || 'Không tìm thấy tài khoản với email này.')
+      setError(err.response?.data?.message || err.response?.data || 'No account found with this email.')
     } finally {
       setLoading(false)
     }
@@ -38,16 +38,16 @@ export default function ForgotPasswordPage() {
         <div className="aas-panel">
           <div className="aas-form-content aas-visible">
             <LogoMark />
-            <p className="aas-eyebrow">Khôi phục tài khoản</p>
-            <h2 className="aas-form-title">Quên mật khẩu?</h2>
-            <p className="aas-form-sub">Nhập email để nhận link đặt lại mật khẩu</p>
+            <p className="aas-eyebrow">Account Recovery</p>
+            <h2 className="aas-form-title">Forgot password?</h2>
+            <p className="aas-form-sub">Enter your email to receive a password reset link</p>
 
             {success ? (
               <div style={{ textAlign: 'center' }}>
                 <div className="aas-alert aas-alert--success">
-                  Email đã được gửi! Kiểm tra hộp thư của bạn và làm theo hướng dẫn.
+                  Email sent! Check your inbox and follow the instructions.
                 </div>
-                <Link to="/login" className="aas-back-link">Quay lại đăng nhập</Link>
+                <Link to="/login" className="aas-back-link">Back to sign in</Link>
               </div>
             ) : (
               <>
@@ -68,11 +68,11 @@ export default function ForgotPasswordPage() {
                   </div>
 
                   <button type="submit" className="aas-submit-btn" disabled={loading}>
-                    {loading ? 'Đang gửi...' : 'Gửi link đặt lại mật khẩu'}
+                    {loading ? 'Sending...' : 'Send reset link'}
                   </button>
                 </form>
 
-                <Link to="/login" className="aas-back-link">Quay lại đăng nhập</Link>
+                <Link to="/login" className="aas-back-link">Back to sign in</Link>
               </>
             )}
           </div>

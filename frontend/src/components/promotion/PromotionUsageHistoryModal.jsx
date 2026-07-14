@@ -2,7 +2,7 @@ import { useState } from 'react'
 import './PromotionUsageHistoryModal.css'
 
 const formatMoney = (value) => {
-  if (value == null) return 'Chưa có dữ liệu'
+  if (value == null) return 'No data'
   return new Intl.NumberFormat('vi-VN', {
     style: 'currency',
     currency: 'VND',
@@ -11,9 +11,9 @@ const formatMoney = (value) => {
 }
 
 const formatDateTime = (value) => {
-  if (!value) return 'Chưa có dữ liệu'
+  if (!value) return 'No data'
   try {
-    return new Intl.DateTimeFormat('vi-VN', {
+    return new Intl.DateTimeFormat('en-US', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -64,8 +64,8 @@ export default function PromotionUsageHistoryModal({
     <div className="puh-overlay" onClick={onClose}>
       <div className="puh-modal" onClick={(e) => e.stopPropagation()}>
         <div className="puh-header">
-          <h2>{title || 'Lịch sử sử dụng mã'}</h2>
-          <button className="puh-close" onClick={onClose} aria-label="Đóng">✕</button>
+          <h2>{title || 'Usage History'}</h2>
+          <button className="puh-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
         <div className="puh-body">
@@ -74,14 +74,14 @@ export default function PromotionUsageHistoryModal({
               <input
                 className="puh-filter-input"
                 type="text"
-                placeholder="Lọc khách hàng (ID / SĐT / tên)..."
+                placeholder="Filter customer (ID / phone / name)..."
                 value={customerQ}
                 onChange={(e) => setCustomerQ(e.target.value)}
               />
               <input
                 className="puh-filter-input"
                 type="text"
-                placeholder="Lọc mã KM (ID / mã code)..."
+                placeholder="Filter promotion (ID / code)..."
                 value={promoQ}
                 onChange={(e) => setPromoQ(e.target.value)}
               />
@@ -89,27 +89,27 @@ export default function PromotionUsageHistoryModal({
           )}
 
           {loading && (
-            <div className="puh-state">Đang tải lịch sử...</div>
+            <div className="puh-state">Loading history...</div>
           )}
           {!loading && error && (
             <div className="puh-state puh-state--error">{error}</div>
           )}
           {!loading && !error && usages.length === 0 && (
-            <div className="puh-state">Chưa có lịch sử sử dụng nào.</div>
+            <div className="puh-state">No usage history yet.</div>
           )}
           {!loading && !error && usages.length > 0 && visible.length === 0 && (
-            <div className="puh-state">Không có kết quả phù hợp.</div>
+            <div className="puh-state">No matching results.</div>
           )}
           {!loading && !error && visible.length > 0 && (
             <div className="puh-table-wrapper">
               <table className="puh-table">
                 <thead>
                   <tr>
-                    {mode === 'admin' && <th>Khách hàng</th>}
-                    <th>Mã khuyến mãi</th>
+                    {mode === 'admin' && <th>Customer</th>}
+                    <th>Promotion code</th>
                     <th>Booking</th>
-                    <th>Giảm giá</th>
-                    <th>Thời gian dùng</th>
+                    <th>Discount</th>
+                    <th>Used at</th>
                   </tr>
                 </thead>
                 <tbody>

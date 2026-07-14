@@ -168,7 +168,7 @@ function LoginForm({ active, justRegistered }) {
       </form>
 
       <div className="aas-divider"><span>OR</span></div>
-      <GoogleSignInButton onCredential={handleGoogleCredential} disabled={googleLoading} text="signin_with" />
+      <GoogleSignInButton onCredential={handleGoogleCredential} active={active} disabled={googleLoading} text="signin_with" />
     </div>
   )
 }
@@ -325,7 +325,7 @@ function RegisterForm({ active }) {
       </form>
 
       <div className="aas-divider"><span>OR</span></div>
-      <GoogleSignInButton onCredential={handleGoogleCredential} disabled={googleLoading} text="signup_with" />
+      <GoogleSignInButton onCredential={handleGoogleCredential} active={active} disabled={googleLoading} text="signup_with" />
     </div>
   )
 }

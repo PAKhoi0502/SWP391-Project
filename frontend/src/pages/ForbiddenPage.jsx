@@ -11,10 +11,10 @@ function ForbiddenPage() {
   return (
     <section className="state-page">
       <h1>403</h1>
-      <p>Bạn không có quyền truy cập trang này.</p>
+      <p>You do not have permission to access this page.</p>
 
       <Link to={dashboardPath}>
-        {isAuthenticated ? 'Về dashboard' : 'Đăng nhập'}
+        {isAuthenticated ? 'Back to dashboard' : 'Sign in'}
       </Link>
     </section>
   )

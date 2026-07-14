@@ -130,7 +130,7 @@ const formatTime = (value) => {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return String(value)
 
-  return date.toLocaleTimeString('vi-VN', {
+  return date.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
   })
@@ -675,7 +675,7 @@ export default function CustomerCreateBookingPage() {
     const id = String(getId(servicePackage))
     setSelectedPackageId(id)
 
-    // Combo là gói riêng — chọn combo thì bỏ hết addon đang chọn
+    // Combo is a standalone package — selecting a combo clears any selected add-ons
     if (normalizePackageType(servicePackage) === 'COMBO') {
       setSelectedAddOnIds([])
     }
@@ -1508,7 +1508,7 @@ function BkStepper({ currentStep, onGoTo }) {
       {/* Mobile progress */}
       <div className="bk-stepper-mobile">
         <span className="bk-mobile-step-info">
-          Bước {currentStep} / {STEP_LABELS.length} — {STEP_LABELS[currentStep - 1]}
+          Step {currentStep} / {STEP_LABELS.length} — {STEP_LABELS[currentStep - 1]}
         </span>
         <div className="bk-mobile-progress-bar">
           <div

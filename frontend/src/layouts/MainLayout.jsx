@@ -1,5 +1,5 @@
-// Bố cục (layout) chính của ứng dụng: header + vùng nội dung + footer.
-// Các route con được render vào <Outlet /> ở giữa.
+// Main application layout: header + content area + footer.
+// Child routes are rendered into <Outlet /> in the middle.
 import { Link, Outlet } from 'react-router-dom'
 
 function MainLayout() {
@@ -19,7 +19,7 @@ function MainLayout() {
         </Link>
         <nav style={{ display: 'flex', gap: 16 }}>
           <Link to="/" style={{ textDecoration: 'none', color: '#374151' }}>
-            Trang chủ
+            Home
           </Link>
         </nav>
       </header>

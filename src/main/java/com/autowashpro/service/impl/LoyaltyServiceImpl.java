@@ -47,7 +47,8 @@ public class LoyaltyServiceImpl implements LoyaltyService {
         return customerLoyaltyRepository.findByCustomerId(customerId).orElseGet(() -> {
             CustomerLoyalty loyalty = new CustomerLoyalty();
             loyalty.setCustomerId(customerId);
-            loyalty.setCurrentTier("BRONZE");
+            // "NEW" = not yet ranked; customer is promoted to BRONZE after their first completed+paid booking.
+            loyalty.setCurrentTier("NEW");
             loyalty.setTotalPoints(0);
             loyalty.setAvailablePoints(0);
             loyalty.setRedeemedPoints(0);
@@ -103,7 +104,7 @@ public class LoyaltyServiceImpl implements LoyaltyService {
 
         List<LoyaltyTierRule> rules = loyaltyTierRuleRepository.findByIsActiveTrueOrderByPriorityLevelDesc();
 
-       final String[] newTierHolder = {"BRONZE"};
+       final String[] newTierHolder = {"NEW"};
 for (LoyaltyTierRule rule : rules) {
     boolean eligible = loyalty.getTotalSpent().compareTo(rule.getMinTotalSpent()) >= 0
             && loyalty.getTotalVisits() >= rule.getMinTotalVisits()

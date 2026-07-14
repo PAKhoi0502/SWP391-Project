@@ -340,11 +340,11 @@ export default function AdminServicePackagePage() {
                 name="stepsTemplate"
                 value={form.stepsTemplate}
                 onChange={handleChange}
-                placeholder={'Steps template, mỗi dòng là 1 bước\nVí dụ:\nRửa ngoại thất\nSấy khô'}
+                placeholder={'Steps template, one step per line\nExample:\nExterior wash\nDry'}
                 style={{ marginTop: 12 }}
               />
               <p style={{ marginTop: 8, color: '#64748b', fontSize: 13 }}>
-                Không cần thêm bước "kiểm tra" hay "bàn giao" — hệ thống tự thêm 2 bước này vào đầu và cuối mỗi booking. Chỉ nhập các bước xử lý thực tế của gói (vd rửa xe, dưỡng bóng).
+                No need to add "inspection" or "handover" steps — the system automatically adds these to the start and end of every booking. Only enter the actual processing steps for the package (e.g. wash, wax).
               </p>
             </>
           )}
@@ -474,9 +474,10 @@ export default function AdminServicePackagePage() {
   )
 }
 
-// Dữ liệu cũ (từ migration_v41) lưu xe máy là 'BIKE', trong khi form tạo gói
-// dùng 'MOTORBIKE' (VEHICLE_TYPES) — chuẩn hóa 2 giá trị này về cùng 1 loại
-// để so sánh/hiển thị không bị lệch nhau (giống cách backend đã tolerant cả 2).
+// Legacy data (from migration_v41) stores motorbikes as 'BIKE', while the
+// package creation form uses 'MOTORBIKE' (VEHICLE_TYPES) — normalize these
+// two values to the same type so comparison/display don't get out of sync
+// (matching how the backend already tolerates both).
 function normalizeVehicleType(value) {
   const normalized = String(value || '').trim().toUpperCase()
   if (normalized === 'BIKE' || normalized === 'MOTORBIKE' || normalized === 'MOTORCYCLE') return 'MOTORBIKE'
@@ -485,8 +486,8 @@ function normalizeVehicleType(value) {
 
 function formatVehicleType(value) {
   const normalized = normalizeVehicleType(value)
-  if (normalized === 'CAR') return 'Ô tô'
-  if (normalized === 'MOTORBIKE') return 'Xe máy'
+  if (normalized === 'CAR') return 'Car'
+  if (normalized === 'MOTORBIKE') return 'Motorbike'
   return value || '-'
 }
 

@@ -16,7 +16,7 @@ function Pagination({
         disabled={page === 1}
         onClick={() => onPageChange(page - 1)}
       >
-        Trước
+        Previous
       </button>
 
       {pages.map((item) => (
@@ -34,7 +34,7 @@ function Pagination({
         disabled={page === totalPages}
         onClick={() => onPageChange(page + 1)}
       >
-        Sau
+        Next
       </button>
     </div>
   );

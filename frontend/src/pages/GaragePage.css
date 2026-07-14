@@ -28,6 +28,7 @@
   margin: 0;
   font-size: clamp(32px, 5vw, 52px);
   line-height: 1.05;
+  color: #111827;
 }
 
 .garage-header p {

@@ -15,7 +15,7 @@ const formatMoney = (value) => {
 const formatDate = (value) => {
   if (!value) return '—'
   try {
-    return new Date(value).toLocaleString('vi-VN', {
+    return new Date(value).toLocaleString('en-US', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -30,12 +30,12 @@ const formatDate = (value) => {
 const formatDiscount = (type, value) => {
   if (!type || value == null) return '—'
   const t = String(type).toUpperCase()
-  if (t === 'PERCENTAGE' || t === 'PERCENT') return `Giảm ${value}%`
-  if (t === 'FIXED_AMOUNT' || t === 'FIXED') return `Giảm ${formatMoney(value)}`
+  if (t === 'PERCENTAGE' || t === 'PERCENT') return `${value}% off`
+  if (t === 'FIXED_AMOUNT' || t === 'FIXED') return `${formatMoney(value)} off`
   return String(value)
 }
 
-const TIER_LABEL = { BRONZE: 'Đồng', SILVER: 'Bạc', GOLD: 'Vàng', PLATINUM: 'Bạch kim' }
+const TIER_LABEL = { BRONZE: 'Bronze', SILVER: 'Silver', GOLD: 'Gold', PLATINUM: 'Platinum' }
 const tierLabel = (tier) => TIER_LABEL[String(tier || '').toUpperCase()] || tier
 
 export default function CustomerPromotionDetailPage() {
@@ -53,7 +53,7 @@ export default function CustomerPromotionDetailPage() {
     promotionApi
       .getPromotionById(id)
       .then((data) => { if (mounted) setPromo(data) })
-      .catch(() => { if (mounted) setError('Không tìm thấy ưu đãi này hoặc đã hết hạn.') })
+      .catch(() => { if (mounted) setError('This promotion could not be found or has expired.') })
       .finally(() => { if (mounted) setLoading(false) })
     return () => { mounted = false }
   }, [id])
@@ -61,7 +61,7 @@ export default function CustomerPromotionDetailPage() {
   if (loading) {
     return (
       <div className="promo-detail-page">
-        <div className="promo-detail-loading">Đang tải chi tiết ưu đãi...</div>
+        <div className="promo-detail-loading">Loading promotion details...</div>
       </div>
     )
   }
@@ -69,9 +69,9 @@ export default function CustomerPromotionDetailPage() {
   if (error || !promo) {
     return (
       <div className="promo-detail-page">
-        <div className="promo-detail-error">{error || 'Không tìm thấy ưu đãi.'}</div>
+        <div className="promo-detail-error">{error || 'Promotion not found.'}</div>
         <button className="promo-detail-back-btn" onClick={() => navigate('/customer/promotions')}>
-          ← Quay lại danh sách
+          ← Back to list
         </button>
       </div>
     )
@@ -84,16 +84,16 @@ export default function CustomerPromotionDetailPage() {
     <div className="promo-detail-page">
       <div className="promo-detail-hero">
         <div className="promo-detail-hero-text">
-          <p className="promo-detail-kicker">Ưu đãi</p>
+          <p className="promo-detail-kicker">Promotion</p>
           <h1>{promo.name}</h1>
           <span className="promo-detail-code-display">{promo.code}</span>
         </div>
         <div className="promo-detail-hero-actions">
           <button className="promo-detail-back-btn" onClick={() => navigate('/customer/promotions')}>
-            ← Danh sách
+            ← List
           </button>
           <button className="promo-detail-use-btn" onClick={() => navigate('/booking')}>
-            Đặt lịch ngay
+            Book Now
           </button>
         </div>
       </div>
@@ -106,27 +106,27 @@ export default function CustomerPromotionDetailPage() {
 
       {promo.allowLoyaltyStack && (
         <div className="promo-detail-loyalty-badge">
-          Cho phép dùng kèm điểm loyalty
+          Can be combined with loyalty points
         </div>
       )}
 
       <div className="promo-detail-grid">
         <div className="promo-detail-card">
-          <h3>Thông tin giảm giá</h3>
+          <h3>Discount Details</h3>
           <div className="promo-detail-fields">
             <div className="promo-detail-field highlight">
-              <span>Ưu đãi</span>
+              <span>Discount</span>
               <strong>{formatDiscount(promo.discountType, promo.discountValue)}</strong>
             </div>
             {promo.maxDiscountAmount != null && (
               <div className="promo-detail-field">
-                <span>Giảm tối đa</span>
+                <span>Max discount</span>
                 <strong>{formatMoney(promo.maxDiscountAmount)}</strong>
               </div>
             )}
             {promo.minOrderAmount != null && (
               <div className="promo-detail-field">
-                <span>Đơn tối thiểu</span>
+                <span>Minimum order</span>
                 <strong>{formatMoney(promo.minOrderAmount)}</strong>
               </div>
             )}
@@ -134,37 +134,37 @@ export default function CustomerPromotionDetailPage() {
         </div>
 
         <div className="promo-detail-card">
-          <h3>Thời gian hiệu lực</h3>
+          <h3>Validity Period</h3>
           <div className="promo-detail-fields">
             <div className="promo-detail-field">
-              <span>Bắt đầu</span>
+              <span>Start</span>
               <strong>{formatDate(promo.startAt)}</strong>
             </div>
             <div className="promo-detail-field">
-              <span>Kết thúc</span>
+              <span>End</span>
               <strong>{formatDate(promo.endAt)}</strong>
             </div>
           </div>
         </div>
 
         <div className="promo-detail-card">
-          <h3>Giới hạn sử dụng</h3>
+          <h3>Usage Limits</h3>
           <div className="promo-detail-fields">
             {promo.usageLimit != null ? (
               <div className="promo-detail-field">
-                <span>Đã dùng / Tổng</span>
+                <span>Used / Total</span>
                 <strong>{promo.usedCount ?? 0} / {promo.usageLimit}</strong>
               </div>
             ) : (
               <div className="promo-detail-field">
-                <span>Tổng lượt</span>
-                <strong>Không giới hạn</strong>
+                <span>Total uses</span>
+                <strong>Unlimited</strong>
               </div>
             )}
             {promo.perUserLimit != null && (
               <div className="promo-detail-field">
-                <span>Giới hạn mỗi người</span>
-                <strong>{promo.perUserLimit} lần</strong>
+                <span>Limit per user</span>
+                <strong>{promo.perUserLimit} time(s)</strong>
               </div>
             )}
           </div>
@@ -172,7 +172,7 @@ export default function CustomerPromotionDetailPage() {
 
         {hasApplicableTiers && (
           <div className="promo-detail-card promo-detail-wide">
-            <h3>Áp dụng cho hạng thành viên</h3>
+            <h3>Applicable Membership Tiers</h3>
             <div className="promo-tier-chips">
               {promo.applicableTiers.map((tier) => (
                 <span key={tier} className="promo-tier-chip">{tierLabel(tier)}</span>
@@ -184,7 +184,7 @@ export default function CustomerPromotionDetailPage() {
 
       <div className="promo-detail-footer">
         <button className="promo-detail-use-btn large" onClick={() => navigate('/booking')}>
-          Đặt lịch ngay →
+          Book Now →
         </button>
       </div>
     </div>

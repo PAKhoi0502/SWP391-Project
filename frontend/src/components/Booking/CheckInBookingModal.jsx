@@ -37,7 +37,7 @@ export default function CheckInBookingModal({ open, onClose, onConfirm, booking,
 
   const formatDateTime = (value) => {
     if (!value) return TEXT.notUpdated
-    return new Date(value).toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' })
+    return new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
   }
 
   const vehicleTypeLabel = booking?.vehicleType
