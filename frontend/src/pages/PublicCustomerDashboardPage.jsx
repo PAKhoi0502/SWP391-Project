@@ -129,7 +129,7 @@ const SERVICES = [
 
 const TIERS = [
   { name: 'BRONZE',   desc: 'For new members · earn points every wash · ×1.0 multiplier' },
-  { name: 'SILVER',   desc: '×1.2 point multiplier · book up to 10 days ahead · min. spend 1,000,000₫' },
+  { name: 'SILVER',   desc: '×1.2 point multiplier · book up to 10 days ahead' },
   { name: 'GOLD',     desc: '×1.35 point multiplier · book up to 12 days ahead · up to 2 queued bookings' },
   { name: 'PLATINUM', desc: '×1.5 point multiplier · book up to 14 days ahead · up to 3 queued bookings' },
 ]

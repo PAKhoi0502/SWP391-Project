@@ -177,8 +177,8 @@ export default function WaitlistModal({ open, onClose }) {
                 const canAccept   = OFFERED_STATUSES.has(status)
                 const isCancelling = actionKey === `cancel-${id}`
                 const isAccepting  = actionKey === `accept-${id}`
-                const startTime   = getVal(item?.startTime, item?.slotStartTime, item?.offeredStartTime)
-                const endTime     = getVal(item?.endTime,   item?.slotEndTime,   item?.offeredEndTime)
+                const startTime   = getVal(item?.desiredStartTime, item?.startTime, item?.slotStartTime, item?.offeredStartTime)
+                const endTime     = getVal(item?.desiredEndTime,   item?.endTime,   item?.slotEndTime,   item?.offeredEndTime)
                 const date        = getVal(item?.date, item?.bookingDate, item?.waitlistDate, startTime)
                 const garageName  = getVal(item?.garageName, item?.garage?.name, item?.garage?.garageName)
                 const packageName = getVal(

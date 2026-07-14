@@ -25,6 +25,12 @@ function getToday() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function getTomorrow() {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  return d.toISOString().slice(0, 10)
+}
+
 function formatTime(dateTime) {
   if (!dateTime) return "";
 
@@ -156,7 +162,7 @@ export default function AvailableSlotsPickerPage() {
     searchParams.get("servicePackageId") || ""
   );
   const [vehicleType, setVehicleType] = useState(searchParams.get("vehicleType") || "");
-  const [date, setDate] = useState(searchParams.get("date") || getToday());
+  const [date, setDate] = useState(searchParams.get("date") || getTomorrow());
 
   const [garages, setGarages] = useState([]);
   const [servicePackages, setServicePackages] = useState([]);
@@ -302,7 +308,7 @@ export default function AvailableSlotsPickerPage() {
   }, [vehicleType, servicePackageOptions, servicePackageId]);
 
   const fetchAvailableSlots = async () => {
-    if (!canLoadSlots) return;
+    if (!canLoadSlots || !date) return;
 
     const requestId = latestRequestId.current + 1;
     latestRequestId.current = requestId;

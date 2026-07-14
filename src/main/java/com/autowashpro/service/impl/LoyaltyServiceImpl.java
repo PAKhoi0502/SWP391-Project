@@ -402,8 +402,8 @@ String newTier = newTierHolder[0];
         pt.setNote(reason);
         pointTransactionRepository.save(pt);
 
-        // Review tier sau khi adjust points
-    reviewCustomerTier(customerId);
+        reviewCustomerTier(customerId);
+        notificationService.notifyPointsAdjusted(customerId, points, reason);
     }
 
     @Override

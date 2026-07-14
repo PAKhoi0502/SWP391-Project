@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { userService } from '../services/userService'
 import { loyaltyApi } from '../api/loyaltyApi'
@@ -9,7 +10,7 @@ import BookingsModal from '../components/profile/BookingsModal'
 import WaitlistModal from '../components/profile/WaitlistModal'
 import VehiclesModal from '../components/profile/VehiclesModal'
 import ImageUpload from '../components/upload/ImageUpload'
-import { TierGemIcon, getTierLabel } from '../components/common/TierGem'
+import { TierGemIcon, getTierLabel, getTierColor } from '../components/common/TierGem'
 import '../components/profile/ProfileSettings.css'
 
 function getInitial(profile) {
@@ -100,6 +101,8 @@ function IconCar() {
 
 export default function ProfilePage() {
   const { user, setCurrentUser } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [profile, setProfile]     = useState(user || null)
   const [loyalty, setLoyalty]     = useState(null)
   const [loading, setLoading]     = useState(true)
@@ -113,6 +116,14 @@ export default function ProfilePage() {
   const [bookingsOpen, setBookingsOpen]   = useState(false)
   const [waitlistOpen, setWaitlistOpen]   = useState(false)
   const [vehiclesOpen, setVehiclesOpen]   = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get('open') === 'waitlist') {
+      setWaitlistOpen(true)
+      navigate('/customer/profile', { replace: true })
+    }
+  }, [location.search])
 
   useEffect(() => {
     let ignore = false
@@ -217,8 +228,9 @@ export default function ProfilePage() {
                   {profile?.fullName || profile?.email || 'User'}
                 </h1>
                 {tierKey && (
-                  <span className="ps-tier-chip">
-                    <TierGemIcon tier={tierKey} size={14} /> {getTierLabel(tierKey)}
+                  <span className="ps-tier-chip" style={{ '--tier-color': getTierColor(tierKey) }}>
+                    <TierGemIcon tier={tierKey} size={14} />
+                    {getTierLabel(tierKey)}
                   </span>
                 )}
               </div>

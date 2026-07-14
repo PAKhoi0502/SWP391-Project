@@ -137,18 +137,13 @@ public class BookingServiceImpl implements BookingService {
                                 continue;
                         }
 
-                        boolean available = isWashBayAvailable(
-                                        garageId,
-                                        vehicleType,
-                                        start,
-                                        end);
+                        boolean bayOk = isWashBayAvailable(garageId, vehicleType, start, end);
+                        boolean staffOk = bayOk && isCareStaffAvailable(garageId, servicePackage, start, end);
+                        boolean available = bayOk && staffOk;
 
-                        if (available) {
-                                available = isCareStaffAvailable(
-                                                garageId,
-                                                servicePackage,
-                                                start,
-                                                end);
+                        String fullReason = null;
+                        if (!available) {
+                                fullReason = !bayOk ? "NO_BAY" : "NO_CARE_STAFF";
                         }
 
                         slots.add(
@@ -156,6 +151,7 @@ public class BookingServiceImpl implements BookingService {
                                                         .startTime(start)
                                                         .endTime(end)
                                                         .available(available)
+                                                        .fullReason(fullReason)
                                                         .build());
 
                         current = current.plusMinutes(garage.getSlotIntervalMinutes());

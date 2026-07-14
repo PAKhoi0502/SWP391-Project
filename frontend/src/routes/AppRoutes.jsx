@@ -84,6 +84,7 @@ function AppRoutes() {
           <Route path="/customer/bookings/:id" element={<BookingDetailPage />} />
           <Route path="/customer/notifications" element={<CustomerNotificationListPage />} />
           <Route path="/customer/notifications/:id" element={<CustomerNotificationDetailPage />} />
+          <Route path="/customer/waitlist" element={<WaitlistPage />} />
         </Route>
       </Route>
 
@@ -100,7 +101,6 @@ function AppRoutes() {
           <Route path="customer/garages" element={<GarageListPage />} />
           <Route path="customer/garages/:id" element={<GarageDetailPage />} />
           <Route path="/booking/available-slots" element={<AvailableSlotsPickerPage />} />
-          <Route path="/customer/waitlist" element={<WaitlistPage />} />
           <Route path="/customer/bookings" element={<CustomerBookingListPage />} />
           <Route path="/customer/wash-histories" element={<CustomerWashHistoryListPage />} />
           <Route path="/customer/wash-histories/:id" element={<WashHistoryDetailPage />} />

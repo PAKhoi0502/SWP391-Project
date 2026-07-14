@@ -140,7 +140,7 @@ function LoginForm({ active, justRegistered }) {
             id="login-phone"
             className="aas-input" type="text" name="identifier"
             placeholder="0912 345 678"
-            value={form.identifier} onChange={handleChange} autoComplete="username"
+            value={form.identifier} onChange={handleChange} autoComplete="off"
           />
         </div>
 
