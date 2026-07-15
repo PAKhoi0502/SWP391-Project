@@ -147,7 +147,8 @@ export default function ServicePackageDetailPage() {
 
                   <div className="spp-detail-cta">
                     <Link
-                      to={isAuthenticated ? '/booking' : '/login'}
+                      to={isAuthenticated ? '/booking' : '/guest-booking'}
+                      state={isAuthenticated ? undefined : { servicePackageId: pkg?.id }}
                       className="spp-detail-book-btn"
                     >
                       <IconCalendar /> Book Now

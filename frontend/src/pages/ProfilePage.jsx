@@ -9,6 +9,7 @@ import VoucherModal from '../components/profile/VoucherModal'
 import BookingsModal from '../components/profile/BookingsModal'
 import WaitlistModal from '../components/profile/WaitlistModal'
 import VehiclesModal from '../components/profile/VehiclesModal'
+import BankAccountsModal from '../components/profile/BankAccountsModal'
 import ImageUpload from '../components/upload/ImageUpload'
 import { TierGemIcon, getTierLabel, getTierColor } from '../components/common/TierGem'
 import '../components/profile/ProfileSettings.css'
@@ -99,6 +100,17 @@ function IconCar() {
   )
 }
 
+function IconBank() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="10" width="18" height="9" rx="1.5"/>
+      <path d="M3 10l9-6 9 6"/>
+      <path d="M6 13v4M10 13v4M14 13v4M18 13v4"/>
+    </svg>
+  )
+}
+
 export default function ProfilePage() {
   const { user, setCurrentUser } = useAuth()
   const location = useLocation()
@@ -116,6 +128,7 @@ export default function ProfilePage() {
   const [bookingsOpen, setBookingsOpen]   = useState(false)
   const [waitlistOpen, setWaitlistOpen]   = useState(false)
   const [vehiclesOpen, setVehiclesOpen]   = useState(false)
+  const [bankAccountsOpen, setBankAccountsOpen] = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -281,6 +294,17 @@ export default function ProfilePage() {
             <span className="ps-row-chevron"><IconChevron /></span>
           </button>
 
+          <div className="ps-row-sep" />
+
+          <button type="button" className="ps-row" onClick={() => setBankAccountsOpen(true)}>
+            <span className="ps-row-icon ps-row-icon--purple"><IconBank /></span>
+            <span className="ps-row-body">
+              <span className="ps-row-label">Bank Accounts</span>
+              <span className="ps-row-desc">Saved accounts for refunds & withdrawals</span>
+            </span>
+            <span className="ps-row-chevron"><IconChevron /></span>
+          </button>
+
           {/* Section: Membership (customer only) */}
           {isCustomer && (
             <>
@@ -364,6 +388,10 @@ export default function ProfilePage() {
       <VehiclesModal
         open={vehiclesOpen}
         onClose={() => setVehiclesOpen(false)}
+      />
+      <BankAccountsModal
+        open={bankAccountsOpen}
+        onClose={() => setBankAccountsOpen(false)}
       />
     </div>
   )
