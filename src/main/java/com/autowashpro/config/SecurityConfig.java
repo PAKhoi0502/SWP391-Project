@@ -83,6 +83,18 @@ public class SecurityConfig {
 .requestMatchers(HttpMethod.PATCH, "/service-packages/*/status")
 .hasRole("ADMIN")
 
+.requestMatchers(HttpMethod.GET, "/api/garages")
+.permitAll()
+
+.requestMatchers(HttpMethod.GET, "/api/garages/*")
+.permitAll()
+
+.requestMatchers(HttpMethod.GET, "/bookings/available-slots")
+.permitAll()
+
+.requestMatchers(HttpMethod.POST, "/bookings/guest")
+.permitAll()
+
                         .anyRequest()
                         .authenticated())
                 .addFilterBefore(

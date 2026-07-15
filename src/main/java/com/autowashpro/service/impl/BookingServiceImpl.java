@@ -829,6 +829,150 @@ public class BookingServiceImpl implements BookingService {
         }
 
         @Override
+        public BookingResponse createGuestBooking(WalkInBookingCreateRequest request) {
+
+                Garage garage = garageRepository.findById(request.getGarageId())
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Garage not found"));
+                if (!Boolean.TRUE.equals(garage.getIsActive())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Garage is inactive");
+                }
+
+                ServicePackage pkg = servicePackageRepository.findById(request.getServicePackageId())
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Service package not found"));
+                if (!Boolean.TRUE.equals(pkg.getIsActive())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Service package is inactive");
+                }
+
+                List<ServicePackage> addOns = loadWalkInAddOnPackages(
+                                request.getAddOnServicePackageIds(),
+                                request.getServicePackageId(),
+                                request);
+                List<ServicePackage> selectedPackages = buildSelectedPackages(pkg, addOns);
+
+                String normalizedPlate = normalizeLicensePlate(request.getLicensePlate());
+
+                LocalDateTime startTime = request.getStartTime();
+                LocalDateTime endTime = startTime.plusMinutes(resolveSlotDurationMinutes(selectedPackages, garage));
+
+                String bayType = mapVehicleTypeToBayType(request.getVehicleType());
+                List<String> supportedTypes = washBayRepository
+                                .findDistinctVehicleTypesByGarageId(request.getGarageId());
+                if (resolveGarageBayType(supportedTypes, request.getVehicleType()) == null) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Garage does not support vehicle type: " + request.getVehicleType());
+                }
+
+                if (!isWalkInVehicleCompatible(
+                                request,
+                                pkg)) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Vehicle is not compatible with selected service package");
+                }
+
+                long plateOverlap = bookingRepository.countOverlappingBookingsByLicensePlate(
+                                normalizedPlate, startTime, endTime);
+                if (plateOverlap > 0) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                        "License plate already has an active booking during this time");
+                }
+
+                if (requiresWashBay(selectedPackages)) {
+                        long totalBays = washBayRepository.countActiveByGarageAndVehicleType(
+                                        request.getGarageId(), bayType);
+                        long occupiedBays = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
+                                        request.getGarageId(), bayType, startTime, endTime);
+                        if (occupiedBays >= totalBays) {
+                                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                                "No wash bay available for this time slot");
+                        }
+                }
+
+                validateCareStaffAvailability(request.getGarageId(), selectedPackages, startTime, endTime);
+
+                User matchedCustomer = findActiveCustomerByPhone(request.getGuestPhone());
+                Vehicle matchedVehicle = findMatchedCustomerVehicle(matchedCustomer, normalizedPlate);
+
+                if (matchedCustomer != null) {
+                        long customerGarageOverlap = bookingRepository.countOverlappingBookingsByCustomerAndGarage(
+                                        matchedCustomer.getId(), request.getGarageId(), startTime, endTime);
+                        if (customerGarageOverlap > 0) {
+                                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                                "Khách hàng này đã có lịch đặt tại garage trong khung giờ này");
+                        }
+                }
+
+                // Auto-save new vehicle for known customers when the plate is not in their profile yet
+                if (matchedCustomer != null && matchedVehicle == null && normalizedPlate != null) {
+                        Vehicle newVehicle = new Vehicle();
+                        newVehicle.setCustomer(matchedCustomer);
+                        newVehicle.setRawLicensePlate(request.getLicensePlate().trim().toUpperCase());
+                        newVehicle.setNormalizedLicensePlate(normalizedPlate);
+                        newVehicle.setVehicleType(request.getVehicleType() != null
+                                        ? request.getVehicleType().toUpperCase() : "CAR");
+                        String brand = request.getVehicleBrand() != null && !request.getVehicleBrand().isBlank()
+                                        ? request.getVehicleBrand().trim() : "Không rõ";
+                        String model = request.getVehicleModel() != null && !request.getVehicleModel().isBlank()
+                                        ? request.getVehicleModel().trim() : "Không rõ";
+                        newVehicle.setBrand(brand);
+                        newVehicle.setModel(model);
+                        newVehicle.setSeatCount(request.getSeatCount());
+                        newVehicle.setMotorbikeGroup(request.getMotorbikeGroup());
+                        newVehicle.setIsDefault(false);
+                        newVehicle.setIsActive(true);
+                        matchedVehicle = vehicleRepository.save(newVehicle);
+                }
+
+                String paymentMethod = normalizeWalkInPaymentMethod(request.getPaymentMethod());
+
+                Booking booking = new Booking();
+                booking.setCustomerId(matchedCustomer != null ? matchedCustomer.getId() : null);
+                booking.setVehicleId(matchedVehicle != null ? matchedVehicle.getId() : null);
+                booking.setVehicleType(bayType);
+                booking.setGarageId(request.getGarageId());
+                booking.setServicePackageId(request.getServicePackageId());
+                booking.setBookingDate(startTime.toLocalDate());
+                booking.setStartTime(startTime);
+                booking.setEndTime(endTime);
+                booking.setStatus("CONFIRMED");
+                booking.setPaymentStatus("UNPAID");
+                booking.setPaymentMethod(paymentMethod);
+                BigDecimal originalPrice = sumBasePrice(selectedPackages);
+                booking.setOriginalPrice(originalPrice);
+                booking.setSurchargeAmount(BigDecimal.ZERO);
+                booking.setDiscountAmount(BigDecimal.ZERO);
+                booking.setFinalPrice(originalPrice);
+                booking.setDepositAmount(BigDecimal.ZERO);
+                booking.setDepositStatus("UNPAID");
+                booking.setRefundAmount(BigDecimal.ZERO);
+                booking.setIsWalkIn(false);
+                booking.setGuestName(matchedCustomer != null ? matchedCustomer.getFullName() : request.getGuestName());
+                booking.setGuestPhone(matchedCustomer != null ? matchedCustomer.getPhone() : normalizePhone(request.getGuestPhone()));
+                booking.setLicensePlate(normalizedPlate);
+                booking.setRewardProcessed(false);
+                booking.setUsedPoints(0);
+                booking.setNote(request.getNote());
+
+                Booking saved = bookingRepository.save(booking);
+
+                int sortOrder = 1;
+                for (ServicePackage addOn : addOns) {
+                        BookingAddOnServicePackage bookingAddOn = new BookingAddOnServicePackage();
+                        bookingAddOn.setBookingId(saved.getId());
+                        bookingAddOn.setServicePackageId(addOn.getId());
+                        bookingAddOn.setSortOrder(sortOrder++);
+                        bookingAddOnServicePackageRepository.save(bookingAddOn);
+                }
+
+                loyaltyService.updateBookingStatistics(saved.getId());
+                notificationService.notifyBookingConfirmed(saved.getId());
+                return toResponse(saved);
+        }
+
+        @Override
         public WalkInCustomerLookupResponse lookupWalkInCustomerByPhone(String phone, String licensePlate) {
                 User customer = findActiveCustomerByPhone(phone);
                 if (customer == null) {

@@ -30,6 +30,8 @@ public interface BookingService {
 
         BookingResponse createWalkInBooking(WalkInBookingCreateRequest request, Long staffUserId);
 
+        BookingResponse createGuestBooking(WalkInBookingCreateRequest request);
+
         WalkInCustomerLookupResponse lookupWalkInCustomerByPhone(String phone, String licensePlate);
 
         // ===================== ISSUE #13 =====================
