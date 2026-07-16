@@ -14,6 +14,7 @@ public final class AuditAction {
     public static final String BOOKING_SERVICE_COMPLETED = "BOOKING_SERVICE_COMPLETED";
     public static final String BOOKING_MARK_PAID = "BOOKING_MARK_PAID";
     public static final String BOOKING_PAYMENT_METHOD_UPDATED = "BOOKING_PAYMENT_METHOD_UPDATED";
+    public static final String BOOKING_REFUND_COMPLETED = "BOOKING_REFUND_COMPLETED";
     public static final String PAYMENT_LINK_CREATED = "PAYMENT_LINK_CREATED";
     public static final String PAYMENT_CONFIRMED = "PAYMENT_CONFIRMED";
     public static final String PAYMENT_FAILED = "PAYMENT_FAILED";

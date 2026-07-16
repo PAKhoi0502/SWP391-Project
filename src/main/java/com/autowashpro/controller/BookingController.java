@@ -24,6 +24,7 @@ import java.util.List;
 import com.autowashpro.dto.request.StartServiceRequest;
 import java.time.LocalDate;
 import com.autowashpro.dto.request.CancelBookingRequest;
+import com.autowashpro.dto.request.ManualRefundRequest;
 import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
 import com.autowashpro.dto.request.CompleteServiceRequest;
 import com.autowashpro.dto.request.MarkBookingPaidRequest;
@@ -52,7 +53,8 @@ public class BookingController {
                 return ApiResponse.<AvailableSlotResponse>builder()
                                 .success(true)
                                 .message("Available slots retrieved")
-                                .data(bookingService.getAvailableSlots(garageId, servicePackageId, vehicleType, date, isWalkIn))
+                                .data(bookingService.getAvailableSlots(garageId, servicePackageId, vehicleType, date,
+                                                isWalkIn))
                                 .build();
         }
 
@@ -288,6 +290,74 @@ public class BookingController {
                 return ApiResponse.<BookingResponse>builder()
                                 .success(true)
                                 .message("Booking cancelled successfully")
+                                .data(response)
+                                .build();
+        }
+
+        @GetMapping("/refund-pending")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<List<BookingSummaryResponse>> getPendingRefundBookings(
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+
+                String role = userDetails.getAuthorities()
+                                .iterator()
+                                .next()
+                                .getAuthority();
+
+                return ApiResponse.<List<BookingSummaryResponse>>builder()
+                                .success(true)
+                                .message("Pending refund bookings retrieved successfully")
+                                .data(
+                                                bookingService.getPendingRefundBookings(
+                                                                staffUserId,
+                                                                role))
+                                .build();
+
+        }
+
+        @PatchMapping("/{id}/refund-completed")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> completeManualRefund(
+
+                        @PathVariable Long id,
+
+                        @Valid @RequestBody(required = false) ManualRefundRequest request,
+
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+
+                String role = userDetails.getAuthorities()
+                                .iterator()
+                                .next()
+                                .getAuthority();
+
+                String note = request != null ? request.getNote() : null;
+
+                BookingResponse response = bookingService.completeManualRefund(
+                                id,
+                                staffUserId,
+                                role,
+                                note);
+
+                auditLogService.createAuditLog(
+                                staffUserId,
+                                AuditAction.BOOKING_REFUND_COMPLETED,
+                                AuditTargetType.BOOKING,
+                                id,
+                                AuditMetadata.of(
+                                                "depositStatus",
+                                                response.getDepositStatus(),
+                                                "refundAmount",
+                                                response.getRefundAmount(),
+                                                "note",
+                                                note));
+
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true)
+                                .message("Manual refund completed successfully")
                                 .data(response)
                                 .build();
         }

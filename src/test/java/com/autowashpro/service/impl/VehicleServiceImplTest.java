@@ -6,9 +6,11 @@ import com.autowashpro.dto.request.VehicleUpdateRequest;
 import com.autowashpro.dto.response.VehicleResponse;
 import com.autowashpro.entity.User;
 import com.autowashpro.entity.Vehicle;
+import com.autowashpro.repository.UploadRepository;
 import com.autowashpro.repository.UserRepository;
 import com.autowashpro.repository.VehicleRepository;
 import com.autowashpro.support.TestFixtures;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -26,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,8 +42,17 @@ class VehicleServiceImplTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private UploadRepository uploadRepository;
+
     @InjectMocks
     private VehicleServiceImpl vehicleService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(uploadRepository.findFirstByOwnerIdAndEntityTypeAndEntityIdOrderByCreatedAtDesc(
+                any(), any(), any())).thenReturn(Optional.empty());
+    }
 
     @Test
     void createNormalizesPlateAndMakesFirstVehicleDefault() {

@@ -34,6 +34,7 @@ import com.autowashpro.repository.BookingServiceStepRepository;
 import com.autowashpro.repository.CustomerLoyaltyRepository;
 import com.autowashpro.repository.GarageRepository;
 import com.autowashpro.repository.LoyaltyTierRuleRepository;
+import com.autowashpro.repository.PaymentTransactionRepository;
 import com.autowashpro.repository.PointTransactionRepository;
 import com.autowashpro.repository.PromotionRepository;
 import com.autowashpro.repository.PromotionUsageRepository;
@@ -140,6 +141,9 @@ class BookingServiceImplTest {
     private PointTransactionRepository pointTransactionRepository;
 
     @Mock
+    private PaymentTransactionRepository paymentTransactionRepository;
+
+    @Mock
     private LoyaltyService loyaltyService;
 
     @Mock
@@ -186,13 +190,14 @@ class BookingServiceImplTest {
 
         BookingResponse response = bookingService.createBooking(request, customer.getId());
 
-        assertEquals("CONFIRMED", response.getStatus());
+        assertEquals("PENDING_DEPOSIT", response.getStatus());
         assertMoney("120000.00", response.getOriginalPrice());
         assertMoney("120000.00", response.getFinalPrice());
         assertMoney("36000.00", response.getDepositAmount());
+        assertEquals("UNPAID", response.getDepositStatus());
+        assertEquals("PAYOS", response.getPaymentMethod());
         assertFalse(response.getIsWalkIn());
-        verify(loyaltyService).updateBookingStatistics(10L);
-        verify(notificationService).notifyBookingConfirmed(10L);
+        verify(paymentTransactionRepository).save(any());
     }
 
     @Test
@@ -219,7 +224,8 @@ class BookingServiceImplTest {
         ServicePackage servicePackage = mainPackage();
         BookingCreateRequest request = bookingRequest(TestFixtures.garage(), vehicle, servicePackage);
         when(userRepository.findById(customer.getId())).thenReturn(Optional.of(customer));
-        when(vehicleRepository.findByIdAndCustomer_Id(vehicle.getId(), customer.getId())).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdAndCustomer_Id(vehicle.getId(), customer.getId()))
+                .thenReturn(Optional.of(vehicle));
         when(servicePackageRepository.findById(servicePackage.getId())).thenReturn(Optional.of(servicePackage));
         when(garageRepository.findById(request.getGarageId())).thenReturn(Optional.empty());
 
@@ -253,7 +259,8 @@ class BookingServiceImplTest {
         ServicePackage servicePackage = mainPackage();
         BookingCreateRequest request = bookingRequest(garage, vehicle, servicePackage);
         when(userRepository.findById(customer.getId())).thenReturn(Optional.of(customer));
-        when(vehicleRepository.findByIdAndCustomer_Id(vehicle.getId(), customer.getId())).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdAndCustomer_Id(vehicle.getId(), customer.getId()))
+                .thenReturn(Optional.of(vehicle));
         when(servicePackageRepository.findById(servicePackage.getId())).thenReturn(Optional.empty());
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
@@ -365,9 +372,9 @@ class BookingServiceImplTest {
         assertMoney("115000.00", response.getFinalPrice());
         assertEquals(80, loyalty.getAvailablePoints());
         assertEquals(20, loyalty.getRedeemedPoints());
-        assertEquals(1, promotion.getUsedCount());
+        assertEquals(0, promotion.getUsedCount());
         verify(pointTransactionRepository).save(any(PointTransaction.class));
-        verify(promotionUsageRepository).save(any(PromotionUsage.class));
+        verify(promotionUsageRepository, never()).save(any(PromotionUsage.class));
         verify(bookingAddOnServicePackageRepository).save(any(BookingAddOnServicePackage.class));
     }
 
@@ -384,7 +391,7 @@ class BookingServiceImplTest {
         BookingResponse response = bookingService.createBooking(request, customer.getId());
 
         assertEquals(servicePackage.getId(), response.getServicePackageId());
-        assertEquals("CONFIRMED", response.getStatus());
+        assertEquals("PENDING_DEPOSIT", response.getStatus());
     }
 
     @Test
@@ -433,7 +440,8 @@ class BookingServiceImplTest {
         when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
         when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
 
-        BookingResponse response = bookingService.checkInBooking(booking.getId(), staffUser.getId(), "ROLE_STAFF", "arrived");
+        BookingResponse response = bookingService.checkInBooking(booking.getId(), staffUser.getId(), "ROLE_STAFF",
+                "arrived");
 
         assertEquals("CHECKED_IN", response.getStatus());
         assertNotNull(response.getCheckedInAt());
@@ -449,7 +457,8 @@ class BookingServiceImplTest {
         when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
         when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
 
-        BookingResponse response = bookingService.checkInBooking(booking.getId(), adminUser.getId(), "ROLE_ADMIN", "arrived");
+        BookingResponse response = bookingService.checkInBooking(booking.getId(), adminUser.getId(), "ROLE_ADMIN",
+                "arrived");
 
         assertEquals("CHECKED_IN", response.getStatus());
         verify(staffProfileRepository, never()).findByUser_Id(any());
@@ -474,7 +483,8 @@ class BookingServiceImplTest {
         when(washBayRepository.save(any(WashBay.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(staffProfileRepository.findByGarageIdAndStaffTypeAndIsActiveTrue(
                 garage.getId(), StaffType.VEHICLE_CARE_STAFF)).thenReturn(List.of(staffProfile));
-        when(bookingAssignedStaffRepository.countOverlap(staffProfile.getId(), booking.getStartTime(), booking.getEndTime()))
+        when(bookingAssignedStaffRepository.countOverlap(staffProfile.getId(), booking.getStartTime(),
+                booking.getEndTime()))
                 .thenReturn(0L);
         when(comboStepResolver.resolveSteps(servicePackage)).thenReturn(List.of(template));
         when(bookingServiceStepRepository.save(any(BookingServiceStep.class))).thenAnswer(invocation -> {
@@ -486,7 +496,8 @@ class BookingServiceImplTest {
         StartServiceRequest request = new StartServiceRequest();
         request.setNote("start now");
 
-        BookingResponse response = bookingService.startService(booking.getId(), staffUser.getId(), "ROLE_STAFF", request);
+        BookingResponse response = bookingService.startService(booking.getId(), staffUser.getId(), "ROLE_STAFF",
+                request);
 
         assertEquals("IN_PROGRESS", response.getStatus());
         assertEquals(washBay.getId(), response.getWashBayId());
@@ -521,7 +532,8 @@ class BookingServiceImplTest {
         when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
         StartServiceRequest request = new StartServiceRequest();
 
-        BookingResponse response = bookingService.startService(booking.getId(), adminUser.getId(), "ROLE_ADMIN", request);
+        BookingResponse response = bookingService.startService(booking.getId(), adminUser.getId(), "ROLE_ADMIN",
+                request);
 
         assertEquals("IN_PROGRESS", response.getStatus());
         assertEquals(washBay.getId(), response.getWashBayId());
@@ -549,10 +561,12 @@ class BookingServiceImplTest {
         when(washBayRepository.findById(washBay.getId())).thenReturn(Optional.of(washBay));
         when(bookingAssignedStaffRepository.findByBookingId(booking.getId())).thenReturn(List.of(assignedStaff));
         when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
+        when(userRepository.findById(booking.getCustomerId())).thenReturn(Optional.of(refundReadyCustomer(booking.getCustomerId())));
         when(vehicleInspectionRepository.findByBookingIdOrderByCreatedAtAsc(booking.getId()))
                 .thenReturn(List.of(inspection("BEFORE_WASH")));
 
-        BookingResponse response = bookingService.completeService(booking.getId(), staffUser.getId(), "ROLE_STAFF", "done");
+        BookingResponse response = bookingService.completeService(booking.getId(), staffUser.getId(), "ROLE_STAFF",
+                "done");
 
         assertEquals("COMPLETED", response.getStatus());
         assertNotNull(response.getCompletedAt());
@@ -627,7 +641,8 @@ class BookingServiceImplTest {
         when(vehicleInspectionRepository.findByBookingIdOrderByCreatedAtAsc(booking.getId()))
                 .thenReturn(List.of(inspection("BEFORE_WASH"), inspection("AFTER_WASH")));
 
-        BookingResponse response = bookingService.completeService(booking.getId(), staffUser.getId(), "ROLE_STAFF", "done");
+        BookingResponse response = bookingService.completeService(booking.getId(), staffUser.getId(), "ROLE_STAFF",
+                "done");
 
         assertEquals("COMPLETED", response.getStatus());
     }
@@ -656,7 +671,8 @@ class BookingServiceImplTest {
         when(bookingServiceStepRepository.findById(step.getId())).thenReturn(Optional.of(step));
         when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
         when(staffProfileRepository.findByUser_Id(staffUser.getId())).thenReturn(Optional.of(staffProfile));
-        when(bookingServiceStepRepository.save(any(BookingServiceStep.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(bookingServiceStepRepository.save(any(BookingServiceStep.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         BookingServiceStepResponse response = bookingService.completeServiceStep(
                 step.getId(), staffUser.getId(), new CompleteBookingServiceStepRequest());
@@ -684,6 +700,7 @@ class BookingServiceImplTest {
         when(washBayRepository.findById(washBay.getId())).thenReturn(Optional.of(washBay));
         when(bookingAssignedStaffRepository.findByBookingId(booking.getId())).thenReturn(List.of(assignedStaff));
         when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
+        when(userRepository.findById(booking.getCustomerId())).thenReturn(Optional.of(refundReadyCustomer(booking.getCustomerId())));
 
         BookingResponse response = bookingService.cancelBooking(
                 booking.getId(), staffUser.getId(), "ROLE_STAFF", "customer requested");
@@ -718,6 +735,7 @@ class BookingServiceImplTest {
         when(promotionUsageRepository.findByBookingId(booking.getId())).thenReturn(Optional.of(usage));
         when(promotionRepository.findById(promotion.getId())).thenReturn(Optional.of(promotion));
         when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
+        when(userRepository.findById(booking.getCustomerId())).thenReturn(Optional.of(refundReadyCustomer(booking.getCustomerId())));
 
         BookingResponse response = bookingService.cancelBooking(
                 booking.getId(), staffUser.getId(), "ROLE_STAFF", "changed plan");
@@ -800,8 +818,7 @@ class BookingServiceImplTest {
         verify(promotionService).recordPromotionUsageAfterPaidBooking(booking.getId());
         verify(loyaltyService).earnPointsAfterPaidBooking(booking.getId());
         verify(washHistoryService).createWashHistoryAfterPaidBooking(booking.getId());
-        verify(notificationService).notifyPaymentConfirmed(booking.getId());
-        verify(notificationService).notifyRewardEarned(booking.getId());
+        verify(notificationService).notifyPaymentAndReward(booking.getId());
     }
 
     @Test
@@ -839,7 +856,8 @@ class BookingServiceImplTest {
             ServicePackage servicePackage,
             CustomerLoyalty loyalty) {
         when(userRepository.findById(customer.getId())).thenReturn(Optional.of(customer));
-        when(vehicleRepository.findByIdAndCustomer_Id(vehicle.getId(), customer.getId())).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdAndCustomer_Id(vehicle.getId(), customer.getId()))
+                .thenReturn(Optional.of(vehicle));
         when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
         when(servicePackageRepository.findById(servicePackage.getId())).thenReturn(Optional.of(servicePackage));
         when(garageRepository.findById(garage.getId())).thenReturn(Optional.of(garage));
@@ -898,6 +916,15 @@ class BookingServiceImplTest {
         request.setStartTime(slotStart());
         request.setPaymentMethod("CASH");
         return request;
+    }
+
+    private User refundReadyCustomer(Long id) {
+        User customer = TestFixtures.customer();
+        customer.setId(id);
+        customer.setBankName("VCB");
+        customer.setBankAccountName("Customer Test");
+        customer.setBankAccountNumber("123456789");
+        return customer;
     }
 
     private Booking confirmedBooking(Vehicle vehicle, Garage garage, ServicePackage servicePackage) {

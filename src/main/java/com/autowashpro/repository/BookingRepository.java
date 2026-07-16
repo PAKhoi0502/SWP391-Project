@@ -12,123 +12,147 @@ import java.util.Optional;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
-    // Giữ nguyên từ phong-bk (issue #10)
-    List<Booking> findByGarageId(Long garageId);
+        // Giữ nguyên từ phong-bk (issue #10)
+        List<Booking> findByGarageId(Long garageId);
 
-    List<Booking> findByGarageIdAndStartTimeBetween(
-            Long garageId,
-            LocalDateTime start,
-            LocalDateTime end);
+        List<Booking> findByGarageIdAndStartTimeBetween(
+                        Long garageId,
+                        LocalDateTime start,
+                        LocalDateTime end);
 
-    // Issue #11: Kiểm tra xe có booking active nào overlap không
-    @Query("""
-        SELECT COUNT(b) FROM Booking b
-        WHERE b.vehicleId = :vehicleId
-        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
-        AND b.startTime < :endTime
-        AND b.endTime > :startTime
-        """)
-    long countOverlappingBookingsByVehicle(
-            @Param("vehicleId") Long vehicleId,
-            @Param("startTime") LocalDateTime startTime,
-            @Param("endTime") LocalDateTime endTime
-    );
+        // Issue #11: Kiểm tra xe có booking active nào overlap không
+        @Query("""
+                        SELECT COUNT(b) FROM Booking b
+                        WHERE b.vehicleId = :vehicleId
+                        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                        AND b.startTime < :endTime
+                        AND b.endTime > :startTime
+                        """)
+        long countOverlappingBookingsByVehicle(
+                        @Param("vehicleId") Long vehicleId,
+                        @Param("startTime") LocalDateTime startTime,
+                        @Param("endTime") LocalDateTime endTime);
 
-    // Issue #11: Đếm upcoming bookings của customer
-    @Query("""
-        SELECT COUNT(b) FROM Booking b
-        WHERE b.customerId = :customerId
-        AND b.status IN ('CONFIRMED', 'CHECKED_IN')
-        AND b.startTime > :now
-        """)
-    long countUpcomingBookings(
-            @Param("customerId") Long customerId,
-            @Param("now") LocalDateTime now
-    );
+        // Issue #11: Đếm upcoming bookings của customer
+        @Query("""
+                        SELECT COUNT(b) FROM Booking b
+                        WHERE b.customerId = :customerId
+                        AND b.status IN ('CONFIRMED', 'CHECKED_IN')
+                        AND b.startTime > :now
+                        """)
+        long countUpcomingBookings(
+                        @Param("customerId") Long customerId,
+                        @Param("now") LocalDateTime now);
 
-    // Issue #11: Lấy bookings theo customer
-    List<Booking> findByCustomerIdOrderByStartTimeDesc(Long customerId);
+        // Issue #11: Lấy bookings theo customer
+        List<Booking> findByCustomerIdOrderByStartTimeDesc(Long customerId);
 
-    // ===== Issue #13 =====
+        // ===== Issue #13 =====
 
-    Optional<Booking> findByIdAndCustomerId(
-            Long id,
-            Long customerId);
+        Optional<Booking> findByIdAndCustomerId(
+                        Long id,
+                        Long customerId);
 
-    List<Booking> findByGarageIdOrderByStartTimeDesc(
-            Long garageId);
+        List<Booking> findByGarageIdOrderByStartTimeDesc(
+                        Long garageId);
 
-    List<Booking> findByGarageIdAndBookingDateOrderByStartTimeDesc(
-            Long garageId,
-            LocalDate bookingDate);
+        List<Booking> findByGarageIdAndBookingDateOrderByStartTimeDesc(
+                        Long garageId,
+                        LocalDate bookingDate);
 
-    List<Booking> findAllByOrderByStartTimeDesc();
+        List<Booking> findAllByOrderByStartTimeDesc();
 
-    long countByPromotionIdAndCustomerIdAndStatusNot(Long promotionId, Long customerId, String status);
+        long countByPromotionIdAndCustomerIdAndStatusNot(Long promotionId, Long customerId, String status);
 
-    long countByPromotionIdAndStatusNot(Long promotionId, String status);
+        long countByPromotionIdAndStatusNot(Long promotionId, String status);
 
+        // ====================
 
-    // ====================
+        // Issue #11: Đếm booking chiếm wash bay theo garage + vehicle type.
+        // Dùng b.vehicleType (lưu trực tiếp trên booking) thay vì JOIN sang Vehicle,
+        // vì khách vãng lai (walk-in) không có vehicle_id nên sẽ bị JOIN loại bỏ nhầm.
+        @Query("""
+                        SELECT COUNT(b) FROM Booking b
+                        WHERE b.garageId = :garageId
+                        AND b.vehicleType = :vehicleType
+                        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                        AND b.startTime < :endTime
+                        AND b.endTime > :startTime
+                        """)
+        long countOverlappingBookingsByGarageAndVehicleType(
+                        @Param("garageId") Long garageId,
+                        @Param("vehicleType") String vehicleType,
+                        @Param("startTime") LocalDateTime startTime,
+                        @Param("endTime") LocalDateTime endTime);
 
-    // Issue #11: Đếm booking chiếm wash bay theo garage + vehicle type.
-    // Dùng b.vehicleType (lưu trực tiếp trên booking) thay vì JOIN sang Vehicle,
-    // vì khách vãng lai (walk-in) không có vehicle_id nên sẽ bị JOIN loại bỏ nhầm.
-    @Query("""
-        SELECT COUNT(b) FROM Booking b
-        WHERE b.garageId = :garageId
-        AND b.vehicleType = :vehicleType
-        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
-        AND b.startTime < :endTime
-        AND b.endTime > :startTime
-        """)
-    long countOverlappingBookingsByGarageAndVehicleType(
-            @Param("garageId") Long garageId,
-            @Param("vehicleType") String vehicleType,
-            @Param("startTime") LocalDateTime startTime,
-            @Param("endTime") LocalDateTime endTime
-    );
+        // Issue #12: Kiểm tra license plate overlap (walk-in booking)
+        @Query("""
+                        SELECT COUNT(b) FROM Booking b
+                        WHERE b.licensePlate = :licensePlate
+                        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                        AND b.startTime < :endTime
+                        AND b.endTime > :startTime
+                        """)
+        long countOverlappingBookingsByLicensePlate(
+                        @Param("licensePlate") String licensePlate,
+                        @Param("startTime") LocalDateTime startTime,
+                        @Param("endTime") LocalDateTime endTime);
 
-    // Issue #12: Kiểm tra license plate overlap (walk-in booking)
-    @Query("""
-        SELECT COUNT(b) FROM Booking b
-        WHERE b.licensePlate = :licensePlate
-        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
-        AND b.startTime < :endTime
-        AND b.endTime > :startTime
-        """)
-    long countOverlappingBookingsByLicensePlate(
-            @Param("licensePlate") String licensePlate,
-            @Param("startTime") LocalDateTime startTime,
-            @Param("endTime") LocalDateTime endTime
-    );
+        // Issue #12: Đếm tất cả booking đang chiếm wash bay theo garage (dùng cho
+        // walk-in)
+        @Query("""
+                        SELECT COUNT(b) FROM Booking b
+                        WHERE b.garageId = :garageId
+                        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                        AND b.startTime < :endTime
+                        AND b.endTime > :startTime
+                        """)
+        long countOverlappingBookingsByGarage(
+                        @Param("garageId") Long garageId,
+                        @Param("startTime") LocalDateTime startTime,
+                        @Param("endTime") LocalDateTime endTime);
 
-    // Issue #12: Đếm tất cả booking đang chiếm wash bay theo garage (dùng cho walk-in)
-    @Query("""
-        SELECT COUNT(b) FROM Booking b
-        WHERE b.garageId = :garageId
-        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
-        AND b.startTime < :endTime
-        AND b.endTime > :startTime
-        """)
-    long countOverlappingBookingsByGarage(
-            @Param("garageId") Long garageId,
-            @Param("startTime") LocalDateTime startTime,
-            @Param("endTime") LocalDateTime endTime
-    );
+        @Query("""
+                        SELECT COUNT(b) FROM Booking b
+                        WHERE b.customerId = :customerId
+                        AND b.garageId = :garageId
+                        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                        AND b.startTime < :endTime
+                        AND b.endTime > :startTime
+                        """)
+        long countOverlappingBookingsByCustomerAndGarage(
+                        @Param("customerId") Long customerId,
+                        @Param("garageId") Long garageId,
+                        @Param("startTime") LocalDateTime startTime,
+                        @Param("endTime") LocalDateTime endTime);
 
-    @Query("""
-        SELECT COUNT(b) FROM Booking b
-        WHERE b.customerId = :customerId
-        AND b.garageId = :garageId
-        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
-        AND b.startTime < :endTime
-        AND b.endTime > :startTime
-        """)
-    long countOverlappingBookingsByCustomerAndGarage(
-            @Param("customerId") Long customerId,
-            @Param("garageId") Long garageId,
-            @Param("startTime") LocalDateTime startTime,
-            @Param("endTime") LocalDateTime endTime
-    );
+        List<Booking> findByStatusAndDepositStatus(
+                        String status,
+                        String depositStatus);
+
+        @Query("""
+                        SELECT b
+                        FROM Booking b
+                        WHERE b.status = :status
+                        AND b.depositStatus = :depositStatus
+                        AND b.paymentExpiredAt IS NOT NULL
+                        AND b.paymentExpiredAt <= :now
+                        """)
+        List<Booking> findExpiredPendingDeposits(
+                        @Param("status") String status,
+                        @Param("depositStatus") String depositStatus,
+                        @Param("now") LocalDateTime now);
+
+        List<Booking> findByDepositStatusOrderByCreatedAtDesc(
+                        String depositStatus);
+
+        @Query("""
+                        SELECT b
+                        FROM Booking b
+                        WHERE b.depositStatus = 'REFUND_PENDING'
+                        ORDER BY b.updatedAt DESC
+                        """)
+        List<Booking> findRefundPendingBookings();
+        Optional<Booking> findByTrackingToken(String trackingToken);
+        
 }

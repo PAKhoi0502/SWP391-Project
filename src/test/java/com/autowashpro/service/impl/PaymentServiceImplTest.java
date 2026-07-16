@@ -143,7 +143,7 @@ class PaymentServiceImplTest {
 
     @Test
     void createPayOSPaymentPostsRequestAndSavesPendingTransaction() {
-        Booking booking = completedBooking();
+        Booking booking = pendingDepositBooking();
         CreatePayOSPaymentRequest request = paymentRequest(booking.getId());
         when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
         when(restTemplate.postForEntity(
@@ -169,7 +169,7 @@ class PaymentServiceImplTest {
         HttpEntity<Map<String, Object>> httpEntity = httpEntityCaptor.getValue();
         assertEquals("client-id", httpEntity.getHeaders().getFirst("x-client-id"));
         assertEquals("api-key", httpEntity.getHeaders().getFirst("x-api-key"));
-        assertEquals(booking.getFinalPrice().intValue(), httpEntity.getBody().get("amount"));
+        assertEquals(booking.getDepositAmount().intValue(), httpEntity.getBody().get("amount"));
         assertEquals("DH#" + booking.getId(), httpEntity.getBody().get("description"));
         assertNotNull(httpEntity.getBody().get("signature"));
         verify(transactionRepository).save(transactionCaptor.capture());
@@ -177,7 +177,7 @@ class PaymentServiceImplTest {
         assertEquals(booking.getId(), saved.getBookingId());
         assertEquals("PAYOS", saved.getPaymentMethod());
         assertEquals("PENDING", saved.getStatus());
-        assertEquals(booking.getFinalPrice(), saved.getAmount());
+        assertEquals(booking.getDepositAmount(), saved.getAmount());
         assertEquals(response.getOrderCode(), saved.getOrderCode());
     }
 
@@ -191,7 +191,7 @@ class PaymentServiceImplTest {
 
         paymentService.handlePayOSWebhook(webhookPayload(transaction.getOrderCode(), "00"));
 
-        assertEquals("PAID", transaction.getStatus());
+        assertEquals("SUCCESS", transaction.getStatus());
         assertNotNull(transaction.getPaidAt());
         assertEquals("payment-link-123", transaction.getPayosTransactionId());
         assertEquals("PAID", booking.getPaymentStatus());
@@ -227,7 +227,7 @@ class PaymentServiceImplTest {
     void handlePayOSWebhookIgnoresAlreadyProcessedTransaction() throws Exception {
         Booking booking = completedBooking();
         PaymentTransaction transaction = pendingTransaction(booking);
-        transaction.setStatus("PAID");
+        transaction.setStatus("SUCCESS");
         when(payOS.verifyPaymentWebhookData(any(Webhook.class))).thenReturn(webhookData(transaction.getOrderCode(), "00"));
         when(transactionRepository.findByOrderCode(transaction.getOrderCode())).thenReturn(Optional.of(transaction));
 
@@ -250,7 +250,7 @@ class PaymentServiceImplTest {
 
         paymentService.handlePayOSWebhook(webhookPayload(transaction.getOrderCode(), "00"));
 
-        assertEquals("PAID", transaction.getStatus());
+        assertEquals("SUCCESS", transaction.getStatus());
         verify(transactionRepository).save(transaction);
         verify(bookingRepository, never()).save(booking);
         verify(loyaltyService, never()).earnPointsAfterPaidBooking(any());
@@ -276,12 +276,21 @@ class PaymentServiceImplTest {
         return booking;
     }
 
+    private Booking pendingDepositBooking() {
+        Booking booking = completedBooking();
+        booking.setStatus("PENDING_DEPOSIT");
+        booking.setPaymentStatus("UNPAID");
+        booking.setDepositAmount(new BigDecimal("36000.00"));
+        booking.setDepositStatus("UNPAID");
+        return booking;
+    }
+
     private PaymentTransaction pendingTransaction(Booking booking) {
         PaymentTransaction transaction = new PaymentTransaction();
         transaction.setId(50L);
         transaction.setBookingId(booking.getId());
         transaction.setPaymentMethod("PAYOS");
-        transaction.setAmount(booking.getFinalPrice());
+        transaction.setAmount(booking.getDepositAmount());
         transaction.setStatus("PENDING");
         transaction.setOrderCode(987654321L);
         transaction.setCheckoutUrl("https://pay.payos.vn/web/abc");
