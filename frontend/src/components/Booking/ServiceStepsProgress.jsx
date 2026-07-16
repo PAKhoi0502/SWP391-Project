@@ -2,31 +2,30 @@ import { useState } from 'react'
 import './ServiceStepsProgress.css'
 
 const TEXT = {
-  noSteps: 'Ch\u01b0a c\u00f3 b\u01b0\u1edbc d\u1ecbch v\u1ee5 n\u00e0o.',
-  notInProgress:
-    'Ch\u1ec9 c\u00f3 th\u1ec3 c\u1eadp nh\u1eadt b\u01b0\u1edbc khi booking \u0111ang th\u1ef1c hi\u1ec7n.',
-  completeStep: 'Ho\u00e0n th\u00e0nh b\u01b0\u1edbc',
-  reopenStep: 'M\u1edf l\u1ea1i b\u01b0\u1edbc',
-  confirm: 'X\u00e1c nh\u1eadn',
-  confirmReopen: 'X\u00e1c nh\u1eadn m\u1edf l\u1ea1i',
-  cancel: 'H\u1ee7y',
-  notePlaceholder: 'Ghi ch\u00fa (t\u00f9y ch\u1ecdn)...',
-  pending: '\u0110ang ch\u1edd',
-  completed: 'Ho\u00e0n th\u00e0nh',
-  completedAt: 'Ho\u00e0n th\u00e0nh l\u00fac',
-  completedBy: 'Ng\u01b0\u1eddi c\u1eadp nh\u1eadt',
-  processing: '\u0110ang x\u1eed l\u00fd...',
-  blockedHint: 'C\u1ea7n \u0111i\u1ec1n v\u00e0 l\u01b0u inspection tr\u01b0\u1edbc khi ho\u00e0n th\u00e0nh b\u01b0\u1edbc n\u00e0y.',
+  noSteps: 'No service steps found.',
+  notInProgress: 'Steps can only be updated while the booking is in progress.',
+  completeStep: 'Complete step',
+  reopenStep: 'Reopen step',
+  confirm: 'Confirm',
+  confirmReopen: 'Confirm reopen',
+  cancel: 'Cancel',
+  notePlaceholder: 'Add a note (optional)...',
+  pending: 'Pending',
+  completed: 'Completed',
+  completedAt: 'Completed at',
+  completedBy: 'Updated by',
+  processing: 'Processing...',
+  blockedHint: 'Please fill and save the inspection before completing this step.',
 }
 
 const formatDateTime = (value) => {
   if (!value) return null
-  return new Date(value).toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' })
+  return new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 const normalizeStep = (step, index) => ({
   id: step.id,
-  title: step.title || step.name || step.stepName || `B\u01b0\u1edbc ${index + 1}`,
+  title: step.title || step.name || step.stepName || `Step ${index + 1}`,
   description: step.description || step.detail || '',
   order: Number(step.stepOrder || step.order || step.sequence || index + 1),
   status: String(step.status || 'PENDING').toUpperCase(),
@@ -92,7 +91,9 @@ export default function ServiceStepsProgress({
   return (
     <div className="ssp-root">
       {error && <p className="ssp-error">{error}</p>}
-      {!isInProgress && onCompleteStep && onReopenStep && <p className="ssp-hint">{TEXT.notInProgress}</p>}
+      {!isInProgress && onCompleteStep && onReopenStep && (
+        <p className="ssp-hint">{TEXT.notInProgress}</p>
+      )}
       <ol className="ssp-list">
         {normalizedSteps.map((step) => {
           const isCompleted = step.status === 'COMPLETED'
@@ -121,9 +122,7 @@ export default function ServiceStepsProgress({
                     <p className="ssp-meta">
                       {TEXT.completedAt}: {formatDateTime(step.completedAt)}
                       {step.completedByStaffId && (
-                        <>
-                          {' \u00b7 '} {TEXT.completedBy} Staff #{step.completedByStaffId}
-                        </>
+                        <> &middot; {TEXT.completedBy} Staff #{step.completedByStaffId}</>
                       )}
                     </p>
                   )}

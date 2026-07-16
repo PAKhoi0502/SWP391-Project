@@ -1,5 +1,5 @@
-﻿import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { bookingApi } from '../../api/bookingApi'
 import customerBookingFlowApi from '../../api/customerBookingFlowApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
@@ -8,45 +8,36 @@ import { vehicleInspectionApi } from '../../api/vehicleInspectionApi'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import './BookingHistoryPage.css'
 
-const BOOKING_CACHE_PREFIX = 'booking-detail-cache-'
-const PAYOS_PAID_CACHE_PREFIX = 'booking-payos-paid-'
+/* ─── Cache keys ─── */
+const BOOKING_CACHE_PREFIX        = 'booking-detail-cache-'
+const PAYOS_PAID_CACHE_PREFIX     = 'booking-payos-paid-'
 const PAYMENT_METHOD_CACHE_PREFIX = 'booking-payment-method-'
 
+/* ─── Filter tabs ─── */
 const STATUS_FILTERS = ['ALL', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELED']
 
+const getFilterLabel = (f) =>
+  ({ ALL: 'All', CONFIRMED: 'Upcoming', IN_PROGRESS: 'In Progress', COMPLETED: 'Completed', CANCELED: 'Cancelled' }[f] || f)
+
+/* ─── Formatters ─── */
 const formatMoney = (value) =>
-  new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    maximumFractionDigits: 0,
-  }).format(Number(value || 0))
+  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(Number(value || 0))
 
 const formatDateTime = (value) => {
-  if (!value) return 'Chưa cập nhật'
-
+  if (!value) return 'N/A'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return String(value)
-
-  return date.toLocaleString('vi-VN', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
+  return date.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-const getBookingId = (booking) => booking?.bookingId ?? booking?.id
+const getBookingId  = (booking) => booking?.bookingId ?? booking?.id
+const normalizeText = (value)   =>
+  String(value || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
-const normalizeText = (value) =>
-  String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-
+/* ─── localStorage helpers ─── */
 const readCachedBooking = (bookingId) => {
-  try {
-    return JSON.parse(localStorage.getItem(`${BOOKING_CACHE_PREFIX}${bookingId}`) || '{}')
-  } catch {
-    return {}
-  }
+  try { return JSON.parse(localStorage.getItem(`${BOOKING_CACHE_PREFIX}${bookingId}`) || '{}') }
+  catch { return {} }
 }
 
 const readCachedPaymentMethod = (bookingId) => {
@@ -61,21 +52,13 @@ const readCachedPayOSPaidAt = (bookingId) => {
 
 const mergeBookingWithCache = (booking) => {
   const bookingId = getBookingId(booking)
-  const cached = readCachedBooking(bookingId)
-  const paidAt = readCachedPayOSPaidAt(bookingId)
-  // Live API data wins for status/note; cache fills in display-only fields
-  // (customerName, vehicleName, garageName, paymentMethod) not returned by list API.
-  const merged = { ...cached, ...booking }
-
+  const cached    = readCachedBooking(bookingId)
+  const paidAt    = readCachedPayOSPaidAt(bookingId)
+  const merged    = { ...cached, ...booking }
   if (!merged.paymentMethod) {
     merged.paymentMethod = cached.paymentMethod || readCachedPaymentMethod(bookingId)
   }
-
-  if (paidAt) {
-    merged.paymentStatus = 'PAID'
-    merged.paidAt = merged.paidAt || paidAt
-  }
-
+  if (paidAt) { merged.paymentStatus = 'PAID'; merged.paidAt = merged.paidAt || paidAt }
   return merged
 }
 
@@ -83,57 +66,33 @@ const getStoredUserName = () => {
   try {
     const user = JSON.parse(localStorage.getItem('user') || '{}')
     return user?.fullName || user?.name || user?.username || user?.email || ''
-  } catch {
-    return ''
-  }
+  } catch { return '' }
 }
 
 const inferPaymentMethod = (booking) => {
   const method = String(booking?.paymentMethod || '').toUpperCase()
-  const note = normalizeText(booking?.note)
-
-  if (method === 'BANK_TRANSFER' || method === 'PAYOS' || note.includes('chuyen khoan')) {
-    return method || 'BANK_TRANSFER'
-  }
-
-  if (method === 'CASH' || note.includes('tien mat')) {
-    return 'CASH'
-  }
-
+  const note   = normalizeText(booking?.note)
+  if (method === 'BANK_TRANSFER' || method === 'PAYOS' || note.includes('chuyen khoan')) return method || 'BANK_TRANSFER'
+  if (method === 'CASH' || note.includes('tien mat')) return 'CASH'
   return ''
 }
 
 const cacheBookingDetail = (booking) => {
   const bookingId = getBookingId(booking)
   if (!bookingId) return
-
   try {
-    const key = `${BOOKING_CACHE_PREFIX}${bookingId}`
-    const cached = readCachedBooking(bookingId)
-    const customerName = cached.customerName || booking.customerName || getStoredUserName()
-    const customerId = booking.customerId || cached.customerId
+    const key           = `${BOOKING_CACHE_PREFIX}${bookingId}`
+    const cached        = readCachedBooking(bookingId)
+    const customerName  = cached.customerName || booking.customerName || getStoredUserName()
+    const customerId    = booking.customerId || cached.customerId
     const paymentMethod = inferPaymentMethod(booking) || inferPaymentMethod(cached)
-
-    if (customerId && customerName) {
-      localStorage.setItem(`booking-customer-name-${customerId}`, customerName)
-    }
-
-    if (paymentMethod) {
-      localStorage.setItem(`booking-payment-method-${bookingId}`, paymentMethod)
-    }
-
-    localStorage.setItem(
-      key,
-      JSON.stringify({
-        ...cached,
-        ...booking,
-        customerName,
-        paymentMethod: booking.paymentMethod || cached.paymentMethod || paymentMethod,
-      }),
-    )
-  } catch {
-    // localStorage can be unavailable in restricted browser modes.
-  }
+    if (customerId && customerName) localStorage.setItem(`booking-customer-name-${customerId}`, customerName)
+    if (paymentMethod) localStorage.setItem(`booking-payment-method-${bookingId}`, paymentMethod)
+    localStorage.setItem(key, JSON.stringify({
+      ...cached, ...booking, customerName,
+      paymentMethod: booking.paymentMethod || cached.paymentMethod || paymentMethod,
+    }))
+  } catch { /* localStorage unavailable */ }
 }
 
 const addOnPackageNameCache = new Map()
@@ -141,87 +100,88 @@ const addOnPackageNameCache = new Map()
 const resolveAddOnServicePackageNames = async (addOnIds) => {
   const ids = Array.isArray(addOnIds) ? addOnIds.filter((id) => id !== null && id !== undefined) : []
   if (ids.length === 0) return []
-
-  const names = await Promise.all(
-    ids.map(async (id) => {
-      if (addOnPackageNameCache.has(id)) return addOnPackageNameCache.get(id)
-
-      try {
-        const pkg = await getServicePackageById(id)
-        const name = getPackageName(pkg)
-        addOnPackageNameCache.set(id, name)
-        return name
-      } catch {
-        return `Gói #${id}`
-      }
-    }),
-  )
-
+  const names = await Promise.all(ids.map(async (id) => {
+    if (addOnPackageNameCache.has(id)) return addOnPackageNameCache.get(id)
+    try {
+      const pkg  = await getServicePackageById(id)
+      const name = getPackageName(pkg)
+      addOnPackageNameCache.set(id, name)
+      return name
+    } catch { return `Package #${id}` }
+  }))
   return names
 }
 
 const enrichBookingsWithDetail = async (items) => {
   if (!Array.isArray(items)) return []
-
-  const results = await Promise.allSettled(
-    items.map(async (booking) => {
-      const bookingId = getBookingId(booking)
-      if (!bookingId) return booking
-
-      const detail = await bookingApi.getCustomerBookingDetail(bookingId)
-      const enrichedBooking = mergeBookingWithCache({ ...booking, ...detail })
-      enrichedBooking.addOnServicePackageNames = await resolveAddOnServicePackageNames(
-        enrichedBooking.addOnServicePackageIds,
-      )
-      cacheBookingDetail(enrichedBooking)
-      return enrichedBooking
-    }),
-  )
-
+  const results = await Promise.allSettled(items.map(async (booking) => {
+    const bookingId = getBookingId(booking)
+    if (!bookingId) return booking
+    const detail         = await bookingApi.getCustomerBookingDetail(bookingId)
+    const enrichedBooking = mergeBookingWithCache({ ...booking, ...detail })
+    enrichedBooking.addOnServicePackageNames = await resolveAddOnServicePackageNames(enrichedBooking.addOnServicePackageIds)
+    cacheBookingDetail(enrichedBooking)
+    return enrichedBooking
+  }))
   return results.map((result, index) =>
-    result.status === 'fulfilled' ? result.value : mergeBookingWithCache(items[index]),
-  )
+    result.status === 'fulfilled' ? result.value : mergeBookingWithCache(items[index]))
 }
 
+/* ─── Status / payment text ─── */
 const getStatusText = (status) => {
-  const value = String(status || '').toUpperCase()
-
-  if (value === 'CONFIRMED') return 'Chưa thực hiện'
-  if (value === 'PENDING_DEPOSIT') return 'Chờ đặt cọc'
-  if (value === 'CHECKED_IN') return 'Đã check-in'
-  if (value === 'IN_PROGRESS') return 'Đang thực hiện'
-  if (value === 'COMPLETED') return 'Hoàn thành'
-  if (value === 'CANCELED' || value === 'CANCELLED') return 'Đã hủy'
-  if (value === 'NO_SHOW') return 'Không đến'
-
-  return status || 'Chưa cập nhật'
+  const v = String(status || '').toUpperCase()
+  if (v === 'CONFIRMED')       return 'Upcoming'
+  if (v === 'PENDING_DEPOSIT') return 'Pending Deposit'
+  if (v === 'CHECKED_IN')      return 'Checked In'
+  if (v === 'IN_PROGRESS')     return 'In Progress'
+  if (v === 'COMPLETED')       return 'Completed'
+  if (v === 'CANCELED' || v === 'CANCELLED') return 'Cancelled'
+  if (v === 'NO_SHOW')         return 'No Show'
+  return status || 'N/A'
 }
 
 const getPaymentText = (status) => {
-  const value = String(status || '').toUpperCase()
-
-  if (value === 'PAID') return 'Đã thanh toán'
-  if (value === 'UNPAID') return 'Chưa thanh toán'
-  if (value === 'PENDING') return 'Đang chờ'
-  if (value === 'CANCELLED' || value === 'CANCELED') return 'Đã hủy'
-
-  return status || 'Chưa thanh toán'
+  const v = String(status || '').toUpperCase()
+  if (v === 'PAID')                          return 'Paid'
+  if (v === 'UNPAID')                        return 'Unpaid'
+  if (v === 'PENDING')                       return 'Pending'
+  if (v === 'CANCELLED' || v === 'CANCELED') return 'Cancelled'
+  return status || 'Unpaid'
 }
 
 const isCanceledStatus = (status) => {
-  const value = String(status || '').toUpperCase()
-  return value === 'CANCELED' || value === 'CANCELLED'
+  const v = String(status || '').toUpperCase()
+  return v === 'CANCELED' || v === 'CANCELLED'
 }
-
 const isNoShowStatus = (status) => String(status || '').toUpperCase() === 'NO_SHOW'
 
+/* ─── Badge / card class helpers ─── */
+const getStatusBadgeClass = (status) => {
+  const v = String(status || '').toUpperCase()
+  if (v === 'COMPLETED') return 'bhp-badge bhp-badge--completed'
+  if (v === 'CANCELED' || v === 'CANCELLED' || v === 'NO_SHOW') return 'bhp-badge bhp-badge--cancelled'
+  if (v === 'IN_PROGRESS' || v === 'CHECKED_IN') return 'bhp-badge bhp-badge--in_progress'
+  return 'bhp-badge bhp-badge--confirmed'
+}
+
+const getPaymentBadgeClass = (status) => {
+  const v = String(status || '').toUpperCase()
+  return v === 'PAID' ? 'bhp-badge bhp-badge--paid' : 'bhp-badge bhp-badge--unpaid'
+}
+
+const getCardClass = (status) => {
+  const v = String(status || '').toUpperCase()
+  if (v === 'COMPLETED') return 'bhp-card bhp-card--completed'
+  if (['CANCELED', 'CANCELLED', 'NO_SHOW'].includes(v)) return 'bhp-card bhp-card--cancelled'
+  return 'bhp-card bhp-card--active'
+}
+
+/* ─── User / booking number helpers ─── */
 const getCurrentUserId = () => {
   try {
     const user = JSON.parse(localStorage.getItem('user') || '{}')
     return String(user?.id || user?.userId || user?.customerId || '')
-  } catch {
-    return ''
-  }
+  } catch { return '' }
 }
 
 const buildCustomerBookingNumberMap = (items) => {
@@ -229,14 +189,10 @@ const buildCustomerBookingNumberMap = (items) => {
   const ownItems = currentUserId
     ? items.filter((b) => String(b?.customerId || '') === currentUserId)
     : items
-
   const map = new Map()
   ;[...ownItems]
-    .sort((left, right) => Number(getBookingId(left) || 0) - Number(getBookingId(right) || 0))
-    .forEach((booking, index) => {
-      map.set(String(getBookingId(booking)), index + 1)
-    })
-
+    .sort((l, r) => Number(getBookingId(l) || 0) - Number(getBookingId(r) || 0))
+    .forEach((booking, index) => { map.set(String(getBookingId(booking)), index + 1) })
   return map
 }
 
@@ -245,14 +201,14 @@ const getPaymentMethodText = (booking) => {
   const note = normalizeText(booking?.note)
 
   if (method === 'BANK_TRANSFER' || method === 'PAYOS' || note.includes('chuyen khoan')) {
-    return 'Chuyển khoản'
+    return 'Bank Transfer'
   }
 
   if (method === 'CASH' || note.includes('tien mat')) {
-    return 'Tiền mặt'
+    return 'Cash'
   }
 
-  return 'Chưa cập nhật'
+  return 'Not updated'
 }
 
 let pkgStepsCache = {}
@@ -268,18 +224,12 @@ const getPackageSteps = async (packageId) => {
   }
   const pkg = await pkgStepsCache[packageId]
   if (!pkg) return []
-  const source =
-    pkg.stepsTemplate || pkg.stepTemplate || pkg.stepTemplates ||
-    pkg.steps || pkg.serviceSteps || null
+  const source = pkg.stepsTemplate || pkg.stepTemplate || pkg.stepTemplates || pkg.steps || pkg.serviceSteps || null
   if (Array.isArray(source)) {
     return source
       .map((item, index) => ({
-        title: typeof item === 'string'
-          ? item
-          : (item.title || item.name || item.stepName || `Bước ${index + 1}`),
-        order: typeof item === 'object'
-          ? (Number(item.stepOrder || item.order || item.sequence) || index + 1)
-          : index + 1,
+        title:  typeof item === 'string' ? item : (item.title || item.name || item.stepName || `Step ${index + 1}`),
+        order:  typeof item === 'object' ? (Number(item.stepOrder || item.order || item.sequence) || index + 1) : index + 1,
         status: 'PLANNED',
       }))
       .filter((s) => s.title)
@@ -298,58 +248,211 @@ const getInspectionByType = (inspections, type) =>
 const getHistoryTimelineItems = (booking, serviceSteps = [], inspections = []) => {
   const status = String(booking?.status || '').toUpperCase()
   const paymentStatus = String(booking?.paymentStatus || '').toUpperCase()
-  const checkedInAt = booking?.checkedInAt
+  const checkedInAt   = booking?.checkedInAt
 
   if (status === 'NO_SHOW') {
     return [
-      { label: 'Đặt lịch', active: true, time: booking?.startTime },
-      { label: 'Không đến', active: true, danger: true, time: booking?.updatedAt || booking?.startTime },
+      { label: 'Booked',  active: true, time: booking?.startTime },
+      { label: 'No Show', active: true, danger: true, time: booking?.updatedAt || booking?.startTime },
     ]
   }
 
   if (status === 'CANCELED' || status === 'CANCELLED') {
     return [
-      { label: 'Đặt lịch', active: true, time: booking?.startTime },
-      { label: 'Đã hủy', active: true, danger: true, time: booking?.updatedAt || booking?.startTime },
+      { label: 'Booked',    active: true, time: booking?.startTime },
+      { label: 'Cancelled', active: true, danger: true, time: booking?.updatedAt || booking?.startTime },
     ]
   }
 
   const checkinActive = ['CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'].includes(status) || Boolean(checkedInAt)
   const beforeWashInspection = getInspectionByType(inspections, 'BEFORE_WASH')
+  const inspectionActive = Boolean(beforeWashInspection) || ['IN_PROGRESS', 'COMPLETED'].includes(status)
+
+  const normLabel = (v) => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
 
   const stepItems = Array.isArray(serviceSteps) && serviceSteps.length > 0
     ? serviceSteps
         .map((step, index) => ({
-          label: step.title || step.name || step.stepName || `Bước ${index + 1}`,
+          label:  step.title || step.name || step.stepName || `Step ${index + 1}`,
           active: String(step.status || '').toUpperCase() === 'COMPLETED',
-          time: step.completedAt || null,
-          order: Number(step.stepOrder || step.order || step.sequence || index + 1),
+          time:   step.completedAt || null,
+          order:  Number(step.stepOrder || step.order || step.sequence || index + 1),
         }))
+        .filter((item) => !normLabel(item.label).startsWith('kiem tra'))
         .sort((a, b) => a.order - b.order)
     : []
 
   return [
-    { label: 'Đặt lịch', active: true, time: booking?.startTime },
+    { label: 'Booked', active: true, time: booking?.startTime },
     { label: 'Check-in', active: checkinActive, time: checkedInAt },
-    { label: 'Kiểm tra', active: Boolean(beforeWashInspection), time: beforeWashInspection?.createdAt },
+    { label: 'Inspection', active: inspectionActive, time: beforeWashInspection?.createdAt },
     ...stepItems,
-    { label: 'Bàn giao', active: status === 'COMPLETED', time: booking?.completedAt },
-    { label: 'Thanh toán', active: paymentStatus === 'PAID', time: booking?.paidAt },
+    { label: 'Completed', active: status === 'COMPLETED', time: booking?.completedAt },
+    { label: 'Paid', active: paymentStatus === 'PAID', time: booking?.paidAt },
   ]
 }
 
+/* ══════════════════════════════════════════════════
+   BookingDetailModal — inline, same vibe
+   ══════════════════════════════════════════════════ */
+function BookingDetailModal({ booking, steps, numberMap, onClose }) {
+  if (!booking) return null
+  const bookingId         = getBookingId(booking)
+  const customerBookingNo = numberMap.get(String(bookingId)) ?? bookingId
+  const status            = String(booking?.status || '').toUpperCase()
+  const paymentStatus     = String(booking?.paymentStatus || '').toUpperCase()
+  const timelineItems     = getHistoryTimelineItems(booking, steps || [])
+
+  return (
+    <div className="bhp-detail-overlay" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="bhp-detail-card" onClick={(e) => e.stopPropagation()}>
+        <div className="bhp-detail-head">
+          <h2 className="bhp-detail-title">Booking Details #{customerBookingNo}</h2>
+          <button type="button" className="bhp-detail-close" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+
+        <div className="bhp-detail-body">
+          {/* Badges */}
+          <div className="bhp-detail-badges">
+            {booking?.isWalkIn && booking?.customerId && (
+              <span className="bhp-badge bhp-badge--walkin">Walk-in</span>
+            )}
+            <span className={getStatusBadgeClass(status)}>{getStatusText(status)}</span>
+            <span className={getPaymentBadgeClass(paymentStatus)}>{getPaymentText(paymentStatus)}</span>
+          </div>
+
+          {/* Booking info */}
+          <div className="bhp-detail-section">
+            <p className="bhp-detail-section-label">Booking Info</p>
+            {booking?.customerName && (
+              <div className="bhp-detail-row">
+                <span className="bhp-detail-row-label">Customer</span>
+                <span className="bhp-detail-row-value">{booking.customerName}</span>
+              </div>
+            )}
+            <div className="bhp-detail-row">
+              <span className="bhp-detail-row-label">Garage</span>
+              <span className="bhp-detail-row-value">{booking?.garageName || booking?.garageId || 'N/A'}</span>
+            </div>
+            <div className="bhp-detail-row">
+              <span className="bhp-detail-row-label">Vehicle</span>
+              <span className="bhp-detail-row-value">
+                {booking?.vehicleName && booking?.licensePlate
+                  ? `${booking.vehicleName} · ${booking.licensePlate}`
+                  : booking?.vehicleName || booking?.licensePlate || 'N/A'}
+              </span>
+            </div>
+            <div className="bhp-detail-row">
+              <span className="bhp-detail-row-label">Service Package</span>
+              <span className="bhp-detail-row-value">{booking?.servicePackageName || booking?.servicePackageId || 'N/A'}</span>
+            </div>
+            {Array.isArray(booking?.addOnServicePackageNames) && booking.addOnServicePackageNames.length > 0 && (
+              <div className="bhp-detail-row">
+                <span className="bhp-detail-row-label">Add-ons</span>
+                <span className="bhp-detail-row-value">{booking.addOnServicePackageNames.join(', ')}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Times */}
+          <div className="bhp-detail-section">
+            <p className="bhp-detail-section-label">Times</p>
+            <div className="bhp-detail-row">
+              <span className="bhp-detail-row-label">Booked At</span>
+              <span className="bhp-detail-row-value">{formatDateTime(booking?.startTime)}</span>
+            </div>
+            {booking?.checkedInAt && (
+              <div className="bhp-detail-row">
+                <span className="bhp-detail-row-label">Check-in</span>
+                <span className="bhp-detail-row-value">{formatDateTime(booking.checkedInAt)}</span>
+              </div>
+            )}
+            {booking?.completedAt && (
+              <div className="bhp-detail-row">
+                <span className="bhp-detail-row-label">Completed At</span>
+                <span className="bhp-detail-row-value">{formatDateTime(booking.completedAt)}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Payment */}
+          <div className="bhp-detail-section">
+            <p className="bhp-detail-section-label">Payment</p>
+            <div className="bhp-detail-row">
+              <span className="bhp-detail-row-label">Total</span>
+              <span className="bhp-detail-row-value">
+                {formatMoney(booking?.finalPrice)}
+                {status === 'COMPLETED' && paymentStatus === 'PAID' && booking?.pointsEarned > 0 && (
+                  <span className="bhp-points-earned"> +{booking.pointsEarned}p</span>
+                )}
+              </span>
+            </div>
+            <div className="bhp-detail-row">
+              <span className="bhp-detail-row-label">Method</span>
+              <span className="bhp-detail-row-value">{getPaymentMethodText(booking)}</span>
+            </div>
+            {booking?.paidAt && (
+              <div className="bhp-detail-row">
+                <span className="bhp-detail-row-label">Paid At</span>
+                <span className="bhp-detail-row-value">{formatDateTime(booking.paidAt)}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Cancel / no-show reason */}
+          {(isCanceledStatus(status) || isNoShowStatus(status)) && booking?.note && (
+            <div className="bhp-detail-section">
+              <p className="bhp-detail-section-label">
+                {isNoShowStatus(status) ? 'No-show Note' : 'Cancellation Reason'}
+              </p>
+              <p className="bhp-detail-note">{booking.note}</p>
+            </div>
+          )}
+
+          {/* Timeline */}
+          <div className="bhp-detail-section">
+            <p className="bhp-detail-section-label">Progress</p>
+            <div className="bhp-detail-timeline">
+              {timelineItems.map((item, index) => (
+                <div
+                  key={`d-${bookingId}-${index}`}
+                  className={['bhp-detail-step', item.active ? 'active' : '', item.danger ? 'danger' : ''].join(' ').trim()}
+                >
+                  <div className="bhp-detail-step-dot">{index + 1}</div>
+                  <div className="bhp-detail-step-label">{item.label}</div>
+                  {item.time && <div className="bhp-detail-step-time">{formatDateTime(item.time)}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════════
+   BookingHistoryPage
+   ══════════════════════════════════════════════════ */
+const PAGE_SIZE = 5
+
 export default function BookingHistoryPage() {
   const location = useLocation()
-  const [bookings, setBookings] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [message, setMessage] = useState(
-    location.state?.bookingCreated ? 'Đặt lịch thành công! Booking của bạn đã được tạo.' : '',
+  const [searchParams] = useSearchParams()
+
+  const [bookings,             setBookings]             = useState([])
+  const [loading,              setLoading]              = useState(true)
+  const [message,              setMessage]              = useState(
+    location.state?.bookingCreated ? 'Booking created successfully!' : '',
   )
-  const [filter, setFilter] = useState('ALL')
-  const [cancelingId, setCancelingId] = useState(null)
+  const [filter,               setFilter]               = useState('CONFIRMED')
+  const [visibleCount,         setVisibleCount]         = useState(PAGE_SIZE)
+  const [cancelingId,          setCancelingId]          = useState(null)
   const [cancelModalBookingId, setCancelModalBookingId] = useState(null)
-  const [cancelModalBooking, setCancelModalBooking] = useState(null)
+  const [cancelModalBooking,   setCancelModalBooking]   = useState(null)
   const [serviceStepsByBookingId, setServiceStepsByBookingId] = useState({})
+  const [detailBooking,        setDetailBooking]        = useState(null)
+  const sentinelRef = useRef(null)
   const [inspectionsByBookingId, setInspectionsByBookingId] = useState({})
 
   const fetchInspectionsForBookings = async (bookingList) => {
@@ -385,40 +488,29 @@ export default function BookingHistoryPage() {
 
   const fetchServiceStepsForBookings = async (bookingList) => {
     if (!Array.isArray(bookingList) || bookingList.length === 0) return
-
     const relevant = bookingList.filter((b) => {
       const s = String(b?.status || '').toUpperCase()
       return !['CANCELED', 'CANCELLED', 'NO_SHOW'].includes(s) && getBookingId(b)
     })
-
     if (relevant.length === 0) return
 
-    const results = await Promise.allSettled(
-      relevant.map(async (booking) => {
-        const bookingId = getBookingId(booking)
-        if (!bookingId) return { bookingId: null, steps: [] }
+    const results = await Promise.allSettled(relevant.map(async (booking) => {
+      const bookingId = getBookingId(booking)
+      if (!bookingId) return { bookingId: null, steps: [] }
+      const raw         = await bookingApi.getBookingServiceSteps(bookingId).catch(() => [])
+      const actualSteps = Array.isArray(raw) ? raw : []
+      if (actualSteps.length > 0) return { bookingId, steps: actualSteps }
 
-        const raw = await bookingApi.getBookingServiceSteps(bookingId).catch(() => [])
-        const actualSteps = Array.isArray(raw) ? raw : []
+      const mainSteps       = await getPackageSteps(booking.servicePackageId)
+      const addOnIds        = Array.isArray(booking.addOnServicePackageIds) ? booking.addOnServicePackageIds : []
+      const addOnStepArrays = await Promise.all(addOnIds.map((id) => getPackageSteps(id)))
+      const addOnSteps      = addOnStepArrays.flat()
 
-        if (actualSteps.length > 0) {
-          return { bookingId, steps: actualSteps }
-        }
-
-        // No actual steps yet — show template steps from service package (+ any
-        // add-ons) so customer can see what the full workflow looks like before
-        // service starts. Main steps first, then add-on steps after, matching
-        // the order BookingServiceImpl uses once service starts.
-        const mainSteps = await getPackageSteps(booking.servicePackageId)
-        const addOnIds = Array.isArray(booking.addOnServicePackageIds) ? booking.addOnServicePackageIds : []
-        const addOnStepsNested = await Promise.all(addOnIds.map((id) => getPackageSteps(id)))
-        const addOnSteps = addOnStepsNested.flat()
-
-        const merged = [...mainSteps, ...addOnSteps]
-        const templateSteps = merged.map((step, index) => ({ ...step, order: index + 1 }))
-        return { bookingId, steps: templateSteps }
-      }),
-    )
+      const merged = [...mainSteps, ...addOnSteps]
+      const templateSteps = merged.map((step, index) => ({ ...step, order: index + 1 }))
+      return { bookingId, steps: templateSteps }
+    }),
+  )
 
     setServiceStepsByBookingId((prev) => {
       const next = { ...prev }
@@ -431,14 +523,11 @@ export default function BookingHistoryPage() {
     })
   }
 
-  const loadBookings = async () => {
+  const loadBookings = async (silent = false) => {
     try {
-      setLoading(true)
-      if (!location.state?.bookingCreated) {
-        setMessage('')
-      }
-
-      const data = await customerBookingFlowApi.getCustomerBookings()
+      if (!silent) setLoading(true)
+      if (!silent && !location.state?.bookingCreated) setMessage('')
+      const data        = await customerBookingFlowApi.getCustomerBookings()
       const enrichedData = await enrichBookingsWithDetail(Array.isArray(data) ? data : [])
       setBookings(enrichedData)
       clearPackageStepsCache()
@@ -447,26 +536,23 @@ export default function BookingHistoryPage() {
       setInspectionsByBookingId({})
       fetchInspectionsForBookings(enrichedData)
     } catch (error) {
-      setMessage(error.message || 'Không tải được lịch sử booking.')
-      setBookings([])
+      if (!silent) {
+        setMessage(error.message || 'Could not load booking history.')
+        setBookings([])
+      }
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
   useEffect(() => {
     let mounted = true
-
-    const load = async () => {
+    const load  = async () => {
       try {
         setLoading(true)
-        if (!location.state?.bookingCreated) {
-          setMessage('')
-        }
-
-        const data = await customerBookingFlowApi.getCustomerBookings()
+        if (!location.state?.bookingCreated) setMessage('')
+        const data         = await customerBookingFlowApi.getCustomerBookings()
         const enrichedData = await enrichBookingsWithDetail(Array.isArray(data) ? data : [])
-
         if (mounted) {
           setBookings(enrichedData)
           clearPackageStepsCache()
@@ -477,22 +563,31 @@ export default function BookingHistoryPage() {
         }
       } catch (error) {
         if (mounted) {
-          setMessage(error.message || 'Không tải được lịch sử booking.')
+          setMessage(error.message || 'Could not load booking history.')
           setBookings([])
         }
       } finally {
-        if (mounted) {
-          setLoading(false)
-        }
+        if (mounted) setLoading(false)
       }
     }
-
     load()
-
-    return () => {
-      mounted = false
-    }
+    const timer = setInterval(() => { if (mounted) loadBookings(true) }, 15_000)
+    return () => { mounted = false; clearInterval(timer) }
   }, [])
+
+  /* Auto-open detail overlay when navigated from notification with ?open=bookingId */
+  const autoOpenRef = useRef(false)
+  useEffect(() => {
+    if (loading || bookings.length === 0 || autoOpenRef.current) return
+    const openId = searchParams.get('open')
+    if (!openId) return
+    autoOpenRef.current = true
+    const target = bookings.find((b) => String(getBookingId(b)) === String(openId))
+    if (target) setDetailBooking(target)
+  }, [loading, bookings, searchParams])
+
+  /* Reset visible count on filter change */
+  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [filter])
 
   const openCancelModal = (bookingId) => {
     const booking = bookings.find((b) => String(getBookingId(b)) === String(bookingId))
@@ -509,18 +604,13 @@ export default function BookingHistoryPage() {
   const handleCancelBooking = async (reason) => {
     const bookingId = cancelModalBookingId
     if (!bookingId) return
-
     const usedPoints = cancelModalBooking?.usedPoints ?? 0
-
     try {
       setCancelingId(bookingId)
       setMessage('')
-
       await customerBookingFlowApi.cancelBooking(bookingId, reason)
-
       setCancelModalBookingId(null)
       setCancelModalBooking(null)
-
       setBookings((prev) =>
         prev.map((booking) =>
           String(getBookingId(booking)) === String(bookingId)
@@ -528,28 +618,27 @@ export default function BookingHistoryPage() {
             : booking,
         ),
       )
-
       if (usedPoints > 0) {
         try {
-          const txPage = await loyaltyApi.getMyTransactions({ type: 'REFUND', page: 1, limit: 5 })
-          const txList = Array.isArray(txPage?.content) ? txPage.content : (Array.isArray(txPage) ? txPage : [])
+          const txPage  = await loyaltyApi.getMyTransactions({ type: 'REFUND', page: 1, limit: 5 })
+          const txList  = Array.isArray(txPage?.content) ? txPage.content : (Array.isArray(txPage) ? txPage : [])
           const refundTx = txList.find(
             (tx) => String(tx?.bookingId) === String(bookingId) && tx?.type === 'REFUND',
           )
           if (refundTx) {
-            setMessage(`Booking đã hủy. Đã hoàn ${refundTx.points} điểm vào tài khoản của bạn.`)
+            setMessage(`Booking cancelled. ${refundTx.points} pts refunded to your account.`)
           } else {
-            setMessage(`Booking đã hủy. Nếu điểm đã được trừ, hệ thống sẽ hoàn lại ${usedPoints} điểm.`)
+            setMessage(`Booking cancelled. Up to ${usedPoints} pts will be refunded if deducted.`)
           }
         } catch {
-          setMessage(`Booking đã hủy. Nếu điểm đã được trừ, hệ thống sẽ hoàn lại ${usedPoints} điểm.`)
+          setMessage(`Booking cancelled. Up to ${usedPoints} pts will be refunded if deducted.`)
         }
       } else {
         const cancelNo = customerBookingNumberMap.get(String(bookingId)) ?? bookingId
-        setMessage(`Đã hủy lịch hẹn #${cancelNo}.`)
+        setMessage(`Booking #${cancelNo} cancelled.`)
       }
     } catch (error) {
-      setMessage(error?.response?.data?.message || error.message || 'Không thể hủy booking.')
+      setMessage(error?.response?.data?.message || error.message || 'Could not cancel booking.')
     } finally {
       setCancelingId(null)
     }
@@ -562,152 +651,167 @@ export default function BookingHistoryPage() {
       bookings
         .filter((booking) => {
           const status = String(booking?.status || '').toUpperCase()
-
-          if (filter === 'ALL') {
-            return (
-              status !== 'CANCELED' &&
-              status !== 'CANCELLED' &&
-              status !== 'COMPLETED' &&
-              status !== 'NO_SHOW'
-            )
-          }
-
-          if (filter === 'CANCELED') {
-            return status === 'CANCELED' || status === 'CANCELLED' || status === 'NO_SHOW'
-          }
-
-          if (filter === 'COMPLETED') {
-            return status === 'COMPLETED'
-          }
-
+          if (filter === 'ALL')      return true
+          if (filter === 'CANCELED') return status === 'CANCELED' || status === 'CANCELLED' || status === 'NO_SHOW'
+          if (filter === 'COMPLETED') return status === 'COMPLETED'
           return status === filter
         })
-        .sort((left, right) => Number(getBookingId(right) || 0) - Number(getBookingId(left) || 0)),
+        .sort((l, r) => Number(getBookingId(r) || 0) - Number(getBookingId(l) || 0)),
     [bookings, filter],
   )
 
+  const visibleBookings = filteredBookings.slice(0, visibleCount)
+  const hasMore         = visibleCount < filteredBookings.length
+
+  /* IntersectionObserver — load next batch when sentinel is visible */
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setVisibleCount((prev) => prev + PAGE_SIZE)
+      },
+      { rootMargin: '120px' },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [filter, bookings.length, visibleCount])
+
   return (
-    <main className="booking-history-page">
-      <section className="booking-history-hero">
-        <div>
-          <p>AutoWash Pro</p>
-          <h1 style={{ margin: 0, color: '#fff', marginBottom: '20px' }}>Booking History</h1>
-          <span>Theo dõi lịch hẹn, trạng thái xử lý và thanh toán của bạn.</span>
+    <div className="bhp-page">
+      <div className="bhp-content">
+        {/* Page header */}
+        <div className="bhp-header">
+          <div>
+            <p className="bhp-header-eyebrow">AutoWash Pro</p>
+            <h1 className="bhp-header-title">Booking History</h1>
+            <p className="bhp-header-sub">Track your appointments, service status, and payments.</p>
+          </div>
+          <div className="bhp-header-actions">
+            <button type="button" className="bhp-refresh-btn" onClick={loadBookings}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+              Refresh
+            </button>
+            <Link to="/booking" className="bhp-book-btn">Book Now</Link>
+          </div>
         </div>
 
-        <Link to="/booking">Đặt lịch mới</Link>
-      </section>
-
-      <section className="booking-history-toolbar">
-        <div className="booking-history-filter-group">
-          {STATUS_FILTERS.map((item) => (
+        {/* Filter bar */}
+        <div className="bhp-filter-bar">
+          {STATUS_FILTERS.map((f) => (
             <button
-              key={item}
+              key={f}
               type="button"
-              className={filter === item ? 'active' : ''}
-              onClick={() => setFilter(item)}
+              className={`bhp-filter-pill${filter === f ? ' bhp-filter-pill--active' : ''}`}
+              onClick={() => setFilter(f)}
             >
-              {item === 'ALL' ? 'Tất cả' : getStatusText(item)}
+              {getFilterLabel(f)}
             </button>
           ))}
         </div>
 
-        <button type="button" className="booking-history-refresh-btn" onClick={loadBookings}>
-          Làm mới
-        </button>
-      </section>
+        {/* Message */}
+        {message && <div className="bhp-message">{message}</div>}
 
-      {message && <div className="booking-history-message">{message}</div>}
+        {/* Content */}
+        {loading ? (
+          <div className="bhp-empty">
+            <div className="bhp-spinner" aria-label="Loading" />
+            <p>Loading bookings…</p>
+          </div>
+        ) : filteredBookings.length === 0 ? (
+          <div className="bhp-empty">
+            <p>No bookings yet</p>
+            <span>No appointments match the current filter.</span>
+            <Link to="/booking" className="bhp-empty-cta">New Booking</Link>
+          </div>
+        ) : (
+          <div className="bhp-list" key={filter}>
+            {visibleBookings.map((booking, idx) => {
+              const bookingId         = getBookingId(booking)
+              const customerBookingNo = customerBookingNumberMap.get(String(bookingId)) ?? bookingId
+              const paymentStatus     = String(booking?.paymentStatus || '').toUpperCase()
+              const status            = String(booking?.status || '').toUpperCase()
+              const canCancel         = status === 'CONFIRMED' || status === 'PENDING_DEPOSIT'
+              const steps             = serviceStepsByBookingId[String(bookingId)] || []
+              const timelineItems     = getHistoryTimelineItems(booking, steps)
+              const batchDelay        = `${(idx % PAGE_SIZE) * 0.06}s`
 
-      {loading ? (
-        <div className="booking-history-empty">Đang tải booking...</div>
-      ) : filteredBookings.length === 0 ? (
-        <div className="booking-history-empty">
-          <h2>Chưa có booking nào</h2>
-          <p>Bạn chưa có lịch hẹn phù hợp với bộ lọc hiện tại.</p>
-          <Link to="/booking">Tạo booking mới</Link>
-        </div>
-      ) : (
-        <section className="booking-history-list">
-          {filteredBookings.map((booking) => {
-            const bookingId = getBookingId(booking)
-            const customerBookingNo = customerBookingNumberMap.get(String(bookingId)) ?? bookingId
-            const paymentStatus = String(booking?.paymentStatus || '').toUpperCase()
-            const status = String(booking?.status || '').toUpperCase()
-            const canCancel = status === 'CONFIRMED' || status === 'PENDING_DEPOSIT'
+              return (
+                <article
+                  className={getCardClass(status)}
+                  key={bookingId}
+                  style={{ animationDelay: batchDelay }}
+                >
+                  {isNoShowStatus(status) && <div className="bhp-no-show-seal">NO SHOW</div>}
 
-            return (
-              <article className="booking-history-card" key={bookingId}>
-                {isNoShowStatus(status) && <div className="booking-no-show-seal">NO SHOW</div>}
-
-                <div className="booking-history-card-top">
-                  <div>
-                    <p>Mã booking</p>
-                    <h2>#{customerBookingNo}</h2>
-                  </div>
-
-                  <div className="booking-history-badges">
-                    {booking?.isWalkIn && booking?.customerId && (
-                      <span className="garage-walk-in">Khách đặt tại garage</span>
-                    )}
-                    <span className={`status ${status.toLowerCase()}`}>{getStatusText(status)}</span>
-                    <span className={`payment ${paymentStatus.toLowerCase()}`}>
-                      {getPaymentText(paymentStatus)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="booking-history-info">
-                  <div>
-                    <span>Garage</span>
-                    <strong>{booking?.garageName || booking?.garageId || 'Chưa cập nhật'}</strong>
-                  </div>
-
-                  <div>
-                    <span>Xe</span>
-                    <strong>
-                      {booking?.vehicleName && booking?.licensePlate
-                        ? `${booking.vehicleName} · ${booking.licensePlate}`
-                        : booking?.vehicleName || booking?.licensePlate || 'Chưa cập nhật'}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Gói dịch vụ</span>
-                    <strong>{booking?.servicePackageName || booking?.servicePackageId || 'Chưa cập nhật'}</strong>
-                  </div>
-
-                  {Array.isArray(booking?.addOnServicePackageNames) && booking.addOnServicePackageNames.length > 0 && (
+                  {/* Card head */}
+                  <div className="bhp-card-head">
                     <div>
-                      <span>Dịch vụ thêm</span>
-                      <strong>{booking.addOnServicePackageNames.join(', ')}</strong>
+                      <p className="bhp-card-num-label">Booking</p>
+                      <p className="bhp-card-num">#{customerBookingNo}</p>
                     </div>
-                  )}
-
-                  <div>
-                    <span>Thời gian</span>
-                    <strong>{formatDateTime(booking?.startTime)}</strong>
+                    <div className="bhp-card-badges">
+                      {booking?.isWalkIn && booking?.customerId && (
+                        <span className="bhp-badge bhp-badge--walkin">Walk-in</span>
+                      )}
+                      <span className={getStatusBadgeClass(status)}>{getStatusText(status)}</span>
+                      <span className={getPaymentBadgeClass(paymentStatus)}>{getPaymentText(paymentStatus)}</span>
+                    </div>
                   </div>
 
-                  <div>
-                    <span>Tổng tiền</span>
-                    <strong>
-                      {formatMoney(booking?.finalPrice)}
-                      {status === 'COMPLETED' &&
-                        paymentStatus === 'PAID' &&
-                        booking?.pointsEarned > 0 && (
-                          <span className="booking-points-earned"> +{booking.pointsEarned}p</span>
+                  {/* Info grid */}
+                  <div className="bhp-info-grid">
+                    <div className="bhp-info-cell">
+                      <span className="bhp-info-label">Garage</span>
+                      <span className="bhp-info-value">{booking?.garageName || booking?.garageId || 'N/A'}</span>
+                    </div>
+                    <div className="bhp-info-cell">
+                      <span className="bhp-info-label">Vehicle</span>
+                      <span className="bhp-info-value">
+                        {booking?.vehicleName && booking?.licensePlate
+                          ? `${booking.vehicleName} · ${booking.licensePlate}`
+                          : booking?.vehicleName || booking?.licensePlate || 'N/A'}
+                      </span>
+                    </div>
+                    <div className="bhp-info-cell">
+                      <span className="bhp-info-label">Service</span>
+                      <span className="bhp-info-value">{booking?.servicePackageName || booking?.servicePackageId || 'N/A'}</span>
+                    </div>
+                    <div className="bhp-info-cell">
+                      <span className="bhp-info-label">Time</span>
+                      <span className="bhp-info-value">{formatDateTime(booking?.startTime)}</span>
+                    </div>
+                    <div className="bhp-info-cell">
+                      <span className="bhp-info-label">Total</span>
+                      <span className="bhp-info-value">
+                        {formatMoney(booking?.finalPrice)}
+                        {status === 'COMPLETED' && paymentStatus === 'PAID' && booking?.pointsEarned > 0 && (
+                          <span className="bhp-points-earned"> +{booking.pointsEarned}p</span>
                         )}
-                    </strong>
-                  </div>
+                      </span>
+                    </div>
+                    <div className="bhp-info-cell">
+                      <span className="bhp-info-label">Payment</span>
+                      <span className="bhp-info-value">{getPaymentMethodText(booking)}</span>
+                    </div>
 
-                  <div>
-                    <span>Phương thức</span>
-                    <strong>{getPaymentMethodText(booking)}</strong>
+                    {(isCanceledStatus(status) || isNoShowStatus(status)) && booking?.note && (
+                      <div className="bhp-info-cell bhp-info-cell--full">
+                        <span className="bhp-info-label">
+                          {isNoShowStatus(status) ? 'No-show Note' : 'Cancellation'}
+                        </span>
+                        <span className="bhp-info-value">{booking.note}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="booking-history-mini-timeline-card">
-                    <span>Tiến trình</span>
+                    <span>Progress</span>
                     <div className="booking-history-mini-timeline">
                       {getHistoryTimelineItems(
                         booking,
@@ -721,7 +825,7 @@ export default function BookingHistoryPage() {
                             item.active ? 'active' : '',
                             item.danger ? 'danger' : '',
                           ].join(' ')}
-                          title={`${item.label}: ${item.time ? formatDateTime(item.time) : 'Chưa cập nhật'}`}
+                          title={`${item.label}: ${item.time ? formatDateTime(item.time) : 'Not updated'}`}
                         >
                           <i>{index + 1}</i>
                           <small>{item.label}</small>
@@ -730,32 +834,47 @@ export default function BookingHistoryPage() {
                     </div>
                   </div>
 
-                  {(isCanceledStatus(status) || isNoShowStatus(status)) && booking?.note && (
-                    <div>
-                      <span>{isNoShowStatus(status) ? 'Ghi chú no-show' : 'Lý do hủy'}</span>
-                      <strong>{booking.note}</strong>
-                    </div>
-                  )}
-                </div>
-
-                <div className="booking-history-actions">
-                  {canCancel && (
+                  {/* Card footer */}
+                  <div className="bhp-card-foot">
+                    {canCancel && (
+                      <button
+                        type="button"
+                        className="bhp-cancel-btn"
+                        onClick={() => openCancelModal(bookingId)}
+                        disabled={cancelingId === bookingId}
+                      >
+                        {cancelingId === bookingId ? 'Cancelling…' : 'Cancel'}
+                      </button>
+                    )}
                     <button
                       type="button"
-                      className="booking-history-cancel-btn"
-                      onClick={() => openCancelModal(bookingId)}
-                      disabled={cancelingId === bookingId}
+                      className="bhp-detail-btn"
+                      onClick={() => setDetailBooking(booking)}
                     >
-                      {cancelingId === bookingId ? 'Đang hủy...' : 'Hủy booking'}
+                      View Details
                     </button>
-                  )}
-                </div>
-              </article>
-            )
-          })}
-        </section>
+                  </div>
+                </article>
+              )
+            })}
+
+            {/* Sentinel triggers next batch via IntersectionObserver */}
+            {hasMore && <div ref={sentinelRef} className="bhp-sentinel" aria-hidden="true" />}
+          </div>
+        )}
+      </div>
+
+      {/* Detail modal */}
+      {detailBooking && (
+        <BookingDetailModal
+          booking={detailBooking}
+          steps={serviceStepsByBookingId[String(getBookingId(detailBooking))] || []}
+          numberMap={customerBookingNumberMap}
+          onClose={() => setDetailBooking(null)}
+        />
       )}
 
+      {/* Cancel modal */}
       <CancelBookingModal
         open={cancelModalBookingId !== null}
         bookingId={cancelModalBookingId}
@@ -763,6 +882,6 @@ export default function BookingHistoryPage() {
         onClose={closeCancelModal}
         onConfirm={handleCancelBooking}
       />
-    </main>
+    </div>
   )
 }

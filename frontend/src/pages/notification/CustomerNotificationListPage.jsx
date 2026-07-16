@@ -3,17 +3,22 @@ import { useNavigate } from 'react-router-dom'
 import notificationApi from '../../api/notificationApi'
 import './CustomerNotificationListPage.css'
 
-const VISIBLE_TYPES = new Set(['TIER_UPGRADED', 'VOUCHER_RECEIVED', 'REWARD_EARNED'])
+const VISIBLE_TYPES = new Set([
+  'TIER_UPGRADED', 'VOUCHER_RECEIVED', 'REWARD_EARNED',
+  'BOOKING_CONFIRMED', 'BOOKING_CANCELED', 'PAYMENT_CONFIRMED',
+  'POINTS_ADJUSTED',
+])
+const isVisible = (t) => VISIBLE_TYPES.has(String(t || '').toUpperCase())
 
 const formatTime = (value) => {
   if (!value) return ''
   try {
     const date = new Date(value)
     const diff = Date.now() - date.getTime()
-    if (diff < 60000) return 'Vừa xong'
-    if (diff < 3600000) return `${Math.floor(diff / 60000)} phút trước`
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)} giờ trước`
-    return new Intl.DateTimeFormat('vi-VN', {
+    if (diff < 60000) return 'Just now'
+    if (diff < 3600000) return `${Math.floor(diff / 60000)} min ago`
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)} hr ago`
+    return new Intl.DateTimeFormat('en-US', {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
     }).format(date)
@@ -23,11 +28,28 @@ const formatTime = (value) => {
 }
 
 const buildTitle = (notif) => {
-  if (notif.eventType === 'TIER_UPGRADED') return 'Lên hạng thành viên'
-  if (notif.eventType === 'VOUCHER_RECEIVED') return 'Nhận voucher mới'
-  if (notif.eventType === 'REWARD_EARNED') return 'Nhận điểm thưởng'
+  if (notif.eventType === 'TIER_UPGRADED')      return 'Tier upgraded'
+  if (notif.eventType === 'VOUCHER_RECEIVED')   return 'New voucher received'
+  if (notif.eventType === 'REWARD_EARNED')      return 'Reward points earned'
+  if (notif.eventType === 'BOOKING_CONFIRMED')  return 'Booking confirmed'
+  if (notif.eventType === 'BOOKING_CANCELED')   return 'Booking canceled'
+  if (notif.eventType === 'PAYMENT_CONFIRMED')  return 'Payment confirmed'
+  if (notif.eventType === 'POINTS_ADJUSTED')    return notif.title || 'Points adjusted'
   return notif.title || notif.eventType || ''
 }
+
+const getTypeKey = (eventType) => {
+  if (eventType === 'REWARD_EARNED')     return 'reward'
+  if (eventType === 'TIER_UPGRADED')     return 'tier'
+  if (eventType === 'VOUCHER_RECEIVED')  return 'voucher'
+  if (eventType === 'BOOKING_CONFIRMED') return 'booking'
+  if (eventType === 'BOOKING_CANCELED')  return 'booking-canceled'
+  if (eventType === 'PAYMENT_CONFIRMED') return 'payment'
+  return 'default'
+}
+
+const TYPE_ICON  = { reward: '★', tier: '▲', voucher: '%', booking: '✓', 'booking-canceled': '✕', payment: '$', default: '•' }
+const TYPE_LABEL = { reward: 'Reward', tier: 'Membership tier', voucher: 'Voucher', booking: 'Booking', 'booking-canceled': 'Booking', payment: 'Payment', default: 'Notification' }
 
 export default function CustomerNotificationListPage() {
   const navigate = useNavigate()
@@ -35,7 +57,7 @@ export default function CustomerNotificationListPage() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [filterRead, setFilterRead] = useState(null) // null=all, false=unread, true=read
+  const [filterRead, setFilterRead] = useState(null)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [markingAll, setMarkingAll] = useState(false)
@@ -53,11 +75,11 @@ export default function CustomerNotificationListPage() {
         isRead: readFilter !== null ? readFilter : undefined,
       })
       const all = result.content ?? []
-      const visible = all.filter(n => VISIBLE_TYPES.has(n.eventType))
+      const visible = all.filter(n => isVisible(n.eventType))
       setItems(visible)
       setTotalPages(result.totalPages ?? 1)
     } catch {
-      setError('Không thể tải danh sách thông báo.')
+      setError('Failed to load notifications.')
     } finally {
       setLoading(false)
     }
@@ -79,7 +101,7 @@ export default function CustomerNotificationListPage() {
       await notificationApi.markAllNotificationsRead()
       setItems(prev => prev.map(n => ({ ...n, isRead: true })))
     } catch {
-      setError('Đánh dấu thất bại.')
+      setError('Failed to mark as read.')
     } finally {
       setMarkingAll(false)
     }
@@ -93,7 +115,7 @@ export default function CustomerNotificationListPage() {
       await notificationApi.deleteNotification(notif.id)
       setItems(prev => prev.filter(n => n.id !== notif.id))
     } catch {
-      setError('Xóa thất bại.')
+      setError('Failed to delete.')
     } finally {
       setDeletingIds(prev => { const s = new Set(prev); s.delete(notif.id); return s })
     }
@@ -110,101 +132,130 @@ export default function CustomerNotificationListPage() {
   }
 
   const hasUnread = items.some(n => !n.isRead)
+  const unreadCount = items.filter(n => !n.isRead).length
 
   return (
-    <div className="cn-list-page">
-      <div className="cn-list-header">
-        <div className="cn-list-title-row">
-          <h1>Thông báo</h1>
-          {hasUnread && (
-            <button className="cn-mark-all-btn" onClick={handleMarkAll} disabled={markingAll}>
-              {markingAll ? 'Đang xử lý...' : 'Đánh dấu tất cả đã đọc'}
-            </button>
-          )}
+    <div className="cn-page">
+      <div className="cn-content">
+
+        {/* Hero */}
+        <div className="cn-hero">
+          <p className="cn-hero-eyebrow">Your account</p>
+          <h1 className="cn-hero-title">Notifications</h1>
+          <p className="cn-hero-sub">
+            {unreadCount > 0
+              ? `You have ${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}`
+              : 'All your notifications'}
+          </p>
         </div>
 
-        <div className="cn-filter-row">
-          {[
-            { val: null, label: 'Tất cả' },
-            { val: false, label: 'Chưa đọc' },
-            { val: true, label: 'Đã đọc' },
-          ].map(({ val, label }) => (
-            <button
-              key={String(val)}
-              className={`cn-filter-btn${filterRead === val ? ' active' : ''}`}
-              onClick={() => handleFilterChange(val)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {error && (
-        <div className="cn-error">
-          {error}
-          <button className="cn-error-dismiss" onClick={() => setError(null)}>✕</button>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="cn-state">Đang tải thông báo...</div>
-      ) : items.length === 0 ? (
-        <div className="cn-state cn-empty">
-          <div className="cn-empty-icon">🔔</div>
-          <p>Chưa có thông báo nào.</p>
-        </div>
-      ) : (
-        <>
-          <div className="cn-list">
-            {items.map((notif) => (
-              <div
-                key={notif.id}
-                className={`cn-item${notif.isRead ? ' read' : ' unread'}`}
-                onClick={() => handleClick(notif)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && handleClick(notif)}
+        {/* Toolbar */}
+        <div className="cn-toolbar">
+          <div className="cn-filter-row">
+            {[
+              { val: null, label: 'All' },
+              { val: false, label: 'Unread' },
+              { val: true, label: 'Read' },
+            ].map(({ val, label }) => (
+              <button
+                key={String(val)}
+                className={`cn-filter-btn${filterRead === val ? ' active' : ''}`}
+                onClick={() => handleFilterChange(val)}
               >
-                {!notif.isRead && <span className="cn-dot" aria-hidden="true" />}
-                <div className="cn-item-body">
-                  <div className="cn-item-title">{buildTitle(notif)}</div>
-                  <div className="cn-item-msg">{notif.message}</div>
-                  <div className="cn-item-time">{formatTime(notif.sentAt ?? notif.createdAt)}</div>
-                </div>
-                <button
-                  className="cn-del-btn"
-                  onClick={(e) => handleDelete(e, notif)}
-                  disabled={deletingIds.has(notif.id)}
-                  aria-label="Xóa thông báo"
-                >
-                  {deletingIds.has(notif.id) ? '…' : '✕'}
-                </button>
-              </div>
+                {label}
+              </button>
             ))}
           </div>
-
-          {totalPages > 1 && (
-            <div className="cn-pagination">
-              <button
-                className="cn-page-btn"
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                ← Trước
-              </button>
-              <span className="cn-page-info">Trang {page} / {totalPages}</span>
-              <button
-                className="cn-page-btn"
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-              >
-                Tiếp →
-              </button>
-            </div>
+          {hasUnread && (
+            <button className="cn-mark-all-btn" onClick={handleMarkAll} disabled={markingAll}>
+              {markingAll ? 'Processing...' : 'Mark all as read'}
+            </button>
           )}
-        </>
-      )}
+        </div>
+
+        {error && (
+          <div className="cn-error">
+            {error}
+            <button className="cn-error-dismiss" onClick={() => setError(null)}>✕</button>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="cn-state">Loading notifications...</div>
+        ) : items.length === 0 ? (
+          <div className="cn-state cn-empty">
+            <div className="cn-empty-icon">🔔</div>
+            <p>No notifications yet.</p>
+          </div>
+        ) : (
+          <>
+            <div className="cn-list">
+              {items.map((notif, idx) => {
+                const typeKey = getTypeKey(notif.eventType)
+                return (
+                  <div
+                    key={notif.id}
+                    className={`cn-item${notif.isRead ? ' read' : ' unread'}`}
+                    style={{ animationDelay: `${idx * 0.04}s` }}
+                    onClick={() => handleClick(notif)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => e.key === 'Enter' && handleClick(notif)}
+                  >
+                    {/* Type icon */}
+                    <div className={`cn-item-icon cn-item-icon--${typeKey}`}>
+                      {TYPE_ICON[typeKey]}
+                    </div>
+
+                    <div className="cn-item-body">
+                      <div className="cn-item-head">
+                        <span className="cn-item-title">{buildTitle(notif)}</span>
+                        <span className={`cn-type-badge cn-type-badge--${typeKey}`}>
+                          {TYPE_LABEL[typeKey]}
+                        </span>
+                      </div>
+                      <div className="cn-item-msg">{notif.message}</div>
+                      <div className="cn-item-time">{formatTime(notif.sentAt ?? notif.createdAt)}</div>
+                    </div>
+
+                    {!notif.isRead && <span className="cn-dot" aria-hidden="true" />}
+
+                    <button
+                      className="cn-del-btn"
+                      onClick={(e) => handleDelete(e, notif)}
+                      disabled={deletingIds.has(notif.id)}
+                      aria-label="Delete notification"
+                    >
+                      {deletingIds.has(notif.id) ? '…' : '✕'}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+
+            {totalPages > 1 && (
+              <div className="cn-pagination">
+                <button
+                  className="cn-page-btn"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  ← Previous
+                </button>
+                <span className="cn-page-info">Page {page} of {totalPages}</span>
+                <button
+                  className="cn-page-btn"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+      </div>
     </div>
   )
 }

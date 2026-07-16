@@ -1,6 +1,6 @@
-// Trạng thái đang tải (loading) dùng chung.
-// Hiển thị khi đang chờ dữ liệu từ API.
-function Loading({ message = 'Đang tải...' }) {
+// Shared loading state.
+// Displayed while waiting for data from the API.
+function Loading({ message = 'Loading...' }) {
   return (
     <div
       role="status"
@@ -26,7 +26,7 @@ function Loading({ message = 'Đang tải...' }) {
       />
       <p style={{ margin: 0, color: '#555' }}>{message}</p>
 
-      {/* Keyframe cho hiệu ứng xoay; nhúng tại chỗ để component tự chứa. */}
+      {/* Keyframes for the spin effect; embedded inline so the component is self-contained. */}
       <style>{`@keyframes awp-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )

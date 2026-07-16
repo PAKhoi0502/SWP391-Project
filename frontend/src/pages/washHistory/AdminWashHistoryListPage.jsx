@@ -1,28 +1,28 @@
 import { useEffect, useState } from 'react'
 import { washHistoryApi } from '../../api/washHistoryApi'
 import { Pagination } from '../../components/common/ui'
-import '../booking/BookingHistoryPage.css'
+import './AdminWashHistoryListPage.css'
 
 const TEXT = {
-  title: 'Lịch sử rửa xe',
-  subtitle: 'Xem toàn bộ lịch sử rửa xe và lọc theo garage hoặc khách hàng.',
-  refresh: 'Làm mới',
-  loading: 'Đang tải lịch sử rửa xe...',
-  empty: 'Chưa có lịch sử rửa xe phù hợp.',
-  loadError: 'Không tải được lịch sử rửa xe.',
-  customer: 'Khách hàng',
-  vehicle: 'Xe',
+  title: 'Wash History',
+  subtitle: 'View all wash history records and filter by garage or customer.',
+  refresh: 'Refresh',
+  loading: 'Loading wash history...',
+  empty: 'No wash history records found.',
+  loadError: 'Failed to load wash history.',
+  customer: 'Customer',
+  vehicle: 'Vehicle',
   garage: 'Garage',
-  servicePackage: 'Gói dịch vụ',
-  completedAt: 'Hoàn thành lúc',
-  total: 'Số tiền',
-  points: 'Điểm nhận được',
-  notUpdated: 'Chưa cập nhật',
+  servicePackage: 'Service package',
+  completedAt: 'Completed at',
+  total: 'Amount',
+  points: 'Points earned',
+  notUpdated: 'Not updated',
 }
 
 const formatDateTime = (value) => {
   if (!value) return TEXT.notUpdated
-  return new Date(value).toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' })
+  return new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 const formatMoney = (value) =>
@@ -37,7 +37,7 @@ const formatNamedValue = (name, id, fallback) => {
   const safeId = id ? `#${id}` : ''
 
   return (
-    <span className="booking-named-value">
+    <span className="awh-named-value">
       <strong>{safeName}</strong>
       {safeId && <small>{safeId}</small>}
     </span>
@@ -102,148 +102,69 @@ function AdminWashHistoryListPage() {
   }
 
   return (
-    <div className="booking-history-page">
-      <section className="booking-history-hero">
+    <div className="awh-page">
+      <div className="awh-header">
         <div>
-          <p>Admin</p>
+          <p className="awh-eyebrow">Admin</p>
           <h1>{TEXT.title}</h1>
-          <span>{TEXT.subtitle}</span>
+          <p>{TEXT.subtitle}</p>
         </div>
-      </section>
-
-      <section className={`booking-filter-shell wash-history-filter-shell ${filterOpen ? 'open' : ''}`}>
-        <style>{`
-          .wash-history-filter-shell .booking-admin-filter-panel .booking-admin-extra-filters {
-            padding-left: 0;
-            align-items: flex-end;
-          }
-
-          .wash-history-filter-shell .booking-admin-extra-filters input {
-            box-sizing: border-box;
-            height: 42px;
-          }
-
-          .wash-history-filter-apply-btn,
-          .wash-history-filter-clear-btn {
-            box-sizing: border-box;
-            height: 42px;
-            border-radius: 999px;
-            padding: 0 16px;
-            font-weight: 900;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, color 160ms ease;
-          }
-
-          .wash-history-filter-apply-btn {
-            border: 1px solid rgba(250, 204, 21, 0.72);
-            background: #facc15;
-            color: #111116;
-          }
-
-          .wash-history-filter-apply-btn:hover {
-            transform: translateY(-1px);
-            filter: brightness(1.05);
-          }
-
-          .wash-history-filter-clear-btn {
-            border: 1px solid rgba(250, 204, 21, 0.24);
-            background: rgba(250, 204, 21, 0.1);
-            color: #facc15;
-          }
-
-          .wash-history-filter-clear-btn:hover {
-            transform: translateY(-1px);
-            border-color: rgba(250, 204, 21, 0.72);
-            background: #facc15;
-            color: #111116;
-          }
-        `}</style>
-
-        <button
-          type="button"
-          className="booking-filter-menu-btn"
-          aria-expanded={filterOpen}
-          onClick={() => setFilterOpen((value) => !value)}
-        >
-          <span className="booking-filter-menu-icon" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
-          Bộ lọc
+        <button type="button" className="awh-refresh-btn" onClick={loadHistories}>
+          ↻ {TEXT.refresh}
         </button>
+      </div>
 
-        <div className="booking-filter-panel booking-admin-filter-panel">
-          <div className="booking-admin-extra-filters">
-            <label>
-              <span>Garage ID</span>
-              <input placeholder="Nhập Garage ID" value={garageId} onChange={(event) => setGarageId(event.target.value)} />
-            </label>
-            <label>
-              <span>Khách hàng</span>
-              <input placeholder="Tìm theo tên khách hàng" value={customerName} onChange={(event) => setCustomerName(event.target.value)} />
-            </label>
-            <button type="button" className="wash-history-filter-apply-btn" onClick={handleApplyFilters}>Áp dụng</button>
-            {(garageId || customerName) && (
-              <button type="button" className="wash-history-filter-clear-btn" onClick={handleClearFilters}>Xóa lọc</button>
-            )}
-          </div>
-        </div>
+      <div className="awh-filters">
+        <label>
+          <span>Garage ID</span>
+          <input placeholder="e.g. 1" value={garageId} onChange={(e) => setGarageId(e.target.value)} />
+        </label>
+        <label>
+          <span>Customer name</span>
+          <input placeholder="Search by name..." value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+        </label>
+        <button type="button" className="awh-apply-btn" onClick={handleApplyFilters}>Apply</button>
+        {(garageId || customerName) && (
+          <button type="button" className="awh-clear-btn" onClick={handleClearFilters}>Clear</button>
+        )}
+      </div>
 
-        <button type="button" className="booking-history-refresh-btn" onClick={loadHistories}>
-          <span aria-hidden="true">↻</span>
-          {TEXT.refresh}
-        </button>
-      </section>
-
-      {error && <div className="booking-history-message">{error}</div>}
+      {error && <div className="awh-error">{error}</div>}
 
       {loading ? (
-        <div className="booking-history-empty">{TEXT.loading}</div>
+        <div className="awh-empty">{TEXT.loading}</div>
       ) : histories.length === 0 ? (
-        <div className="booking-history-empty">{TEXT.empty}</div>
+        <div className="awh-empty">{TEXT.empty}</div>
       ) : (
         <>
-          <section className="booking-history-list">
-            {histories.map((history) => (
-              <article className="booking-history-card" key={history.id}>
-                <div className="booking-history-card-top">
-                  <div>
-                    <p>{TEXT.completedAt}</p>
-                    <h2>{formatDateTime(history.completedAt)}</h2>
-                  </div>
-                </div>
-
-                <div className="booking-history-info">
-                  <div>
-                    <span>{TEXT.customer}</span>
-                    {formatNamedValue(history.customerName, history.customerId, TEXT.customer)}
-                  </div>
-                  <div>
-                    <span>{TEXT.vehicle}</span>
-                    {formatNamedValue(history.vehicleName, history.vehicleId, TEXT.vehicle)}
-                  </div>
-                  <div>
-                    <span>{TEXT.garage}</span>
-                    {formatNamedValue(history.garageName, history.garageId, TEXT.garage)}
-                  </div>
-                  <div>
-                    <span>{TEXT.servicePackage}</span>
-                    {formatNamedValue(history.servicePackageName, history.servicePackageId, TEXT.servicePackage)}
-                  </div>
-                  <div>
-                    <span>{TEXT.total}</span>
-                    <strong>{formatMoney(history.finalPrice)}</strong>
-                  </div>
-                  <div>
-                    <span>{TEXT.points}</span>
-                    <strong className="booking-points-earned">+{history.earnedPoints ?? 0}</strong>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </section>
+          <div className="awh-table-wrap">
+            <table className="awh-table">
+              <thead>
+                <tr>
+                  <th>{TEXT.completedAt}</th>
+                  <th>{TEXT.customer}</th>
+                  <th>{TEXT.vehicle}</th>
+                  <th>{TEXT.garage}</th>
+                  <th>{TEXT.servicePackage}</th>
+                  <th>{TEXT.total}</th>
+                  <th>{TEXT.points}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {histories.map((history) => (
+                  <tr key={history.id}>
+                    <td>{formatDateTime(history.completedAt)}</td>
+                    <td>{formatNamedValue(history.customerName, history.customerId, TEXT.customer)}</td>
+                    <td>{formatNamedValue(history.vehicleName, history.vehicleId, TEXT.vehicle)}</td>
+                    <td>{formatNamedValue(history.garageName, history.garageId, TEXT.garage)}</td>
+                    <td>{formatNamedValue(history.servicePackageName, history.servicePackageId, TEXT.servicePackage)}</td>
+                    <td><strong>{formatMoney(history.finalPrice)}</strong></td>
+                    <td><span className="awh-points">+{history.earnedPoints ?? 0}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
         </>

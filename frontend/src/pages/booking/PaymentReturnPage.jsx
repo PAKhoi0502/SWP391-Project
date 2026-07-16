@@ -36,7 +36,7 @@ function PaymentReturnPage() {
 
   return (
     <div className="booking-history-page">
-      <div className="booking-history-empty">Dang quay ve booking...</div>
+      <div className="booking-history-empty">Returning to your booking...</div>
     </div>
   )
 }

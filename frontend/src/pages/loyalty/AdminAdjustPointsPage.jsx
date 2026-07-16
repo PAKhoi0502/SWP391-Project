@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import loyaltyApi from '../../api/loyaltyApi'
-import { Button, Input, Textarea } from '../../components/common/ui'
 import { userService } from '../../services/userService'
+import './AdminAdjustPointsPage.css'
 
 export default function AdminAdjustPointsPage() {
   const [customerId, setCustomerId] = useState('')
@@ -23,7 +23,7 @@ export default function AdminAdjustPointsPage() {
 
     const id = customerId.trim()
     if (!id || Number.isNaN(Number(id))) {
-      setLookupError('Vui lòng nhập Customer ID hợp lệ.')
+      setLookupError('Please enter a valid Customer ID.')
       return
     }
 
@@ -31,7 +31,7 @@ export default function AdminAdjustPointsPage() {
     try {
       setCustomer(await userService.getUser(id))
     } catch (err) {
-      setLookupError(getErrorMessage(err, 'Không tìm thấy khách hàng.'))
+      setLookupError(getErrorMessage(err, 'Customer not found.'))
     } finally {
       setLookupLoading(false)
     }
@@ -39,10 +39,10 @@ export default function AdminAdjustPointsPage() {
 
   const validate = () => {
     const fieldErrors = {}
-    if (!customer) fieldErrors.customer = 'Vui lòng tìm và xác nhận khách hàng trước.'
+    if (!customer) fieldErrors.customer = 'Please look up and confirm a customer first.'
     const pointsValue = Number(points)
     if (!points || Number.isNaN(pointsValue) || !Number.isInteger(pointsValue) || pointsValue === 0) {
-      fieldErrors.points = 'Vui lòng nhập số điểm nguyên khác 0 (âm để trừ, dương để cộng).'
+      fieldErrors.points = 'Please enter a non-zero whole number of points (negative to deduct, positive to add).'
     }
     return fieldErrors
   }
@@ -61,137 +61,93 @@ export default function AdminAdjustPointsPage() {
     setSubmitting(true)
     try {
       await loyaltyApi.adjustPoints({ customerId: customer.id, points: pointsValue, reason: reason.trim() || undefined })
-      setSuccess(`Đã ${pointsValue > 0 ? 'cộng' : 'trừ'} ${Math.abs(pointsValue)} điểm cho ${customer.fullName || customer.email}.`)
+      setSuccess(`${pointsValue > 0 ? 'Added' : 'Deducted'} ${Math.abs(pointsValue)} points ${pointsValue > 0 ? 'to' : 'from'} ${customer.fullName || customer.email}.`)
       setPoints('')
       setReason('')
     } catch (err) {
-      setSubmitError(getErrorMessage(err, 'Không thể điều chỉnh điểm.'))
+      setSubmitError(getErrorMessage(err, 'Unable to adjust points.'))
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <div style={pageStyle}>
-      <div style={headerStyle}>
-        <div>
-          <h1 style={{ margin: 0, color: '#fff', marginBottom: 8 }}>Điều chỉnh điểm loyalty</h1>
-          <p style={{ margin: 0, color: 'rgba(200,220,255,0.58)' }}>
-            Cộng hoặc trừ điểm thủ công cho một khách hàng, kèm lý do.
-          </p>
-        </div>
-      </div>
+    <div className="aap-page">
+      <section className="aap-hero">
+        <h1>Adjust Loyalty Points</h1>
+        <p>Manually add or deduct points for a customer, with a reason.</p>
+      </section>
 
-      <div style={panelStyle}>
-        <h2 style={{ margin: '0 0 16px', color: '#fff', fontSize: 18 }}>1. Xác nhận khách hàng</h2>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div style={{ minWidth: 220 }}>
-            <Input
-              label="Customer ID"
+      <section className="aap-panel">
+        <h2>1. Confirm customer</h2>
+        <div className="aap-lookup-row">
+          <div className="aap-field">
+            <span className="aap-label">Customer ID</span>
+            <input
+              className="aap-input"
               value={customerId}
               onChange={(e) => { setCustomerId(e.target.value); setCustomer(null) }}
-              placeholder="Nhập Customer ID"
+              placeholder="Enter Customer ID"
             />
           </div>
-          <Button variant="secondary" onClick={handleLookupCustomer} loading={lookupLoading}>Tìm khách hàng</Button>
+          <button type="button" className="aap-btn aap-btn--primary" onClick={handleLookupCustomer} disabled={lookupLoading}>
+            {lookupLoading ? 'Searching...' : 'Look up customer'}
+          </button>
         </div>
 
-        {lookupError && <div style={errorStyle}>{lookupError}</div>}
+        {lookupError && <div className="aap-error" style={{ marginTop: 12 }}>{lookupError}</div>}
 
         {customer && (
-          <div style={customerCardStyle}>
-            <strong style={{ color: '#fff' }}>{customer.fullName || 'Chưa có tên'}</strong>
-            <span style={{ color: 'rgba(200,220,255,0.6)' }}>{customer.email || '-'}</span>
-            <span style={{ color: 'rgba(200,220,255,0.45)', fontSize: 13 }}>ID #{customer.id} · {String(customer.role || '').replace('ROLE_', '')}</span>
+          <div className="aap-customer-card">
+            <strong>{customer.fullName || 'No name yet'}</strong>
+            <span>{customer.email || '-'}</span>
+            <span>ID #{customer.id} · {String(customer.role || '').replace('ROLE_', '')}</span>
           </div>
         )}
-      </div>
+      </section>
 
-      <div style={panelStyle}>
-        <h2 style={{ margin: '0 0 16px', color: '#fff', fontSize: 18 }}>2. Số điểm điều chỉnh</h2>
-        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 14, maxWidth: 480 }}>
-          <Input
-            label="Số điểm (âm để trừ, dương để cộng)"
-            type="number"
-            step="1"
-            value={points}
-            onChange={(e) => setPoints(e.target.value)}
-            error={errors.points}
-            placeholder="VD: 50 hoặc -20"
-          />
-          <Textarea
-            label="Lý do (khuyến nghị)"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="VD: Bù điểm do lỗi hệ thống booking #123"
-            rows={3}
-          />
+      <section className="aap-panel">
+        <h2>2. Points adjustment</h2>
+        <form onSubmit={handleSubmit} className="aap-form">
+          <div className="aap-field">
+            <span className="aap-label">Points (negative to deduct, positive to add)</span>
+            <input
+              className="aap-input"
+              type="number"
+              step="1"
+              value={points}
+              onChange={(e) => setPoints(e.target.value)}
+              placeholder="e.g. 50 or -20"
+            />
+            {errors.points && <div className="aap-error">{errors.points}</div>}
+          </div>
 
-          {errors.customer && <div style={errorStyle}>{errors.customer}</div>}
-          {submitError && <div style={errorStyle}>{submitError}</div>}
-          {success && <div style={successStyle}>{success}</div>}
+          <div className="aap-field">
+            <span className="aap-label">Reason (recommended)</span>
+            <textarea
+              className="aap-textarea"
+              rows={3}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. Points compensation for booking #123 system error"
+            />
+          </div>
+
+          {errors.customer && <div className="aap-error">{errors.customer}</div>}
+          {submitError && <div className="aap-error">{submitError}</div>}
+          {success && <div className="aap-success">{success}</div>}
 
           <div>
-            <Button type="submit" loading={submitting}>Áp dụng điều chỉnh</Button>
+            <button type="submit" className="aap-btn aap-btn--primary" disabled={submitting}>
+              {submitting ? 'Processing...' : 'Apply adjustment'}
+            </button>
           </div>
         </form>
-      </div>
+      </section>
     </div>
   )
 }
 
 function getErrorMessage(err, fallback) {
   return err?.response?.data?.message || err?.response?.data || err?.message || fallback
-}
-
-const pageStyle = {
-  display: 'grid',
-  gap: 20,
-  fontFamily: "'Be Vietnam Pro', sans-serif",
-}
-
-const headerStyle = {
-  alignItems: 'center',
-  background: 'linear-gradient(135deg, #0f172a, #1e1b4b)',
-  borderRadius: 24,
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: 18,
-  padding: 24,
-}
-
-const panelStyle = {
-  background: 'radial-gradient(circle at 90% 0%, rgba(167,139,250,0.16) 0%, transparent 40%), linear-gradient(145deg, rgba(18,16,26,0.94), rgba(38,34,52,0.88))',
-  border: '1px solid rgba(167,139,250,0.25)',
-  borderRadius: 24,
-  boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
-  padding: 20,
-}
-
-const customerCardStyle = {
-  display: 'grid',
-  gap: 4,
-  marginTop: 16,
-  padding: 14,
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.1)',
-  borderRadius: 14,
-  maxWidth: 360,
-}
-
-const errorStyle = {
-  background: 'rgba(239,68,68,0.15)',
-  border: '1px solid rgba(239,68,68,0.35)',
-  borderRadius: 12,
-  color: '#fca5a5',
-  marginTop: 12,
-  padding: '10px 12px',
-}
-
-const successStyle = {
-  background: 'rgba(34,197,94,0.15)',
-  border: '1px solid rgba(34,197,94,0.35)',
-  borderRadius: 12,
-  color: '#86efac',
-  padding: '10px 12px',
 }

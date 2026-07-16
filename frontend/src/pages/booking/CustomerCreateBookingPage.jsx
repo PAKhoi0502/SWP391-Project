@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   bookingFlowUtils,
   customerBookingFlowApi,
 } from '../../api/customerBookingFlowApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
 import promotionApi from '../../api/promotionApi'
+import { waitlistApi } from '../../api/waitlistApi'
 import './CustomerCreateBookingPage.css'
 import { getPackageType } from '../../services/servicePackageApi'
 
@@ -53,16 +54,16 @@ const formatMoney = (value) =>
 const formatDiscountLabel = (promo) => {
   const type = String(promo?.discountType || '').toUpperCase()
   const value = promo?.discountValue
-  if (type === 'PERCENTAGE' && value != null) return `Voucher giảm ${value}%`
+  if (type === 'PERCENTAGE' && value != null) return `Voucher -${value}%`
   if ((type === 'FIXED_AMOUNT' || type === 'FIXED') && value != null)
-    return `Voucher giảm ${formatMoney(value)}`
+    return `Voucher -${formatMoney(value)}`
   return 'Voucher'
 }
 
 const formatEndDate = (value) => {
   if (!value) return ''
   try {
-    return new Date(value).toLocaleDateString('vi-VN', {
+    return new Date(value).toLocaleDateString('en-US', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -81,7 +82,7 @@ const getId = (item) =>
   item?.slotId ??
   item?.startTime
 
-const getName = (item, fallback = 'Không có tên') =>
+const getName = (item, fallback = 'Unnamed') =>
   item?.name ||
   item?.packageName ||
   item?.serviceName ||
@@ -117,7 +118,7 @@ const getVehicleDisplayName = (vehicle) => {
     vehicle.plateNumber
   const modelName = [vehicle.brand, vehicle.model].filter(Boolean).join(' ').trim()
 
-  return [plate, modelName].filter(Boolean).join(' - ') || getName(vehicle, 'Xe')
+  return [plate, modelName].filter(Boolean).join(' - ') || getName(vehicle, 'Vehicle')
 }
 
 const formatTime = (value) => {
@@ -130,7 +131,7 @@ const formatTime = (value) => {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return String(value)
 
-  return date.toLocaleTimeString('vi-VN', {
+  return date.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
   })
@@ -142,7 +143,7 @@ const getSlotLabel = (slot) => {
 
   if (start && end) return `${formatTime(start)} - ${formatTime(end)}`
 
-  return slot?.label || slot?.time || 'Khung giờ'
+  return slot?.label || slot?.time || 'Time slot'
 }
 
 const getSlotStartDateTime = (slot, selectedDate) => {
@@ -195,11 +196,18 @@ export default function CustomerCreateBookingPage() {
   const [loyaltyPreview, setLoyaltyPreview] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('')
 
+  const [waitlistModal, setWaitlistModal]           = useState(null)
+  const [waitlistSubmitting, setWaitlistSubmitting] = useState(false)
+  const [waitlistResult, setWaitlistResult]         = useState(null)
+
   const [loadingInitial, setLoadingInitial] = useState(true)
   const [loadingPackages, setLoadingPackages] = useState(false)
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState('')
+  const [promoError, setPromoError] = useState('')
+  const [loyaltyError, setLoyaltyError] = useState('')
+  const [loyaltyInfo, setLoyaltyInfo] = useState('')
 
   const selectedVehicle = useMemo(
     () => vehicles.find((item) => String(getId(item)) === String(selectedVehicleId)),
@@ -308,7 +316,7 @@ export default function CustomerCreateBookingPage() {
         setSelectedDate((current) => clampBookingDate(current, nextBookingWindowDays))
       } catch (error) {
         if (mounted) {
-          setMessage(error.message || 'Không tải được dữ liệu đặt lịch.')
+          setMessage(error.message || 'Failed to load booking data.')
         }
       } finally {
         if (mounted) setLoadingInitial(false)
@@ -354,7 +362,7 @@ export default function CustomerCreateBookingPage() {
       } catch (error) {
         if (mounted) {
           setServicePackages([])
-          setMessage(error.message || 'Không tải được gói dịch vụ khả dụng.')
+          setMessage(error.message || 'Failed to load available packages.')
         }
       } finally {
         if (mounted) setLoadingPackages(false)
@@ -394,7 +402,10 @@ export default function CustomerCreateBookingPage() {
       } catch (error) {
         if (mounted) {
           setSlots([])
-          setMessage(error.message || 'Không tải được khung giờ khả dụng.')
+          const status = error?.response?.status
+          if (status !== 400) {
+            setMessage(error.message || 'Failed to load available time slots.')
+          }
         }
       } finally {
         if (mounted) setLoadingSlots(false)
@@ -434,11 +445,14 @@ export default function CustomerCreateBookingPage() {
     setPromotionCode('')
     setEligiblePromotions([])
     setShowPromoDropdown(false)
+    setPromoError('')
   }, [selectedPackageId, selectedAddOnIds])
 
   // Reset loyalty when promotion changes; also clear points if stacking is blocked
   useEffect(() => {
     setLoyaltyPreview(null)
+    setLoyaltyError('')
+    setLoyaltyInfo('')
     if (promotionResult?.valid && !promotionResult?.allowLoyaltyStack) {
       setLoyaltyPoints('')
     }
@@ -468,17 +482,18 @@ export default function CustomerCreateBookingPage() {
 
     if (!promotionCode.trim()) {
       setPromotionResult(null)
-      setMessage('Nhập mã khuyến mãi trước khi áp dụng.')
+      setMessage('Enter a promo code first.')
       return
     }
 
     if (!selectedPackage) {
-      setMessage('Chọn gói dịch vụ trước khi áp dụng mã.')
+      setMessage('Select a service package before applying a code.')
       return
     }
 
     try {
       setMessage('')
+      setPromoError('')
       const result = await promotionApi.validatePromotion({
         promotionCode: promotionCode.trim(),
         servicePackageId: Number(selectedPackageId),
@@ -487,14 +502,14 @@ export default function CustomerCreateBookingPage() {
 
       if (result?.valid === false) {
         setPromotionResult(null)
-        setMessage(result?.message || 'Mã khuyến mãi không hợp lệ hoặc không áp dụng được.')
+        setPromoError(result?.message || 'Promo code is invalid or not applicable.')
       } else {
         setPromotionResult(result)
-        setMessage(result?.message || 'Áp dụng mã khuyến mãi thành công.')
+        setPromoError('')
       }
     } catch (error) {
       setPromotionResult(null)
-      setMessage(error?.response?.data?.message || error.message || 'Mã khuyến mãi không hợp lệ.')
+      setPromoError(error?.response?.data?.message || error.message || 'Promo code is invalid.')
     }
   }
 
@@ -505,6 +520,7 @@ export default function CustomerCreateBookingPage() {
 
     try {
       setMessage('')
+      setPromoError('')
       const result = await promotionApi.validatePromotion({
         promotionCode: promo.code,
         servicePackageId: Number(selectedPackageId),
@@ -513,14 +529,14 @@ export default function CustomerCreateBookingPage() {
 
       if (result?.valid === false) {
         setPromotionResult(null)
-        setMessage(result?.message || 'Mã khuyến mãi không áp dụng được.')
+        setPromoError(result?.message || 'Promo code is not applicable.')
       } else {
         setPromotionResult(result)
-        setMessage(result?.message || 'Áp dụng mã khuyến mãi thành công.')
+        setPromoError('')
       }
     } catch (error) {
       setPromotionResult(null)
-      setMessage(error?.response?.data?.message || error.message || 'Mã khuyến mãi không hợp lệ.')
+      setPromoError(error?.response?.data?.message || error.message || 'Promo code is invalid.')
     }
   }
 
@@ -529,12 +545,12 @@ export default function CustomerCreateBookingPage() {
 
     if (points <= 0) {
       setLoyaltyPreview(null)
-      setMessage('Nhập số điểm muốn dùng trước khi tính thử.')
+      setMessage('Enter the points amount first.')
       return
     }
 
     if (!selectedPackage) {
-      setMessage('Chọn gói dịch vụ trước khi tính thử điểm.')
+      setMessage('Select a service package first.')
       return
     }
 
@@ -552,22 +568,22 @@ export default function CustomerCreateBookingPage() {
       })
 
       setLoyaltyPreview(result)
+      setLoyaltyError('')
 
       const validPoints = result?.validPoints ?? 0
       const discountAmount = result?.discountAmount ?? 0
 
-      if (result?.message) {
-        setMessage(result.message)
-      } else if (validPoints < points) {
-        setMessage(`Chỉ áp dụng được ${validPoints} điểm (giảm ${formatMoney(discountAmount)}).`)
-      } else {
-        setMessage(`Áp dụng ${validPoints} điểm, giảm ${formatMoney(discountAmount)}.`)
-      }
+      const infoMsg = result?.message ||
+        (validPoints < points
+          ? `Only ${validPoints} pts can be applied (saves ${formatMoney(discountAmount)}).`
+          : `Applying ${validPoints} pts saves ${formatMoney(discountAmount)}.`)
+      setLoyaltyInfo(infoMsg)
     } catch (error) {
       setLoyaltyPreview(null)
+      setLoyaltyInfo('')
       const errMsg = error?.response?.data?.message || error?.message || ''
       const isInsufficient = /insufficient|not enough|không đủ|khong du/i.test(errMsg)
-      setMessage(isInsufficient ? 'Bạn không đủ điểm khả dụng để đổi.' : (errMsg || 'Không thể tính thử điểm loyalty.'))
+      setLoyaltyError(isInsufficient ? 'You don\'t have enough points.' : (errMsg || 'Could not preview loyalty points.'))
     }
   }
 
@@ -583,40 +599,29 @@ export default function CustomerCreateBookingPage() {
   }
 
   const handleJoinWaitlist = (slot) => {
-    const confirmJoin = window.confirm(
-      `Khung giờ ${getSlotLabel(slot)} đã đầy. Bạn có muốn tham gia hàng chờ không?`,
-    )
+    setWaitlistResult(null)
+    setWaitlistModal(slot)
+  }
 
-    if (!confirmJoin) return
-
-    const waitlistDraft = {
-      garageId: getId(selectedGarage),
-      garageName: getName(selectedGarage, 'Garage'),
-      servicePackageId: getId(selectedPackage),
-      servicePackageName: getName(selectedPackage, 'Gói dịch vụ'),
-      vehicleId: getId(selectedVehicle),
-      vehicleName: getName(selectedVehicle, 'Xe'),
-      vehicleType: bookingFlowUtils.getVehicleType(selectedVehicle),
-      date: selectedDate,
-      startTime: slot?.startTime || slot?.start || '',
-      endTime: slot?.endTime || slot?.end || '',
+  const handleConfirmWaitlist = async () => {
+    if (!waitlistModal) return
+    setWaitlistSubmitting(true)
+    setWaitlistResult(null)
+    try {
+      await waitlistApi.join({
+        garageId: getId(selectedGarage),
+        vehicleId: getId(selectedVehicle),
+        servicePackageId: getId(selectedPackage),
+        desiredStartTime: waitlistModal?.startTime || waitlistModal?.start || waitlistModal?.from,
+        reason: 'NO_BAY',
+      })
+      setWaitlistResult({ ok: true })
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Không thể tham gia danh sách chờ.'
+      setWaitlistResult({ ok: false, msg })
+    } finally {
+      setWaitlistSubmitting(false)
     }
-
-    localStorage.setItem('waitlistDraft', JSON.stringify(waitlistDraft))
-
-    const params = new URLSearchParams({
-      garageId: String(waitlistDraft.garageId || ''),
-      garageName: waitlistDraft.garageName || '',
-      servicePackageId: String(waitlistDraft.servicePackageId || ''),
-      servicePackageName: waitlistDraft.servicePackageName || '',
-      vehicleId: String(waitlistDraft.vehicleId || ''),
-      vehicleType: waitlistDraft.vehicleType || '',
-      date: waitlistDraft.date || '',
-      startTime: waitlistDraft.startTime || '',
-      endTime: waitlistDraft.endTime || '',
-    })
-
-    navigate(`/customer/waitlist?${params.toString()}`)
   }
 
   const canSubmit =
@@ -640,10 +645,10 @@ export default function CustomerCreateBookingPage() {
 
   const handleNextStep = () => {
     if (!canGoNext()) {
-      if (currentStep === 1) setMessage('Vui lòng chọn xe trước.')
-      if (currentStep === 2) setMessage('Vui lòng chọn garage trước.')
-      if (currentStep === 3) setMessage('Vui lòng chọn gói dịch vụ trước.')
-      if (currentStep === 4) setMessage('Vui lòng chọn ngày và khung giờ trước.')
+      if (currentStep === 1) setMessage('Please select a vehicle first.')
+      if (currentStep === 2) setMessage('Please select a garage first.')
+      if (currentStep === 3) setMessage('Please select a service package first.')
+      if (currentStep === 4) setMessage('Please select a date and time slot first.')
       return
     }
 
@@ -667,7 +672,7 @@ export default function CustomerCreateBookingPage() {
     const id = String(getId(servicePackage))
     setSelectedPackageId(id)
 
-    // Combo là gói riêng — chọn combo thì bỏ hết addon đang chọn
+    // Combo is a standalone package — selecting a combo clears any selected add-ons
     if (normalizePackageType(servicePackage) === 'COMBO') {
       setSelectedAddOnIds([])
     }
@@ -675,23 +680,23 @@ export default function CustomerCreateBookingPage() {
 
   const handleSubmitBooking = async () => {
     if (!canSubmit) {
-      setMessage('Bạn cần chọn đủ xe, garage, gói dịch vụ, ngày, khung giờ và phương thức thanh toán.')
+      setMessage('Please complete all steps: vehicle, garage, package, date, time slot, and payment method.')
       return
     }
 
     if (promotionCode.trim() && !promotionResult?.valid) {
-      setMessage('Mã khuyến mãi chưa được xác thực. Nhấn "Áp dụng" để kiểm tra trước.')
+      setMessage('Promo code not validated. Click "Apply" to check it first.')
       return
     }
 
     const enteredPoints = Number(loyaltyPoints || 0)
     if (enteredPoints > 0) {
       if (loyaltyPreview === null) {
-        setMessage('Bạn đã nhập điểm loyalty nhưng chưa bấm "Tính thử". Vui lòng bấm "Tính thử" trước khi xác nhận đặt lịch.')
+        setMessage('You entered loyalty points but haven\'t clicked "Preview" yet. Please click "Preview" before confirming.')
         return
       }
       if ((loyaltyPreview.validPoints ?? 0) <= 0) {
-        setMessage('Không thể áp dụng số điểm này. Vui lòng xóa điểm hoặc nhập lại và bấm "Tính thử".')
+        setMessage('Cannot apply these points. Please clear or re-enter and click "Preview".')
         return
       }
     }
@@ -726,8 +731,8 @@ export default function CustomerCreateBookingPage() {
         paymentMethod,
         note:
           paymentMethod === 'BANK_TRANSFER'
-            ? 'Khách chọn chuyển khoản tại garage sau khi hoàn thành dịch vụ.'
-            : 'Khách chọn thanh toán tiền mặt tại garage sau khi hoàn thành dịch vụ.',
+            ? 'Customer selected bank transfer at garage after service completion.'
+            : 'Customer selected cash payment at garage after service completion.',
       }
       const createdBooking = await customerBookingFlowApi.createBooking(bookingPayload)
 
@@ -746,7 +751,7 @@ export default function CustomerCreateBookingPage() {
               customerName,
               vehicleName: getVehicleDisplayName(selectedVehicle),
               garageName: getName(selectedGarage, 'Garage'),
-              servicePackageName: getName(selectedPackage, 'Gói dịch vụ'),
+              servicePackageName: getName(selectedPackage, 'Service Package'),
               paymentMethod,
               note: bookingPayload.note,
             }),
@@ -762,507 +767,803 @@ export default function CustomerCreateBookingPage() {
       })
     } catch (error) {
       const msg = error?.response?.data?.message || error.message || ''
-      setMessage(msg || 'Đặt lịch thất bại. Vui lòng thử lại.')
+      setMessage(msg || 'Booking failed. Please try again.')
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <main className="booking-flow-page">
-      <section className="booking-flow-hero">
-        <p className="booking-eyebrow">AutoWash Pro</p>
-        <h1>Tạo lịch rửa xe</h1>
-        <p>
-          Chọn xe, garage, gói dịch vụ, thời gian, mã giảm giá và điểm loyalty
-          trước khi xác nhận booking. Thanh toán sẽ được xử lý tại garage sau khi
-          hoàn tất dịch vụ.
-        </p>
-      </section>
+    <main className="bk-page">
+      <div className="bk-inner">
 
-      {message && <div className="booking-message">{message}</div>}
+        {/* Hero */}
+        <div className="bk-hero">
+          <p className="bk-eyebrow">AutoWash Pro</p>
+          <h1 className="bk-title">New Booking</h1>
+          <p className="bk-subtitle">
+            Choose your vehicle, garage, package, and time — confirm in just a few steps.
+            Payment is made at the garage after service.
+          </p>
+        </div>
 
-      {loadingInitial ? (
-        <div className="booking-loading-card">Đang tải dữ liệu đặt lịch...</div>
-      ) : (
-        <section className="booking-flow-layout">
-          <div className="booking-flow-main">
-            {currentStep === 1 && (
-              <section className="booking-step-card">
-                <div className="booking-step-title">
-                  <span>1</span>
-                  <h2>Chọn xe</h2>
-                </div>
+        {/* Stepper */}
+        <BkStepper
+          currentStep={currentStep}
+          onGoTo={(step) => { setMessage(''); setCurrentStep(step) }}
+        />
 
-                {vehicles.length === 0 ? (
-                  <p className="booking-muted">
-                    Bạn chưa có xe nào. Vui lòng thêm xe ở trang Xe của tôi trước.
-                  </p>
-                ) : (
-                  <div className="booking-grid">
-                    {vehicles.map((vehicle) => (
-                      <button
-                        type="button"
-                        key={getId(vehicle)}
-                        className={`booking-option-card ${String(selectedVehicleId) === String(getId(vehicle)) ? 'active' : ''
-                          }`}
-                        onClick={() => setSelectedVehicleId(String(getId(vehicle)))}
-                      >
-                        <strong>{getName(vehicle, 'Xe của bạn')}</strong>
-                        <small>
-                          {vehicle?.licensePlate ||
-                            vehicle?.plateNumber ||
-                            bookingFlowUtils.getVehicleType(vehicle)}
-                        </small>
-                      </button>
-                    ))}
-                  </div>
-                )}
+        {/* Message banner */}
+        {message && <div className="bk-msg">{message}</div>}
 
-                <div className="booking-step-actions">
-                  <button type="button" onClick={handleNextStep}>
-                    Tiếp tục
-                  </button>
-                </div>
-              </section>
-            )}
+        {/* Loading state */}
+        {loadingInitial ? (
+          <div className="bk-loading">
+            <div className="bk-spinner" />
+            <span>Loading booking data...</span>
+          </div>
+        ) : (
+          <div className="bk-layout">
 
-            {currentStep === 2 && (
-              <section className="booking-step-card">
-                <div className="booking-step-title">
-                  <span>2</span>
-                  <h2>Chọn garage</h2>
-                </div>
+            {/* ── Main content ── */}
+            <div className="bk-main">
+              <div key={currentStep} className="bk-step-animate">
 
-                {garages.length === 0 ? (
-                  <p className="booking-muted">Chưa có garage khả dụng.</p>
-                ) : (
-                  <div className="booking-grid">
-                    {garages.map((garage) => (
-                      <button
-                        type="button"
-                        key={getId(garage)}
-                        className={`booking-option-card ${String(selectedGarageId) === String(getId(garage)) ? 'active' : ''
-                          }`}
-                        onClick={() => setSelectedGarageId(String(getId(garage)))}
-                      >
-                        <strong>{getName(garage, 'Garage')}</strong>
-                        <small>{garage?.address || garage?.location || 'AutoWash Pro'}</small>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <div className="booking-step-actions">
-                  <button type="button" className="secondary" onClick={handlePrevStep}>
-                    Quay lại
-                  </button>
-                  <button type="button" onClick={handleNextStep}>
-                    Tiếp tục
-                  </button>
-                </div>
-              </section>
-            )}
-
-            {currentStep === 3 && (
-              <section className="booking-step-card">
-                <div className="booking-step-title">
-                  <span>3</span>
-                  <h2>Chọn gói dịch vụ</h2>
-                </div>
-
-                {loadingPackages ? (
-                  <p className="booking-muted">Đang tải gói dịch vụ...</p>
-                ) : (
-                  <>
-                    <h3>Gói chính</h3>
-                    <div className="booking-grid">
-                      {mainPackages.map((servicePackage) => (
-                        <button
-                          type="button"
-                          key={getId(servicePackage)}
-                          className={`booking-option-card ${String(selectedPackageId) === String(getId(servicePackage)) ? 'active' : ''
-                            }`}
-                          onClick={() => handleSelectPackage(servicePackage)}
-                        >
-                          <strong>{getName(servicePackage, 'Gói dịch vụ')}</strong>
-                          <small>{formatMoney(bookingFlowUtils.getPackagePrice(servicePackage))}</small>
-                        </button>
-                      ))}
+                {/* ════ STEP 1: VEHICLE ════ */}
+                {currentStep === 1 && (
+                  <div className="bk-card">
+                    <div className="bk-step-header">
+                      <div className="bk-step-badge">1</div>
+                      <h2 className="bk-step-title">Select Vehicle</h2>
                     </div>
 
-                    {comboPackages.length > 0 && (
-                      <>
-                        <h3>Gói combo</h3>
-                        <div className="booking-grid">
-                          {comboPackages.map((servicePackage) => {
-                            const includedNames = getIncludedPackageNames(servicePackage)
+                    {vehicles.length === 0 ? (
+                      <div className="bk-empty">
+                        <p>No vehicles found</p>
+                        <span>Please add a vehicle in My Vehicles first.</span>
+                      </div>
+                    ) : (
+                      <div className="bk-opt-grid">
+                        {vehicles.map((vehicle) => {
+                          const vid = String(getId(vehicle))
+                          const sel = selectedVehicleId === vid
+                          const plate = vehicle?.rawLicensePlate || vehicle?.normalizedLicensePlate || vehicle?.licensePlate || vehicle?.plateNumber || ''
+                          const modelName = [vehicle?.brand, vehicle?.model].filter(Boolean).join(' ') || ''
+                          const vtype = String(bookingFlowUtils.getVehicleType(vehicle) || '').toUpperCase()
+                          return (
+                            <button
+                              type="button"
+                              key={vid}
+                              className={`bk-opt-card${sel ? ' bk-opt-card--sel' : ''}`}
+                              onClick={() => setSelectedVehicleId(vid)}
+                            >
+                              <div className="bk-opt-icon">
+                                {vtype === 'BIKE' || vtype === 'MOTORBIKE' ? '🛵' : '🚗'}
+                              </div>
+                              <div className="bk-opt-body">
+                                <span className="bk-opt-name">{plate || getName(vehicle, 'Your vehicle')}</span>
+                                {modelName && <span className="bk-opt-sub">{modelName}</span>}
+                                <span className="bk-opt-tag">{vtype === 'BIKE' || vtype === 'MOTORBIKE' ? 'Motorbike' : 'Car'}</span>
+                              </div>
+                              {sel && <span className="bk-check">✓</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
 
-                            return (
-                              <button
-                                type="button"
-                                key={getId(servicePackage)}
-                                className={`booking-option-card ${String(selectedPackageId) === String(getId(servicePackage)) ? 'active' : ''
-                                  }`}
-                                onClick={() => handleSelectPackage(servicePackage)}
-                              >
-                                <strong>{getName(servicePackage, 'Gói combo')}</strong>
-                                {includedNames && <small className="booking-combo-includes">{includedNames}</small>}
-                                <small>{formatMoney(bookingFlowUtils.getPackagePrice(servicePackage))}</small>
-                              </button>
-                            )
-                          })}
-                        </div>
+                    <div className="bk-step-nav">
+                      <button
+                        type="button"
+                        className="bk-btn-primary"
+                        disabled={!canGoNext()}
+                        onClick={handleNextStep}
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ════ STEP 2: GARAGE ════ */}
+                {currentStep === 2 && (
+                  <div className="bk-card">
+                    <div className="bk-step-header">
+                      <div className="bk-step-badge">2</div>
+                      <h2 className="bk-step-title">Select Garage</h2>
+                    </div>
+
+                    {garages.length === 0 ? (
+                      <div className="bk-empty">
+                        <p>No garages available</p>
+                        <span>Please try again later.</span>
+                      </div>
+                    ) : (
+                      <div className="bk-opt-grid">
+                        {garages.map((garage) => {
+                          const gid = String(getId(garage))
+                          const sel = selectedGarageId === gid
+                          return (
+                            <button
+                              type="button"
+                              key={gid}
+                              className={`bk-opt-card${sel ? ' bk-opt-card--sel' : ''}`}
+                              onClick={() => setSelectedGarageId(gid)}
+                            >
+                              <div className="bk-opt-body">
+                                <span className="bk-opt-name">{getName(garage, 'Garage')}</span>
+                                <span className="bk-opt-sub">{garage?.address || garage?.location || 'AutoWash Pro'}</span>
+                              </div>
+                              {sel && <span className="bk-check">✓</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    <div className="bk-step-nav">
+                      <button type="button" className="bk-btn-ghost" onClick={handlePrevStep}>← Back</button>
+                      <button type="button" className="bk-btn-primary" disabled={!canGoNext()} onClick={handleNextStep}>Next →</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ════ STEP 3: SERVICE PACKAGE ════ */}
+                {currentStep === 3 && (
+                  <div className="bk-card">
+                    <div className="bk-step-header">
+                      <div className="bk-step-badge">3</div>
+                      <h2 className="bk-step-title">Select Service Package</h2>
+                    </div>
+
+                    {loadingPackages ? (
+                      <div className="bk-loading-inline">
+                        <div className="bk-spinner-sm" />
+                        Loading packages...
+                      </div>
+                    ) : (
+                      <>
+                        {/* Main packages */}
+                        {mainPackages.length > 0 && (
+                          <div className="bk-pkg-section">
+                            <p className="bk-pkg-section-title">Main package</p>
+                            <div className="bk-pkg-grid">
+                              {mainPackages.map((pkg) => {
+                                const pid = String(getId(pkg))
+                                const sel = selectedPackageId === pid
+                                const dur = bookingFlowUtils.getPackageDuration?.(pkg)
+                                return (
+                                  <button
+                                    type="button"
+                                    key={pid}
+                                    className={`bk-pkg-card${sel ? ' bk-pkg-card--sel' : ''}`}
+                                    onClick={() => handleSelectPackage(pkg)}
+                                  >
+                                    <div className="bk-pkg-card-top">
+                                      <div className="bk-pkg-card-meta">
+                                        <span className="bk-pkg-badge bk-pkg-badge--main">Main</span>
+                                        {dur > 0 && <span className="bk-pkg-duration">⏱ {dur} min</span>}
+                                      </div>
+                                      <span className="bk-pkg-name">{getName(pkg, 'Service package')}</span>
+                                      {(pkg?.description || pkg?.shortDescription) && (
+                                        <p className="bk-pkg-desc">{pkg.description || pkg.shortDescription}</p>
+                                      )}
+                                    </div>
+                                    <div className="bk-pkg-card-foot">
+                                      <span className="bk-pkg-price">{formatMoney(bookingFlowUtils.getPackagePrice(pkg))}</span>
+                                      {sel && <span className="bk-pkg-check">✓</span>}
+                                    </div>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Combo packages */}
+                        {comboPackages.length > 0 && (
+                          <div className="bk-pkg-section">
+                            <p className="bk-pkg-section-title">Combo package</p>
+                            <div className="bk-pkg-grid">
+                              {comboPackages.map((pkg) => {
+                                const pid = String(getId(pkg))
+                                const sel = selectedPackageId === pid
+                                const includedNames = getIncludedPackageNames(pkg)
+                                return (
+                                  <button
+                                    type="button"
+                                    key={pid}
+                                    className={`bk-pkg-card${sel ? ' bk-pkg-card--sel' : ''}`}
+                                    onClick={() => handleSelectPackage(pkg)}
+                                  >
+                                    <div className="bk-pkg-card-top">
+                                      <div className="bk-pkg-card-meta">
+                                        <span className="bk-pkg-badge bk-pkg-badge--combo">Combo</span>
+                                      </div>
+                                      <span className="bk-pkg-name">{getName(pkg, 'Combo package')}</span>
+                                      {includedNames && <p className="bk-pkg-includes">{includedNames}</p>}
+                                    </div>
+                                    <div className="bk-pkg-card-foot">
+                                      <span className="bk-pkg-price">{formatMoney(bookingFlowUtils.getPackagePrice(pkg))}</span>
+                                      {sel && <span className="bk-pkg-check">✓</span>}
+                                    </div>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Add-on packages */}
+                        {addOnPackages.length > 0 && (
+                          <div className="bk-pkg-section">
+                            <p className="bk-pkg-section-title">
+                              Add-ons
+                              {isComboSelected
+                                ? <span className="bk-pkg-section-hint"> — not available with combo</span>
+                                : <span className="bk-pkg-section-hint"> — select multiple</span>
+                              }
+                            </p>
+                            <div className="bk-pkg-grid">
+                              {addOnPackages.map((pkg) => {
+                                const pid = String(getId(pkg))
+                                const sel = selectedAddOnIds.includes(pid)
+                                return (
+                                  <button
+                                    type="button"
+                                    key={pid}
+                                    disabled={isComboSelected}
+                                    className={`bk-pkg-card${sel ? ' bk-pkg-card--sel' : ''}`}
+                                    onClick={() => toggleAddOn(pid)}
+                                  >
+                                    <div className="bk-pkg-card-top">
+                                      <div className="bk-pkg-card-meta">
+                                        <span className="bk-pkg-badge bk-pkg-badge--addon">Add-on</span>
+                                      </div>
+                                      <span className="bk-pkg-name">{getName(pkg, 'Add-on')}</span>
+                                      {(pkg?.description || pkg?.shortDescription) && (
+                                        <p className="bk-pkg-desc">{pkg.description || pkg.shortDescription}</p>
+                                      )}
+                                    </div>
+                                    <div className="bk-pkg-card-foot">
+                                      <span className="bk-pkg-price">{formatMoney(bookingFlowUtils.getPackagePrice(pkg))}</span>
+                                      {sel && <span className="bk-pkg-check">✓</span>}
+                                    </div>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {!loadingPackages && selectedVehicle && selectedGarage && servicePackages.length === 0 && (
+                          <div className="bk-empty">
+                            <p>No packages available</p>
+                            <span>No packages match the selected vehicle / garage.</span>
+                          </div>
+                        )}
                       </>
                     )}
 
-                    {addOnPackages.length > 0 && (
+                    <div className="bk-step-nav">
+                      <button type="button" className="bk-btn-ghost" onClick={handlePrevStep}>← Back</button>
+                      <button type="button" className="bk-btn-primary" disabled={!canGoNext()} onClick={handleNextStep}>Next →</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ════ STEP 4: DATE & SLOT ════ */}
+                {currentStep === 4 && (
+                  <div className="bk-card">
+                    <div className="bk-step-header">
+                      <div className="bk-step-badge">4</div>
+                      <h2 className="bk-step-title">Select Date & Time</h2>
+                    </div>
+
+                    <div className="bk-date-field">
+                      <label className="bk-field-label" style={{ marginBottom: 10, display: 'block' }}>Booking date</label>
+                      <BkCalendar
+                        value={selectedDate}
+                        min={minBookingDateIso()}
+                        max={maxBookingDateIso(bookingWindowDays)}
+                        onChange={(iso) => setSelectedDate(clampBookingDate(iso, bookingWindowDays))}
+                      />
+                    </div>
+
+                    {loadingSlots ? (
+                      <div className="bk-loading-inline">
+                        <div className="bk-spinner-sm" />
+                        Loading time slots...
+                      </div>
+                    ) : (
                       <>
-                        <h3>Dịch vụ thêm (có thể chọn nhiều)</h3>
-                        {isComboSelected && (
-                          <p className="booking-muted">
-                            Gói combo đã bao gồm sẵn dịch vụ, không thể chọn thêm dịch vụ khác.
+                        {visibleSlots.length > 0 && (
+                          <div className="bk-slot-grid">
+                            {visibleSlots.map((slot) => {
+                              const full = isSlotFull(slot)
+                              const sel = String(selectedSlotId) === String(getId(slot))
+                              return (
+                                <button
+                                  type="button"
+                                  key={getId(slot)}
+                                  className={`bk-slot${sel ? ' bk-slot--sel' : ''}${full ? ' bk-slot--full' : ''}`}
+                                  onClick={() => {
+                                    if (full) { handleJoinWaitlist(slot); return }
+                                    setSelectedSlotId(String(getId(slot)))
+                                  }}
+                                >
+                                  <span className="bk-slot-time">{getSlotLabel(slot)}</span>
+                                  {full && <span className="bk-slot-full-tag">Full</span>}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+                        {selectedPackage && visibleSlots.length === 0 && (
+                          <div className="bk-empty">
+                            <p>No slots available</p>
+                            <span>No available slots for this date, or today's slots have already passed.</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    <div className="bk-step-nav">
+                      <button type="button" className="bk-btn-ghost" onClick={handlePrevStep}>← Back</button>
+                      <button type="button" className="bk-btn-primary" disabled={!canGoNext()} onClick={handleNextStep}>Next →</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ════ STEP 5: PROMO + LOYALTY + PAYMENT ════ */}
+                {currentStep === 5 && (
+                  <div className="bk-card">
+                    <div className="bk-step-header">
+                      <div className="bk-step-badge">5</div>
+                      <h2 className="bk-step-title">Offers & Confirm</h2>
+                    </div>
+
+                    {/* Promo section */}
+                    <div className="bk-section">
+                      <p className="bk-section-title">Promo code</p>
+                      <div className="bk-promo-wrap" ref={promoDropdownRef}>
+                        {!selectedPackage && (
+                          <p className="bk-muted">Select a service package first to apply a promo code.</p>
+                        )}
+                        <div className="bk-promo-row">
+                          <div className="bk-promo-input-wrap">
+                            <input
+                              className="bk-input"
+                              value={promotionCode}
+                              placeholder={selectedPackage ? 'Enter or choose a promo code' : 'Select a package first'}
+                              disabled={!selectedPackage}
+                              onFocus={() => { if (selectedPackage) setShowPromoDropdown(true) }}
+                              onChange={(e) => {
+                                setPromotionCode(e.target.value)
+                                setPromotionResult(null)
+                                setPromoError('')
+                                if (selectedPackage) setShowPromoDropdown(true)
+                              }}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            className="bk-btn-primary bk-btn-sm"
+                            disabled={!selectedPackage}
+                            onClick={handleValidatePromotion}
+                          >
+                            Apply
+                          </button>
+                          {promotionResult?.valid && (
+                            <button
+                              type="button"
+                              className="bk-btn-ghost bk-btn-sm"
+                              onClick={() => { setPromotionCode(''); setPromotionResult(null); setShowPromoDropdown(false) }}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+
+                        {showPromoDropdown && selectedPackage && (
+                          <div className="booking-promo-dropdown">
+                            {loadingEligible ? (
+                              <div className="booking-promo-dd-state">Loading promo codes...</div>
+                            ) : eligiblePromotions.length === 0 ? (
+                              <div className="booking-promo-dd-state">No eligible promo codes for your selection.</div>
+                            ) : (
+                              eligiblePromotions.map((promo) => (
+                                <button
+                                  key={promo.id}
+                                  type="button"
+                                  className="booking-promo-dd-item"
+                                  onClick={() => handleSelectPromoFromDropdown(promo)}
+                                >
+                                  <div className="booking-promo-dd-top">
+                                    <span className="booking-promo-dd-code">{promo.code}</span>
+                                    <span className="booking-promo-dd-name">{promo.name || formatDiscountLabel(promo)}</span>
+                                    <span className="booking-promo-dd-amount">{formatDiscountLabel(promo)}</span>
+                                  </div>
+                                  {promo.description && (
+                                    <div className="booking-promo-dd-desc">{promo.description}</div>
+                                  )}
+                                  <div className="booking-promo-dd-meta">
+                                    {promo.endAt && <span>Expires: {formatEndDate(promo.endAt)}</span>}
+                                  </div>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        )}
+
+                        {promoError && <span className="bk-field-error">{promoError}</span>}
+
+                        {promotionResult?.valid && (
+                          <p className="booking-promo-success">
+                            Code applied — saves {formatMoney(promotionResult.discountAmount ?? 0)}
+                            {promotionResult.message ? `. ${promotionResult.message}` : ''}
                           </p>
                         )}
-                        <div className="booking-grid">
-                          {addOnPackages.map((servicePackage) => {
-                            const id = String(getId(servicePackage))
-                            const active = selectedAddOnIds.includes(id)
+                      </div>
+                    </div>
 
-                            return (
-                              <button
-                                type="button"
-                                key={id}
-                                disabled={isComboSelected}
-                                className={`booking-option-card ${active ? 'active' : ''}`}
-                                onClick={() => toggleAddOn(id)}
-                              >
-                                <strong>{getName(servicePackage, 'Dịch vụ thêm')}</strong>
-                                <small>{formatMoney(bookingFlowUtils.getPackagePrice(servicePackage))}</small>
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
-
-                {!loadingPackages && selectedVehicle && selectedGarage && servicePackages.length === 0 && (
-                  <p className="booking-muted">
-                    Chưa có gói dịch vụ khả dụng cho lựa chọn này.
-                  </p>
-                )}
-
-                <div className="booking-step-actions">
-                  <button type="button" className="secondary" onClick={handlePrevStep}>
-                    Quay lại
-                  </button>
-                  <button type="button" onClick={handleNextStep}>
-                    Tiếp tục
-                  </button>
-                </div>
-              </section>
-            )}
-
-            {currentStep === 4 && (
-              <section className="booking-step-card">
-                <div className="booking-step-title">
-                  <span>4</span>
-                  <h2>Chọn ngày và khung giờ</h2>
-                </div>
-
-                <label className="booking-field">
-                  Ngày đặt lịch
-                  <input
-                    type="date"
-                    min={minBookingDateIso()}
-                    max={maxBookingDateIso(bookingWindowDays)}
-                    value={selectedDate}
-                    onChange={(event) => setSelectedDate(clampBookingDate(event.target.value, bookingWindowDays))}
-                  />
-                </label>
-
-                {loadingSlots ? (
-                  <p className="booking-muted">Đang tải khung giờ...</p>
-                ) : (
-                  <div className="booking-slot-grid">
-                    {visibleSlots.map((slot) => {
-                      const full = isSlotFull(slot)
-                      const active = String(selectedSlotId) === String(getId(slot))
-
-                      return (
-                        <button
-                          type="button"
-                          key={getId(slot)}
-                          className={`booking-slot ${active ? 'active' : ''} ${full ? 'full' : ''
-                            }`}
-                          onClick={() => {
-                            if (full) {
-                              handleJoinWaitlist(slot)
-                              return
-                            }
-
-                            setSelectedSlotId(String(getId(slot)))
-                          }}
-                        >
-                          <strong>{getSlotLabel(slot)}</strong>
-                          {full && <small>Hết chỗ</small>}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-
-                {!loadingSlots && selectedPackage && visibleSlots.length === 0 && (
-                  <p className="booking-muted">
-                    Không có slot khả dụng cho ngày này, hoặc các khung giờ trong hôm nay đã qua.
-                  </p>
-                )}
-
-                <div className="booking-step-actions">
-                  <button type="button" className="secondary" onClick={handlePrevStep}>
-                    Quay lại
-                  </button>
-                  <button type="button" onClick={handleNextStep}>
-                    Tiếp tục
-                  </button>
-                </div>
-              </section>
-            )}
-
-            {currentStep === 5 && (
-              <section className="booking-step-card">
-                <div className="booking-step-title">
-                  <span>5</span>
-                  <h2>Ưu đãi và xác nhận</h2>
-                </div>
-
-                <div className="booking-promo-wrapper" ref={promoDropdownRef}>
-                  {!selectedPackage && (
-                    <p className="booking-muted booking-promo-hint">
-                      Vui lòng chọn gói dịch vụ trước khi chọn mã giảm giá.
-                    </p>
-                  )}
-                  <div className="booking-inline-fields">
-                    <label className="booking-field">
-                      Mã khuyến mãi
-                      <input
-                        value={promotionCode}
-                        placeholder={selectedPackage ? 'Nhập hoặc chọn mã giảm giá' : 'Chọn gói dịch vụ trước'}
-                        disabled={!selectedPackage}
-                        onFocus={() => { if (selectedPackage) setShowPromoDropdown(true) }}
-                        onChange={(event) => {
-                          setPromotionCode(event.target.value)
-                          setPromotionResult(null)
-                          if (selectedPackage) setShowPromoDropdown(true)
-                        }}
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleValidatePromotion}
-                      disabled={!selectedPackage}
-                    >
-                      Áp dụng
-                    </button>
-                    {promotionResult?.valid && (
-                      <button
-                        type="button"
-                        className="secondary"
-                        onClick={() => {
-                          setPromotionCode('')
-                          setPromotionResult(null)
-                          setShowPromoDropdown(false)
-                        }}
-                      >
-                        Bỏ mã
-                      </button>
-                    )}
-                  </div>
-
-                  {showPromoDropdown && selectedPackage && (
-                    <div className="booking-promo-dropdown">
-                      {loadingEligible ? (
-                        <div className="booking-promo-dd-state">Đang tải mã khuyến mãi...</div>
-                      ) : eligiblePromotions.length === 0 ? (
-                        <div className="booking-promo-dd-state">Không có mã phù hợp với lựa chọn hiện tại.</div>
+                    {/* Loyalty section */}
+                    <div className="bk-section">
+                      <p className="bk-section-title">Loyalty points</p>
+                      {promotionResult?.valid && !promotionResult?.allowLoyaltyStack ? (
+                        <p className="booking-loyalty-blocked">
+                          This promo code cannot be combined with loyalty points.
+                        </p>
                       ) : (
-                        eligiblePromotions.map((promo) => (
-                          <button
-                            key={promo.id}
-                            type="button"
-                            className="booking-promo-dd-item"
-                            onClick={() => handleSelectPromoFromDropdown(promo)}
-                          >
-                            <div className="booking-promo-dd-top">
-                              <span className="booking-promo-dd-code">{promo.code}</span>
-                              <span className="booking-promo-dd-name">
-                                {promo.name || formatDiscountLabel(promo)}
-                              </span>
-                              <span className="booking-promo-dd-amount">
-                                {formatDiscountLabel(promo)}
-                              </span>
+                        <>
+                          {promotionResult?.valid && promotionResult?.allowLoyaltyStack && promotionResult?.maxLoyaltyPoints != null && (
+                            <span className="booking-loyalty-cap-hint">
+                              Maximum {promotionResult.maxLoyaltyPoints} pts when using with this code.
+                            </span>
+                          )}
+                          <div className="bk-loyalty-row">
+                            <div className="bk-loyalty-input-wrap">
+                              <input
+                                className="bk-input"
+                                type="number"
+                                min="0"
+                                max={
+                                  promotionResult?.valid && promotionResult?.allowLoyaltyStack && promotionResult?.maxLoyaltyPoints != null
+                                    ? promotionResult.maxLoyaltyPoints
+                                    : undefined
+                                }
+                                value={loyaltyPoints}
+                                placeholder="e.g. 100"
+                                onChange={(e) => {
+                                  let val = e.target.value
+                                  const capMax = promotionResult?.valid && promotionResult?.allowLoyaltyStack && promotionResult?.maxLoyaltyPoints != null
+                                    ? promotionResult.maxLoyaltyPoints : null
+                                  if (val !== '' && capMax != null && Number(val) > capMax) val = String(capMax)
+                                  if (val !== '' && Number(val) < 0) val = '0'
+                                  setLoyaltyPoints(val)
+                                  setLoyaltyPreview(null)
+                                  setLoyaltyError('')
+                                  setLoyaltyInfo('')
+                                }}
+                              />
                             </div>
-                            {promo.description && (
-                              <div className="booking-promo-dd-desc">{promo.description}</div>
-                            )}
-                            <div className="booking-promo-dd-meta">
-                              {promo.endAt && (
-                                <span>HSD: {formatEndDate(promo.endAt)}</span>
-                              )}
-                            </div>
-                          </button>
-                        ))
+                            <button type="button" className="bk-btn-primary bk-btn-sm" onClick={handleRedeemPreview}>
+                              Preview
+                            </button>
+                          </div>
+                          {loyaltyInfo  && <span className="bk-field-info">{loyaltyInfo}</span>}
+                          {loyaltyError && <span className="bk-field-error">{loyaltyError}</span>}
+                        </>
                       )}
                     </div>
-                  )}
 
-                  {promotionResult?.valid && (
-                    <p className="booking-promo-success">
-                      Mã hợp lệ — giảm {formatMoney(promotionResult.discountAmount ?? 0)}
-                      {promotionResult.message ? `. ${promotionResult.message}` : ''}
-                    </p>
-                  )}
-                </div>
+                    {/* Payment method */}
+                    <div className="bk-section">
+                      <p className="bk-section-title">Payment method</p>
+                      <div className="bk-payment-grid">
+                        <button
+                          type="button"
+                          className={`bk-payment-btn${paymentMethod === 'CASH' ? ' bk-payment-btn--sel' : ''}`}
+                          onClick={() => setPaymentMethod('CASH')}
+                        >
+                          <strong>Cash</strong>
+                          <span>Pay at the garage after service.</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`bk-payment-btn${paymentMethod === 'BANK_TRANSFER' ? ' bk-payment-btn--sel' : ''}`}
+                          onClick={() => setPaymentMethod('BANK_TRANSFER')}
+                        >
+                          <strong>Bank Transfer</strong>
+                          <span>Staff will create a QR code for payment after service.</span>
+                        </button>
+                      </div>
+                      <p className="bk-note">
+                        The booking will be saved as unpaid. Staff will process payment after the service is complete.
+                      </p>
+                    </div>
 
-                {promotionResult?.valid && !promotionResult?.allowLoyaltyStack ? (
-                  <p className="booking-loyalty-blocked">
-                    Khuyến mãi này không cho phép dùng kèm điểm loyalty.
-                  </p>
-                ) : (
-                  <div className="booking-inline-fields">
-                    <label className="booking-field">
-                      Điểm loyalty muốn dùng
-                      {promotionResult?.valid && promotionResult?.allowLoyaltyStack && promotionResult?.maxLoyaltyPoints != null && (
-                        <span className="booking-loyalty-cap-hint">
-                          (tối đa {promotionResult.maxLoyaltyPoints} điểm khi dùng kèm mã này)
-                        </span>
-                      )}
-                      <input
-                        type="number"
-                        min="0"
-                        max={
-                          promotionResult?.valid && promotionResult?.allowLoyaltyStack && promotionResult?.maxLoyaltyPoints != null
-                            ? promotionResult.maxLoyaltyPoints
-                            : undefined
-                        }
-                        value={loyaltyPoints}
-                        placeholder="Ví dụ: 100"
-                        onChange={(event) => {
-                          let val = event.target.value
-                          const capMax = promotionResult?.valid && promotionResult?.allowLoyaltyStack && promotionResult?.maxLoyaltyPoints != null
-                            ? promotionResult.maxLoyaltyPoints
-                            : null
-                          if (val !== '' && capMax != null && Number(val) > capMax) val = String(capMax)
-                          if (val !== '' && Number(val) < 0) val = '0'
-                          setLoyaltyPoints(val)
-                          setLoyaltyPreview(null)
-                        }}
-                      />
-                    </label>
-                    <button type="button" onClick={handleRedeemPreview}>
-                      Tính thử
-                    </button>
+                    <div className="bk-step-nav">
+                      <button type="button" className="bk-btn-ghost" onClick={handlePrevStep}>← Back</button>
+                    </div>
                   </div>
                 )}
-                <div className="booking-payment-method-box">
-                  <h3>Phương thức thanh toán</h3>
 
-                  <div className="booking-payment-method-grid">
-                    <button
-                      type="button"
-                      className={paymentMethod === 'CASH' ? 'active' : ''}
-                      onClick={() => setPaymentMethod('CASH')}
-                    >
-                      <strong>Thanh toán tiền mặt</strong>
-                      <span>Khách trả tiền mặt tại garage sau khi rửa xong.</span>
-                    </button>
+              </div>
+            </div>
 
-                    <button
-                      type="button"
-                      className={paymentMethod === 'BANK_TRANSFER' ? 'active' : ''}
-                      onClick={() => setPaymentMethod('BANK_TRANSFER')}
-                    >
-                      <strong>Chuyển khoản</strong>
-                      <span>Staff sẽ tạo mã QR đúng số tiền để khách quét sau khi rửa xong.</span>
-                    </button>
+            {/* ── Summary sidebar ── */}
+            <aside className="bk-summary-wrap">
+              <div className="bk-summary-card">
+                <p className="bk-summary-eyebrow">Price summary</p>
+
+                <div className="bk-summary-rows">
+                  <div className="bk-summary-row">
+                    <span>Vehicle</span>
+                    <strong>{selectedVehicle ? getVehicleDisplayName(selectedVehicle) || getName(selectedVehicle, 'Vehicle') : '—'}</strong>
+                  </div>
+                  <div className="bk-summary-row">
+                    <span>Garage</span>
+                    <strong>{selectedGarage ? getName(selectedGarage, 'Garage') : '—'}</strong>
+                  </div>
+                  <div className="bk-summary-row">
+                    <span>Package</span>
+                    <strong>{selectedPackage ? getName(selectedPackage, 'Package') : '—'}</strong>
+                  </div>
+                  {isComboSelected && getIncludedPackageNames(selectedPackage) && (
+                    <div className="bk-summary-row bk-summary-row--sub">
+                      <span>Includes</span>
+                      <strong>{getIncludedPackageNames(selectedPackage)}</strong>
+                    </div>
+                  )}
+                  {selectedAddOns.length > 0 && selectedAddOns.map((addon) => (
+                    <div key={getId(addon)} className="bk-summary-row bk-summary-row--sub">
+                      <span>+ {getName(addon, 'Add-on')}</span>
+                      <strong>{formatMoney(bookingFlowUtils.getPackagePrice(addon))}</strong>
+                    </div>
+                  ))}
+                  <div className="bk-summary-row">
+                    <span>Time</span>
+                    <strong>{selectedSlot ? `${selectedDate} · ${getSlotLabel(selectedSlot)}` : '—'}</strong>
                   </div>
                 </div>
 
-                <p className="booking-muted">
-                  Booking sẽ được lưu với trạng thái chưa thanh toán. Nhân viên sẽ tạo QR
-                  thanh toán tại garage sau khi dịch vụ hoàn tất.
+                <div className="bk-summary-divider" />
+
+                <div className="bk-summary-rows">
+                  <div className="bk-summary-row">
+                    <span>Subtotal</span>
+                    <strong>{formatMoney(priceSummary.subtotal)}</strong>
+                  </div>
+                  {priceSummary.promotionDiscount > 0 && (
+                    <div className="bk-summary-row bk-summary-row--discount">
+                      <span>Promo discount</span>
+                      <strong>-{formatMoney(priceSummary.promotionDiscount)}</strong>
+                    </div>
+                  )}
+                  {priceSummary.loyaltyDiscount > 0 && (
+                    <div className="bk-summary-row bk-summary-row--discount">
+                      <span>Loyalty points</span>
+                      <strong>-{formatMoney(priceSummary.loyaltyDiscount)}</strong>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bk-summary-total">
+                  <span>Total</span>
+                  <strong>{formatMoney(priceSummary.finalPrice)}</strong>
+                </div>
+
+                <button
+                  type="button"
+                  className="bk-submit-btn"
+                  disabled={!canSubmit}
+                  onClick={handleSubmitBooking}
+                >
+                  {submitting ? (
+                    <><div className="bk-submit-spinner" /> Creating booking...</>
+                  ) : 'Confirm Booking'}
+                </button>
+              </div>
+            </aside>
+
+          </div>
+        )}
+
+      </div>
+
+      {/* Waitlist modal */}
+      {waitlistModal && (
+        <div className="bk-wl-overlay" onClick={() => !waitlistSubmitting && !waitlistResult?.ok && setWaitlistModal(null)}>
+          <div className="bk-wl-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="bk-wl-head">
+              <h2 className="bk-wl-title">Slot đã đầy</h2>
+              <button className="bk-wl-close" disabled={waitlistSubmitting} onClick={() => setWaitlistModal(null)}>✕</button>
+            </div>
+
+            {waitlistResult?.ok ? (
+              <div className="bk-wl-success">
+                <span className="bk-wl-success-icon">✓</span>
+                <p>Đã tham gia danh sách chờ thành công!</p>
+                <p className="bk-wl-success-sub">Bạn sẽ nhận thông báo khi có slot trống.</p>
+                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                  <button className="bk-wl-btn bk-wl-btn--ghost" onClick={() => setWaitlistModal(null)}>Đóng</button>
+                  <Link className="bk-wl-btn bk-wl-btn--primary" to="/customer/profile?open=waitlist" onClick={() => setWaitlistModal(null)}>Xem danh sách chờ</Link>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="bk-wl-desc">
+                  Slot <strong>{getSlotLabel(waitlistModal)}</strong> ngày <strong>{selectedDate}</strong> hiện đã đầy.
+                  Bạn có muốn tham gia danh sách chờ không?
                 </p>
 
-                <div className="booking-step-actions">
-                  <button type="button" className="secondary" onClick={handlePrevStep}>
-                    Quay lại
+                <div className="bk-wl-info">
+                  <div className="bk-wl-info-row"><span>Garage</span><strong>{getName(selectedGarage, '—')}</strong></div>
+                  <div className="bk-wl-info-row"><span>Dịch vụ</span><strong>{getName(selectedPackage, '—')}</strong></div>
+                  <div className="bk-wl-info-row"><span>Xe</span><strong>{getVehicleDisplayName(selectedVehicle) || getName(selectedVehicle, '—')}</strong></div>
+                </div>
+
+                {waitlistResult?.ok === false && (
+                  <p className="bk-wl-error">{waitlistResult.msg}</p>
+                )}
+
+                <div className="bk-wl-actions">
+                  <button className="bk-wl-btn bk-wl-btn--ghost" disabled={waitlistSubmitting} onClick={() => setWaitlistModal(null)}>
+                    Huỷ
+                  </button>
+                  <button className="bk-wl-btn bk-wl-btn--primary" disabled={waitlistSubmitting} onClick={handleConfirmWaitlist}>
+                    {waitlistSubmitting ? 'Đang đăng ký…' : 'Tham gia danh sách chờ'}
                   </button>
                 </div>
-              </section>
+              </>
             )}
           </div>
-
-          <aside className="booking-summary-card">
-            <p className="booking-eyebrow">Price summary</p>
-            <h2>Tóm tắt đặt lịch</h2>
-
-            <div className="booking-summary-row">
-              <span>Xe</span>
-              <strong>{selectedVehicle ? getName(selectedVehicle, 'Xe') : 'Chưa chọn'}</strong>
-            </div>
-            <div className="booking-summary-row">
-              <span>Garage</span>
-              <strong>{selectedGarage ? getName(selectedGarage, 'Garage') : 'Chưa chọn'}</strong>
-            </div>
-            <div className="booking-summary-row">
-              <span>Gói</span>
-              <strong>{selectedPackage ? getName(selectedPackage, 'Gói') : 'Chưa chọn'}</strong>
-            </div>
-            {isComboSelected && getIncludedPackageNames(selectedPackage) && (
-              <div className="booking-summary-row">
-                <span>Bao gồm</span>
-                <strong>{getIncludedPackageNames(selectedPackage)}</strong>
-              </div>
-            )}
-            <div className="booking-summary-row">
-              <span>Thời gian</span>
-              <strong>
-                {selectedSlot ? `${selectedDate} · ${getSlotLabel(selectedSlot)}` : 'Chưa chọn'}
-              </strong>
-            </div>
-
-            <hr />
-
-            <div className="booking-summary-row">
-              <span>Tạm tính</span>
-              <strong>{formatMoney(priceSummary.subtotal)}</strong>
-            </div>
-            <div className="booking-summary-row discount">
-              <span>Giảm giá</span>
-              <strong>-{formatMoney(priceSummary.promotionDiscount)}</strong>
-            </div>
-            <div className="booking-summary-row discount">
-              <span>Điểm loyalty</span>
-              <strong>-{formatMoney(priceSummary.loyaltyDiscount)}</strong>
-            </div>
-            <div className="booking-summary-total">
-              <span>Thanh toán cuối</span>
-              <strong>{formatMoney(priceSummary.finalPrice)}</strong>
-            </div>
-
-            <button
-              type="button"
-              className="booking-submit-btn"
-              disabled={!canSubmit}
-              onClick={handleSubmitBooking}
-            >
-              {submitting ? 'Đang tạo booking...' : 'Xác nhận đặt lịch'}
-            </button>
-          </aside>
-        </section>
+        </div>
       )}
     </main>
+  )
+}
+
+const STEP_LABELS = ['Vehicle', 'Garage', 'Package', 'Date & Time', 'Confirm']
+
+const VI_MONTHS = ['January','February','March','April','May','June',
+  'July','August','September','October','November','December']
+const VI_DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+
+function BkCalendar({ value, onChange, min, max }) {
+  const parseIso = (iso) => iso ? new Date(iso + 'T00:00:00') : null
+
+  const selDate = parseIso(value)
+  const minDate = parseIso(min)
+  const maxDate = parseIso(max)
+
+  const [viewYear, setViewYear] = useState(() => (selDate || new Date()).getFullYear())
+  const [viewMonth, setViewMonth] = useState(() => (selDate || new Date()).getMonth())
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const firstOfMonth = new Date(viewYear, viewMonth, 1)
+  const lastOfMonth  = new Date(viewYear, viewMonth + 1, 0)
+
+  // Mon-start offset (Mon=0 … Sun=6)
+  const startOffset = (firstOfMonth.getDay() + 6) % 7
+
+  const cells = []
+  for (let i = 0; i < startOffset; i++) cells.push(null)
+  for (let d = 1; d <= lastOfMonth.getDate(); d++) cells.push(new Date(viewYear, viewMonth, d))
+
+  const toIso = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+  const isDisabled = (d) => {
+    if (!d) return true
+    if (minDate && d < minDate) return true
+    if (maxDate && d > maxDate) return true
+    return false
+  }
+
+  const isSel     = (d) => d && selDate && d.toDateString() === selDate.toDateString()
+  const isToday   = (d) => d && d.toDateString() === today.toDateString()
+
+  const canPrev = !minDate ||
+    new Date(viewYear, viewMonth, 1) > new Date(minDate.getFullYear(), minDate.getMonth(), 1)
+  const canNext = !maxDate ||
+    new Date(viewYear, viewMonth, 1) < new Date(maxDate.getFullYear(), maxDate.getMonth(), 1)
+
+  const goPrev = () => {
+    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) }
+    else setViewMonth(m => m - 1)
+  }
+  const goNext = () => {
+    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) }
+    else setViewMonth(m => m + 1)
+  }
+
+  return (
+    <div className="bk-cal">
+      <div className="bk-cal-header">
+        <button type="button" className="bk-cal-nav" disabled={!canPrev} onClick={goPrev}>‹</button>
+        <span className="bk-cal-month">{VI_MONTHS[viewMonth]} {viewYear}</span>
+        <button type="button" className="bk-cal-nav" disabled={!canNext} onClick={goNext}>›</button>
+      </div>
+      <div className="bk-cal-grid">
+        {VI_DAYS.map((d) => <span key={d} className="bk-cal-dow">{d}</span>)}
+        {cells.map((d, i) => {
+          const disabled = isDisabled(d)
+          const sel = isSel(d)
+          const tod = isToday(d)
+          const cls = [
+            'bk-cal-day',
+            !d             ? 'bk-cal-day--blank'    : '',
+            d && disabled  ? 'bk-cal-day--disabled' : '',
+            d && sel       ? 'bk-cal-day--sel'      : '',
+            d && tod       ? 'bk-cal-day--today'    : '',
+          ].filter(Boolean).join(' ')
+          return (
+            <button
+              key={i}
+              type="button"
+              className={cls}
+              disabled={!d || disabled}
+              onClick={() => d && !disabled && onChange(toIso(d))}
+            >
+              {d ? d.getDate() : ''}
+            </button>
+          )
+        })}
+      </div>
+      {selDate && (
+        <div className="bk-cal-selected-display">
+          <strong>
+            {selDate.toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
+          </strong>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BkStepper({ currentStep, onGoTo }) {
+  return (
+    <div className="bk-stepper-wrap">
+      <div className="bk-stepper">
+        {STEP_LABELS.map((label, i) => {
+          const step = i + 1
+          const done = step < currentStep
+          const active = step === currentStep
+          return (
+            <Fragment key={step}>
+              {i > 0 && <div className={`bk-step-line${done ? ' bk-step-line--done' : ''}`} />}
+              <div className={`bk-si${done ? ' bk-si--done' : ''}${active ? ' bk-si--active' : ''}`}>
+                <button
+                  type="button"
+                  className="bk-si-btn"
+                  onClick={() => { if (done) onGoTo(step) }}
+                  aria-label={`Step ${step}: ${label}`}
+                >
+                  <div className="bk-si-bubble">{done ? '✓' : step}</div>
+                </button>
+                <span className="bk-si-label">{label}</span>
+              </div>
+            </Fragment>
+          )
+        })}
+      </div>
+
+      {/* Mobile progress */}
+      <div className="bk-stepper-mobile">
+        <span className="bk-mobile-step-info">
+          Step {currentStep} / {STEP_LABELS.length} — {STEP_LABELS[currentStep - 1]}
+        </span>
+        <div className="bk-mobile-progress-bar">
+          <div
+            className="bk-mobile-progress-fill"
+            style={{ width: `${(currentStep / STEP_LABELS.length) * 100}%` }}
+          />
+        </div>
+      </div>
+    </div>
   )
 }

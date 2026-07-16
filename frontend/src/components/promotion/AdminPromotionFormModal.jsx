@@ -3,12 +3,12 @@ import promotionApi from '../../api/promotionApi'
 import './AdminPromotionFormModal.css'
 
 const DISCOUNT_TYPES = [
-  { value: 'PERCENTAGE', label: 'Phần trăm (%)' },
-  { value: 'FIXED_AMOUNT', label: 'Số tiền cố định (VNĐ)' },
+  { value: 'PERCENTAGE', label: 'Percentage (%)' },
+  { value: 'FIXED_AMOUNT', label: 'Fixed amount (VND)' },
 ]
 
 const TIER_OPTIONS = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM']
-const TIER_LABELS = { BRONZE: 'Đồng', SILVER: 'Bạc', GOLD: 'Vàng', PLATINUM: 'Bạch kim' }
+const TIER_LABELS = { BRONZE: 'Bronze', SILVER: 'Silver', GOLD: 'Gold', PLATINUM: 'Platinum' }
 
 const EMPTY_FORM = {
   code: '',
@@ -44,33 +44,33 @@ const validate = (form, isCreate) => {
   const errors = {}
 
   if (isCreate && !form.code.trim()) {
-    errors.code = 'Mã khuyến mãi là bắt buộc.'
+    errors.code = 'Promotion code is required.'
   } else if (isCreate && !/^[A-Z0-9_-]+$/i.test(form.code.trim())) {
-    errors.code = 'Mã chỉ được dùng chữ, số, dấu - và _.'
+    errors.code = 'Code may only contain letters, numbers, - and _.'
   }
 
-  if (!form.name.trim()) errors.name = 'Tên khuyến mãi là bắt buộc.'
-  if (!form.discountType) errors.discountType = 'Loại giảm giá là bắt buộc.'
+  if (!form.name.trim()) errors.name = 'Promotion name is required.'
+  if (!form.discountType) errors.discountType = 'Discount type is required.'
 
   const val = Number(form.discountValue)
   if (!form.discountValue || isNaN(val) || val <= 0) {
-    errors.discountValue = 'Giá trị giảm phải lớn hơn 0.'
+    errors.discountValue = 'Discount value must be greater than 0.'
   } else if (form.discountType === 'PERCENTAGE' && val > 100) {
-    errors.discountValue = 'Giảm theo % không được vượt quá 100.'
+    errors.discountValue = 'Percentage discount cannot exceed 100.'
   }
 
   if (form.usageLimit !== '' && form.usageLimit !== null) {
     const n = Number(form.usageLimit)
-    if (!Number.isInteger(n) || n <= 0) errors.usageLimit = 'Phải là số nguyên dương.'
+    if (!Number.isInteger(n) || n <= 0) errors.usageLimit = 'Must be a positive integer.'
   }
 
   if (form.perUserLimit !== '' && form.perUserLimit !== null) {
     const n = Number(form.perUserLimit)
-    if (!Number.isInteger(n) || n <= 0) errors.perUserLimit = 'Phải là số nguyên dương.'
+    if (!Number.isInteger(n) || n <= 0) errors.perUserLimit = 'Must be a positive integer.'
   }
 
   if (form.startAt && form.endAt && form.startAt >= form.endAt) {
-    errors.endAt = 'Ngày kết thúc phải sau ngày bắt đầu.'
+    errors.endAt = 'End date must be after the start date.'
   }
 
   return errors
@@ -122,7 +122,7 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
         setErrors({})
       })
       .catch(() => {
-        if (mounted) setApiError('Không tải được thông tin khuyến mãi.')
+        if (mounted) setApiError('Unable to load promotion details.')
       })
       .finally(() => { if (mounted) setLoadingDetail(false) })
 
@@ -179,7 +179,22 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
       setSubmitting(true)
       setApiError('')
       if (isCreate) {
-        await promotionApi.createPromotion(payload)
+        const created = await promotionApi.createPromotion(payload)
+        // Auto-send VOUCHER_RECEIVED notification only if promotion is immediately active
+        // (i.e. isActive=true AND startAt is null/past — not a scheduled future promotion)
+        const startsAt = form.startAt ? new Date(toLocalDateTime(form.startAt)) : null
+        const isImmediatelyActive = form.isActive && (!startsAt || startsAt <= new Date())
+        if (created?.id && isImmediatelyActive) {
+          if (form.applicableTiers.length > 0) {
+            await Promise.allSettled(
+              form.applicableTiers.map((tier) =>
+                promotionApi.sendVoucher(created.id, { filterType: 'TIER', tier })
+              )
+            )
+          } else {
+            promotionApi.sendVoucher(created.id, { filterType: 'ALL' }).catch(() => {})
+          }
+        }
       } else {
         await promotionApi.updatePromotion(promotionId, payload)
       }
@@ -187,7 +202,7 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
       onClose()
     } catch (err) {
       const msg = err?.response?.data?.message || err.message || ''
-      setApiError(msg || (isCreate ? 'Tạo khuyến mãi thất bại.' : 'Cập nhật thất bại.'))
+      setApiError(msg || (isCreate ? 'Failed to create promotion.' : 'Failed to update.'))
     } finally {
       setSubmitting(false)
     }
@@ -197,12 +212,12 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
     <div className="apm-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="apm-modal">
         <div className="apm-header">
-          <h2>{isCreate ? 'Tạo khuyến mãi mới' : 'Cập nhật khuyến mãi'}</h2>
+          <h2>{isCreate ? 'Create New Promotion' : 'Update Promotion'}</h2>
           <button className="apm-close" onClick={onClose} type="button">✕</button>
         </div>
 
         {loadingDetail ? (
-          <div className="apm-loading">Đang tải thông tin...</div>
+          <div className="apm-loading">Loading details...</div>
         ) : (
           <form className="apm-form" onSubmit={handleSubmit}>
             {apiError && <div className="apm-api-error">{apiError}</div>}
@@ -211,11 +226,11 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
               {/* Code — create only */}
               {isCreate && (
                 <div className="apm-field apm-field-full">
-                  <label>Mã khuyến mãi <span className="apm-required">*</span></label>
+                  <label>Promotion code <span className="apm-required">*</span></label>
                   <input
                     value={form.code}
                     onChange={set('code')}
-                    placeholder="VD: SUMMER2024"
+                    placeholder="e.g. SUMMER2024"
                     className={errors.code ? 'error' : ''}
                     style={{ textTransform: 'uppercase' }}
                   />
@@ -225,11 +240,11 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
 
               {/* Name */}
               <div className="apm-field apm-field-full">
-                <label>Tên khuyến mãi <span className="apm-required">*</span></label>
+                <label>Promotion name <span className="apm-required">*</span></label>
                 <input
                   value={form.name}
                   onChange={set('name')}
-                  placeholder="VD: Khuyến mãi hè 2024"
+                  placeholder="e.g. Summer Sale 2024"
                   className={errors.name ? 'error' : ''}
                 />
                 {errors.name && <span className="apm-err">{errors.name}</span>}
@@ -237,18 +252,18 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
 
               {/* Description */}
               <div className="apm-field apm-field-full">
-                <label>Mô tả</label>
+                <label>Description</label>
                 <textarea
                   value={form.description}
                   onChange={set('description')}
-                  placeholder="Mô tả chi tiết về khuyến mãi"
+                  placeholder="Detailed description of the promotion"
                   rows={2}
                 />
               </div>
 
               {/* Discount type */}
               <div className="apm-field">
-                <label>Loại giảm giá <span className="apm-required">*</span></label>
+                <label>Discount type <span className="apm-required">*</span></label>
                 <select
                   value={form.discountType}
                   onChange={set('discountType')}
@@ -264,9 +279,9 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
               {/* Discount value */}
               <div className="apm-field">
                 <label>
-                  Giá trị giảm <span className="apm-required">*</span>
+                  Discount value <span className="apm-required">*</span>
                   <span className="apm-label-hint">
-                    {form.discountType === 'PERCENTAGE' ? '(%)' : '(VNĐ)'}
+                    {form.discountType === 'PERCENTAGE' ? '(%)' : '(VND)'}
                   </span>
                 </label>
                 <input
@@ -275,7 +290,7 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
                   step={form.discountType === 'PERCENTAGE' ? '0.1' : '1000'}
                   value={form.discountValue}
                   onChange={set('discountValue')}
-                  placeholder={form.discountType === 'PERCENTAGE' ? 'VD: 50' : 'VD: 50000'}
+                  placeholder={form.discountType === 'PERCENTAGE' ? 'e.g. 50' : 'e.g. 50000'}
                   className={errors.discountValue ? 'error' : ''}
                 />
                 {errors.discountValue && <span className="apm-err">{errors.discountValue}</span>}
@@ -283,40 +298,40 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
 
               {/* Max discount amount */}
               <div className="apm-field">
-                <label>Giảm tối đa (VNĐ)</label>
+                <label>Maximum discount (VND)</label>
                 <input
                   type="number"
                   min="0"
                   step="1000"
                   value={form.maxDiscountAmount}
                   onChange={set('maxDiscountAmount')}
-                  placeholder="Để trống = không giới hạn"
+                  placeholder="Leave blank = no limit"
                 />
               </div>
 
               {/* Min order amount */}
               <div className="apm-field">
-                <label>Đơn hàng tối thiểu (VNĐ)</label>
+                <label>Minimum order amount (VND)</label>
                 <input
                   type="number"
                   min="0"
                   step="1000"
                   value={form.minOrderAmount}
                   onChange={set('minOrderAmount')}
-                  placeholder="Để trống = không yêu cầu"
+                  placeholder="Leave blank = no requirement"
                 />
               </div>
 
               {/* Usage limit */}
               <div className="apm-field">
-                <label>Giới hạn tổng lượt dùng</label>
+                <label>Total usage limit</label>
                 <input
                   type="number"
                   min="1"
                   step="1"
                   value={form.usageLimit}
                   onChange={set('usageLimit')}
-                  placeholder="Để trống = không giới hạn"
+                  placeholder="Leave blank = no limit"
                   className={errors.usageLimit ? 'error' : ''}
                 />
                 {errors.usageLimit && <span className="apm-err">{errors.usageLimit}</span>}
@@ -324,14 +339,14 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
 
               {/* Per user limit */}
               <div className="apm-field">
-                <label>Giới hạn mỗi người dùng</label>
+                <label>Limit per user</label>
                 <input
                   type="number"
                   min="1"
                   step="1"
                   value={form.perUserLimit}
                   onChange={set('perUserLimit')}
-                  placeholder="Để trống = không giới hạn"
+                  placeholder="Leave blank = no limit"
                   className={errors.perUserLimit ? 'error' : ''}
                 />
                 {errors.perUserLimit && <span className="apm-err">{errors.perUserLimit}</span>}
@@ -339,7 +354,7 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
 
               {/* Start at */}
               <div className="apm-field">
-                <label>Ngày bắt đầu</label>
+                <label>Start date</label>
                 <input
                   type="datetime-local"
                   value={form.startAt}
@@ -349,7 +364,7 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
 
               {/* End at */}
               <div className="apm-field">
-                <label>Ngày kết thúc</label>
+                <label>End date</label>
                 <input
                   type="datetime-local"
                   value={form.endAt}
@@ -361,7 +376,7 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
 
               {/* Applicable tiers */}
               <div className="apm-field apm-field-full">
-                <label>Áp dụng cho hạng <span className="apm-label-hint">(để trống = tất cả hạng)</span></label>
+                <label>Applies to tiers <span className="apm-label-hint">(leave blank = all tiers)</span></label>
                 <div className="apm-tier-group">
                   {TIER_OPTIONS.map((tier) => (
                     <label key={tier} className={`apm-tier-chip ${form.applicableTiers.includes(tier) ? 'selected' : ''}`}>
@@ -384,7 +399,7 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
                     checked={form.isActive}
                     onChange={set('isActive')}
                   />
-                  <span>Kích hoạt ngay</span>
+                  <span>Activate immediately</span>
                 </label>
               </div>
 
@@ -396,19 +411,19 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
                     checked={form.allowLoyaltyStack}
                     onChange={set('allowLoyaltyStack')}
                   />
-                  <span>Cho phép dùng kèm điểm loyalty</span>
+                  <span>Allow stacking with loyalty points</span>
                 </label>
                 <span className="apm-label-hint" style={{ marginTop: 4, fontSize: 12 }}>
-                  Nếu bật, khách có thể vừa dùng mã này vừa đổi điểm loyalty trong cùng một booking.
+                  If enabled, customers can use this code and redeem loyalty points in the same booking.
                 </span>
               </div>
 
-              {/* Max loyalty points — chỉ hiện khi allowLoyaltyStack bật */}
+              {/* Max loyalty points — only shown when allowLoyaltyStack is enabled */}
               {form.allowLoyaltyStack && (
                 <div className="apm-field apm-field-full">
                   <label>
-                    Điểm loyalty tối đa được dùng kèm
-                    <span className="apm-label-hint">(để trống = không giới hạn)</span>
+                    Maximum loyalty points allowed with this promotion
+                    <span className="apm-label-hint">(leave blank = no limit)</span>
                   </label>
                   <input
                     type="number"
@@ -416,7 +431,7 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
                     step="1"
                     value={form.maxLoyaltyPoints}
                     onChange={set('maxLoyaltyPoints')}
-                    placeholder="VD: 100"
+                    placeholder="e.g. 100"
                     className={errors.maxLoyaltyPoints ? 'error' : ''}
                   />
                   {errors.maxLoyaltyPoints && <span className="apm-err">{errors.maxLoyaltyPoints}</span>}
@@ -426,10 +441,10 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
 
             <div className="apm-actions">
               <button type="button" className="apm-btn-cancel" onClick={onClose} disabled={submitting}>
-                Hủy
+                Cancel
               </button>
               <button type="submit" className="apm-btn-submit" disabled={submitting}>
-                {submitting ? 'Đang lưu...' : isCreate ? 'Tạo khuyến mãi' : 'Lưu thay đổi'}
+                {submitting ? 'Saving...' : isCreate ? 'Create promotion' : 'Save changes'}
               </button>
             </div>
           </form>

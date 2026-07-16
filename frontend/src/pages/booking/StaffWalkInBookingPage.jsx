@@ -80,7 +80,7 @@ function packageMatchesVehicle(pkg, vehicleType) {
 
 function formatTime(value) {
   if (!value) return ''
-  return new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+  return new Date(value).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 }
 
 function formatMoney(value) {
@@ -92,7 +92,7 @@ function formatMoney(value) {
 }
 
 function getPaymentMethodLabel(paymentMethod) {
-  return paymentMethod === 'PAYOS' ? 'Chuyển khoản PayOS' : 'Tiền mặt'
+  return paymentMethod === 'PAYOS' ? 'PayOS transfer' : 'Cash'
 }
 
 const INIT_FORM = {
@@ -160,7 +160,7 @@ export default function StaffWalkInBookingPage() {
         setPackages(packageResult.status === 'fulfilled' ? extractList(packageResult.value) : [])
 
         if (profileResult.status === 'rejected') {
-          setError('Tài khoản staff này chưa có hồ sơ nhân viên hoặc chưa được gắn garage.')
+          setError('This staff account has no staff profile or is not assigned to a garage.')
         }
 
         if (profileGarageId) {
@@ -256,10 +256,8 @@ export default function StaffWalkInBookingPage() {
 
   useEffect(() => {
     if (!selectedPackage) return
-
     const seatCount = getPackageSeatCount(selectedPackage)
     const motorbikeGroup = getPackageMotorbikeGroup(selectedPackage)
-
     setForm((prev) => ({
       ...prev,
       seatCount: normalizeVehicleType(prev.vehicleType) === 'CAR' && seatCount ? String(seatCount) : prev.seatCount,
@@ -278,7 +276,6 @@ export default function StaffWalkInBookingPage() {
       clearTimeout(lookupDebounce.current)
       return
     }
-
     clearTimeout(lookupDebounce.current)
     lookupDebounce.current = setTimeout(async () => {
       try {
@@ -294,29 +291,22 @@ export default function StaffWalkInBookingPage() {
         setLoadingCustomer(false)
       }
     }, 350)
-
     return () => clearTimeout(lookupDebounce.current)
   }, [form.guestPhone, form.licensePlate])
 
-  // Auto-fill vehicle type when the entered plate matches a known vehicle for the found customer
   useEffect(() => {
     if (customerLookup?.found && customerLookup.vehicleId && customerLookup.vehicleType) {
       const normalized = normalizeVehicleType(customerLookup.vehicleType)
       const uiType = normalized === 'MOTORBIKE' ? 'MOTORBIKE' : 'CAR'
       setForm((prev) => {
         if (prev.vehicleType === uiType) return prev
-        // Vehicle type changed — keep current package if compatible, otherwise pick first compatible one
         const currentPkg = packages.find((p) => String(getPackageId(p)) === String(prev.servicePackageId))
         const compatible = currentPkg && packageMatchesVehicle(currentPkg, uiType)
-        const fallbackPkg = !compatible
-          ? packages.find((p) => packageMatchesVehicle(p, uiType))
-          : null
+        const fallbackPkg = !compatible ? packages.find((p) => packageMatchesVehicle(p, uiType)) : null
         return {
           ...prev,
           vehicleType: uiType,
-          servicePackageId: compatible
-            ? prev.servicePackageId
-            : fallbackPkg ? String(getPackageId(fallbackPkg)) : '',
+          servicePackageId: compatible ? prev.servicePackageId : fallbackPkg ? String(getPackageId(fallbackPkg)) : '',
           startTime: '',
         }
       })
@@ -329,7 +319,6 @@ export default function StaffWalkInBookingPage() {
       setSlots([])
       return
     }
-
     clearTimeout(slotDebounce.current)
     slotDebounce.current = setTimeout(async () => {
       try {
@@ -346,21 +335,14 @@ export default function StaffWalkInBookingPage() {
         const allSlots = extractSlots(payload)
         const now = new Date()
         const isToday = date === todayIso()
-
-        setSlots(
-          allSlots.filter((slot) => {
-            if (isToday) return new Date(slot.startTime) > now
-            return true
-          }),
-        )
+        setSlots(allSlots.filter((slot) => (isToday ? new Date(slot.startTime) > now : true)))
       } catch (err) {
         setSlots([])
-        setError(getErrorMessage(err, 'Không thể tải khung giờ trống.'))
+        setError(getErrorMessage(err, 'Failed to load available slots.'))
       } finally {
         setLoadingSlots(false)
       }
     }, 250)
-
     return () => clearTimeout(slotDebounce.current)
   }, [form.garageId, form.servicePackageId, form.vehicleType, form.date])
 
@@ -369,7 +351,6 @@ export default function StaffWalkInBookingPage() {
       setCustomerConflictSlots(new Set())
       return
     }
-
     let active = true
     bookingApi.getStaffBookings({ date: form.date })
       .then((bookings) => {
@@ -381,45 +362,28 @@ export default function StaffWalkInBookingPage() {
         )
         setCustomerConflictSlots(conflictSet)
       })
-      .catch(() => {
-        if (active) setCustomerConflictSlots(new Set())
-      })
-
-    return () => {
-      active = false
-    }
+      .catch(() => { if (active) setCustomerConflictSlots(new Set()) })
+    return () => { active = false }
   }, [form.garageId, form.date, customerLookup])
 
   const handleChange = (event) => {
     const { name, value } = event.target
     setError('')
     setFieldErrors((prev) => ({ ...prev, [name]: '' }))
-
-    if (name === 'vehicleType') {
-      setSelectedAddOnIds([])
-    }
-
+    if (name === 'vehicleType') setSelectedAddOnIds([])
     if (name === 'servicePackageId') {
       const nextPackage = packages.find((pkg) => String(getPackageId(pkg)) === String(value))
-      if (nextPackage && normalizePackageType(nextPackage) === 'COMBO') {
-        setSelectedAddOnIds([])
-      }
+      if (nextPackage && normalizePackageType(nextPackage) === 'COMBO') setSelectedAddOnIds([])
     }
-
     setForm((prev) => {
       const next = { ...prev, [name]: value }
-
       if (name === 'vehicleType') {
         next.servicePackageId = ''
         next.startTime = ''
         next.seatCount = ''
         next.motorbikeGroup = ''
       }
-
-      if (['garageId', 'servicePackageId', 'date'].includes(name)) {
-        next.startTime = ''
-      }
-
+      if (['garageId', 'servicePackageId', 'date'].includes(name)) next.startTime = ''
       return next
     })
   }
@@ -437,7 +401,6 @@ export default function StaffWalkInBookingPage() {
         guestPhone: customerLookup.phone || prev.guestPhone,
         guestEmail: customerLookup.email || prev.guestEmail,
       }
-      // If the entered plate matched an existing vehicle, lock vehicle type too
       if (customerLookup.vehicleId && customerLookup.licensePlate) {
         const normalized = normalizeVehicleType(customerLookup.vehicleType || '')
         next.vehicleType = normalized === 'MOTORBIKE' ? 'MOTORBIKE' : 'CAR'
@@ -468,20 +431,20 @@ export default function StaffWalkInBookingPage() {
     const requiredSeatCount = getPackageSeatCount(selectedPackage)
     const requiredMotorbikeGroup = getPackageMotorbikeGroup(selectedPackage)
 
-    if (!form.guestName.trim()) errors.guestName = 'Vui lòng nhập tên khách.'
-    if (!form.guestPhone.trim()) errors.guestPhone = 'Vui lòng nhập số điện thoại.'
-    if (!form.licensePlate.trim()) errors.licensePlate = 'Vui lòng nhập biển số xe.'
-    if (!form.vehicleType) errors.vehicleType = 'Vui lòng chọn loại xe.'
+    if (!form.guestName.trim()) errors.guestName = 'Please enter a customer name.'
+    if (!form.guestPhone.trim()) errors.guestPhone = 'Please enter a phone number.'
+    if (!form.licensePlate.trim()) errors.licensePlate = 'Please enter the license plate.'
+    if (!form.vehicleType) errors.vehicleType = 'Please select a vehicle type.'
     if (selectedVehicleType === 'CAR' && requiredSeatCount && !form.seatCount) {
-      errors.seatCount = 'Vui lòng nhập số chỗ theo gói dịch vụ.'
+      errors.seatCount = 'Package requires a seat count.'
     }
     if (selectedVehicleType === 'MOTORBIKE' && requiredMotorbikeGroup && !form.motorbikeGroup) {
-      errors.motorbikeGroup = 'Vui lòng nhập nhóm xe máy theo gói dịch vụ.'
+      errors.motorbikeGroup = 'Package requires a motorbike group.'
     }
-    if (!form.garageId) errors.garageId = 'Vui lòng chọn garage.'
-    if (!form.servicePackageId) errors.servicePackageId = 'Vui lòng chọn gói dịch vụ.'
-    if (!form.date) errors.date = 'Vui lòng chọn ngày.'
-    if (!form.startTime) errors.startTime = 'Vui lòng chọn khung giờ.'
+    if (!form.garageId) errors.garageId = 'Please select a garage.'
+    if (!form.servicePackageId) errors.servicePackageId = 'Please select a service package.'
+    if (!form.date) errors.date = 'Please select a date.'
+    if (!form.startTime) errors.startTime = 'Please select a time slot.'
 
     setFieldErrors(errors)
     return Object.keys(errors).length === 0
@@ -490,9 +453,7 @@ export default function StaffWalkInBookingPage() {
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
-
     if (!validate()) return
-
     try {
       setSubmitting(true)
       const payload = {
@@ -510,15 +471,12 @@ export default function StaffWalkInBookingPage() {
         ...(form.vehicleModel.trim() ? { vehicleModel: form.vehicleModel.trim() } : {}),
         ...(form.note.trim() ? { note: form.note.trim() } : {}),
       }
-
       if (normalizeVehicleType(form.vehicleType) === 'CAR' && form.seatCount) {
         payload.seatCount = Number(form.seatCount)
       }
-
       if (normalizeVehicleType(form.vehicleType) === 'MOTORBIKE' && form.motorbikeGroup) {
         payload.motorbikeGroup = form.motorbikeGroup.trim()
       }
-
       const result = await bookingApi.createWalkInBooking(payload)
       const id = result?.id ?? result?.bookingId
       if (id && form.paymentMethod) {
@@ -533,7 +491,7 @@ export default function StaffWalkInBookingPage() {
         setForm((prev) => ({ ...prev, startTime: '' }))
         setFieldErrors((prev) => ({ ...prev, startTime: '' }))
       } else {
-        setError(getErrorMessage(err, 'Tạo hồ sơ walk-in thất bại. Vui lòng thử lại.'))
+        setError(getErrorMessage(err, 'Failed to create walk-in booking. Please try again.'))
       }
     } finally {
       setSubmitting(false)
@@ -554,11 +512,11 @@ export default function StaffWalkInBookingPage() {
       <section className="swi-hero">
         <div>
           <p className="swi-kicker">Staff</p>
-          <h1>Thêm hồ sơ walk-in</h1>
-          <span>Tạo booking tại quầy cho khách vãng lai hoặc khách đã có tài khoản.</span>
+          <h1>New Walk-in</h1>
+          <span>Create a walk-in booking for a customer at the counter.</span>
         </div>
         <button type="button" className="swi-back-btn" onClick={scrollToForm}>
-          Thêm hồ sơ
+          Add booking
         </button>
       </section>
 
@@ -567,26 +525,22 @@ export default function StaffWalkInBookingPage() {
       <div className="swi-layout">
         <form id="staff-walk-in-form" className="swi-form" onSubmit={handleSubmit} noValidate>
           <section className="swi-section">
-            <h2 className="swi-section-title">Thông tin khách</h2>
+            <h2 className="swi-section-title">Customer info</h2>
             <div className="swi-row">
               <div className="swi-field">
-                <label>
-                  Tên khách <span className="swi-required">*</span>
-                </label>
+                <label>Customer name <span className="swi-required">*</span></label>
                 <input
                   name="guestName"
                   value={form.guestName}
                   onChange={handleChange}
-                  placeholder="Nguyễn Văn A"
+                  placeholder="Full name"
                   className={fieldErrors.guestName ? 'swi-input-error' : ''}
                 />
                 {fieldErrors.guestName && <p className="swi-field-error">{fieldErrors.guestName}</p>}
               </div>
 
               <div className="swi-field">
-                <label>
-                  Số điện thoại <span className="swi-required">*</span>
-                </label>
+                <label>Phone number <span className="swi-required">*</span></label>
                 <input
                   name="guestPhone"
                   value={form.guestPhone}
@@ -600,7 +554,7 @@ export default function StaffWalkInBookingPage() {
 
             <div className="swi-field">
               <label>
-                Email <span className="swi-optional">(không dùng để tìm tài khoản)</span>
+                Email <span className="swi-optional">(not used for account lookup)</span>
               </label>
               <input
                 name="guestEmail"
@@ -611,29 +565,25 @@ export default function StaffWalkInBookingPage() {
               />
             </div>
 
-            {loadingCustomer && <p className="swi-lookup-note">Đang kiểm tra số điện thoại...</p>}
+            {loadingCustomer && <p className="swi-lookup-note">Looking up customer...</p>}
 
             {customerLookup?.found && (
               <div className="swi-match-card">
                 <div>
-                  <span>Tìm thấy tài khoản khách hàng</span>
+                  <span>Customer account found</span>
                   <strong>{customerLookup.fullName}</strong>
                   <small>#{customerLookup.customerId} · {customerLookup.phone}</small>
                 </div>
-                <button type="button" onClick={useMatchedCustomer}>
-                  Dùng thông tin này
-                </button>
+                <button type="button" onClick={useMatchedCustomer}>Use this info</button>
               </div>
             )}
           </section>
 
           <section className="swi-section">
-            <h2 className="swi-section-title">Thông tin xe</h2>
+            <h2 className="swi-section-title">Vehicle</h2>
             <div className="swi-row">
               <div className="swi-field">
-                <label>
-                  Biển số xe <span className="swi-required">*</span>
-                </label>
+                <label>License plate <span className="swi-required">*</span></label>
                 <input
                   name="licensePlate"
                   value={form.licensePlate}
@@ -643,17 +593,14 @@ export default function StaffWalkInBookingPage() {
                 />
                 {customerLookup?.vehicleId && (
                   <p className="swi-plate-match">
-                    Xe đã có trong hệ thống
-                    {customerLookup.vehicleName ? ` · ${customerLookup.vehicleName}` : ''}
+                    Vehicle found in system{customerLookup.vehicleName ? ` · ${customerLookup.vehicleName}` : ''}
                   </p>
                 )}
                 {fieldErrors.licensePlate && <p className="swi-field-error">{fieldErrors.licensePlate}</p>}
               </div>
 
               <div className="swi-field">
-                <label>
-                  Loại xe <span className="swi-required">*</span>
-                </label>
+                <label>Vehicle type <span className="swi-required">*</span></label>
                 <select
                   name="vehicleType"
                   value={form.vehicleType}
@@ -661,31 +608,30 @@ export default function StaffWalkInBookingPage() {
                   disabled={!!customerLookup?.vehicleId}
                   className={fieldErrors.vehicleType ? 'swi-input-error' : ''}
                 >
-                  <option value="CAR">Ô tô</option>
-                  <option value="MOTORBIKE">Xe máy</option>
+                  <option value="CAR">Car</option>
+                  <option value="MOTORBIKE">Motorbike</option>
                 </select>
                 {customerLookup?.vehicleId && (
-                  <span className="swi-help">Loại xe được xác định từ hệ thống.</span>
+                  <span className="swi-help">Vehicle type determined by system.</span>
                 )}
                 {fieldErrors.vehicleType && <p className="swi-field-error">{fieldErrors.vehicleType}</p>}
               </div>
             </div>
 
-            {/* Brand/model for new vehicles being auto-saved to customer profile */}
             {customerLookup?.found && !customerLookup?.vehicleId && form.licensePlate.trim().length > 0 && (
               <div className="swi-row">
                 <div className="swi-field">
-                  <label>Hãng xe</label>
+                  <label>Make</label>
                   <input
                     name="vehicleBrand"
                     value={form.vehicleBrand}
                     onChange={handleChange}
                     placeholder="Toyota, Honda, Yamaha..."
                   />
-                  <span className="swi-help">Xe mới sẽ được lưu vào tài khoản khách hàng.</span>
+                  <span className="swi-help">New vehicle will be saved to customer account.</span>
                 </div>
                 <div className="swi-field">
-                  <label>Dòng xe</label>
+                  <label>Model</label>
                   <input
                     name="vehicleModel"
                     value={form.vehicleModel}
@@ -698,43 +644,41 @@ export default function StaffWalkInBookingPage() {
 
             {selectedVehicleType === 'CAR' && packageSeatCount && (
               <div className="swi-field">
-                <label>Số chỗ</label>
+                <label>Seat count</label>
                 <input
                   name="seatCount"
                   value={form.seatCount}
                   onChange={handleChange}
-                  placeholder="Ví dụ: 5"
+                  placeholder="e.g. 5"
                   inputMode="numeric"
                   className={fieldErrors.seatCount ? 'swi-input-error' : ''}
                 />
-                <span className="swi-help">Gói đã chọn yêu cầu xe {packageSeatCount} chỗ.</span>
+                <span className="swi-help">Selected package requires {packageSeatCount} seats.</span>
                 {fieldErrors.seatCount && <p className="swi-field-error">{fieldErrors.seatCount}</p>}
               </div>
             )}
 
             {selectedVehicleType === 'MOTORBIKE' && packageMotorbikeGroup && (
               <div className="swi-field">
-                <label>Nhóm xe máy</label>
+                <label>Motorbike group</label>
                 <input
                   name="motorbikeGroup"
                   value={form.motorbikeGroup}
                   onChange={handleChange}
-                  placeholder="Ví dụ: phổ thông"
+                  placeholder="e.g. standard"
                   className={fieldErrors.motorbikeGroup ? 'swi-input-error' : ''}
                 />
-                <span className="swi-help">Gói đã chọn yêu cầu nhóm {packageMotorbikeGroup}.</span>
+                <span className="swi-help">Selected package requires group: {packageMotorbikeGroup}.</span>
                 {fieldErrors.motorbikeGroup && <p className="swi-field-error">{fieldErrors.motorbikeGroup}</p>}
               </div>
             )}
           </section>
 
           <section className="swi-section">
-            <h2 className="swi-section-title">Chọn dịch vụ</h2>
+            <h2 className="swi-section-title">Service</h2>
             <div className="swi-row">
               <div className="swi-field">
-                <label>
-                  Garage <span className="swi-required">*</span>
-                </label>
+                <label>Garage <span className="swi-required">*</span></label>
                 <select
                   name="garageId"
                   value={form.garageId}
@@ -742,21 +686,19 @@ export default function StaffWalkInBookingPage() {
                   disabled={loadingInitial || garageLocked}
                   className={fieldErrors.garageId ? 'swi-input-error' : ''}
                 >
-                  <option value="">{loadingInitial ? 'Đang tải...' : 'Chọn garage'}</option>
+                  <option value="">{loadingInitial ? 'Loading...' : 'Select garage'}</option>
                   {garages.map((garage) => (
                     <option key={getGarageId(garage)} value={getGarageId(garage)}>
                       {getGarageName(garage)}
                     </option>
                   ))}
                 </select>
-                {garageLocked && <span className="swi-help">Garage được khóa theo hồ sơ nhân viên.</span>}
+                {garageLocked && <span className="swi-help">Garage locked to your staff profile.</span>}
                 {fieldErrors.garageId && <p className="swi-field-error">{fieldErrors.garageId}</p>}
               </div>
 
               <div className="swi-field">
-                <label>
-                  Gói dịch vụ <span className="swi-required">*</span>
-                </label>
+                <label>Service package <span className="swi-required">*</span></label>
                 <select
                   name="servicePackageId"
                   value={form.servicePackageId}
@@ -764,7 +706,7 @@ export default function StaffWalkInBookingPage() {
                   disabled={loadingInitial}
                   className={fieldErrors.servicePackageId ? 'swi-input-error' : ''}
                 >
-                  <option value="">{loadingInitial ? 'Đang tải...' : 'Chọn gói dịch vụ'}</option>
+                  <option value="">{loadingInitial ? 'Loading...' : 'Select service package'}</option>
                   {mainPackages.map((pkg) => (
                     <option key={getPackageId(pkg)} value={getPackageId(pkg)}>
                       {getPackageName(pkg)} - {formatMoney(getPackagePrice(pkg))}
@@ -777,13 +719,12 @@ export default function StaffWalkInBookingPage() {
 
             {comboPackages.length > 0 && (
               <div className="swi-field">
-                <label>Gói combo</label>
+                <label>Combo package</label>
                 <div className="swi-addon-grid">
                   {comboPackages.map((pkg) => {
                     const id = String(getPackageId(pkg))
                     const active = String(form.servicePackageId) === id
                     const includedNames = getIncludedPackageNames(pkg)
-
                     return (
                       <button
                         type="button"
@@ -803,15 +744,14 @@ export default function StaffWalkInBookingPage() {
 
             {addOnPackages.length > 0 && (
               <div className="swi-field">
-                <label>Dịch vụ thêm (có thể chọn nhiều)</label>
+                <label>Add-ons (select multiple)</label>
                 {isComboSelected && (
-                  <span className="swi-help">Gói combo đã bao gồm sẵn dịch vụ, không thể chọn thêm.</span>
+                  <span className="swi-help">Combo package already includes services; no add-ons available.</span>
                 )}
                 <div className="swi-addon-grid">
                   {addOnPackages.map((pkg) => {
                     const id = String(getPackageId(pkg))
                     const active = selectedAddOnIds.includes(id)
-
                     return (
                       <button
                         type="button"
@@ -831,11 +771,9 @@ export default function StaffWalkInBookingPage() {
           </section>
 
           <section className="swi-section">
-            <h2 className="swi-section-title">Ngày và khung giờ</h2>
+            <h2 className="swi-section-title">Date & Time</h2>
             <div className="swi-field swi-field--date">
-              <label>
-                Ngày <span className="swi-required">*</span>
-              </label>
+              <label>Date <span className="swi-required">*</span></label>
               <input
                 name="date"
                 type="date"
@@ -849,9 +787,9 @@ export default function StaffWalkInBookingPage() {
 
             {form.garageId && form.servicePackageId ? (
               loadingSlots ? (
-                <p className="swi-slots-loading">Đang tải khung giờ...</p>
+                <p className="swi-slots-loading">Loading time slots...</p>
               ) : slots.length === 0 ? (
-                <p className="swi-slots-empty">Không có khung giờ trống trong ngày này.</p>
+                <p className="swi-slots-empty">No available slots for this date.</p>
               ) : (
                 <>
                   <div className="swi-slots-grid">
@@ -877,8 +815,8 @@ export default function StaffWalkInBookingPage() {
                           }}
                         >
                           {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
-                          {isFull && <span className="swi-slot-full-label">Hết chỗ</span>}
-                          {isCustomerBooked && <span className="swi-slot-customer-booked-label">KH đã đặt</span>}
+                          {isFull && <span className="swi-slot-full-label">Full</span>}
+                          {isCustomerBooked && <span className="swi-slot-customer-booked-label">Booked</span>}
                         </button>
                       )
                     })}
@@ -887,20 +825,20 @@ export default function StaffWalkInBookingPage() {
                 </>
               )
             ) : (
-              <p className="swi-slots-hint">Chọn garage và gói dịch vụ để xem khung giờ.</p>
+              <p className="swi-slots-hint">Select a garage and package to see available slots.</p>
             )}
           </section>
 
           <section className="swi-section">
-            <h2 className="swi-section-title">Thanh toán</h2>
+            <h2 className="swi-section-title">Payment</h2>
             <div className="swi-payment-options">
               <button
                 type="button"
                 className={`swi-payment-option${form.paymentMethod === 'CASH' ? ' swi-payment-option--active' : ''}`}
                 onClick={() => setForm((prev) => ({ ...prev, paymentMethod: 'CASH' }))}
               >
-                <span>Tiền mặt</span>
-                <small>Khách sẽ trả tiền mặt sau khi dịch vụ hoàn thành.</small>
+                <span>Cash</span>
+                <small>Customer pays cash after service is complete.</small>
               </button>
 
               <button
@@ -909,86 +847,86 @@ export default function StaffWalkInBookingPage() {
                 onClick={() => setForm((prev) => ({ ...prev, paymentMethod: 'PAYOS' }))}
               >
                 <span>PayOS</span>
-                <small>Staff sẽ tạo QR PayOS sau khi dịch vụ hoàn thành.</small>
+                <small>Staff creates a PayOS QR code after service is complete.</small>
               </button>
             </div>
           </section>
 
           <section className="swi-section">
             <h2 className="swi-section-title">
-              Ghi chú <span className="swi-optional">(không bắt buộc)</span>
+              Notes <span className="swi-optional">(optional)</span>
             </h2>
             <textarea
               name="note"
               value={form.note}
               onChange={handleChange}
-              placeholder="Ghi chú thêm về yêu cầu của khách..."
+              placeholder="Add notes about the customer's request..."
               rows={3}
             />
           </section>
 
           <button type="submit" className="swi-submit-btn" disabled={submitting || loadingInitial}>
-            {submitting ? 'Đang tạo hồ sơ...' : 'Tạo hồ sơ'}
+            {submitting ? 'Creating booking...' : 'Create booking'}
           </button>
         </form>
 
         <aside className="swi-summary">
-          <h2 className="swi-summary-title">Tóm tắt hồ sơ</h2>
+          <h2 className="swi-summary-title">Booking summary</h2>
 
           <div className="swi-summary-row">
-            <span>Khách</span>
-            <strong>{form.guestName || <em>Chưa nhập</em>}</strong>
+            <span>Customer</span>
+            <strong>{form.guestName || <em>Not entered</em>}</strong>
           </div>
           <div className="swi-summary-row">
-            <span>Số điện thoại</span>
-            <strong>{form.guestPhone || <em>Chưa nhập</em>}</strong>
+            <span>Phone</span>
+            <strong>{form.guestPhone || <em>Not entered</em>}</strong>
           </div>
           <div className="swi-summary-row">
-            <span>Tài khoản</span>
+            <span>Account</span>
             <strong>
               {customerLookup?.found
-              ? `${customerLookup.fullName} #${customerLookup.customerId}`
-              : <em>Khách vãng lai</em>}
+                ? `${customerLookup.fullName} #${customerLookup.customerId}`
+                : <em>Walk-in guest</em>}
             </strong>
           </div>
           <div className="swi-summary-row">
-            <span>Xe</span>
+            <span>Vehicle</span>
             <strong>
               {form.licensePlate
-                ? `${form.licensePlate.toUpperCase()} (${selectedVehicleType === 'CAR' ? 'Ô tô' : 'Xe máy'})`
-                : <em>Chưa nhập</em>}
+                ? `${form.licensePlate.toUpperCase()} (${selectedVehicleType === 'CAR' ? 'Car' : 'Motorbike'})`
+                : <em>Not entered</em>}
             </strong>
           </div>
           <div className="swi-summary-row">
             <span>Garage</span>
-            <strong>{selectedGarage ? getGarageName(selectedGarage) : <em>Chưa chọn</em>}</strong>
+            <strong>{selectedGarage ? getGarageName(selectedGarage) : <em>Not selected</em>}</strong>
           </div>
           <div className="swi-summary-row">
-            <span>Gói dịch vụ</span>
-            <strong>{selectedPackage ? getPackageName(selectedPackage) : <em>Chưa chọn</em>}</strong>
+            <span>Package</span>
+            <strong>{selectedPackage ? getPackageName(selectedPackage) : <em>Not selected</em>}</strong>
           </div>
           {isComboSelected && getIncludedPackageNames(selectedPackage) && (
             <div className="swi-summary-row">
-              <span>Bao gồm</span>
+              <span>Includes</span>
               <strong>{getIncludedPackageNames(selectedPackage)}</strong>
             </div>
           )}
           {selectedAddOns.length > 0 && (
             <div className="swi-summary-row">
-              <span>Dịch vụ thêm</span>
+              <span>Add-ons</span>
               <strong>{selectedAddOns.map((pkg) => getPackageName(pkg)).join(', ')}</strong>
             </div>
           )}
           <div className="swi-summary-row">
-            <span>Thời gian</span>
+            <span>Time</span>
             <strong>
               {selectedSlot
                 ? `${formatTime(selectedSlot.startTime)} - ${formatTime(selectedSlot.endTime)}, ${form.date}`
-                : <em>Chưa chọn</em>}
+                : <em>Not selected</em>}
             </strong>
           </div>
           <div className="swi-summary-row">
-            <span>Thanh toán</span>
+            <span>Payment</span>
             <strong>{getPaymentMethodLabel(form.paymentMethod)}</strong>
           </div>
 
@@ -996,13 +934,13 @@ export default function StaffWalkInBookingPage() {
             <>
               <div className="swi-summary-divider" />
               <div className="swi-summary-row swi-summary-total">
-                <span>Tổng tiền</span>
+                <span>Total</span>
                 <strong className="swi-summary-price">{formatMoney(totalPrice)}</strong>
               </div>
               {totalDuration > 0 && (
                 <div className="swi-summary-row">
-                  <span>Thời lượng</span>
-                  <strong>{totalDuration} phút</strong>
+                  <span>Duration</span>
+                  <strong>{totalDuration} min</strong>
                 </div>
               )}
             </>

@@ -100,6 +100,24 @@ public class BookingController {
                                 .build();
         }
 
+        @PostMapping("/guest")
+        public ApiResponse<BookingResponse> createGuestBooking(
+                        @Valid @RequestBody WalkInBookingCreateRequest request) {
+
+                BookingResponse response = bookingService.createGuestBooking(request);
+                auditLogService.createAuditLog(
+                                null,
+                                AuditAction.BOOKING_GUEST_CREATED,
+                                AuditTargetType.BOOKING,
+                                response.getId(),
+                                AuditMetadata.of("status", response.getStatus()));
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true)
+                                .message("Guest booking created successfully")
+                                .data(response)
+                                .build();
+        }
+
         @GetMapping("/walk-in/customer-lookup")
         @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
         public ApiResponse<WalkInCustomerLookupResponse> lookupWalkInCustomer(

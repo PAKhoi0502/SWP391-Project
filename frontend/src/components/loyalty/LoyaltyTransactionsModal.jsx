@@ -15,29 +15,29 @@ const buildBookingNumberMap = (items) => {
 }
 
 const TABS = [
-  { label: 'Tất cả', value: '' },
-  { label: 'Cộng điểm', value: 'EARN' },
-  { label: 'Đổi điểm', value: 'REDEEM' },
-  { label: 'Hoàn điểm', value: 'REFUND' },
-  { label: 'Hết hạn', value: 'EXPIRE' },
-  { label: 'Điều chỉnh', value: 'ADJUST' },
+  { label: 'All', value: '' },
+  { label: 'Earned', value: 'EARN' },
+  { label: 'Redeemed', value: 'REDEEM' },
+  { label: 'Refunded', value: 'REFUND' },
+  { label: 'Expired', value: 'EXPIRE' },
+  { label: 'Adjusted', value: 'ADJUST' },
 ]
 
 const normalizeType = (type) => {
   const t = String(type || '').toUpperCase()
-  if (['EARN', 'EARNED', 'ACCRUAL'].includes(t)) return { label: 'Cộng điểm', key: 'earn', sign: '+' }
-  if (['REDEEM', 'REDEEMED', 'USE', 'USED'].includes(t)) return { label: 'Đổi điểm', key: 'redeem', sign: '-' }
-  if (t === 'REFUND') return { label: 'Hoàn điểm', key: 'refund', sign: '+' }
-  if (['EXPIRE', 'EXPIRED'].includes(t)) return { label: 'Hết hạn', key: 'expire', sign: '-' }
-  if (['ADJUST', 'ADJUSTMENT'].includes(t)) return { label: 'Điều chỉnh', key: 'adjust', sign: '±' }
-  return { label: type || 'Giao dịch', key: 'default', sign: '' }
+  if (['EARN', 'EARNED', 'ACCRUAL'].includes(t)) return { label: 'Earned', key: 'earn', sign: '+' }
+  if (['REDEEM', 'REDEEMED', 'USE', 'USED'].includes(t)) return { label: 'Redeemed', key: 'redeem', sign: '-' }
+  if (t === 'REFUND') return { label: 'Refunded', key: 'refund', sign: '+' }
+  if (['EXPIRE', 'EXPIRED'].includes(t)) return { label: 'Expired', key: 'expire', sign: '-' }
+  if (['ADJUST', 'ADJUSTMENT'].includes(t)) return { label: 'Adjusted', key: 'adjust', sign: '±' }
+  return { label: type || 'Transaction', key: 'default', sign: '' }
 }
 
 const formatDate = (value) => {
   if (!value) return ''
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return String(value)
-  return d.toLocaleString('vi-VN', {
+  return d.toLocaleString('en-US', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -104,7 +104,7 @@ export default function LoyaltyTransactionsModal({ open, onClose }) {
     } catch (err) {
       if (reqId !== reqIdRef.current) return
       const msg = err?.response?.data?.message || err?.message || ''
-      setError(msg || 'Không tải được lịch sử giao dịch. Vui lòng thử lại.')
+      setError(msg || 'Could not load transaction history. Please try again.')
     } finally {
       if (reqId === reqIdRef.current) {
         setLoading(false)
@@ -155,8 +155,8 @@ export default function LoyaltyTransactionsModal({ open, onClose }) {
     >
       <div className="ltm-dialog">
         <div className="ltm-header">
-          <h2 className="ltm-title">Lịch sử điểm thưởng</h2>
-          <button type="button" className="ltm-close-btn" onClick={onClose} aria-label="Đóng">
+          <h2 className="ltm-title">Points History</h2>
+          <button type="button" className="ltm-close-btn" onClick={onClose} aria-label="Close">
             ✕
           </button>
         </div>
@@ -177,12 +177,12 @@ export default function LoyaltyTransactionsModal({ open, onClose }) {
         </div>
 
         <div className="ltm-list-wrap">
-          {loading && <p className="ltm-state">Đang tải...</p>}
+          {loading && <p className="ltm-state">Loading...</p>}
 
           {!loading && error && <p className="ltm-error">{error}</p>}
 
           {!loading && !error && transactions.length === 0 && (
-            <p className="ltm-state">Chưa có giao dịch điểm.</p>
+            <p className="ltm-state">No points transactions yet.</p>
           )}
 
           {transactions.length > 0 && (
@@ -224,7 +224,7 @@ export default function LoyaltyTransactionsModal({ open, onClose }) {
                       </div>
                       <div className="ltm-item-right">
                         {tx.balanceAfter != null && (
-                          <span className="ltm-balance">Số dư: {tx.balanceAfter}p</span>
+                          <span className="ltm-balance">Balance: {tx.balanceAfter}p</span>
                         )}
                         {tx.status && (
                           <span className={`ltm-status ltm-status--${String(tx.status).toLowerCase()}`}>
@@ -246,7 +246,7 @@ export default function LoyaltyTransactionsModal({ open, onClose }) {
               disabled={loadingMore}
               onClick={handleLoadMore}
             >
-              {loadingMore ? 'Đang tải thêm...' : 'Xem thêm'}
+              {loadingMore ? 'Loading more...' : 'Load more'}
             </button>
           )}
         </div>

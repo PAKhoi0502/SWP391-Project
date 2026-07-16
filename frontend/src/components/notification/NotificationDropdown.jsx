@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { ROLES } from '../../constants/roles'
@@ -6,20 +7,78 @@ import notificationApi from '../../api/notificationApi'
 import promotionApi from '../../api/promotionApi'
 import { customerBookingFlowApi } from '../../api/customerBookingFlowApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
+import { bookingApi } from '../../api/bookingApi'
 import './NotificationDropdown.css'
 
-// Only show these event types in the dropdown
-const VISIBLE_TYPES = new Set(['TIER_UPGRADED', 'VOUCHER_RECEIVED', 'REWARD_EARNED'])
+// Only show these event types in the dropdown (case-insensitive)
+const VISIBLE_TYPES = new Set([
+  'TIER_UPGRADED', 'VOUCHER_RECEIVED', 'REWARD_EARNED',
+  'BOOKING_CONFIRMED', 'BOOKING_CANCELED', 'PAYMENT_CONFIRMED',
+  'POINTS_ADJUSTED',
+])
+const isVisible = (eventType) => VISIBLE_TYPES.has(String(eventType || '').toUpperCase())
+
+// ── Expiry-item helpers ────────────────────────────────────────────────────
+const DISMISSED_EXPIRY_KEY = 'audela_dismissed_expiry'
+const EXPIRY_WARN_MS  = 5 * 3600 * 1000  // warn 5 h before
+const EXPIRY_GRACE_MS = 2 * 3600 * 1000  // keep showing up to 2 h after expiry
+
+const getDismissedExpiryIds = () => {
+  try { return new Set(JSON.parse(localStorage.getItem(DISMISSED_EXPIRY_KEY) || '[]').map(String)) }
+  catch { return new Set() }
+}
+const persistDismissedExpiry = (ids) =>
+  localStorage.setItem(DISMISSED_EXPIRY_KEY, JSON.stringify([...ids]))
+
+const buildExpiryItems = (promos, customerTier, dismissed) => {
+  const now = Date.now()
+  return promos
+    .filter((p) => {
+      if (!p.endAt || dismissed.has(String(p.id))) return false
+      const diff = new Date(p.endAt).getTime() - now
+      if (diff > EXPIRY_WARN_MS)  return false   // more than 5h left — not urgent yet
+      if (diff < -EXPIRY_GRACE_MS) return false  // expired more than 2h ago — remove
+      const tiers = p.applicableTiers
+      if (Array.isArray(tiers) && tiers.length > 0) {
+        if (!customerTier) return false
+        return tiers.map(t => String(t).toUpperCase()).includes(customerTier)
+      }
+      return true
+    })
+    .map((p) => ({ ...p, _isExpired: new Date(p.endAt).getTime() <= now }))
+}
+
+const STATUS_VI = {
+  PENDING:    'Pending confirmation',
+  CONFIRMED:  'Scheduled',
+  CHECKED_IN: 'Checked in',
+  IN_PROGRESS:'In progress',
+  COMPLETED:  'Completed',
+  CANCELLED:  'Cancelled',
+  CANCELED:   'Cancelled',
+  NO_SHOW:    'No show',
+}
+
+const PAYMENT_VI = {
+  PAID:      'Paid',
+  UNPAID:    'Unpaid',
+  PENDING:   'Pending',
+  CANCELLED: 'Cancelled',
+  CANCELED:  'Cancelled',
+}
+
+const formatMoney = (val) =>
+  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(Number(val || 0))
 
 const formatTime = (value) => {
   if (!value) return ''
   try {
     const date = new Date(value)
     const diff = Date.now() - date.getTime()
-    if (diff < 60000) return 'Vừa xong'
-    if (diff < 3600000) return `${Math.floor(diff / 60000)} phút trước`
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)} giờ trước`
-    return new Intl.DateTimeFormat('vi-VN', {
+    if (diff < 60000) return 'Just now'
+    if (diff < 3600000) return `${Math.floor(diff / 60000)} min ago`
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)} hr ago`
+    return new Intl.DateTimeFormat('en-US', {
       day: '2-digit', month: '2-digit', year: 'numeric',
     }).format(date)
   } catch {
@@ -29,46 +88,141 @@ const formatTime = (value) => {
 
 const formatTimeRemaining = (endAt) => {
   const diff = new Date(endAt).getTime() - Date.now()
-  if (diff <= 0) return 'đã hết hạn'
+  if (diff <= 0) return 'expired'
   const hours = Math.floor(diff / 3600000)
   const minutes = Math.floor((diff % 3600000) / 60000)
-  if (hours > 0) return `còn ${hours} tiếng${minutes > 0 ? ` ${minutes} phút` : ''} nữa`
-  return `còn ${minutes} phút nữa`
+  if (hours > 0) return `${hours}h${minutes > 0 ? ` ${minutes}m` : ''} left`
+  return `${minutes}m left`
 }
 
 const buildTitle = (notif) => {
-  if (notif.eventType === 'TIER_UPGRADED') return 'Lên hạng thành viên'
-  if (notif.eventType === 'VOUCHER_RECEIVED') return 'Nhận voucher mới'
-  if (notif.eventType === 'REWARD_EARNED') return 'Nhận điểm thưởng'
+  if (notif.eventType === 'TIER_UPGRADED') return 'Tier upgraded'
+  if (notif.eventType === 'VOUCHER_RECEIVED') return 'New voucher received'
+  if (notif.eventType === 'REWARD_EARNED') return 'Reward points earned'
+  if (notif.eventType === 'BOOKING_CONFIRMED') return 'Booking confirmed'
+  if (notif.eventType === 'BOOKING_CANCELED') return 'Booking canceled'
+  if (notif.eventType === 'PAYMENT_CONFIRMED') return 'Payment confirmed'
+  if (notif.eventType === 'POINTS_ADJUSTED') return notif.title || 'Points adjusted'
   return notif.title || ''
 }
 
 const buildMessage = (notif, bookingSeqMap) => {
   if (notif.eventType === 'REWARD_EARNED') {
-    // Extract points value from backend message
     const match = notif.message?.match(/(\d[\d,.]*)[\s\xa0]*loyalty\s+points/i)
     const points = match ? match[1] : '?'
     const seq = notif.bookingId != null ? bookingSeqMap.get(Number(notif.bookingId)) : null
     const label = seq != null
-      ? `lần đặt xe #${seq} của bạn`
+      ? `booking #${seq}`
       : notif.bookingId != null
         ? `booking #${notif.bookingId}`
-        : 'lần đặt xe'
-    return `Bạn được +${points} điểm từ ${label}`
+        : 'your booking'
+    return `You earned +${points} points from ${label}`
   }
   if (notif.eventType === 'TIER_UPGRADED') {
     const m = notif.message?.match(/from\s+(.+?)\s+to\s+(.+?)\s+tier/i)
-    if (m) return `Chúc mừng! Bạn đã lên hạng từ ${m[1]} lên ${m[2]}`
+    if (m) return `Congratulations! You moved up from ${m[1]} to ${m[2]}`
     return notif.message || notif.title || ''
   }
   if (notif.eventType === 'VOUCHER_RECEIVED') {
     const m = notif.message?.match(/voucher:\s*(.+?)\s*\(Code:\s*(.+?)\)/i)
-    if (m) return `Bạn nhận voucher "${m[1]}" — Mã: ${m[2]}`
+    if (m) return `You received voucher "${m[1]}" — Code: ${m[2]}`
     return notif.message || ''
   }
   return notif.message || ''
 }
 
+// ── Mini booking detail modal ──────────────────────────────────────────────
+function BookingMiniModal({ bookingId, seqNum, onClose, onNavigate }) {
+  const [booking, setBooking] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let mounted = true
+    setLoading(true)
+    setError('')
+    bookingApi.getCustomerBookingDetail(bookingId)
+      .then((data) => { if (mounted) setBooking(data) })
+      .catch(() => { if (mounted) setError('Could not load booking details.') })
+      .finally(() => { if (mounted) setLoading(false) })
+    return () => { mounted = false }
+  }, [bookingId])
+
+  const label = seqNum != null ? `#${seqNum}` : `#${bookingId}`
+
+  const startTime = booking?.startTime
+  const dateLabel = startTime
+    ? new Date(startTime).toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })
+    : '—'
+  const timeLabel = startTime
+    ? new Date(startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    : ''
+
+  const status        = String(booking?.status || '').toUpperCase()
+  const payStatus     = String(booking?.paymentStatus || '').toUpperCase()
+  const statusLabel   = STATUS_VI[status]   || booking?.status   || '—'
+  const payLabel      = PAYMENT_VI[payStatus] || booking?.paymentStatus || '—'
+  const price         = booking?.finalPrice ?? booking?.totalPrice ?? booking?.totalAmount
+  const points        = booking?.pointsEarned
+  const pkgName       = booking?.servicePackageName || booking?.packageName || null
+
+  return (
+    <div className="notif-modal-overlay" onClick={onClose}>
+      <div className="notif-modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="notif-modal-header">
+          <span className="notif-modal-title">Booking {label}</span>
+          <button type="button" className="notif-modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        {loading && <div className="notif-modal-body notif-modal-loading">Loading...</div>}
+        {!loading && error && <div className="notif-modal-body notif-modal-error">{error}</div>}
+
+        {!loading && !error && booking && (
+          <div className="notif-modal-body">
+            <div className="notif-modal-row">
+              <span className="notif-modal-label">Status</span>
+              <span className={`notif-modal-status notif-modal-status--${status.toLowerCase()}`}>{statusLabel}</span>
+            </div>
+            <div className="notif-modal-row">
+              <span className="notif-modal-label">Payment</span>
+              <span className={`notif-modal-status notif-modal-status--pay-${payStatus.toLowerCase()}`}>{payLabel}</span>
+            </div>
+            {pkgName && (
+              <div className="notif-modal-row">
+                <span className="notif-modal-label">Package</span>
+                <span className="notif-modal-val">{pkgName}</span>
+              </div>
+            )}
+            <div className="notif-modal-row">
+              <span className="notif-modal-label">Date & time</span>
+              <span className="notif-modal-val">{dateLabel}{timeLabel && ` · ${timeLabel}`}</span>
+            </div>
+            {price != null && (
+              <div className="notif-modal-row">
+                <span className="notif-modal-label">Total</span>
+                <span className="notif-modal-val notif-modal-price">{formatMoney(price)}</span>
+              </div>
+            )}
+            {points != null && points > 0 && (
+              <div className="notif-modal-row">
+                <span className="notif-modal-label">Points earned</span>
+                <span className="notif-modal-val notif-modal-points">+{points} pts</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="notif-modal-footer">
+          <button type="button" className="notif-modal-nav-btn" onClick={onNavigate}>
+            View full details →
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main component ─────────────────────────────────────────────────────────
 export default function NotificationDropdown() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -77,6 +231,7 @@ export default function NotificationDropdown() {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState([])
   const [expiryItems, setExpiryItems] = useState([])
+  const [dismissedExpiry, setDismissedExpiry] = useState(getDismissedExpiryIds)
   const [bookingSeqMap, setBookingSeqMap] = useState(new Map())
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -84,18 +239,58 @@ export default function NotificationDropdown() {
   const [markingAll, setMarkingAll] = useState(false)
   const [deletingIds, setDeletingIds] = useState(new Set())
 
-  // Accurate unread badge: fetch filtered unread count on mount
-  useEffect(() => {
-    if (!user) return
-    notificationApi.getNotifications({ page: 1, limit: 50, isRead: false })
-      .then((page) => {
-        const count = (page.content ?? []).filter(n => VISIBLE_TYPES.has(n.eventType)).length
-        setUnreadCount(count)
-      })
-      .catch(() => {})
-  }, [user])
+  // Mini modal state: { bookingId, seqNum } or null
+  const [detailModal, setDetailModal] = useState(null)
 
-  // Click outside → close
+  // Background poll: refresh badge + items every 15 s without F5.
+  // Uses recursive setTimeout so a slow response never stacks intervals.
+  // Dependency on user?.id (primitive) prevents the effect from restarting
+  // on every parent re-render (scroll, hover, etc.) that would kill the timer.
+  const pollTimerRef = useRef(null)
+  useEffect(() => {
+    if (!user?.id && !user?.email) return
+    const isCustomer = String(user.role || '').toUpperCase() === 'CUSTOMER'
+    let cancelled = false
+
+    const poll = async () => {
+      if (cancelled) return
+      try {
+        const page = await notificationApi.getNotifications({ page: 1, limit: 50 })
+        const visible = (page.content ?? []).filter(n => isVisible(n.eventType))
+        if (!cancelled) {
+          setItems(visible)
+          let count = visible.filter(n => !n.isRead).length
+
+          if (isCustomer) {
+            const [promos, loyalty] = await Promise.all([
+              promotionApi.getActivePromotions(),
+              loyaltyApi.getMyLoyalty().catch(() => null),
+            ])
+            const customerTier = loyalty?.currentTier
+              ? String(loyalty.currentTier).toUpperCase()
+              : null
+            const expiry = buildExpiryItems(promos, customerTier, getDismissedExpiryIds())
+            setExpiryItems(expiry)
+            count += expiry.length
+          }
+
+          setUnreadCount(count)
+        }
+      } catch {}
+      if (!cancelled) {
+        pollTimerRef.current = setTimeout(poll, 15_000)
+      }
+    }
+
+    poll()
+    return () => {
+      cancelled = true
+      clearTimeout(pollTimerRef.current)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id ?? user?.email])
+
+  // Click outside → close dropdown (modal close handled by its own overlay)
   useEffect(() => {
     const onDown = (e) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
@@ -110,7 +305,7 @@ export default function NotificationDropdown() {
     try {
       // 1. Fetch notifications and filter to visible types
       const page = await notificationApi.getNotifications({ page: 1, limit: 50 })
-      const visible = (page.content ?? []).filter(n => VISIBLE_TYPES.has(n.eventType))
+      const visible = (page.content ?? []).filter(n => isVisible(n.eventType))
       setUnreadCount(visible.filter(n => !n.isRead).length)
 
       // 2. Build booking sequence map (CUSTOMER only, for REWARD_EARNED items)
@@ -120,7 +315,6 @@ export default function NotificationDropdown() {
         if (needsSeq) {
           try {
             const bookings = await customerBookingFlowApi.getCustomerBookings()
-            // Sort ascending by id → sequential booking #1, #2, #3...
             const sorted = [...bookings].sort((a, b) => Number(a.id) - Number(b.id))
             sorted.forEach((b, idx) => seqMap.set(Number(b.id), idx + 1))
           } catch {}
@@ -129,31 +323,24 @@ export default function NotificationDropdown() {
       setBookingSeqMap(seqMap)
       setItems(visible)
 
-      // 3. Synthetic voucher-expiry items (CUSTOMER only)
-      // Show expiry warnings for tier-eligible promotions expiring within 24h.
+      // 3. Synthetic voucher-expiry / expired items (CUSTOMER only)
       if (user?.role === ROLES.CUSTOMER) {
         try {
           const [promos, loyalty] = await Promise.all([
             promotionApi.getActivePromotions(),
             loyaltyApi.getMyLoyalty().catch(() => null),
           ])
-          const customerTier = loyalty?.currentTier ?? null
-          const now = Date.now()
-          const expiring = promos.filter((p) => {
-            if (!p.endAt) return false
-            const diff = new Date(p.endAt).getTime() - now
-            if (diff <= 0 || diff >= 24 * 3600000) return false
-            const tiers = p.applicableTiers
-            if (Array.isArray(tiers) && tiers.length > 0 && customerTier) {
-              return tiers.includes(customerTier)
-            }
-            return true
-          })
-          setExpiryItems(expiring)
+          const customerTier = loyalty?.currentTier
+            ? String(loyalty.currentTier).toUpperCase()
+            : null
+          const expiry = buildExpiryItems(promos, customerTier, dismissedExpiry)
+          setExpiryItems(expiry)
+          // Sync badge count: unread real + expiry items
+          setUnreadCount(visible.filter(n => !n.isRead).length + expiry.length)
         } catch {}
       }
     } catch {
-      setError('Không tải được thông báo.')
+      setError('Failed to load notifications.')
     } finally {
       setLoading(false)
     }
@@ -167,7 +354,7 @@ export default function NotificationDropdown() {
   const getBookingPath = (bookingId) => {
     if (user?.role === ROLES.STAFF) return `/staff/bookings/${bookingId}`
     if (user?.role === ROLES.ADMIN) return `/admin/bookings/${bookingId}`
-    return `/customer/bookings/${bookingId}`
+    return `/customer/booking-history?open=${bookingId}`
   }
 
   const handleItemClick = async (notif) => {
@@ -179,8 +366,15 @@ export default function NotificationDropdown() {
       } catch {}
     }
     if (notif.bookingId) {
-      setOpen(false)
-      navigate(getBookingPath(notif.bookingId))
+      // CUSTOMER: show inline mini modal instead of navigating away
+      if (user?.role === ROLES.CUSTOMER) {
+        const seqNum = bookingSeqMap.get(Number(notif.bookingId)) ?? null
+        setOpen(false)
+        setDetailModal({ bookingId: notif.bookingId, seqNum })
+      } else {
+        setOpen(false)
+        navigate(getBookingPath(notif.bookingId))
+      }
     }
   }
 
@@ -193,7 +387,7 @@ export default function NotificationDropdown() {
       setItems(prev => prev.map(n => ({ ...n, isRead: true })))
       setUnreadCount(0)
     } catch {
-      setError('Đánh dấu thất bại.')
+      setError('Failed to mark as read.')
     } finally {
       setMarkingAll(false)
     }
@@ -208,10 +402,20 @@ export default function NotificationDropdown() {
       setItems(prev => prev.filter(n => n.id !== notif.id))
       if (!notif.isRead) setUnreadCount(prev => Math.max(0, prev - 1))
     } catch {
-      setError('Xóa thất bại.')
+      setError('Failed to delete.')
     } finally {
       setDeletingIds(prev => { const s = new Set(prev); s.delete(notif.id); return s })
     }
+  }
+
+  const handleDismissExpiry = (e, promoId) => {
+    e.stopPropagation()
+    const next = new Set(dismissedExpiry)
+    next.add(String(promoId))
+    persistDismissedExpiry(next)
+    setDismissedExpiry(next)
+    setExpiryItems(prev => prev.filter(p => String(p.id) !== String(promoId)))
+    setUnreadCount(prev => Math.max(0, prev - 1))
   }
 
   if (!user) return null
@@ -220,91 +424,124 @@ export default function NotificationDropdown() {
   const isEmpty = !loading && items.length === 0 && expiryItems.length === 0
 
   return (
-    <div className="notif-wrap" ref={wrapRef}>
-      <button className="notif-bell" onClick={handleToggle} aria-label="Thông báo">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2.2"
-          strokeLinecap="round" strokeLinejoin="round">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-        </svg>
-        {unreadCount > 0 && (
-          <span className="notif-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
-        )}
-      </button>
+    <>
+      <div className="notif-wrap" ref={wrapRef}>
+        <button className="notif-bell" onClick={handleToggle} aria-label="Notifications">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.2"
+            strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
+          {unreadCount > 0 && (
+            <span className="notif-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
+          )}
+        </button>
 
-      {open && (
-        <div className="notif-dropdown">
-          <div className="notif-dd-header">
-            <span className="notif-dd-title">Thông báo</span>
-            {hasUnread && (
-              <button className="notif-mark-all" onClick={handleMarkAll} disabled={markingAll}>
-                {markingAll ? '...' : 'Đánh dấu tất cả đã đọc'}
-              </button>
-            )}
-          </div>
-
-          {error && <div className="notif-error">{error}</div>}
-
-          <div className="notif-list">
-            {loading && <div className="notif-state">Đang tải...</div>}
-            {isEmpty && <div className="notif-state">Chưa có thông báo.</div>}
-
-
-            {/* Synthetic voucher-expiry items (no mark-read / delete) */}
-            {!loading && expiryItems.map((p) => (
-              <div key={`expiry-${p.id}`} className="notif-item notif-item--expiry">
-                <span className="notif-expiry-icon" aria-hidden="true">⏰</span>
-                <div className="notif-item-body">
-                  <div className="notif-title">Voucher sắp hết hạn</div>
-                  <div className="notif-msg">
-                    Mã: <span className="notif-code">{p.code}</span> #{p.id}
-                    {' '}— {formatTimeRemaining(p.endAt)} là hết hạn
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {/* Real notifications */}
-            {!loading && items.map((notif) => (
-              <div
-                key={notif.id}
-                className={`notif-item${notif.isRead ? ' read' : ' unread'}`}
-                onClick={() => handleItemClick(notif)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && handleItemClick(notif)}
-              >
-                {!notif.isRead && <span className="notif-dot" aria-hidden="true" />}
-                <div className="notif-item-body">
-                  <div className="notif-title">{buildTitle(notif)}</div>
-                  <div className="notif-msg">{buildMessage(notif, bookingSeqMap)}</div>
-                  <div className="notif-time">
-                    {formatTime(notif.sentAt ?? notif.createdAt)}
-                  </div>
-                </div>
-                <button
-                  className="notif-del"
-                  onClick={(e) => handleDelete(e, notif)}
-                  disabled={deletingIds.has(notif.id)}
-                  aria-label="Xóa"
-                >
-                  {deletingIds.has(notif.id) ? '…' : '✕'}
+        {open && (
+          <div className="notif-dropdown">
+            <div className="notif-dd-header">
+              <span className="notif-dd-title">Notifications</span>
+              {hasUnread && (
+                <button className="notif-mark-all" onClick={handleMarkAll} disabled={markingAll}>
+                  {markingAll ? '...' : 'Mark all as read'}
                 </button>
-              </div>
-            ))}
-          </div>
+              )}
+            </div>
 
-          <div className="notif-dd-footer">
-            <button
-              className="notif-view-all"
-              onClick={() => { setOpen(false); navigate('/customer/notifications') }}
-            >
-              Xem tất cả thông báo →
-            </button>
+            {error && <div className="notif-error">{error}</div>}
+
+            <div className="notif-list">
+              {loading && <div className="notif-state">Loading...</div>}
+              {isEmpty && <div className="notif-state">No notifications yet.</div>}
+
+              {/* Synthetic voucher-expiry / expired items */}
+              {!loading && expiryItems.map((p) => (
+                <div
+                  key={`expiry-${p.id}`}
+                  className={`notif-item ${p._isExpired ? 'notif-item--expired' : 'notif-item--expiry'}`}
+                  onClick={(e) => handleDismissExpiry(e, p.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(ev) => ev.key === 'Enter' && handleDismissExpiry(ev, p.id)}
+                >
+                  <span className="notif-expiry-icon" aria-hidden="true">
+                    {p._isExpired ? '⛔' : '⏰'}
+                  </span>
+                  <div className="notif-item-body">
+                    <div className="notif-title">
+                      {p._isExpired ? 'Voucher expired' : 'Voucher expiring soon'}
+                    </div>
+                    <div className="notif-msg">
+                      Code: <span className="notif-code">{p.code}</span>
+                      {' '}— {p._isExpired ? 'expired' : formatTimeRemaining(p.endAt)}
+                    </div>
+                  </div>
+                  <button
+                    className="notif-del"
+                    onClick={(e) => handleDismissExpiry(e, p.id)}
+                    aria-label="Dismiss notification"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+
+              {/* Real notifications */}
+              {!loading && items.map((notif) => (
+                <div
+                  key={notif.id}
+                  className={`notif-item${notif.isRead ? ' read' : ' unread'}`}
+                  onClick={() => handleItemClick(notif)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && handleItemClick(notif)}
+                >
+                  {!notif.isRead && <span className="notif-dot" aria-hidden="true" />}
+                  <div className="notif-item-body">
+                    <div className="notif-title">{buildTitle(notif)}</div>
+                    <div className="notif-msg">{buildMessage(notif, bookingSeqMap)}</div>
+                    <div className="notif-time">
+                      {formatTime(notif.sentAt ?? notif.createdAt)}
+                    </div>
+                  </div>
+                  <button
+                    className="notif-del"
+                    onClick={(e) => handleDelete(e, notif)}
+                    disabled={deletingIds.has(notif.id)}
+                    aria-label="Delete"
+                  >
+                    {deletingIds.has(notif.id) ? '…' : '✕'}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="notif-dd-footer">
+              <button
+                className="notif-view-all"
+                onClick={() => { setOpen(false); navigate('/customer/notifications') }}
+              >
+                View all notifications →
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+      </div>
+
+      {/* Booking detail mini modal — portal to body to escape navbar transform context */}
+      {detailModal && createPortal(
+        <BookingMiniModal
+          bookingId={detailModal.bookingId}
+          seqNum={detailModal.seqNum}
+          onClose={() => setDetailModal(null)}
+          onNavigate={() => {
+            setDetailModal(null)
+            navigate(getBookingPath(detailModal.bookingId))
+          }}
+        />,
+        document.body
       )}
-    </div>
+    </>
   )
 }

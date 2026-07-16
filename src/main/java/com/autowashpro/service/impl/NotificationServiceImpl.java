@@ -70,6 +70,23 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
+    public void notifyBookingCanceled(Long bookingId) {
+        bookingRepository.findById(bookingId).ifPresent(booking -> {
+            if (booking.getCustomerId() == null) return;
+
+            String reason = booking.getNote() != null ? " Reason: " + booking.getNote() : "";
+            createInAppNotification(
+                    booking.getCustomerId(),
+                    bookingId,
+                    "BOOKING_CANCELED",
+                    "Booking Canceled",
+                    "Your booking #" + bookingId + " has been canceled." + reason
+            );
+        });
+    }
+
+    @Override
+    @Transactional
     public void notifyPaymentConfirmed(Long bookingId) {
         bookingRepository.findById(bookingId).ifPresent(booking -> {
             if (booking.getCustomerId() == null) return;
@@ -127,6 +144,25 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    @Transactional
+    public void notifyPaymentAndReward(Long bookingId) {
+        if (notificationRepository.existsByBookingIdAndEventType(bookingId, "PAYMENT_CONFIRMED")) return;
+        bookingRepository.findById(bookingId).ifPresent(booking -> {
+            if (booking.getCustomerId() == null) return;
+            String pointsPart = pointTransactionRepository.findByBookingIdAndType(bookingId, "EARN")
+                    .map(pt -> " You earned +" + pt.getPoints() + " loyalty points.")
+                    .orElse("");
+            createInAppNotification(
+                    booking.getCustomerId(),
+                    bookingId,
+                    "PAYMENT_CONFIRMED",
+                    "Payment confirmed" + (pointsPart.isEmpty() ? "" : " & points earned"),
+                    "Payment for booking #" + bookingId + " has been confirmed." + pointsPart + " Thank you!"
+            );
+        });
+    }
+
+    @Override
 @Transactional
 public void notifyTierUpgraded(Long customerId, String oldTier, String newTier) {
     createInAppNotification(
@@ -149,6 +185,16 @@ public void notifyVoucherReceived(Long customerId, String promotionCode, String 
             "You received a voucher: " + promotionName + " (Code: " + promotionCode + "). Use it on your next booking!"
     );
 }
+    @Override
+    @Transactional
+    public void notifyPointsAdjusted(Long customerId, Integer points, String reason) {
+        String sign = points > 0 ? "+" : "";
+        String title = points > 0 ? "Points Added" : "Points Deducted";
+        String body = sign + points + " loyalty points have been adjusted to your account"
+                + (reason != null && !reason.isBlank() ? ": " + reason : "") + ".";
+        createInAppNotification(customerId, null, "POINTS_ADJUSTED", title, body);
+    }
+
     // ===================== API =====================
 
     @Override

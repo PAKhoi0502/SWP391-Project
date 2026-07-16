@@ -45,6 +45,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/auth/register",
                                 "/auth/login",
+                                "/auth/google",
                                 "/auth/refresh-token",
                                 "/auth/logout",
                                 "/auth/forgot-password",
@@ -81,6 +82,18 @@ public class SecurityConfig {
 
 .requestMatchers(HttpMethod.PATCH, "/service-packages/*/status")
 .hasRole("ADMIN")
+
+.requestMatchers(HttpMethod.GET, "/api/garages")
+.permitAll()
+
+.requestMatchers(HttpMethod.GET, "/api/garages/*")
+.permitAll()
+
+.requestMatchers(HttpMethod.GET, "/bookings/available-slots")
+.permitAll()
+
+.requestMatchers(HttpMethod.POST, "/bookings/guest")
+.permitAll()
 
                         .anyRequest()
                         .authenticated())

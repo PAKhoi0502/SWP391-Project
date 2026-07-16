@@ -34,6 +34,7 @@ import com.autowashpro.repository.BookingServiceStepRepository;
 import com.autowashpro.repository.CustomerLoyaltyRepository;
 import com.autowashpro.repository.GarageRepository;
 import com.autowashpro.repository.LoyaltyTierRuleRepository;
+import com.autowashpro.repository.PaymentTransactionRepository;
 import com.autowashpro.repository.PointTransactionRepository;
 import com.autowashpro.repository.PromotionRepository;
 import com.autowashpro.repository.PromotionUsageRepository;
@@ -140,6 +141,9 @@ class BookingServiceImplTest {
     private PointTransactionRepository pointTransactionRepository;
 
     @Mock
+    private PaymentTransactionRepository paymentTransactionRepository;
+
+    @Mock
     private LoyaltyService loyaltyService;
 
     @Mock
@@ -186,13 +190,14 @@ class BookingServiceImplTest {
 
         BookingResponse response = bookingService.createBooking(request, customer.getId());
 
-        assertEquals("CONFIRMED", response.getStatus());
+        assertEquals("PENDING_DEPOSIT", response.getStatus());
         assertMoney("120000.00", response.getOriginalPrice());
         assertMoney("120000.00", response.getFinalPrice());
         assertMoney("36000.00", response.getDepositAmount());
+        assertEquals("UNPAID", response.getDepositStatus());
+        assertEquals("PAYOS", response.getPaymentMethod());
         assertFalse(response.getIsWalkIn());
-        verify(loyaltyService).updateBookingStatistics(10L);
-        verify(notificationService).notifyBookingConfirmed(10L);
+        verify(paymentTransactionRepository).save(any());
     }
 
     @Test
@@ -367,9 +372,9 @@ class BookingServiceImplTest {
         assertMoney("115000.00", response.getFinalPrice());
         assertEquals(80, loyalty.getAvailablePoints());
         assertEquals(20, loyalty.getRedeemedPoints());
-        assertEquals(1, promotion.getUsedCount());
+        assertEquals(0, promotion.getUsedCount());
         verify(pointTransactionRepository).save(any(PointTransaction.class));
-        verify(promotionUsageRepository).save(any(PromotionUsage.class));
+        verify(promotionUsageRepository, never()).save(any(PromotionUsage.class));
         verify(bookingAddOnServicePackageRepository).save(any(BookingAddOnServicePackage.class));
     }
 
@@ -386,7 +391,7 @@ class BookingServiceImplTest {
         BookingResponse response = bookingService.createBooking(request, customer.getId());
 
         assertEquals(servicePackage.getId(), response.getServicePackageId());
-        assertEquals("CONFIRMED", response.getStatus());
+        assertEquals("PENDING_DEPOSIT", response.getStatus());
     }
 
     @Test
@@ -556,6 +561,7 @@ class BookingServiceImplTest {
         when(washBayRepository.findById(washBay.getId())).thenReturn(Optional.of(washBay));
         when(bookingAssignedStaffRepository.findByBookingId(booking.getId())).thenReturn(List.of(assignedStaff));
         when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
+        when(userRepository.findById(booking.getCustomerId())).thenReturn(Optional.of(refundReadyCustomer(booking.getCustomerId())));
         when(vehicleInspectionRepository.findByBookingIdOrderByCreatedAtAsc(booking.getId()))
                 .thenReturn(List.of(inspection("BEFORE_WASH")));
 
@@ -694,6 +700,7 @@ class BookingServiceImplTest {
         when(washBayRepository.findById(washBay.getId())).thenReturn(Optional.of(washBay));
         when(bookingAssignedStaffRepository.findByBookingId(booking.getId())).thenReturn(List.of(assignedStaff));
         when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
+        when(userRepository.findById(booking.getCustomerId())).thenReturn(Optional.of(refundReadyCustomer(booking.getCustomerId())));
 
         BookingResponse response = bookingService.cancelBooking(
                 booking.getId(), staffUser.getId(), "ROLE_STAFF", "customer requested");
@@ -728,6 +735,7 @@ class BookingServiceImplTest {
         when(promotionUsageRepository.findByBookingId(booking.getId())).thenReturn(Optional.of(usage));
         when(promotionRepository.findById(promotion.getId())).thenReturn(Optional.of(promotion));
         when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
+        when(userRepository.findById(booking.getCustomerId())).thenReturn(Optional.of(refundReadyCustomer(booking.getCustomerId())));
 
         BookingResponse response = bookingService.cancelBooking(
                 booking.getId(), staffUser.getId(), "ROLE_STAFF", "changed plan");
@@ -810,8 +818,7 @@ class BookingServiceImplTest {
         verify(promotionService).recordPromotionUsageAfterPaidBooking(booking.getId());
         verify(loyaltyService).earnPointsAfterPaidBooking(booking.getId());
         verify(washHistoryService).createWashHistoryAfterPaidBooking(booking.getId());
-        verify(notificationService).notifyPaymentConfirmed(booking.getId());
-        verify(notificationService).notifyRewardEarned(booking.getId());
+        verify(notificationService).notifyPaymentAndReward(booking.getId());
     }
 
     @Test
@@ -907,8 +914,17 @@ class BookingServiceImplTest {
         request.setVehicleModel("Vios");
         request.setServicePackageId(servicePackage.getId());
         request.setStartTime(slotStart());
-        request.setDepositPaymentMethod("CASH");
+        request.setPaymentMethod("CASH");
         return request;
+    }
+
+    private User refundReadyCustomer(Long id) {
+        User customer = TestFixtures.customer();
+        customer.setId(id);
+        customer.setBankName("VCB");
+        customer.setBankAccountName("Customer Test");
+        customer.setBankAccountNumber("123456789");
+        return customer;
     }
 
     private Booking confirmedBooking(Vehicle vehicle, Garage garage, ServicePackage servicePackage) {

@@ -1,6 +1,6 @@
 import "../ui.css";
 
-function LoadingSpinner({ text = "Đang tải dữ liệu..." }) {
+function LoadingSpinner({ text = "Loading data..." }) {
   return (
     <div className="ui-center-state">
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>

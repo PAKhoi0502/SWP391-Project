@@ -1,0 +1,644 @@
+/* ═══════════════════════════════════════════════
+   PublicPillNavbar — Liquid Glass Pill / Dynamic Island
+   Light "premium clean" theme
+   ═══════════════════════════════════════════════ */
+
+/* ── Wrapper: fixed full-width container ── */
+.ppn-wrap {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 16px 0;
+  pointer-events: none;
+  transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.28s ease;
+}
+
+.ppn-wrap.ppn-hidden {
+  transform: translateY(-110%);
+  opacity: 0;
+}
+
+.ppn-wrap.ppn-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* ── Pill / Dynamic Island ── */
+.ppn-pill {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 14px 14px 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(22px) saturate(1.6);
+  -webkit-backdrop-filter: blur(22px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  max-width: 960px;
+  width: 100%;
+  transition: background 0.28s ease,
+              box-shadow 0.28s ease,
+              transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.28s ease;
+}
+
+.ppn-wrap.ppn-scrolled .ppn-pill {
+  background: rgba(10, 18, 36, 0.55);
+  backdrop-filter: blur(32px) saturate(2);
+  -webkit-backdrop-filter: blur(32px) saturate(2);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transform: scale(0.97);
+}
+
+/* ── Logo ── */
+.ppn-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: #1F2933;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-right: 8px;
+  transition: filter 0.25s ease, transform 0.25s cubic-bezier(0.22,1,0.36,1);
+}
+
+.ppn-logo:hover {
+  transform: translateY(-1px) scale(1.04);
+  filter: brightness(1.1);
+}
+
+.ppn-logo svg {
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 5px rgba(46,194,247,0.35));
+}
+
+.ppn-logo-text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  line-height: 1;
+}
+
+.ppn-logo-audela {
+  font-size: 1.22rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+}
+
+.ppn-logo-washing {
+  font-size: 1.14rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: #2EC2F7;
+}
+
+/* ── Nav links ── */
+.ppn-links {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+}
+
+.ppn-link svg,
+.ppn-link-btn svg {
+  width: 23px;
+  height: 23px;
+  flex-shrink: 0;
+}
+
+.ppn-link,
+.ppn-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  width: 40px;
+  padding: 0 9px;
+  border-radius: 999px;
+  overflow: hidden;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.78);
+  text-decoration: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  transition:
+    width 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    padding 0.30s ease,
+    background 0.25s ease,
+    color 0.15s ease,
+    box-shadow 0.25s ease;
+}
+
+.ppn-link:hover,
+.ppn-link-btn:hover {
+  width: 120px;
+  padding: 0 14px 0 9px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #172033;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+}
+
+.ppn-link.active {
+  width: 120px;
+  padding: 0 14px 0 9px;
+  color: #2EC2F7;
+  background: rgba(46, 194, 247, 0.20);
+}
+
+/* Label — hidden until hover expands the container */
+.ppn-link-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  opacity: 0;
+  max-width: 0;
+  transform: translateX(-5px);
+  pointer-events: none;
+  transition:
+    opacity 0.20s ease 0.12s,
+    max-width 0.40s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.28s ease 0.10s;
+}
+
+.ppn-link:hover .ppn-link-label,
+.ppn-link-btn:hover .ppn-link-label,
+.ppn-link.active .ppn-link-label {
+  opacity: 1;
+  max-width: 80px;
+  transform: translateX(0);
+}
+
+/* ── Action buttons ── */
+.ppn-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.ppn-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.ppn-btn-ghost {
+  color: rgba(255, 255, 255, 0.88);
+  border-color: rgba(255, 255, 255, 0.35);
+  background: transparent;
+}
+
+.ppn-btn-ghost:hover {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.70);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.ppn-btn-solid {
+  color: #FAF9F6;
+  background: #2EC2F7;
+  border-color: #2EC2F7;
+}
+
+.ppn-btn-solid:hover {
+  background: #159BD7;
+  border-color: #159BD7;
+  box-shadow: 0 4px 20px rgba(46, 194, 247, 0.38);
+}
+
+/* ── Hamburger (mobile only) ── */
+.ppn-hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 1px solid rgba(23, 32, 51, 0.15);
+  border-radius: 10px;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  margin-left: auto;
+  transition: border-color 0.15s;
+}
+
+.ppn-hamburger span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: #1F2933;
+  border-radius: 2px;
+  transition: all 0.22s;
+  transform-origin: center;
+}
+
+.ppn-hamburger:hover {
+  border-color: rgba(46, 194, 247, 0.45);
+}
+
+.ppn-hamburger.is-open span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.ppn-hamburger.is-open span:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(0);
+}
+.ppn-hamburger.is-open span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* ── Mobile menu ── */
+.ppn-mobile-menu {
+  pointer-events: auto;
+  margin-top: 6px;
+  width: 100%;
+  max-width: 960px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 20px;
+  box-shadow: 0 12px 36px rgba(23, 32, 51, 0.12);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ppn-mobile-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1F2933;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.ppn-mobile-link:hover {
+  background: rgba(46, 194, 247, 0.10);
+  color: #0879B8;
+}
+
+.ppn-mobile-auth {
+  display: flex;
+  gap: 8px;
+  padding-top: 10px;
+  margin-top: 6px;
+  border-top: 1px solid rgba(23, 32, 51, 0.08);
+}
+
+.ppn-mobile-auth .ppn-btn {
+  flex: 1;
+  justify-content: center;
+}
+
+/* ── Avatar button ── */
+.ppn-avatar-wrap {
+  position: relative;
+}
+
+.ppn-avatar-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: transform 0.18s cubic-bezier(0.22,1,0.36,1),
+              background 0.18s ease,
+              border-color 0.18s ease;
+}
+
+.ppn-avatar-btn:hover,
+.ppn-avatar-btn--open {
+  transform: scale(1.08);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.85);
+  color: #ffffff;
+}
+
+.ppn-avatar-initials {
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  user-select: none;
+  text-transform: uppercase;
+}
+
+/* ── Dropdown ── */
+.ppn-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 230px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(20px) saturate(1.6);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  border: 1px solid rgba(23, 32, 51, 0.08);
+  border-radius: 18px;
+  box-shadow:
+    0 20px 56px rgba(23, 32, 51, 0.16),
+    0 2px 8px rgba(23, 32, 51, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  padding: 6px;
+  z-index: 200;
+
+  /* Closed state */
+  opacity: 0;
+  transform: translateY(-10px) scale(0.95);
+  transform-origin: top right;
+  pointer-events: none;
+  transition:
+    opacity 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ppn-dropdown--open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+/* ── Dropdown: user header ── */
+.ppn-drop-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(46, 194, 247, 0.06);
+  border-radius: 12px;
+  margin-bottom: 2px;
+}
+
+.ppn-drop-avatar-sm {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2EC2F7 0%, #0855b3 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.ppn-drop-avatar-sm img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ppn-drop-avatar-sm span {
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ppn-drop-userinfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ppn-drop-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #172033;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ppn-drop-email {
+  font-size: 11px;
+  color: #667085;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Dropdown: divider ── */
+.ppn-drop-divider {
+  height: 1px;
+  background: rgba(23, 32, 51, 0.07);
+  margin: 4px 4px;
+}
+
+/* ── Dropdown: items ── */
+.ppn-drop-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1F2933;
+  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.13s, color 0.13s;
+  text-align: left;
+  line-height: 1;
+}
+
+.ppn-drop-item:hover {
+  background: rgba(46, 194, 247, 0.1);
+  color: #0879B8;
+}
+
+.ppn-drop-item svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.ppn-drop-item:hover svg {
+  opacity: 1;
+}
+
+.ppn-drop-item--danger {
+  color: #dc2626;
+}
+
+.ppn-drop-item--danger:hover {
+  background: rgba(220, 38, 38, 0.08);
+  color: #b91c1c;
+}
+
+.ppn-drop-item--danger svg {
+  opacity: 0.75;
+}
+
+/* ── User chip (avatar initials + name in navbar) ── */
+.ppn-user-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px 0 4px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.ppn-user-chip:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.65);
+  color: #ffffff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
+
+.ppn-user-chip--open {
+  background: rgba(46, 194, 247, 0.42);
+  border-color: rgba(46, 194, 247, 0.88);
+  color: #ffffff;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+    0 6px 22px rgba(46, 194, 247, 0.30);
+}
+
+.ppn-user-chip--open:hover {
+  background: rgba(46, 194, 247, 0.52);
+  border-color: rgba(46, 194, 247, 1);
+}
+
+/* Avatar blends into pill when active */
+.ppn-user-chip--open .ppn-chip-avatar {
+  background: rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.40);
+}
+
+/* Avatar circle inside chip */
+.ppn-chip-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2EC2F7 0%, #0855b3 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: background 0.18s ease, box-shadow 0.18s ease;
+  flex-shrink: 0;
+  user-select: none;
+  overflow: hidden;
+}
+
+.ppn-chip-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Name text inside chip */
+.ppn-chip-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Notification bell slot in pill navbar ── */
+.ppn-notif-slot {
+  display: flex;
+  align-items: center;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .ppn-links,
+  .ppn-actions {
+    display: none;
+  }
+
+  .ppn-hamburger {
+    display: flex;
+  }
+
+  .ppn-pill {
+    padding: 14px 12px 14px 16px;
+  }
+
+  .ppn-logo-audela,
+  .ppn-logo-washing {
+    font-size: 1rem;
+  }
+}

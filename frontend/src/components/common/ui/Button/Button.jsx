@@ -17,7 +17,7 @@ function Button({
       onClick={onClick}
       className={`ui-btn ui-btn-${variant} ui-btn-${size} ${className}`}
     >
-      {loading ? "Đang xử lý..." : children}
+      {loading ? "Processing..." : children}
     </button>
   );
 }

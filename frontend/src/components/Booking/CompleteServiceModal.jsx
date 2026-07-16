@@ -2,24 +2,24 @@ import { useEffect, useState } from 'react'
 import './CompleteServiceModal.css'
 
 const TEXT = {
-  notUpdated: 'Chưa cập nhật',
-  title: 'Xác nhận hoàn thành dịch vụ',
-  subtitle: 'Xác nhận khi đã hoàn thành toàn bộ dịch vụ cho khách hàng.',
-  bookingCode: 'Mã booking',
-  customer: 'Khách hàng',
-  vehicle: 'Xe',
+  notUpdated: '—',
+  title: 'Complete service',
+  subtitle: 'Confirm all service work has been finished for this customer.',
+  bookingCode: 'Booking',
+  customer: 'Customer',
+  vehicle: 'Vehicle',
   garage: 'Garage',
-  servicePackage: 'Gói dịch vụ',
-  paymentStatus: 'Thanh toán',
-  note: 'Ghi chú hoàn thành',
-  optional: '(tùy chọn)',
-  notePlaceholder: 'Ghi chú khi hoàn thành dịch vụ...',
-  cancel: 'Hủy',
-  completing: 'Đang hoàn thành...',
-  confirm: 'Xác nhận hoàn thành',
-  paid: 'Đã thanh toán',
-  unpaid: 'Chưa thanh toán',
-  pending: 'Đang chờ',
+  servicePackage: 'Package',
+  paymentStatus: 'Payment',
+  note: 'Completion note',
+  optional: '(optional)',
+  notePlaceholder: 'Add a note for this completion...',
+  cancel: 'Cancel',
+  completing: 'Completing...',
+  confirm: 'Complete service',
+  paid: 'Paid',
+  unpaid: 'Unpaid',
+  pending: 'Pending',
 }
 
 const getPaymentStatusLabel = (status) => {
@@ -57,7 +57,7 @@ export default function CompleteServiceModal({ open, onClose, onConfirm, booking
   }
 
   const vehicleTypeLabel = booking?.vehicleType
-    ? (String(booking.vehicleType).toUpperCase().includes('BIKE') ? '#Xe máy' : '#Ô tô')
+    ? (String(booking.vehicleType).toUpperCase().includes('BIKE') ? '#Motorbike' : '#Car')
     : null
   const vehicleMain = [booking?.licensePlate, booking?.vehicleName].filter(Boolean).join(' · ') || TEXT.notUpdated
 
@@ -125,7 +125,7 @@ export default function CompleteServiceModal({ open, onClose, onConfirm, booking
 
         {hasIncompleteSteps && (
           <p className="csm-error">
-            Còn {incompleteCount || ''} bước dịch vụ chưa hoàn thành. Vui lòng hoàn thành tất cả bước trước khi xác nhận.
+            {incompleteCount || 'Some'} service steps are still incomplete. Please finish all steps before confirming.
           </p>
         )}
 

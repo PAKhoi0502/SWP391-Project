@@ -67,6 +67,59 @@ INSERT INTO loyalty_tier_rules
 )
 VALUES
 ('BRONZE',   0,       0,   0,   7,  1, 1.00, 1, 1),
-('SILVER',   500000,  5, 100,  10, 1, 1.20, 2, 1),
-('GOLD',     1500000,12, 300,  12, 2, 1.35, 3, 1),
-('PLATINUM', 3000000,25, 700,  14, 3, 1.50, 4, 1);
+('SILVER',   1000000,  5, 100,  10, 1, 1.20, 2, 1),
+('GOLD',     3000000,12, 300,  12, 2, 1.35, 3, 1),
+('PLATINUM', 6000000,25, 700,  14, 3, 1.50, 4, 1);
+
+UPDATE loyalty_tier_rules
+SET min_total_visits = CASE tier
+    WHEN 'BRONZE' THEN 0
+    WHEN 'SILVER' THEN 10
+    WHEN 'GOLD' THEN 20
+    WHEN 'PLATINUM' THEN 35
+    ELSE min_total_visits
+END
+WHERE tier IN ('BRONZE', 'SILVER', 'GOLD', 'PLATINUM');
+
+SELECT * from loyalty_tier_rules
+
+UPDATE loyalty_tier_rules
+SET min_total_spent = CASE tier
+    WHEN 'BRONZE' THEN 0
+    WHEN 'SILVER' THEN 1000000
+    WHEN 'GOLD' THEN 3000000
+    WHEN 'PLATINUM' THEN 6000000
+    ELSE min_total_spent
+END
+WHERE tier IN ('BRONZE', 'SILVER', 'GOLD', 'PLATINUM');
+
+
+
+SELECT *
+FROM loyalty_tier_rules;
+
+SELECT * FROM booking_service_steps
+
+select * from wash_bays
+select * from service_packages
+select * from garages
+
+update garages
+set slot_interval_minutes = 30
+select * from vehicles
+
+select * from users
+
+ALTER TABLE bookings
+ADD promotion_discount_amount DECIMAL(18,2) NOT NULL
+DEFAULT 0;
+
+select * from bookings
+SELECT * FROM vehicles
+SELECT * FROM vehicle_inspections
+
+SELECT id, status, start_time, end_time FROM bookings
+WHERE garage_id = <garage_id>
+  AND start_time < '2026-07-05 08:00:00'
+  AND end_time > '2026-07-05 07:30:00'
+  AND status NOT IN ('CANCELED', 'NO_SHOW');

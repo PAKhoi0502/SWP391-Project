@@ -42,9 +42,9 @@ function AdminResearchExportPage() {
       } else {
         await researchExportApi.exportCustomers(filters)
       }
-      setMessage('Đã tải file xuất dữ liệu.')
+      setMessage('Export file downloaded.')
     } catch (err) {
-      setError(err.message || 'Không thể xuất dữ liệu.')
+      setError(err.message || 'Unable to export data.')
     } finally {
       setLoading(false)
     }
@@ -54,15 +54,15 @@ function AdminResearchExportPage() {
     <section className="research-export-page">
       <div className="research-export-hero">
         <p className="research-export-kicker">Research</p>
-        <h1>Xuất dữ liệu nghiên cứu</h1>
-        <p>Xuất dataset booking hoặc khách hàng đã được ẩn danh hoá phục vụ nghiên cứu.</p>
+        <h1>Export Research Data</h1>
+        <p>Export anonymized booking or customer datasets for research purposes.</p>
       </div>
 
       <div className="research-export-warning">
-        Dữ liệu xuất ra đã được <strong>ẩn danh hoá</strong>: mã khách hàng/booking được băm một chiều, không chứa
-        tên, số điện thoại, biển số xe hay bất kỳ thông tin định danh cá nhân (PII) nào.
+        The exported data is <strong>anonymized</strong>: customer/booking IDs are one-way hashed and contain no
+        names, phone numbers, license plates, or any personally identifiable information (PII).
         <br />
-        Khoảng thời gian tối đa mỗi lần xuất là 366 ngày.
+        The maximum date range per export is 366 days.
       </div>
 
       <form className="research-export-panel" onSubmit={handleExport}>
@@ -79,17 +79,17 @@ function AdminResearchExportPage() {
           </label>
 
           <label>
-            Từ ngày
+            From date
             <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
           </label>
 
           <label>
-            Đến ngày
+            To date
             <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
           </label>
 
           <label>
-            Định dạng
+            Format
             <select value={format} onChange={(e) => setFormat(e.target.value)}>
               {FORMATS.map((item) => (
                 <option key={item.value} value={item.value}>
@@ -104,7 +104,7 @@ function AdminResearchExportPage() {
         {message && <div className="research-export-alert success">{message}</div>}
 
         <button className="research-export-primary-btn" type="submit" disabled={loading}>
-          {loading ? 'Đang xuất...' : 'Tải xuống'}
+          {loading ? 'Exporting...' : 'Download'}
         </button>
       </form>
     </section>

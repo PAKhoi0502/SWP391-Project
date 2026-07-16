@@ -28,7 +28,7 @@ export function getPackageId(item) {
 }
 
 export function getPackageName(item) {
-  return item?.name ?? item?.packageName ?? item?.servicePackageName ?? 'Gói dịch vụ'
+  return item?.name ?? item?.packageName ?? item?.servicePackageName ?? 'Service Package'
 }
 
 export function getPackageType(item) {
@@ -51,7 +51,7 @@ export function getPackageActive(item) {
   return true
 }
 
-export function getErrorMessage(error, fallback = 'Có lỗi xảy ra') {
+export function getErrorMessage(error, fallback = 'An error occurred') {
   const data = error?.response?.data
   return data?.message || data?.error || (typeof data === 'string' ? data : '') || error?.message || fallback
 }

@@ -18,6 +18,8 @@ function ImageUpload({
   disabled = false,
   allowDelete = true,
   className = '',
+  avatarMode = false,
+  avatarFallback = null,
 }) {
   const [pendingFile, setPendingFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState('')
@@ -40,11 +42,11 @@ function ImageUpload({
     setError('')
 
     if (!acceptedTypes.includes(file.type)) {
-      setError('Định dạng ảnh không được hỗ trợ.')
+      setError('This image format is not supported.')
       return
     }
     if (file.size > maxSizeMB * 1024 * 1024) {
-      setError(`Ảnh không được vượt quá ${maxSizeMB} MB.`)
+      setError(`Image must not exceed ${maxSizeMB} MB.`)
       return
     }
 
@@ -70,7 +72,7 @@ function ImageUpload({
       onUploaded?.(uploaded)
       handleCancelPreview()
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Không tải được ảnh lên.')
+      setError(err?.response?.data?.message || err?.message || 'Failed to upload image.')
     } finally {
       setUploading(false)
     }
@@ -84,13 +86,80 @@ function ImageUpload({
       await uploadService.deleteImage(publicId)
       onDeleted?.(publicId)
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Không xóa được ảnh.')
+      setError(err?.response?.data?.message || err?.message || 'Failed to delete image.')
     } finally {
       setDeletingPublicId('')
     }
   }
 
   const canAddMore = !disabled && !pendingFile && (multiple || images.length === 0)
+
+  if (avatarMode) {
+    const currentImage = images[0] || null
+    return (
+      <div className={`image-upload image-upload--avatar ${className}`.trim()}>
+        <label className="image-upload-avatar-label">
+          <div className="image-upload-avatar-circle">
+            {currentImage
+              ? <img src={currentImage.imageUrl} alt="avatar" />
+              : avatarFallback
+            }
+            {!disabled && (
+              <div className="image-upload-avatar-overlay">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+                <span>{currentImage ? 'Change photo' : 'Add photo'}</span>
+              </div>
+            )}
+          </div>
+          {!disabled && (
+            <input
+              ref={inputRef}
+              type="file"
+              accept={acceptedTypes.join(',')}
+              onChange={handleFileChange}
+              style={{ display: 'none' }}
+            />
+          )}
+        </label>
+
+        {allowDelete && currentImage && !disabled && (
+          <button
+            type="button"
+            className="image-upload-avatar-delete"
+            disabled={deletingPublicId === currentImage.publicId}
+            onClick={() => handleDelete(currentImage.publicId)}
+            aria-label="Delete image"
+          >
+            {deletingPublicId === currentImage.publicId ? '…' : '✕'}
+          </button>
+        )}
+
+        {error && <p className="image-upload-error" style={{ textAlign: 'center', marginTop: 6 }}>{error}</p>}
+
+        {Boolean(pendingFile) && (
+          <div className="image-upload-avatar-modal-overlay" onClick={uploading ? undefined : handleCancelPreview}>
+            <div className="image-upload-avatar-modal" onClick={(e) => e.stopPropagation()}>
+              <p className="image-upload-avatar-modal-title">Preview Avatar</p>
+              {previewUrl && (
+                <img src={previewUrl} alt="Preview" className="image-upload-avatar-modal-img" />
+              )}
+              <div className="image-upload-avatar-modal-actions">
+                <button type="button" className="image-upload-avatar-modal-cancel" disabled={uploading} onClick={handleCancelPreview}>
+                  Cancel
+                </button>
+                <button type="button" className="image-upload-avatar-modal-confirm" disabled={uploading} onClick={handleConfirmUpload}>
+                  {uploading ? 'Uploading…' : 'Upload'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className={`image-upload ${className}`.trim()}>
@@ -104,7 +173,7 @@ function ImageUpload({
                 className="image-upload-remove"
                 disabled={deletingPublicId === image.publicId}
                 onClick={() => handleDelete(image.publicId)}
-                aria-label="Xóa ảnh"
+                aria-label="Delete image"
               >
                 {deletingPublicId === image.publicId ? '...' : '✕'}
               </button>
@@ -114,7 +183,7 @@ function ImageUpload({
 
         {canAddMore && (
           <label className="image-upload-add">
-            <span>+ Thêm ảnh</span>
+            <span>+ Add photo</span>
             <input
               ref={inputRef}
               type="file"
@@ -129,20 +198,20 @@ function ImageUpload({
 
       <Modal
         open={Boolean(pendingFile)}
-        title="Xem trước ảnh"
+        title="Image preview"
         onClose={uploading ? undefined : handleCancelPreview}
         footer={
           <>
             <Button variant="ghost" disabled={uploading} onClick={handleCancelPreview}>
-              Hủy
+              Cancel
             </Button>
             <Button variant="primary" loading={uploading} onClick={handleConfirmUpload}>
-              Tải lên
+              Upload
             </Button>
           </>
         }
       >
-        {previewUrl && <img src={previewUrl} alt="Xem trước" className="image-upload-preview-img" />}
+        {previewUrl && <img src={previewUrl} alt="Preview" className="image-upload-preview-img" />}
       </Modal>
     </div>
   )

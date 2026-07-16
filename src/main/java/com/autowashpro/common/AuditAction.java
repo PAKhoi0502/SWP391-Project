@@ -4,6 +4,7 @@ public final class AuditAction {
 
     public static final String BOOKING_CREATED = "BOOKING_CREATED";
     public static final String BOOKING_WALK_IN_CREATED = "BOOKING_WALK_IN_CREATED";
+    public static final String BOOKING_GUEST_CREATED = "BOOKING_GUEST_CREATED";
     public static final String BOOKING_CHECKED_IN = "BOOKING_CHECKED_IN";
     public static final String BOOKING_SERVICE_STARTED = "BOOKING_SERVICE_STARTED";
     public static final String BOOKING_CANCELLED = "BOOKING_CANCELLED";

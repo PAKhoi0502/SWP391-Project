@@ -51,6 +51,7 @@ public final class TestFixtures {
                 .phone(phone)
                 .passwordHash("encoded-password")
                 .role(role)
+                .authProvider("LOCAL")
                 .isActive(true)
                 .createdAt(BASE_TIME.minusDays(30))
                 .updatedAt(BASE_TIME.minusDays(30))

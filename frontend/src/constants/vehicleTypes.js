@@ -2,12 +2,12 @@ export const VEHICLE_TYPES = ['CAR', 'BIKE']
 
 export const ENGINE_TYPES = ['GASOLINE', 'ELECTRIC', 'HYBRID', 'DIESEL']
 
-// Phải khớp chính xác với các giá trị motorbike_group đang lưu ở bảng
-// service_packages (xem database/migration_v41_normalize_service_package_vehicle_type.sql).
-// Đây là danh sách cố định (mã code), không phải text tự do, để tránh sai lệch
-// giữa xe của khách hàng và gói dịch vụ khi so khớp ở BookingServiceImpl.
+// Must match exactly the motorbike_group values stored in the
+// service_packages table (see database/migration_v41_normalize_service_package_vehicle_type.sql).
+// This is a fixed list of codes, not free text, to avoid mismatches
+// between customer vehicles and service packages when matching in BookingServiceImpl.
 export const MOTORBIKE_GROUPS = [
-  { value: 'UNDER_175', label: 'Dưới 175cc (xe số, xe tay ga phổ thông)' },
-  { value: 'OVER_175', label: 'Trên 175cc (phân khối lớn)' },
-  { value: 'ELECTRIC', label: 'Xe máy điện' },
+  { value: 'UNDER_175', label: 'Under 175cc (standard & common scooters)' },
+  { value: 'OVER_175', label: 'Over 175cc (large displacement)' },
+  { value: 'ELECTRIC', label: 'Electric motorbike' },
 ]

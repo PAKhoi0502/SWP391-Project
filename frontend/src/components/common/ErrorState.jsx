@@ -1,8 +1,8 @@
-// Trạng thái lỗi dùng chung.
-// Hiển thị khi gọi API thất bại; có nút "Thử lại" nếu truyền onRetry.
+// Shared error state.
+// Displayed when an API call fails; shows a "Retry" button if onRetry is provided.
 function ErrorState({
-  title = 'Đã có lỗi xảy ra',
-  message = 'Không thể tải dữ liệu. Vui lòng thử lại.',
+  title = 'An error occurred',
+  message = 'Unable to load data. Please try again.',
   onRetry,
 }) {
   return (
@@ -38,7 +38,7 @@ function ErrorState({
             cursor: 'pointer',
           }}
         >
-          Thử lại
+          Retry
         </button>
       )}
     </div>

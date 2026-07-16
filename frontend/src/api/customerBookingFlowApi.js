@@ -138,7 +138,7 @@ export const customerBookingFlowApi = {
 
       if (list.length > 0) return list
     } catch (error) {
-      // Fallback xuống danh sách gói dịch vụ chung nếu endpoint available lỗi.
+      // Fall back to the general service package list if the available endpoint fails.
     }
 
     const fallbackResponse = await api.get('/service-packages', {

@@ -1,371 +1,398 @@
-import { Component, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { userService } from '../services/userService'
-import LoyaltyPointsCard from '../components/loyalty/LoyaltyPointsCard'
+import { loyaltyApi } from '../api/loyaltyApi'
+import ProfileDetailModal from '../components/profile/ProfileDetailModal'
+import MemberBenefitsModal from '../components/profile/MemberBenefitsModal'
+import VoucherModal from '../components/profile/VoucherModal'
+import BookingsModal from '../components/profile/BookingsModal'
+import WaitlistModal from '../components/profile/WaitlistModal'
+import VehiclesModal from '../components/profile/VehiclesModal'
+import BankAccountsModal from '../components/profile/BankAccountsModal'
 import ImageUpload from '../components/upload/ImageUpload'
+import { TierGemIcon, getTierLabel, getTierColor } from '../components/common/TierGem'
+import '../components/profile/ProfileSettings.css'
 
-// Error boundary to prevent LoyaltyPointsCard crash from taking down the whole profile
-class LoyaltyBoundary extends Component {
-  constructor(props) {
-    super(props)
-    this.state = { failed: false }
-  }
+function getInitial(profile) {
+  return String(profile?.fullName || profile?.email || 'U').trim().charAt(0).toUpperCase()
+}
 
-  static getDerivedStateFromError() {
-    return { failed: true }
-  }
+/* ── Inline SVG icons ── */
+function IconStar() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+    </svg>
+  )
+}
 
-  render() {
-    if (this.state.failed) {
-      return (
-        <div style={loyaltyErrorStyle}>
-          Không tải được thông tin điểm thưởng. Vui lòng thử lại sau.
-        </div>
-      )
-    }
-    return this.props.children
-  }
+function IconTicket() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z"/>
+      <path d="M13 5v2M13 17v2M13 11v2"/>
+    </svg>
+  )
+}
+
+function IconCalendar() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4.5" width="18" height="16" rx="2.5"/>
+      <path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>
+    </svg>
+  )
+}
+
+function IconUser() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4"/>
+      <path d="M4 20c0-4 3.58-7 8-7s8 3 8 7"/>
+    </svg>
+  )
+}
+
+function IconLock() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2.5"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+  )
+}
+
+function IconChevron() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+  )
+}
+
+function IconWaitlist() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9"/>
+      <polyline points="12 7 12 12 15 14"/>
+    </svg>
+  )
+}
+
+function IconCar() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 11l1.7-4.3A2 2 0 0 1 8.6 5.5h6.8a2 2 0 0 1 1.9 1.2L19 11"/>
+      <path d="M3 11h18v5.2a.8.8 0 0 1-.8.8H18"/>
+      <path d="M6 17H3.8a.8.8 0 0 1-.8-.8V11"/>
+      <circle cx="7.5" cy="17" r="1.7"/>
+      <circle cx="16.5" cy="17" r="1.7"/>
+    </svg>
+  )
+}
+
+function IconBank() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="10" width="18" height="9" rx="1.5"/>
+      <path d="M3 10l9-6 9 6"/>
+      <path d="M6 13v4M10 13v4M14 13v4M18 13v4"/>
+    </svg>
+  )
 }
 
 export default function ProfilePage() {
   const { user, setCurrentUser } = useAuth()
-  const initialProfile = user || getStoredUser()
-  const [form, setForm] = useState(() => toForm(initialProfile))
-  const [profile, setProfile] = useState(initialProfile)
-  const [loading, setLoading] = useState(true)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [profile, setProfile]     = useState(user || null)
+  const [loyalty, setLoyalty]     = useState(null)
+  const [loading, setLoading]     = useState(true)
   const [loadError, setLoadError] = useState('')
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+
+  const [detailOpen, setDetailOpen]             = useState(false)
+  const [detailAutoOpenPw, setDetailAutoOpenPw] = useState(false)
+  const [memberOpen, setMemberOpen]             = useState(false)
+  const [voucherOpen, setVoucherOpen]           = useState(false)
+
+  const [bookingsOpen, setBookingsOpen]   = useState(false)
+  const [waitlistOpen, setWaitlistOpen]   = useState(false)
+  const [vehiclesOpen, setVehiclesOpen]   = useState(false)
+  const [bankAccountsOpen, setBankAccountsOpen] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get('open') === 'waitlist') {
+      setWaitlistOpen(true)
+      navigate('/customer/profile', { replace: true })
+    }
+  }, [location.search])
 
   useEffect(() => {
     let ignore = false
-
     userService.getMe()
       .then((data) => {
         if (ignore) return
         setProfile(data)
-        setForm(toForm(data))
         setCurrentUser(data)
+        const role = String(data?.role || '').toUpperCase().replace('ROLE_', '')
+        if (role === 'CUSTOMER') {
+          loyaltyApi.getMyLoyalty()
+            .then((ld) => { if (!ignore) setLoyalty(ld) })
+            .catch(() => {})
+        }
       })
       .catch((err) => {
-        if (!ignore) setLoadError(getErrorMessage(err, 'Không thể tải hồ sơ.'))
+        if (!ignore) setLoadError(err?.response?.data?.message || 'Could not load profile.')
       })
-      .finally(() => {
-        if (!ignore) setLoading(false)
-      })
-
+      .finally(() => { if (!ignore) setLoading(false) })
     return () => { ignore = true }
   }, [setCurrentUser])
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
-    setError('')
-    setSuccess('')
-  }
-
   const refreshProfile = async () => {
-    const updated = await userService.getMe()
-    setProfile(updated)
-    setCurrentUser(updated)
-    return updated
+    const data = await userService.getMe()
+    setProfile(data)
+    setCurrentUser(data)
   }
 
   const handleAvatarUploaded = async () => {
-    setError('')
-    setSuccess('')
-    try {
-      await refreshProfile()
-      setSuccess('Cập nhật ảnh đại diện thành công.')
-    } catch (err) {
-      setError(getErrorMessage(err, 'Không thể tải lại hồ sơ.'))
-    }
+    try { await refreshProfile() } catch {}
   }
 
   const handleAvatarDeleted = async () => {
-    setError('')
-    setSuccess('')
-    try {
-      await refreshProfile()
-      setSuccess('Đã xóa ảnh đại diện.')
-    } catch (err) {
-      setError(getErrorMessage(err, 'Không thể tải lại hồ sơ.'))
-    }
+    try { await refreshProfile() } catch {}
   }
 
   const isCustomer = String(profile?.role || user?.role || '').toUpperCase().replace('ROLE_', '') === 'CUSTOMER'
-  const isActive = profile?.isActive !== false
-  const hasProfileContent = Boolean(form.fullName || form.email || form.phone)
+  const isActive   = profile?.isActive !== false
+  const tierKey    = loyalty?.currentTier ? String(loyalty.currentTier).toUpperCase() : null
+  const sub        = profile?.email || profile?.phone || ''
 
-  if (loading) return <StateCard message="Đang tải hồ sơ..." />
+  const openDetail   = () => { setDetailAutoOpenPw(false); setDetailOpen(true) }
+  const openPassword = () => { setDetailAutoOpenPw(true);  setDetailOpen(true) }
 
-  if (loadError && !profile) return <StateCard message={loadError} tone="error" />
-
-  return (
-    <div style={pageStyle}>
-      <style>{`
-        .profile-input:focus {
-          border-color: #0369a1 !important;
-          box-shadow: 0 0 0 3px rgba(3,105,161,0.12) !important;
-          outline: none;
-        }
-        .profile-grid {
-          display: grid;
-          gap: 20px;
-          grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.8fr);
-        }
-        @media (max-width: 900px) {
-          .profile-grid { grid-template-columns: 1fr; }
-        }
-      `}</style>
-
-      <div style={heroStyle}>
-        <div style={avatarPanelStyle}>
-          {!profile?.avatarUrl && <div style={avatarStyle}>{getInitial(profile)}</div>}
-          <ImageUpload
-            className="image-upload--round image-upload--sm image-upload--pill"
-            folder="avatars"
-            images={profile?.avatarUrl ? [{ publicId: profile.avatarPublicId, imageUrl: profile.avatarUrl }] : []}
-            onUploaded={handleAvatarUploaded}
-            onDeleted={handleAvatarDeleted}
-            multiple={false}
-          />
+  if (loading) {
+    return (
+      <div className="ps-page">
+        <div className="ps-bg">
+          <img src="/images/Hero1.jpg" className="ps-bg-img" alt="" aria-hidden="true" />
+          <div className="ps-bg-overlay" />
         </div>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 26 }}>
-            {profile?.fullName || profile?.email || 'Hồ sơ của tôi'}
-          </h1>
-          <p style={{ margin: '6px 0 0', color: '#64748b' }}>Xem và cập nhật thông tin tài khoản hiện tại.</p>
+        <div className="ps-content">
+          <p className="ps-state">Loading...</p>
         </div>
       </div>
+    )
+  }
 
-      <div className="profile-grid">
-        <section style={cardStyle}>
-          {/* Status badge top-right */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18 }}>
-            <h2 style={{ ...sectionTitleStyle, margin: 0 }}>Thông tin tài khoản</h2>
-            <span style={isActive ? activeBadgeStyle : inactiveBadgeStyle}>
-              {isActive ? 'Đang hoạt động' : 'Không hoạt động'}
+  if (loadError && !profile) {
+    return (
+      <div className="ps-page">
+        <div className="ps-bg">
+          <img src="/images/Hero1.jpg" className="ps-bg-img" alt="" aria-hidden="true" />
+          <div className="ps-bg-overlay" />
+        </div>
+        <div className="ps-content">
+          <p className="ps-state" style={{ color: '#fca5a5' }}>{loadError}</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="ps-page">
+      {/* Hero background */}
+      <div className="ps-bg" aria-hidden="true">
+        <img src="/images/Hero1.jpg" className="ps-bg-img" alt="" />
+        <div className="ps-bg-overlay" />
+      </div>
+
+      {/* Content */}
+      <div className="ps-content">
+
+        {/* ── Single merged card ── */}
+        <div className="ps-main-card">
+
+          {/* User header section */}
+          <div className="ps-main-card-user">
+            <ImageUpload
+              avatarMode
+              avatarFallback={<div className="ps-avatar">{getInitial(profile)}</div>}
+              folder="avatars"
+              images={profile?.avatarUrl ? [{ publicId: profile.avatarPublicId, imageUrl: profile.avatarUrl }] : []}
+              onUploaded={handleAvatarUploaded}
+              onDeleted={handleAvatarDeleted}
+              multiple={false}
+            />
+
+            <div className="ps-user-meta">
+              <div className="ps-user-name-row">
+                <h1 className="ps-user-name">
+                  {profile?.fullName || profile?.email || 'User'}
+                </h1>
+                {tierKey && (
+                  <span className="ps-tier-chip" style={{ '--tier-color': getTierColor(tierKey) }}>
+                    <TierGemIcon tier={tierKey} size={14} />
+                    {getTierLabel(tierKey)}
+                  </span>
+                )}
+              </div>
+              {sub && <p className="ps-user-email">{sub}</p>}
+            </div>
+
+            <div className="ps-user-right">
+              <span className={isActive ? 'ps-badge-active' : 'ps-badge-inactive'}>
+                {isActive ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+          </div>
+
+          {/* Divider between user header and settings */}
+          <div className="ps-main-card-divider" />
+
+          {/* Section: Account */}
+          <p className="ps-section-label">Account</p>
+
+          <button type="button" className="ps-row" onClick={openDetail}>
+            <span className="ps-row-icon ps-row-icon--navy"><IconUser /></span>
+            <span className="ps-row-body">
+              <span className="ps-row-label">Account Details</span>
+              <span className="ps-row-desc">Name, email, phone number</span>
             </span>
-          </div>
+            <span className="ps-row-chevron"><IconChevron /></span>
+          </button>
 
-          <InfoRow label="Vai trò" value={normalizeRole(profile?.role)} />
+          <div className="ps-row-sep" />
 
-          <div style={{ marginTop: 16 }}>
-            <Field label="Họ và tên" name="fullName" value={form.fullName} onChange={handleChange} autoComplete="name" readOnly />
-            <Field label="Email" name="email" type="email" value={form.email} onChange={handleChange} autoComplete="email" readOnly />
-            <Field label="Số điện thoại" name="phone" value={form.phone} onChange={handleChange} autoComplete="tel" readOnly />
+          <button type="button" className="ps-row" onClick={openPassword}>
+            <span className="ps-row-icon ps-row-icon--amber"><IconLock /></span>
+            <span className="ps-row-body">
+              <span className="ps-row-label">Change Password</span>
+              <span className="ps-row-desc">Update your login password</span>
+            </span>
+            <span className="ps-row-chevron"><IconChevron /></span>
+          </button>
 
-            {loadError && !hasProfileContent && <div style={warnStyle}>{loadError}</div>}
-            {error && <div style={errorStyle}>{error}</div>}
-            {success && <div style={successStyle}>{success}</div>}
-          </div>
-        </section>
+          <div className="ps-row-sep" />
 
-        <aside style={{ display: 'grid', gap: 20, alignContent: 'start' }}>
+          <button type="button" className="ps-row" onClick={() => setVehiclesOpen(true)}>
+            <span className="ps-row-icon ps-row-icon--navy"><IconCar /></span>
+            <span className="ps-row-body">
+              <span className="ps-row-label">My Vehicles</span>
+              <span className="ps-row-desc">Manage vehicles, set default</span>
+            </span>
+            <span className="ps-row-chevron"><IconChevron /></span>
+          </button>
+
+          <div className="ps-row-sep" />
+
+          <button type="button" className="ps-row" onClick={() => setBankAccountsOpen(true)}>
+            <span className="ps-row-icon ps-row-icon--purple"><IconBank /></span>
+            <span className="ps-row-body">
+              <span className="ps-row-label">Bank Accounts</span>
+              <span className="ps-row-desc">Saved accounts for refunds & withdrawals</span>
+            </span>
+            <span className="ps-row-chevron"><IconChevron /></span>
+          </button>
+
+          {/* Section: Membership (customer only) */}
           {isCustomer && (
-            <LoyaltyBoundary>
-              <LoyaltyPointsCard />
-            </LoyaltyBoundary>
+            <>
+              <div className="ps-section-sep" />
+
+              <p className="ps-section-label">Membership</p>
+
+              <button type="button" className="ps-row" onClick={() => setMemberOpen(true)}>
+                <span className="ps-row-icon ps-row-icon--blue"><IconStar /></span>
+                <span className="ps-row-body">
+                  <span className="ps-row-label">Member Tier</span>
+                  <span className="ps-row-desc">Points, tier, transaction history</span>
+                </span>
+                <span className="ps-row-chevron"><IconChevron /></span>
+              </button>
+
+              <div className="ps-row-sep" />
+
+              <button type="button" className="ps-row" onClick={() => setVoucherOpen(true)}>
+                <span className="ps-row-icon ps-row-icon--green"><IconTicket /></span>
+                <span className="ps-row-body">
+                  <span className="ps-row-label">Vouchers & Promotions</span>
+                  <span className="ps-row-desc">Discount codes available to you</span>
+                </span>
+                <span className="ps-row-chevron"><IconChevron /></span>
+              </button>
+
+              <div className="ps-row-sep" />
+
+              <button type="button" className="ps-row" onClick={() => setBookingsOpen(true)}>
+                <span className="ps-row-icon ps-row-icon--indigo"><IconCalendar /></span>
+                <span className="ps-row-body">
+                  <span className="ps-row-label">Appointments</span>
+                  <span className="ps-row-desc">Booking schedule and status</span>
+                </span>
+                <span className="ps-row-chevron"><IconChevron /></span>
+              </button>
+
+              <div className="ps-row-sep" />
+
+              <button type="button" className="ps-row" onClick={() => setWaitlistOpen(true)}>
+                <span className="ps-row-icon ps-row-icon--teal"><IconWaitlist /></span>
+                <span className="ps-row-body">
+                  <span className="ps-row-label">Waitlist</span>
+                  <span className="ps-row-desc">Track your waitlist requests</span>
+                </span>
+                <span className="ps-row-chevron"><IconChevron /></span>
+              </button>
+            </>
           )}
-        </aside>
+
+          <div style={{ height: 8 }} />
+        </div>
+
       </div>
+
+      {/* ── Modals ── */}
+      <ProfileDetailModal
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        profile={profile}
+        autoOpenPw={detailAutoOpenPw}
+      />
+      <MemberBenefitsModal
+        open={memberOpen}
+        onClose={() => setMemberOpen(false)}
+      />
+      <VoucherModal
+        open={voucherOpen}
+        onClose={() => setVoucherOpen(false)}
+        currentTier={loyalty?.currentTier ?? null}
+      />
+      <BookingsModal
+        open={bookingsOpen}
+        onClose={() => setBookingsOpen(false)}
+      />
+      <WaitlistModal
+        open={waitlistOpen}
+        onClose={() => setWaitlistOpen(false)}
+      />
+      <VehiclesModal
+        open={vehiclesOpen}
+        onClose={() => setVehiclesOpen(false)}
+      />
+      <BankAccountsModal
+        open={bankAccountsOpen}
+        onClose={() => setBankAccountsOpen(false)}
+      />
     </div>
   )
-}
-
-function Field({ label, ...props }) {
-  return (
-    <label style={fieldStyle}>
-      <span style={labelStyle}>{label}</span>
-      <input className="profile-input" required style={inputStyle} {...props} />
-    </label>
-  )
-}
-
-function InfoRow({ label, value }) {
-  return (
-    <div style={infoRowStyle}>
-      <span style={{ color: '#64748b', fontSize: 13 }}>{label}</span>
-      <strong style={{ color: '#0f172a' }}>{value}</strong>
-    </div>
-  )
-}
-
-function StateCard({ message, tone }) {
-  const bg = tone === 'error' ? '#fef2f2' : '#f8fafc'
-  const color = tone === 'error' ? '#b91c1c' : '#0f172a'
-  return (
-    <div style={{ ...cardStyle, margin: 24, background: bg, color }}>
-      {message}
-    </div>
-  )
-}
-
-function toForm(data) {
-  return {
-    fullName: data?.fullName || '',
-    email: data?.email || '',
-    phone: data?.phone || '',
-  }
-}
-
-function getStoredUser() {
-  try {
-    const raw = localStorage.getItem('user') || localStorage.getItem('currentUser')
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
-
-function getErrorMessage(err, fallback) {
-  const raw = err.response?.data?.message || err.response?.data || fallback
-  if (String(raw).includes('Email already exists')) return 'Email đã được sử dụng.'
-  if (String(raw).includes('Phone already exists')) return 'Số điện thoại đã được sử dụng.'
-  return raw
-}
-
-function normalizeRole(role) {
-  return String(role || 'CUSTOMER').replace('ROLE_', '')
-}
-
-function getInitial(user) {
-  return String(user?.fullName || user?.email || 'U').trim().charAt(0).toUpperCase()
-}
-
-const pageStyle = {
-  display: 'grid',
-  gap: 24,
-}
-
-const heroStyle = {
-  alignItems: 'center',
-  background: 'linear-gradient(135deg, #ffffff, #e0f2fe)',
-  border: '1px solid #dbeafe',
-  borderRadius: 20,
-  display: 'flex',
-  gap: 18,
-  padding: 24,
-}
-
-const avatarStyle = {
-  alignItems: 'center',
-  background: '#0369a1',
-  borderRadius: '50%',
-  color: '#fff',
-  display: 'flex',
-  flexShrink: 0,
-  fontSize: 28,
-  fontWeight: 800,
-  height: 64,
-  justifyContent: 'center',
-  width: 64,
-  overflow: 'hidden',
-}
-
-const avatarPanelStyle = {
-  alignItems: 'center',
-  display: 'flex',
-  gap: 12,
-}
-
-const cardStyle = {
-  background: '#fff',
-  border: '1px solid #e2e8f0',
-  borderRadius: 18,
-  boxShadow: '0 18px 40px rgba(15,23,42,0.08)',
-  padding: 24,
-}
-
-const sectionTitleStyle = {
-  fontSize: 18,
-  margin: '0 0 18px',
-}
-
-const fieldStyle = {
-  display: 'grid',
-  gap: 8,
-  marginBottom: 16,
-}
-
-const labelStyle = {
-  color: '#334155',
-  fontSize: 13,
-  fontWeight: 700,
-}
-
-const inputStyle = {
-  border: '1px solid #cbd5e1',
-  borderRadius: 12,
-  boxSizing: 'border-box',
-  color: '#0f172a',
-  font: 'inherit',
-  padding: '11px 12px',
-  width: '100%',
-}
-
-const infoRowStyle = {
-  borderBottom: '1px solid #e2e8f0',
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: 16,
-  padding: '11px 0',
-}
-
-const activeBadgeStyle = {
-  background: '#f0fdf4',
-  border: '1px solid #bbf7d0',
-  borderRadius: 999,
-  color: '#15803d',
-  fontSize: 12,
-  fontWeight: 700,
-  padding: '4px 12px',
-  whiteSpace: 'nowrap',
-}
-
-const inactiveBadgeStyle = {
-  background: '#fef2f2',
-  border: '1px solid #fecaca',
-  borderRadius: 999,
-  color: '#b91c1c',
-  fontSize: 12,
-  fontWeight: 700,
-  padding: '4px 12px',
-  whiteSpace: 'nowrap',
-}
-
-const errorStyle = {
-  background: '#fef2f2',
-  border: '1px solid #fecaca',
-  borderRadius: 12,
-  color: '#b91c1c',
-  marginBottom: 16,
-  padding: '10px 12px',
-}
-
-const warnStyle = {
-  background: '#fffbeb',
-  border: '1px solid #fde68a',
-  borderRadius: 12,
-  color: '#92400e',
-  marginBottom: 16,
-  padding: '10px 12px',
-}
-
-const successStyle = {
-  background: '#f0fdf4',
-  border: '1px solid #bbf7d0',
-  borderRadius: 12,
-  color: '#15803d',
-  marginBottom: 16,
-  padding: '10px 12px',
-}
-
-const loyaltyErrorStyle = {
-  background: '#fef9c3',
-  border: '1px solid #fde68a',
-  borderRadius: 12,
-  color: '#92400e',
-  fontSize: 13,
-  padding: '12px 16px',
 }

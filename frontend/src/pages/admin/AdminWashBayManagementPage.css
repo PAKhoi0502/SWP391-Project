@@ -1,10 +1,4 @@
 .wash-bay-page {
-  min-height: 100vh;
-  padding: 32px;
-  background:
-    radial-gradient(circle at top left, rgba(124, 58, 237, 0.16), transparent 34%),
-    radial-gradient(circle at top right, rgba(14, 165, 233, 0.14), transparent 30%),
-    #f7f8fc;
   color: #172033;
 }
 
@@ -14,11 +8,9 @@
   gap: 24px;
   align-items: stretch;
   padding: 28px;
-  border: 1px solid rgba(124, 58, 237, 0.15);
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(18px);
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
   margin-bottom: 22px;
 }
 
@@ -28,7 +20,7 @@
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #7c3aed;
+  color: #2563eb;
 }
 
 .wash-bay-hero h1 {
@@ -111,10 +103,9 @@
 
 .wash-bay-panel {
   padding: 22px;
-  border-radius: 26px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  box-shadow: 0 18px 55px rgba(15, 23, 42, 0.07);
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
 }
 
 .wash-bay-panel-header {
@@ -181,8 +172,8 @@
 .wash-bay-form textarea:focus,
 .wash-bay-filter-box input:focus,
 .wash-bay-filter-box select:focus {
-  border-color: #8b5cf6;
-  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.12);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .wash-bay-actions {
@@ -205,13 +196,14 @@
 
 .wash-bay-primary-btn {
   color: white;
-  background: linear-gradient(135deg, #7c3aed, #2563eb);
-  box-shadow: 0 12px 28px rgba(99, 102, 241, 0.25);
+  background: #2563eb;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
 }
 
 .wash-bay-primary-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 16px 34px rgba(99, 102, 241, 0.32);
+  transform: none;
+  background: #1d4ed8;
+  box-shadow: 0 4px 18px rgba(37, 99, 235, 0.35);
 }
 
 .wash-bay-ghost-btn {
@@ -225,9 +217,9 @@
 
 .wash-bay-info-btn {
   width: 100%;
-  color: #4338ca;
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
 }
 
 .wash-bay-garage-info {
@@ -314,8 +306,8 @@
 }
 
 .wash-bay-type-pill {
-  color: #4338ca;
-  background: #eef2ff;
+  color: #1d4ed8;
+  background: #eff6ff;
 }
 
 .wash-bay-status.AVAILABLE {

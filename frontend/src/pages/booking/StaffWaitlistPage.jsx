@@ -1,27 +1,26 @@
 import { useCallback, useEffect, useState } from 'react'
 import { waitlistApi } from '../../api/waitlistApi'
 import { useAuth } from '../../contexts/AuthContext'
-import { Button, EmptyState, ErrorState, LoadingSpinner, Pagination, Select } from '../../components/common/ui'
 import './StaffWaitlistPage.css'
 
 const STATUS_OPTIONS = [
-  { value: 'WAITING', label: 'Đang chờ' },
-  { value: 'OFFERED', label: 'Đã offer slot' },
-  { value: 'ACCEPTED', label: 'Đã nhận slot' },
-  { value: 'EXPIRED', label: 'Hết hạn' },
-  { value: 'CANCELED', label: 'Khách đã hủy' },
-  { value: 'ALL', label: 'Tất cả' },
+  { value: 'WAITING', label: 'Waiting' },
+  { value: 'OFFERED', label: 'Slot offered' },
+  { value: 'ACCEPTED', label: 'Slot accepted' },
+  { value: 'EXPIRED', label: 'Expired' },
+  { value: 'CANCELED', label: 'Canceled by customer' },
+  { value: 'ALL', label: 'All' },
 ]
 
 const REASON_LABELS = {
-  NO_BAY: 'Hết chỗ rửa xe',
-  NO_CARE_STAFF: 'Hết nhân viên chăm xe',
+  NO_BAY: 'No washing bay available',
+  NO_CARE_STAFF: 'No care staff available',
 }
 
 function formatDate(value) {
-  if (!value) return 'Chưa có ngày'
+  if (!value) return 'No date yet'
 
-  return new Date(value).toLocaleDateString('vi-VN', {
+  return new Date(value).toLocaleDateString('en-US', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -29,9 +28,9 @@ function formatDate(value) {
 }
 
 function formatTime(value) {
-  if (!value) return 'Chưa có giờ'
+  if (!value) return 'No time yet'
 
-  return new Date(value).toLocaleTimeString('vi-VN', {
+  return new Date(value).toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
   })
@@ -39,27 +38,27 @@ function formatTime(value) {
 
 function formatDateTime(value) {
   if (!value) return null
-  return new Date(value).toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' })
+  return new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 function getVehicleTypeLabel(vehicleType) {
   const value = String(vehicleType || '').toUpperCase()
-  if (value === 'CAR') return 'Ô tô'
-  if (value === 'MOTORBIKE' || value === 'BIKE' || value === 'MOTORCYCLE') return 'Xe máy'
-  return vehicleType || 'Chưa có loại xe'
+  if (value === 'CAR') return 'Car'
+  if (value === 'MOTORBIKE' || value === 'BIKE' || value === 'MOTORCYCLE') return 'Motorbike'
+  return vehicleType || 'No vehicle type'
 }
 
 function getReasonLabel(reason) {
-  return REASON_LABELS[reason] || reason || 'Chưa rõ lý do'
+  return REASON_LABELS[reason] || reason || 'Reason unknown'
 }
 
 function getStatusLabel(status) {
   const value = String(status || 'WAITING').toUpperCase()
-  if (value === 'WAITING') return 'Đang chờ'
-  if (value === 'OFFERED') return 'Đã offer slot'
-  if (value === 'ACCEPTED') return 'Đã nhận slot'
-  if (value === 'EXPIRED') return 'Hết hạn'
-  if (value === 'CANCELED' || value === 'CANCELLED') return 'Khách đã hủy'
+  if (value === 'WAITING') return 'Waiting'
+  if (value === 'OFFERED') return 'Slot offered'
+  if (value === 'ACCEPTED') return 'Slot accepted'
+  if (value === 'EXPIRED') return 'Expired'
+  if (value === 'CANCELED' || value === 'CANCELLED') return 'Canceled by customer'
   return value
 }
 
@@ -89,7 +88,7 @@ function StaffWaitlistCard({ item, actionKey, onOffer, onExpire }) {
       <div className="staff-waitlist-card-header">
         <div>
           <span className="staff-waitlist-label">Customer</span>
-          <h2>{item?.customerName || `Khách hàng #${item?.customerId || '-'}`}</h2>
+          <h2>{item?.customerName || `Customer #${item?.customerId || '-'}`}</h2>
         </div>
 
         <span className={`staff-waitlist-status staff-waitlist-status-${getStatusTone(status)}`}>
@@ -103,50 +102,60 @@ function StaffWaitlistCard({ item, actionKey, onOffer, onExpire }) {
           <dd>{item?.garageName || `Garage #${item?.garageId || '-'}`}</dd>
         </div>
         <div>
-          <dt>Xe</dt>
-          <dd>{item?.vehicleName || `Xe #${item?.vehicleId || '-'}`}</dd>
+          <dt>Vehicle</dt>
+          <dd>{item?.vehicleName || `Vehicle #${item?.vehicleId || '-'}`}</dd>
         </div>
         <div>
-          <dt>Gói dịch vụ</dt>
-          <dd>{item?.servicePackageName || `Gói #${item?.servicePackageId || '-'}`}</dd>
+          <dt>Service package</dt>
+          <dd>{item?.servicePackageName || `Package #${item?.servicePackageId || '-'}`}</dd>
         </div>
         <div>
-          <dt>Loại xe</dt>
+          <dt>Vehicle type</dt>
           <dd>{getVehicleTypeLabel(item?.vehicleType)}</dd>
         </div>
         <div>
-          <dt>Ngày mong muốn</dt>
+          <dt>Desired date</dt>
           <dd>{formatDate(item?.desiredStartTime)}</dd>
         </div>
         <div>
-          <dt>Khung giờ mong muốn</dt>
+          <dt>Desired time window</dt>
           <dd>{formatTime(item?.desiredStartTime)} - {formatTime(item?.desiredEndTime)}</dd>
         </div>
         <div>
-          <dt>Lý do vào waitlist</dt>
+          <dt>Waitlist reason</dt>
           <dd>{getReasonLabel(item?.reason)}</dd>
         </div>
         <div>
-          <dt>Hạng thành viên</dt>
+          <dt>Membership tier</dt>
           <dd>{item?.customerTier || 'BRONZE'}</dd>
         </div>
       </dl>
 
       {status === 'OFFERED' && offerExpiresAt && (
-        <p className="staff-waitlist-reason">Offer hết hạn lúc: {offerExpiresAt}</p>
+        <p className="staff-waitlist-reason">Offer expires at: {offerExpiresAt}</p>
       )}
 
       {(canOffer || canExpire) && (
         <div className="staff-waitlist-actions">
           {canOffer && (
-            <Button loading={isOffering} disabled={Boolean(actionKey)} onClick={() => onOffer(item)}>
-              Offer slot
-            </Button>
+            <button
+              type="button"
+              className="staff-waitlist-btn staff-waitlist-btn--primary"
+              disabled={Boolean(actionKey)}
+              onClick={() => onOffer(item)}
+            >
+              {isOffering ? 'Processing...' : 'Offer slot'}
+            </button>
           )}
           {canExpire && (
-            <Button variant="ghost" loading={isExpiring} disabled={Boolean(actionKey)} onClick={() => onExpire(item)}>
-              Đánh dấu hết hạn
-            </Button>
+            <button
+              type="button"
+              className="staff-waitlist-btn staff-waitlist-btn--ghost"
+              disabled={Boolean(actionKey)}
+              onClick={() => onExpire(item)}
+            >
+              {isExpiring ? 'Processing...' : 'Mark as expired'}
+            </button>
           )}
         </div>
       )}
@@ -181,7 +190,7 @@ export default function StaffWaitlistPage() {
       setItems(Array.isArray(data?.content) ? data.content : [])
       setTotalPages(data?.totalPages || 1)
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể tải danh sách waitlist.'))
+      setError(getErrorMessage(err, 'Could not load the waitlist.'))
     } finally {
       setLoading(false)
     }
@@ -203,10 +212,10 @@ export default function StaffWaitlistPage() {
       setError('')
       setSuccess('')
       await waitlistApi.offerWaitlist(item.id)
-      setSuccess('Đã offer slot cho khách hàng.')
+      setSuccess('Slot offered to the customer.')
       await fetchQueue()
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể offer slot cho waitlist này.'))
+      setError(getErrorMessage(err, 'Could not offer a slot for this waitlist entry.'))
     } finally {
       setActionKey('')
     }
@@ -218,10 +227,10 @@ export default function StaffWaitlistPage() {
       setError('')
       setSuccess('')
       await waitlistApi.expireWaitlist(item.id)
-      setSuccess('Đã đánh dấu hết hạn waitlist.')
+      setSuccess('Waitlist entry marked as expired.')
       await fetchQueue()
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể đánh dấu hết hạn waitlist này.'))
+      setError(getErrorMessage(err, 'Could not mark this waitlist entry as expired.'))
     } finally {
       setActionKey('')
     }
@@ -232,42 +241,53 @@ export default function StaffWaitlistPage() {
       <section className="staff-waitlist-hero">
         <div>
           <p className="staff-waitlist-eyebrow">{isAdmin ? 'Admin waitlist' : 'Staff waitlist'}</p>
-          <h1>Quản lý danh sách chờ</h1>
-          <p>Xem hàng chờ, offer slot trống hoặc đánh dấu hết hạn các yêu cầu waitlist của khách.</p>
+          <h1>Waitlist Management</h1>
+          <p>View the queue, offer open slots, or mark customer waitlist requests as expired.</p>
         </div>
+      </section>
 
-        <div className="staff-waitlist-filters-row">
-          {isAdmin && (
-            <label className="staff-waitlist-garage-filter">
-              <span>Garage ID</span>
-              <input
-                placeholder="Tất cả garage"
-                value={garageId}
-                onChange={(event) => setGarageId(event.target.value)}
-                onBlur={handleApplyGarageFilter}
-                onKeyDown={(event) => event.key === 'Enter' && handleApplyGarageFilter()}
-              />
-            </label>
-          )}
-
-          <div className="staff-waitlist-filter">
-            <Select
-              label="Trạng thái"
-              value={status}
-              options={STATUS_OPTIONS}
-              onChange={(e) => { setStatus(e.target.value); setPage(1) }}
+      <section className="staff-waitlist-filters">
+        {isAdmin && (
+          <label className="staff-waitlist-garage-filter">
+            <span>Garage ID</span>
+            <input
+              placeholder="All garages"
+              value={garageId}
+              onChange={(event) => setGarageId(event.target.value)}
+              onBlur={handleApplyGarageFilter}
+              onKeyDown={(event) => event.key === 'Enter' && handleApplyGarageFilter()}
             />
-          </div>
-        </div>
+          </label>
+        )}
+
+        <label className="staff-waitlist-status-filter">
+          <span>Status</span>
+          <select
+            value={status}
+            onChange={(e) => { setStatus(e.target.value); setPage(1) }}
+          >
+            {STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </label>
       </section>
 
       {success && <p className="staff-waitlist-message staff-waitlist-message-success">{success}</p>}
       {error && !loading && <p className="staff-waitlist-message staff-waitlist-message-error">{error}</p>}
 
-      {loading && <LoadingSpinner text="Đang tải waitlist..." />}
-      {!loading && error && <ErrorState title="Không thể tải waitlist" description={error} onRetry={fetchQueue} />}
+      {loading && <div className="staff-waitlist-state">Loading waitlist...</div>}
+      {!loading && error && (
+        <div className="staff-waitlist-state staff-waitlist-state--error">
+          <p>{error}</p>
+          <button type="button" className="staff-waitlist-btn staff-waitlist-btn--ghost" onClick={fetchQueue}>Retry</button>
+        </div>
+      )}
       {!loading && !error && items.length === 0 && (
-        <EmptyState icon="WL" title="Không có yêu cầu waitlist" description="Các yêu cầu khách tham gia waitlist sẽ hiển thị tại đây." />
+        <div className="staff-waitlist-state">
+          <p className="staff-waitlist-state-title">No waitlist requests</p>
+          <p>Customer waitlist requests will appear here.</p>
+        </div>
       )}
       {!loading && !error && items.length > 0 && (
         <>
@@ -283,7 +303,27 @@ export default function StaffWaitlistPage() {
             ))}
           </div>
 
-          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+          {totalPages > 1 && (
+            <div className="staff-waitlist-pagination">
+              <button
+                type="button"
+                className="staff-waitlist-page-btn"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                ← Previous
+              </button>
+              <span className="staff-waitlist-page-info">Page {page} / {totalPages}</span>
+              <button
+                type="button"
+                className="staff-waitlist-page-btn"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

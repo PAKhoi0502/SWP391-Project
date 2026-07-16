@@ -42,7 +42,7 @@ export default function AdminGarageFormPage() {
                     slotIntervalMinutes: data.slotIntervalMinutes || 30,
                 });
             } catch (err) {
-                setError(err.message || "Không thể tải garage");
+                setError(err.message || "Unable to load garage");
             } finally {
                 setLoading(false);
             }
@@ -63,11 +63,11 @@ export default function AdminGarageFormPage() {
     async function handleSubmit(e) {
         e.preventDefault();
 
-        if (!form.name.trim()) return alert("Vui lòng nhập tên garage");
-        if (!form.garageCode.trim() && !isEdit) return alert("Vui lòng nhập mã garage");
-        if (!form.address.trim()) return alert("Vui lòng nhập địa chỉ");
-        if (!form.city.trim()) return alert("Vui lòng nhập thành phố");
-        if (!form.phone.trim()) return alert("Vui lòng nhập số điện thoại");
+        if (!form.name.trim()) return alert("Please enter the garage name");
+        if (!form.garageCode.trim() && !isEdit) return alert("Please enter the garage code");
+        if (!form.address.trim()) return alert("Please enter the address");
+        if (!form.city.trim()) return alert("Please enter the city");
+        if (!form.phone.trim()) return alert("Please enter the phone number");
 
         try {
             setSaving(true);
@@ -92,63 +92,63 @@ export default function AdminGarageFormPage() {
 
             navigate("/admin/garages");
         } catch (err) {
-            setError(err.message || "Lưu garage thất bại");
+            setError(err.message || "Failed to save garage");
         } finally {
             setSaving(false);
         }
     }
 
     if (loading) {
-        return <div className="garage-page">Đang tải form...</div>;
+        return <div className="garage-page">Loading form...</div>;
     }
 
     return (
         <div className="garage-page">
             <Link to="/admin/garages" className="garage-back">
-                ← Quay lại quản lý garage
+                ← Back to garage management
             </Link>
 
             <div className="garage-form-card">
                 <p className="garage-eyebrow">Admin</p>
-                <h1>{isEdit ? "Cập nhật garage" : "Tạo garage mới"}</h1>
+                <h1>{isEdit ? "Update Garage" : "Create New Garage"}</h1>
 
                 {error && <div className="garage-error">{error}</div>}
 
                 <form className="garage-form" onSubmit={handleSubmit}>
                     <label>
-                        Tên garage
+                        Garage name
                         <input name="name" value={form.name} onChange={handleChange} />
                     </label>
 
                     <label>
-                        Mã garage
+                        Garage code
                         <input
                             name="garageCode"
                             value={form.garageCode}
                             onChange={handleChange}
                             disabled={isEdit}
-                            placeholder="VD: GARAGE_Q1"
+                            placeholder="e.g. GARAGE_Q1"
                         />
                     </label>
 
                     <label>
-                        Địa chỉ
+                        Address
                         <input name="address" value={form.address} onChange={handleChange} />
                     </label>
 
                     <label>
-                        Thành phố
+                        City
                         <input name="city" value={form.city} onChange={handleChange} />
                     </label>
 
                     <label>
-                        Số điện thoại
+                        Phone number
                         <input name="phone" value={form.phone} onChange={handleChange} />
                     </label>
 
                     <div className="garage-form-row">
                         <label>
-                            Giờ mở cửa
+                            Opening time
                             <input
                                 type="time"
                                 name="openingTime"
@@ -158,7 +158,7 @@ export default function AdminGarageFormPage() {
                         </label>
 
                         <label>
-                            Giờ đóng cửa
+                            Closing time
                             <input
                                 type="time"
                                 name="closingTime"
@@ -169,7 +169,7 @@ export default function AdminGarageFormPage() {
                     </div>
 
                     <label>
-                        Khoảng cách slot phút
+                        Slot interval (minutes)
                         <input
                             type="number"
                             name="slotIntervalMinutes"
@@ -180,7 +180,7 @@ export default function AdminGarageFormPage() {
                     </label>
 
                     <button className="garage-submit-btn" disabled={saving}>
-                        {saving ? "Đang lưu..." : isEdit ? "Cập nhật garage" : "Tạo garage"}
+                        {saving ? "Saving..." : isEdit ? "Update garage" : "Create garage"}
                     </button>
                 </form>
             </div>

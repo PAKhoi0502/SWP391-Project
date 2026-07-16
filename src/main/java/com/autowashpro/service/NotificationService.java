@@ -10,15 +10,21 @@ public interface NotificationService {
 
     void notifyBookingConfirmed(Long bookingId);
 
+    void notifyBookingCanceled(Long bookingId);
+
     void notifyPaymentConfirmed(Long bookingId);
 
     void notifyRewardEarned(Long bookingId);
+
+    void notifyPaymentAndReward(Long bookingId);
 
     void notifyWaitlistOffered(Long waitlistId);
 
     void notifyTierUpgraded(Long customerId, String oldTier, String newTier);
     
     void notifyVoucherReceived(Long customerId, String promotionCode, String promotionName);
+
+    void notifyPointsAdjusted(Long customerId, Integer points, String reason);
     
     // ===================== API =====================
     Page<NotificationResponse> getMyNotifications(Long userId, Boolean isRead, int page, int limit);

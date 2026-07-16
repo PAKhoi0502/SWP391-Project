@@ -46,5 +46,5 @@ public class WalkInBookingCreateRequest {
     private String vehicleModel;
 
     @NotBlank
-    private String depositPaymentMethod;// NONE | CASH | PAYOS
+    private String paymentMethod;
 }

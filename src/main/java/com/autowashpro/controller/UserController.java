@@ -1,5 +1,6 @@
 package com.autowashpro.controller;
 
+import com.autowashpro.common.ApiResponse;
 import com.autowashpro.common.AuditAction;
 import com.autowashpro.common.AuditActorContext;
 import com.autowashpro.common.AuditMetadata;
@@ -8,6 +9,7 @@ import com.autowashpro.dto.request.*;
 import com.autowashpro.dto.response.UserDetailResponse;
 import com.autowashpro.service.UserService;
 import com.autowashpro.service.AuditLogService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -43,6 +45,22 @@ public class UserController {
         return userService.updateCurrentUser(
                 userId,
                 request);
+    }
+
+    @PatchMapping("/me/password")
+    public ApiResponse<Void> changePassword(
+            Authentication authentication,
+            @Valid @RequestBody ChangePasswordRequest request) {
+
+        Long userId =
+                Long.valueOf(authentication.getName());
+
+        userService.changePassword(userId, request);
+
+        return ApiResponse.<Void>builder()
+                .success(true)
+                .message("Password changed successfully")
+                .build();
     }
 
     @GetMapping

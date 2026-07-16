@@ -1,48 +1,32 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { ROLES } from '../constants/roles'
 import { useAuth } from '../contexts/AuthContext'
-import NotificationDropdown from '../components/notification/NotificationDropdown'
 import './layout.css'
 
 const NAV_ITEMS = {
   [ROLES.CUSTOMER]: [
-    { to: '/', label: 'Trang chủ' },
-    { to: '/customer/service-packages', label: 'Gói dịch vụ' },
+    { to: '/', label: 'Home' },
     { to: '/booking', label: 'Booking' },
-    { to: '/customer/bookings', label: 'Lịch hẹn' },
-    { to: '/customer/waitlist', label: 'Waitlist' },
-    { to: '/customer/booking-history', label: 'Booking History' },
-    { to: '/customer/wash-histories', label: 'Lịch sử rửa xe' },
-    { to: '/customer/promotions', label: 'Ưu đãi' },
-    { to: '/customer/notifications', label: 'Thông báo' },
-    { to: '/customer/vehicles', label: 'Xe của tôi' },
-    { to: '/customer/profile', label: 'Hồ sơ' },
-  ],
-  [ROLES.STAFF]: [
-    { to: '/staff', label: 'Ca làm' },
-    { to: '/staff/bookings/walk-in', label: 'Thêm hồ sơ' },
-    { to: '/staff/bookings', label: 'Booking' },
-    { to: '/staff/waitlist', label: 'Waitlist' },
-    { to: '/staff/profile', label: 'Hồ sơ' },
+    { to: '/customer/vehicles', label: 'My Vehicles' },
   ],
   [ROLES.ADMIN]: [
-    { to: '/admin/profile', label: 'Hồ sơ' },
-    { to: '/admin', label: 'Tổng quan' },
-    { to: '/admin/users', label: 'Người dùng' },
-    { to: '/admin/staff-profiles', label: 'Nhân viên' },
-    { to: '/admin/vehicles', label: 'Xe' },
+    { to: '/admin/profile', label: 'Profile' },
+    { to: '/admin', label: 'Overview' },
+    { to: '/admin/users', label: 'Users' },
+    { to: '/admin/staff-profiles', label: 'Staff' },
+    { to: '/admin/vehicles', label: 'Vehicles' },
     { to: '/admin/garages', label: 'Garage' },
     { to: '/admin/wash-bays', label: 'Wash Bays' },
-    { to: '/admin/service-packages', label: 'Gói dịch vụ' },
+    { to: '/admin/service-packages', label: 'Service Packages' },
     { to: '/admin/bookings', label: 'Booking' },
-    { to: '/admin/wash-histories', label: 'Lịch sử rửa xe' },
+    { to: '/admin/wash-histories', label: 'Wash History' },
     { to: '/admin/waitlist', label: 'Waitlist' },
-    { to: '/admin/loyalty/tier-rules', label: 'Hạng thành viên' },
-    { to: '/admin/loyalty/adjust-points', label: 'Điều chỉnh điểm' },
-    { to: '/admin/promotions', label: 'Khuyến mãi' },
-    { to: '/admin/notifications/test-email', label: 'Kiểm tra email' },
-    { to: '/admin/research/export', label: 'Xuất dữ liệu nghiên cứu' },
-    { to: '/admin/audit-logs', label: 'Nhật ký hệ thống' },
+    { to: '/admin/loyalty/tier-rules', label: 'Membership Tiers' },
+    { to: '/admin/loyalty/adjust-points', label: 'Adjust Points' },
+    { to: '/admin/promotions', label: 'Promotions' },
+    { to: '/admin/notifications/test-email', label: 'Test Email' },
+    { to: '/admin/research/export', label: 'Export Research Data' },
+    { to: '/admin/audit-logs', label: 'System Logs' },
   ],
 }
 
@@ -58,16 +42,6 @@ function DashboardLayout({ role }) {
   }
 
   const getNavClassName = (item, isActive) => {
-    if (item.to === '/staff/bookings/walk-in') {
-      return location.pathname === item.to ? 'active' : undefined
-    }
-
-    if (item.to === '/staff/bookings') {
-      const isStaffBookingPage =
-        location.pathname === item.to || /^\/staff\/bookings\/\d+$/.test(location.pathname)
-      return isStaffBookingPage ? 'active' : undefined
-    }
-
     return isActive ? 'active' : undefined
   }
 
@@ -78,7 +52,6 @@ function DashboardLayout({ role }) {
           <Link className="app-brand" to="/">
             AutoWash Pro
           </Link>
-          <NotificationDropdown />
         </div>
 
         <nav className="dashboard-nav" aria-label={`${role} navigation`}>
@@ -105,12 +78,12 @@ function DashboardLayout({ role }) {
             )}
             <div>
             <strong>{role}</strong>
-            <span>{user?.fullName || user?.email || user?.phone || 'Người dùng'}</span>
+            <span>{user?.fullName || user?.email || user?.phone || 'User'}</span>
             </div>
           </div>
 
           <button className="text-button" type="button" onClick={handleLogout}>
-            Đăng xuất
+            Sign out
           </button>
         </header>
 

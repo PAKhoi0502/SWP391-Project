@@ -8,6 +8,7 @@ import AdminUsersPage from '../pages/AdminUsersPage'
 import AdminStaffProfilesPage from '../pages/AdminStaffProfilesPage'
 import ProtectedRoute from './ProtectedRoute'
 import DashboardPlaceholderPage from '../pages/DashboardPlaceholderPage'
+import StaffDashboardPage from '../pages/staff/StaffDashboardPage'
 import ForbiddenPage from '../pages/ForbiddenPage'
 import ForgotPasswordPage from '../pages/ForgotPasswordPage'
 import HomePage from '../pages/HomePage'
@@ -15,6 +16,7 @@ import LoginPage from '../pages/LoginPage'
 import NotFoundPage from '../pages/NotFoundPage'
 import ProfilePage from '../pages/ProfilePage'
 import RegisterPage from '../pages/RegisterPage'
+import AnimatedAuthShell from '../components/auth/AnimatedAuthShell'
 import ResetPasswordPage from '../pages/ResetPasswordPage'
 import StaffProfilePage from '../pages/StaffProfilePage'
 import UikitDemo from '../pages/UikitDemo'
@@ -37,6 +39,7 @@ import CustomerBookingListPage from '../pages/booking/CustomerBookingListPage'
 import BookingDetailPage from '../pages/booking/BookingDetailPage'
 import StaffBookingListPage from '../pages/booking/StaffBookingListPage'
 import StaffWalkInBookingPage from '../pages/booking/StaffWalkInBookingPage'
+import GuestBookingPage from '../pages/booking/GuestBookingPage'
 import AdminBookingListPage from '../pages/booking/AdminBookingListPage'
 import PaymentReturnPage from '../pages/booking/PaymentReturnPage'
 import CustomerWashHistoryListPage from '../pages/washHistory/CustomerWashHistoryListPage'
@@ -51,6 +54,8 @@ import CustomerNotificationListPage from '../pages/notification/CustomerNotifica
 import CustomerNotificationDetailPage from '../pages/notification/CustomerNotificationDetailPage'
 import AdminTestEmailPage from '../pages/admin/AdminTestEmailPage'
 import AdminDashboardPage from '../pages/admin/AdminDashboardPage'
+import ProfileLayout from '../layouts/ProfileLayout'
+import AboutUsPage from '../pages/AboutUsPage'
 import AdminResearchExportPage from '../pages/admin/AdminResearchExportPage'
 import AdminAuditLogPage from '../pages/admin/AdminAuditLogPage'
 
@@ -60,43 +65,55 @@ function AppRoutes() {
     <Routes>
       <Route element={<PublicLayout />}>
         <Route index element={<HomePage />} />
-        <Route path="login" element={<LoginPage />} />
+        <Route path="about" element={<AboutUsPage />} />
+        <Route path="login" element={<AnimatedAuthShell />} />
         <Route path="forgot-password" element={<ForgotPasswordPage />} />
         <Route path="reset-password" element={<ResetPasswordPage />} />
         <Route path="payment/success" element={<PaymentReturnPage />} />
         <Route path="payment/cancel" element={<PaymentReturnPage />} />
-        <Route path="register" element={<RegisterPage />} />
+        <Route path="register" element={<AnimatedAuthShell />} />
         <Route path="uikit" element={<UikitDemo />} />
         <Route path="forbidden" element={<ForbiddenPage />} />
+      </Route>
+
+      {/* Customer standalone pages — ProfileLayout (no sidebar dashboard chrome) */}
+      <Route element={<ProtectedRoute allowedRoles={[ROLES.CUSTOMER]} />}>
+        <Route element={<ProfileLayout />}>
+          <Route path="customer/profile" element={<ProfilePage />} />
+          <Route path="/customer/booking-history" element={<BookingHistoryPage />} />
+          <Route path="/booking" element={<CustomerCreateBookingPage />} />
+          <Route path="/customer/bookings/:id" element={<BookingDetailPage />} />
+          <Route path="/customer/notifications" element={<CustomerNotificationListPage />} />
+          <Route path="/customer/notifications/:id" element={<CustomerNotificationDetailPage />} />
+          <Route path="/customer/waitlist" element={<WaitlistPage />} />
+        </Route>
+      </Route>
+
+      {/* Service packages — public, no auth required; uses PublicPillNavbar via ProfileLayout */}
+      <Route element={<ProfileLayout />}>
+        <Route path="customer/service-packages" element={<ServicePackageListPage />} />
+        <Route path="customer/service-packages/:id" element={<ServicePackageDetailPage />} />
+        <Route path="guest-booking" element={<GuestBookingPage />} />
       </Route>
 
       <Route element={<ProtectedRoute allowedRoles={[ROLES.CUSTOMER]} />}>
         <Route element={<CustomerLayout />}>
           <Route path="customer" element={<Navigate to="/" replace />} />
           <Route path="customer/vehicles" element={<CustomerVehiclesPage />} />
-          <Route path="customer/profile" element={<ProfilePage />} />
           <Route path="customer/garages" element={<GarageListPage />} />
           <Route path="customer/garages/:id" element={<GarageDetailPage />} />
-          <Route path="customer/service-packages" element={<ServicePackageListPage />} />
-          <Route path="customer/service-packages/:id" element={<ServicePackageDetailPage />} />
-          <Route path="/booking" element={<CustomerCreateBookingPage />} />
           <Route path="/booking/available-slots" element={<AvailableSlotsPickerPage />} />
-          <Route path="/customer/waitlist" element={<WaitlistPage />} />
           <Route path="/customer/bookings" element={<CustomerBookingListPage />} />
-          <Route path="/customer/bookings/:id" element={<BookingDetailPage />} />
-          <Route path="/customer/booking-history" element={<BookingHistoryPage />} />
           <Route path="/customer/wash-histories" element={<CustomerWashHistoryListPage />} />
           <Route path="/customer/wash-histories/:id" element={<WashHistoryDetailPage />} />
           <Route path="/customer/promotions" element={<CustomerPromotionListPage />} />
           <Route path="/customer/promotions/:id" element={<CustomerPromotionDetailPage />} />
-          <Route path="/customer/notifications" element={<CustomerNotificationListPage />} />
-          <Route path="/customer/notifications/:id" element={<CustomerNotificationDetailPage />} />
         </Route>
       </Route>
 
       <Route element={<ProtectedRoute allowedRoles={[ROLES.STAFF]} />}>
         <Route element={<StaffLayout />}>
-          <Route path="staff" element={<DashboardPlaceholderPage title="Staff Dashboard" />} />
+          <Route path="staff" element={<StaffDashboardPage />} />
           <Route path="staff/bookings" element={<StaffBookingListPage />} />
           <Route path="staff/bookings/walk-in" element={<StaffWalkInBookingPage />} />
           <Route path="staff/bookings/:id" element={<BookingDetailPage />} />

@@ -1,10 +1,10 @@
-// Các vai trò người dùng trong hệ thống AutoWash Pro.
-// Dùng hằng số thay vì gõ chuỗi trực tiếp để tránh sai chính tả.
+// User roles in the AutoWash Pro system.
+// Uses constants instead of typing strings directly to avoid typos.
 export const ROLES = {
   CUSTOMER: 'CUSTOMER',
   STAFF: 'STAFF',
   ADMIN: 'ADMIN',
 }
 
-// Danh sách tất cả vai trò (tiện cho việc kiểm tra/validate).
+// List of all roles (useful for checking/validation).
 export const ALL_ROLES = Object.values(ROLES)

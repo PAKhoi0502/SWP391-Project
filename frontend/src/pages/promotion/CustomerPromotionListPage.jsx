@@ -29,8 +29,8 @@ const formatMoney = (value) =>
 const formatDiscount = (type, value) => {
   if (!type || value == null) return ''
   const t = String(type).toUpperCase()
-  if (t === 'PERCENTAGE' || t === 'PERCENT') return `Giảm ${value}%`
-  if (t === 'FIXED_AMOUNT' || t === 'FIXED') return `Giảm ${formatMoney(value)}`
+  if (t === 'PERCENTAGE' || t === 'PERCENT') return `${value}% off`
+  if (t === 'FIXED_AMOUNT' || t === 'FIXED') return `${formatMoney(value)} off`
   return String(value)
 }
 
@@ -84,7 +84,7 @@ export default function CustomerPromotionListPage() {
       }))
       setHistoryUsages(enriched)
     } catch {
-      setHistoryError('Không thể tải lịch sử sử dụng. Vui lòng thử lại.')
+      setHistoryError('Could not load usage history. Please try again.')
     } finally {
       setHistoryLoading(false)
     }
@@ -107,7 +107,7 @@ export default function CustomerPromotionListPage() {
         setBookings(myBookings)
         setCustomerTier(loyalty?.currentTier ?? null)
       })
-      .catch(() => { if (mounted) setError('Không thể tải danh sách ưu đãi. Vui lòng thử lại.') })
+      .catch(() => { if (mounted) setError('Could not load promotions. Please try again.') })
       .finally(() => { if (mounted) setLoading(false) })
     return () => { mounted = false }
   }, [])
@@ -162,24 +162,24 @@ export default function CustomerPromotionListPage() {
       <div className="promo-list-hero">
         <div className="promo-list-hero-text">
           <p className="promo-list-kicker">AutoWash Pro</p>
-          <h1>Ưu đãi của bạn</h1>
-          <span>Khuyến mãi đang hoạt động — áp dụng khi đặt lịch rửa xe.</span>
+          <h1>Your Promotions</h1>
+          <span>Active offers — apply them when booking a wash.</span>
         </div>
         <button className="promo-list-history-btn" onClick={openHistory}>
-          Lịch sử mã đã dùng
+          Usage History
         </button>
       </div>
 
       {error && <div className="promo-list-error">{error}</div>}
 
       {loading ? (
-        <div className="promo-list-loading">Đang tải ưu đãi...</div>
+        <div className="promo-list-loading">Loading promotions...</div>
       ) : visiblePromotions.length === 0 ? (
         <div className="promo-list-empty">
           <div className="promo-empty-icon">🎟</div>
-          <p>Hiện chưa có ưu đãi nào đang hoạt động.</p>
+          <p>No active promotions available right now.</p>
           <button className="promo-list-book-btn" onClick={() => navigate('/booking')}>
-            Đặt lịch ngay
+            Book Now
           </button>
         </div>
       ) : (
@@ -188,7 +188,7 @@ export default function CustomerPromotionListPage() {
             <div key={promo.id} className="promo-card">
               <div className="promo-card-top">
                 <span className="promo-code-badge">{promo.code}</span>
-                <span className="promo-active-dot">Đang hoạt động</span>
+                <span className="promo-active-dot">Active</span>
               </div>
 
               <h3 className="promo-card-name">{promo.name}</h3>
@@ -208,13 +208,13 @@ export default function CustomerPromotionListPage() {
                   className="promo-btn-detail"
                   onClick={() => navigate(`/customer/promotions/${promo.id}`)}
                 >
-                  Xem chi tiết
+                  View Details
                 </button>
                 <button
                   className="promo-btn-use"
                   onClick={() => navigate('/booking')}
                 >
-                  Dùng mã này
+                  Use This Code
                 </button>
               </div>
             </div>
@@ -224,7 +224,7 @@ export default function CustomerPromotionListPage() {
       <PromotionUsageHistoryModal
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
-        title="Lịch sử mã khuyến mãi đã dùng"
+        title="Promotion Usage History"
         usages={historyUsages}
         loading={historyLoading}
         error={historyError}

@@ -2,8 +2,8 @@ import "../ui.css";
 import Button from "../Button/Button";
 
 function ErrorState({
-  title = "Đã xảy ra lỗi",
-  description = "Không thể tải dữ liệu. Vui lòng thử lại.",
+  title = "An error occurred",
+  description = "Unable to load data. Please try again.",
   onRetry,
 }) {
   return (
@@ -14,7 +14,7 @@ function ErrorState({
 
       {onRetry && (
         <div style={{ marginTop: 18 }}>
-          <Button onClick={onRetry}>Thử lại</Button>
+          <Button onClick={onRetry}>Retry</Button>
         </div>
       )}
     </div>

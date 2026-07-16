@@ -2,22 +2,22 @@ import { useEffect, useState } from 'react'
 import './StartServiceModal.css'
 
 const TEXT = {
-  notUpdated: 'Ch\u01b0a c\u1eadp nh\u1eadt',
-  title: 'X\u00e1c nh\u1eadn b\u1eaft \u0111\u1ea7u d\u1ecbch v\u1ee5',
-  subtitle: 'Backend s\u1ebd t\u1ef1 g\u00e1n wash bay v\u00e0 nh\u00e2n vi\u00ean ph\u00f9 h\u1ee3p.',
-  customer: 'Kh\u00e1ch h\u00e0ng',
-  vehicle: 'Xe',
+  notUpdated: '\u2014',
+  title: 'Start service',
+  subtitle: 'The system will auto-assign a wash bay and available staff.',
+  customer: 'Customer',
+  vehicle: 'Vehicle',
   garage: 'Garage',
-  servicePackage: 'G\u00f3i d\u1ecbch v\u1ee5',
-  appointmentTime: 'Gi\u1edd h\u1eb9n',
-  note: 'Ghi ch\u00fa',
-  optional: '(t\u00f9y ch\u1ecdn)',
-  notePlaceholder: 'Ghi ch\u00fa b\u1eaft \u0111\u1ea7u d\u1ecbch v\u1ee5...',
-  cancel: 'H\u1ee7y',
-  starting: '\u0110ang b\u1eaft \u0111\u1ea7u...',
-  confirm: 'X\u00e1c nh\u1eadn b\u1eaft \u0111\u1ea7u',
-  car: '#\u00d4 t\u00f4',
-  motorbike: '#Xe m\u00e1y',
+  servicePackage: 'Package',
+  appointmentTime: 'Appointment',
+  note: 'Note',
+  optional: '(optional)',
+  notePlaceholder: 'Start service note...',
+  cancel: 'Cancel',
+  starting: 'Starting...',
+  confirm: 'Start service',
+  car: '#Car',
+  motorbike: '#Motorbike',
   icon: '\u25b6',
 }
 
@@ -42,7 +42,7 @@ export default function StartServiceModal({ open, onClose, onConfirm, booking, b
 
   const formatDateTime = (value) => {
     if (!value) return TEXT.notUpdated
-    return new Date(value).toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' })
+    return new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
   }
 
   const vehicleTypeLabel = booking?.vehicleType

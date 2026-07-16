@@ -3,7 +3,7 @@ import "../ui.css";
 function SearchBox({
   value,
   onChange,
-  placeholder = "Tìm kiếm...",
+  placeholder = "Search...",
   className = "",
 }) {
   return (

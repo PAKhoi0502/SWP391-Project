@@ -1,5 +1,6 @@
 package com.autowashpro.service;
 
+import com.autowashpro.dto.request.ChangePasswordRequest;
 import com.autowashpro.dto.request.UpdateProfileRequest;
 import com.autowashpro.dto.request.UpdateUserRoleRequest;
 import com.autowashpro.dto.request.UpdateUserStatusRequest;
@@ -14,6 +15,10 @@ public interface UserService {
     UserDetailResponse updateCurrentUser(
             Long userId,
             UpdateProfileRequest request);
+
+    void changePassword(
+            Long userId,
+            ChangePasswordRequest request);
 
     List<UserDetailResponse> getAllUsers();
 

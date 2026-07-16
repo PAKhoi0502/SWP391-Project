@@ -28,7 +28,7 @@ const parseDate = (value) => {
 const formatDate = (value) => {
   const date = parseDate(value)
   if (!date) return 'Ch\u01b0a c\u1eadp nh\u1eadt'
-  return date.toLocaleDateString('vi-VN', {
+  return date.toLocaleDateString('en-US', {
     weekday: 'long',
     day: '2-digit',
     month: '2-digit',
@@ -41,10 +41,10 @@ const formatTimeRange = (startValue, endValue) => {
   const end = parseDate(endValue)
 
   if (!start) return 'Ch\u01b0a c\u1eadp nh\u1eadt'
-  const startText = start.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+  const startText = start.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
   if (!end) return startText
 
-  const endText = end.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+  const endText = end.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
   return `${startText} - ${endText}`
 }
 
