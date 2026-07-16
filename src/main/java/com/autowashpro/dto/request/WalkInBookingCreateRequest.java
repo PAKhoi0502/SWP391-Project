@@ -37,8 +37,6 @@ public class WalkInBookingCreateRequest {
 
     private String note;
 
-    private String paymentMethod;
-
     private Integer seatCount;
 
     private String motorbikeGroup;
@@ -46,4 +44,7 @@ public class WalkInBookingCreateRequest {
     private String vehicleBrand;
 
     private String vehicleModel;
+
+    @NotBlank
+    private String depositPaymentMethod;// NONE | CASH | PAYOS
 }

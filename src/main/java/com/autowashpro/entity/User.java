@@ -39,6 +39,15 @@ public class User {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Column(name = "bank_name", length = 100)
+    private String bankName;
+
+    @Column(name = "bank_account_name", length = 100)
+    private String bankAccountName;
+
+    @Column(name = "bank_account_number", length = 50)
+    private String bankAccountNumber;
+
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }
