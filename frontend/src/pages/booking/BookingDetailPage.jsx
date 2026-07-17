@@ -16,6 +16,7 @@ import CheckInBookingModal from '../../components/Booking/CheckInBookingModal'
 import CompleteServiceModal from '../../components/Booking/CompleteServiceModal'
 import NoShowBookingModal from '../../components/Booking/NoShowBookingModal'
 import PayOSQrModal from '../../components/Booking/PayOSQrModal'
+import DepositQrModal from '../../components/Booking/DepositQrModal'
 import PaymentCollectionModal from '../../components/Booking/PaymentCollectionModal'
 import ServiceStepsProgress from '../../components/Booking/ServiceStepsProgress'
 import StartServiceModal from '../../components/Booking/StartServiceModal'
@@ -268,6 +269,19 @@ const getPaymentStatusText = (status) => {
   if (value === 'CANCELED' || value === 'CANCELLED') return 'Canceled'
 
   return status || 'Unpaid'
+}
+
+const getDepositStatusText = (status) => {
+  const value = String(status || '').toUpperCase()
+
+  if (value === 'NOT_REQUIRED') return 'Not required'
+  if (value === 'PENDING' || value === 'UNPAID') return 'Pending'
+  if (value === 'PAID') return 'Paid'
+  if (value === 'FAILED') return 'Failed'
+  if (value === 'CANCELED' || value === 'CANCELLED') return 'Canceled'
+  if (value === 'EXPIRED') return 'Expired'
+
+  return status || 'Not required'
 }
 
 const getActionErrorMessage = (err) => {
@@ -624,6 +638,14 @@ function BookingDetailPage() {
   const [payosCancelLoading, setPayosCancelLoading] = useState(false)
   const [payosSuccess, setPayosSuccess] = useState(false)
   const [payosQrError, setPayosQrError] = useState('')
+  const [depositLoading, setDepositLoading] = useState(false)
+  const [depositQrOpen, setDepositQrOpen] = useState(false)
+  const [depositTransaction, setDepositTransaction] = useState(null)
+  const [depositCheckoutUrl, setDepositCheckoutUrl] = useState('')
+  const [depositRefreshLoading, setDepositRefreshLoading] = useState(false)
+  const [depositCancelLoading, setDepositCancelLoading] = useState(false)
+  const [depositSuccess, setDepositSuccess] = useState(false)
+  const [depositQrError, setDepositQrError] = useState('')
   const [assignedResources, setAssignedResources] = useState(null)
   const [serviceSteps, setServiceSteps] = useState([])
   const [stepActionLoadingId, setStepActionLoadingId] = useState(null)
@@ -642,7 +664,6 @@ function BookingDetailPage() {
     currentStatus === 'CANCELED' ||
     currentStatus === 'CANCELLED' ||
     currentStatus === 'NO_SHOW'
-  const canCustomerCancel = role === 'customer' && (currentStatus === 'CONFIRMED' || currentStatus === 'PENDING_DEPOSIT')
   const canEditBooking = role !== 'customer' && !isClosedBooking
   const workflowStatus = ['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'].includes(currentStatus)
     ? currentStatus
@@ -657,6 +678,9 @@ function BookingDetailPage() {
   const paymentMethodText = isBankTransfer ? TEXT.bankTransfer : isCashPayment ? TEXT.cash : TEXT.notUpdated
   const isPaid = String(booking?.paymentStatus || '').toUpperCase() === 'PAID'
   const canCreatePayOS = role !== 'customer' && currentStatus === 'COMPLETED' && !isPaid && isBankTransfer
+  const depositStatus = String(booking?.depositStatus || 'NOT_REQUIRED').toUpperCase()
+  const canPayDeposit = role === 'customer' && Number(booking?.depositAmount) > 0 && depositStatus !== 'PAID' && depositStatus !== 'NOT_REQUIRED'
+  const canCustomerCancel = role === 'customer' && (currentStatus === 'CONFIRMED' || currentStatus === 'PENDING_DEPOSIT') && !canPayDeposit
   const canMarkNoShow = canEditBooking && currentStatus === 'CONFIRMED'
   const canCheckIn = canEditBooking && currentStatus === 'CONFIRMED'
   const canStartService = canEditBooking && currentStatus === 'CHECKED_IN'
@@ -977,6 +1001,40 @@ function BookingDetailPage() {
     const timer = setInterval(poll, 4000)
     return () => clearInterval(timer)
   }, [payosQrOpen, payosSuccess, payosTransaction?.id])
+
+  useEffect(() => {
+    if (!depositQrOpen || depositSuccess) return undefined
+
+    const txId = depositTransaction?.id
+
+    const poll = async () => {
+      try {
+        if (txId) {
+          const tx = await bookingApi.getPaymentTransaction(txId)
+          if (String(tx?.status || '').toUpperCase() === 'PAID') {
+            setDepositTransaction((prev) => ({ ...prev, ...tx }))
+            setDepositSuccess(true)
+            loadDetail()
+            refreshBookingCount()
+          }
+        } else {
+          const txs = await bookingApi.getDepositTransactions(id)
+          const paidTx = txs.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
+          if (paidTx) {
+            setDepositTransaction((prev) => ({ ...prev, ...paidTx }))
+            setDepositSuccess(true)
+            loadDetail()
+            refreshBookingCount()
+          }
+        }
+      } catch {
+        // silently ignore
+      }
+    }
+
+    const timer = setInterval(poll, 4000)
+    return () => clearInterval(timer)
+  }, [depositQrOpen, depositSuccess, depositTransaction?.id])
 
   const runAction = async (label, action) => {
     try {
@@ -1364,6 +1422,103 @@ function BookingDetailPage() {
     setPayosQrError('')
   }
 
+  const handlePayDeposit = async () => {
+    setDepositLoading(true)
+    setDepositQrError('')
+    setDepositSuccess(false)
+    try {
+      const result = await bookingApi.createDepositPayment(id)
+      persistPayOSReturnPath(location.pathname, result)
+
+      let txData = {
+        orderCode: result.orderCode,
+        qrCode: result.qrCode,
+        checkoutUrl: result.checkoutUrl,
+        amount: booking?.depositAmount,
+        status: 'PENDING',
+      }
+
+      try {
+        const transactions = await bookingApi.getDepositTransactions(id)
+        const matchingTx =
+          transactions.find((tx) => String(tx.orderCode) === String(result.orderCode)) ||
+          transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PENDING')
+        if (matchingTx) {
+          txData = { ...matchingTx, qrCode: matchingTx.qrCode || result.qrCode }
+        }
+      } catch {
+        // silently ignore — use data from createDepositPayment response
+      }
+
+      setDepositTransaction(txData)
+      setDepositCheckoutUrl(result.checkoutUrl || '')
+      setDepositQrOpen(true)
+    } catch (err) {
+      setDepositQrError(err?.response?.data?.message || err?.message || 'Failed to create deposit payment.')
+      setDepositQrOpen(true)
+    } finally {
+      setDepositLoading(false)
+    }
+  }
+
+  const handleDepositRefresh = async () => {
+    setDepositRefreshLoading(true)
+    setDepositQrError('')
+    try {
+      if (depositTransaction?.id) {
+        const tx = await bookingApi.getPaymentTransaction(depositTransaction.id)
+        setDepositTransaction((prev) => ({ ...prev, ...tx }))
+        if (String(tx?.status || '').toUpperCase() === 'PAID') {
+          setDepositSuccess(true)
+          await loadDetail()
+          refreshBookingCount()
+        }
+      } else {
+        const transactions = await bookingApi.getDepositTransactions(id)
+        const paidTx = transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
+        if (paidTx) {
+          setDepositTransaction((prev) => ({ ...prev, ...paidTx }))
+          setDepositSuccess(true)
+          await loadDetail()
+          refreshBookingCount()
+        } else {
+          const pendingTx = transactions.find(
+            (tx) => String(tx.orderCode) === String(depositTransaction?.orderCode),
+          )
+          if (pendingTx) setDepositTransaction((prev) => ({ ...prev, ...pendingTx }))
+        }
+      }
+    } catch {
+      setDepositQrError('Refresh failed. Please try again.')
+    } finally {
+      setDepositRefreshLoading(false)
+    }
+  }
+
+  const handleDepositCancelTransaction = async () => {
+    setDepositCancelLoading(true)
+    setDepositQrError('')
+    try {
+      if (depositTransaction?.id) {
+        await bookingApi.cancelPaymentTransaction(depositTransaction.id)
+      }
+      setDepositQrOpen(false)
+      setDepositTransaction(null)
+      setDepositCheckoutUrl('')
+    } catch (err) {
+      setDepositQrError(err?.response?.data?.message || err?.message || 'Failed to cancel transaction.')
+    } finally {
+      setDepositCancelLoading(false)
+    }
+  }
+
+  const handleDepositQrClose = () => {
+    if (depositRefreshLoading || depositCancelLoading) return
+    setDepositQrOpen(false)
+    setDepositSuccess(false)
+    setDepositQrError('')
+  }
+
   const handleCompleteServiceStep = async (stepId, note) => {
     setStepActionLoadingId(stepId)
     setStepActionError('')
@@ -1709,6 +1864,17 @@ function BookingDetailPage() {
               <span className="bd-info-label">{TEXT.paidAt}</span>
               <span className="bd-info-value"><strong>{formatDateTime(booking.paidAt)}</strong></span>
             </div>
+            {Number(booking.depositAmount) > 0 && (
+              <div className="bd-info-cell">
+                <span className="bd-info-label">Deposit</span>
+                <span className="bd-info-value">
+                  <strong>{formatMoney(booking.depositAmount)}</strong>
+                  <span className={`bd-badge bd-badge--${depositStatus.toLowerCase()}`} style={{ marginLeft: 8 }}>
+                    {getDepositStatusText(depositStatus)}
+                  </span>
+                </span>
+              </div>
+            )}
             {booking.rewardProcessed !== undefined && booking.rewardProcessed !== null && isPaid && (
               <div className="bd-info-cell bd-info-cell--full">
                 <span className="bd-info-label">Loyalty points</span>
@@ -1742,6 +1908,11 @@ function BookingDetailPage() {
               {canCreatePayOS && (
                 <button type="button" className="bd-btn--payos" onClick={handleCreatePayOS}>
                   {TEXT.createQr}
+                </button>
+              )}
+              {canPayDeposit && (
+                <button type="button" className="bd-btn--payos" onClick={handlePayDeposit} disabled={depositLoading}>
+                  {depositLoading ? 'Creating...' : 'Pay deposit'}
                 </button>
               )}
             </div>
@@ -2020,6 +2191,20 @@ function BookingDetailPage() {
         refreshLoading={payosRefreshLoading}
         cancelLoading={payosCancelLoading}
         paymentSuccess={payosSuccess}
+      />
+
+      <DepositQrModal
+        open={depositQrOpen}
+        onClose={handleDepositQrClose}
+        booking={booking}
+        transaction={depositTransaction}
+        checkoutUrl={depositCheckoutUrl}
+        error={depositQrError}
+        onRefresh={handleDepositRefresh}
+        onCancelTransaction={handleDepositCancelTransaction}
+        refreshLoading={depositRefreshLoading}
+        cancelLoading={depositCancelLoading}
+        paymentSuccess={depositSuccess}
       />
     </div>
   )

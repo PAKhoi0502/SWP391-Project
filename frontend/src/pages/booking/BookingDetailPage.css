@@ -184,6 +184,9 @@
 .bd-badge--paid      { background: #f0fdf4; border: 1px solid #bbf7d0; color: #14532d; }
 .bd-badge--unpaid    { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
 .bd-badge--pending   { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; }
+.bd-badge--not_required { background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; }
+.bd-badge--failed    { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+.bd-badge--expired   { background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; }
 
 /* ── Info grid ── */
 .bd-info {

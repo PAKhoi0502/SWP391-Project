@@ -92,6 +92,12 @@ public class Booking {
     @Column(name = "deposit_status")
     private String depositStatus = "UNPAID";
 
+    @Column(name = "deposit_paid_at")
+    private LocalDateTime depositPaidAt;
+
+    @Column(name = "deposit_transaction_id")
+    private Long depositTransactionId;
+
     @Column(name = "payment_expired_at")
     private LocalDateTime paymentExpiredAt;
 

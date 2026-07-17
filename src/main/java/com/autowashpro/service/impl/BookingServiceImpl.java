@@ -1978,6 +1978,8 @@ return toResponse(saved);
                                 .finalPrice(b.getFinalPrice())
                                 .depositAmount(b.getDepositAmount())
                                 .depositStatus(b.getDepositStatus())
+                                .depositPaidAt(b.getDepositPaidAt())
+                                .depositTransactionId(b.getDepositTransactionId())
                                 .isWalkIn(b.getIsWalkIn())
                                 .usedPoints(b.getUsedPoints())
                                 .note(b.getNote())

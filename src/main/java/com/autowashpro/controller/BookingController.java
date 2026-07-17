@@ -31,6 +31,9 @@ import com.autowashpro.dto.request.UpdatePaymentMethodRequest;
 import com.autowashpro.dto.request.NoShowBookingRequest;
 import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
 import com.autowashpro.dto.response.BookingServiceStepResponse;
+import com.autowashpro.dto.response.CreatePayOSPaymentResponse;
+import com.autowashpro.dto.response.PaymentTransactionResponse;
+import com.autowashpro.service.PaymentService;
 import org.springframework.security.core.Authentication;
 
 @RestController
@@ -40,6 +43,7 @@ public class BookingController {
 
         private final BookingService bookingService;
         private final AuditLogService auditLogService;
+        private final PaymentService paymentService;
 
         @GetMapping("/available-slots")
         public ApiResponse<AvailableSlotResponse> getAvailableSlots(
@@ -469,6 +473,42 @@ public class BookingController {
                                 .success(true)
                                 .message("Payment method updated successfully")
                                 .data(response)
+                                .build();
+        }
+
+        @PostMapping("/{id}/deposit/payment")
+        @PreAuthorize("hasRole('CUSTOMER')")
+        public ApiResponse<CreatePayOSPaymentResponse> createDepositPayment(
+                        @PathVariable Long id,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long customerId = Long.valueOf(userDetails.getUsername());
+                CreatePayOSPaymentResponse response = paymentService.createDepositPayment(id, customerId);
+                auditLogService.createAuditLog(
+                                customerId,
+                                AuditAction.PAYMENT_LINK_CREATED,
+                                AuditTargetType.PAYMENT_TRANSACTION,
+                                response.getTransactionId(),
+                                AuditMetadata.of("bookingId", id, "purpose", "DEPOSIT", "status", response.getStatus()));
+                return ApiResponse.<CreatePayOSPaymentResponse>builder()
+                                .success(true)
+                                .message("Deposit payment link created successfully")
+                                .data(response)
+                                .build();
+        }
+
+        @GetMapping("/{id}/payment-transactions")
+        @PreAuthorize("hasRole('CUSTOMER')")
+        public ApiResponse<List<PaymentTransactionResponse>> getOwnPaymentTransactions(
+                        @PathVariable Long id,
+                        @RequestParam(required = false) String purpose,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long customerId = Long.valueOf(userDetails.getUsername());
+                return ApiResponse.<List<PaymentTransactionResponse>>builder()
+                                .success(true)
+                                .message("Payment transactions retrieved")
+                                .data(paymentService.getTransactionsByBookingForCustomer(id, customerId, purpose))
                                 .build();
         }
 }

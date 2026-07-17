@@ -13,4 +13,9 @@ public interface PaymentService {
     PaymentTransactionResponse getTransactionById(Long id);
     List<PaymentTransactionResponse> getTransactionsByBooking(Long bookingId);
     PaymentTransactionResponse cancelTransaction(Long id, Long staffUserId);
+
+    CreatePayOSPaymentResponse createDepositPayment(Long bookingId, Long customerId);
+    List<PaymentTransactionResponse> getTransactionsByBookingForCustomer(Long bookingId, Long customerId, String purpose);
+    PaymentTransactionResponse getTransactionByIdForCustomer(Long id, Long customerId);
+    PaymentTransactionResponse cancelTransactionForCustomer(Long id, Long customerId);
 }

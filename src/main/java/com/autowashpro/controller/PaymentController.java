@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import vn.payos.type.Webhook;
 
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -60,12 +61,22 @@ public ApiResponse<Void> handleWebhook(@RequestBody Map<String, Object> webhookD
 }
 
     @GetMapping("/transactions/{id}")
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
-    public ApiResponse<PaymentTransactionResponse> getTransactionById(@PathVariable Long id) {
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('STAFF') or hasRole('ADMIN')")
+    public ApiResponse<PaymentTransactionResponse> getTransactionById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails,
+            Authentication authentication) {
+
+        String role = authentication.getAuthorities().stream()
+                .findFirst().orElseThrow().getAuthority().replace("ROLE_", "");
+        PaymentTransactionResponse data = "CUSTOMER".equalsIgnoreCase(role)
+                ? paymentService.getTransactionByIdForCustomer(id, Long.valueOf(userDetails.getUsername()))
+                : paymentService.getTransactionById(id);
+
         return ApiResponse.<PaymentTransactionResponse>builder()
                 .success(true)
                 .message("Transaction retrieved")
-                .data(paymentService.getTransactionById(id))
+                .data(data)
                 .build();
     }
 
@@ -81,15 +92,20 @@ public ApiResponse<Void> handleWebhook(@RequestBody Map<String, Object> webhookD
     }
 
     @PatchMapping("/transactions/{id}/cancel")
-    @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('STAFF') or hasRole('ADMIN')")
     public ApiResponse<PaymentTransactionResponse> cancelTransaction(
             @PathVariable Long id,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            @AuthenticationPrincipal UserDetails userDetails,
+            Authentication authentication) {
 
-        Long staffUserId = Long.valueOf(userDetails.getUsername());
-        PaymentTransactionResponse response = paymentService.cancelTransaction(id, staffUserId);
+        Long callerId = Long.valueOf(userDetails.getUsername());
+        String role = authentication.getAuthorities().stream()
+                .findFirst().orElseThrow().getAuthority().replace("ROLE_", "");
+        PaymentTransactionResponse response = "CUSTOMER".equalsIgnoreCase(role)
+                ? paymentService.cancelTransactionForCustomer(id, callerId)
+                : paymentService.cancelTransaction(id, callerId);
         auditLogService.createAuditLog(
-                staffUserId,
+                callerId,
                 AuditAction.PAYMENT_TRANSACTION_CANCELLED,
                 AuditTargetType.PAYMENT_TRANSACTION,
                 id,
