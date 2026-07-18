@@ -50,6 +50,7 @@ const NAV_ITEMS = [
   { to: '/admin/notifications/test-email', label: 'Test Email',       icon: 'mail' },
   { to: '/admin/research/export',          label: 'Research Export',  icon: 'download' },
   { to: '/admin/audit-logs',               label: 'Audit Logs',       icon: 'shield' },
+  { to: '/admin/deposit-refunds',          label: 'Deposit Refunds',  icon: 'dollar' },
 ]
 
 export default function AdminLayout() {

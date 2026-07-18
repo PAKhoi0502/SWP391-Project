@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { QRCodeSVG } from 'qrcode.react'
 import { bookingApi } from '../../api/bookingApi'
 import { getGarages } from '../../api/GarageApi'
 import {
@@ -97,10 +98,6 @@ function formatMoney(value) {
   }).format(Number(value || 0))
 }
 
-function getPaymentMethodLabel(paymentMethod) {
-  return paymentMethod === 'PAYOS' ? 'PayOS transfer' : 'Cash'
-}
-
 const INIT_FORM = {
   guestName: '',
   guestPhone: '',
@@ -114,7 +111,6 @@ const INIT_FORM = {
   servicePackageId: '',
   date: tomorrowIso(),
   startTime: '',
-  paymentMethod: 'CASH',
   note: '',
 }
 
@@ -362,7 +358,7 @@ export default function GuestBookingPage() {
         servicePackageId: Number(form.servicePackageId),
         addOnServicePackageIds: selectedAddOnIds.map(Number),
         startTime: form.startTime,
-        paymentMethod: form.paymentMethod,
+        paymentMethod: 'PAYOS',
         ...(form.vehicleBrand.trim() ? { vehicleBrand: form.vehicleBrand.trim() } : {}),
         ...(form.vehicleModel.trim() ? { vehicleModel: form.vehicleModel.trim() } : {}),
         ...(form.note.trim() ? { note: form.note.trim() } : {}),
@@ -404,8 +400,17 @@ export default function GuestBookingPage() {
         <button type="button" className="gbk-modal-close" aria-label="Close" onClick={resetForm}>×</button>
 
         <p className="swi-kicker">Guest booking</p>
-        <h2 className="gbk-modal-title">Booking confirmed!</h2>
-        <p className="gbk-modal-subtitle">We'll see you soon. Please pay at the garage after service is complete.</p>
+        <h2 className="gbk-modal-title">Pay your deposit to confirm</h2>
+        <p className="gbk-modal-subtitle">
+          Scan the QR code below with your banking app within 15 minutes. Your booking will be
+          automatically canceled if the deposit isn't received in time.
+        </p>
+
+        {confirmedBooking.depositQrCode && (
+          <div style={{ display: 'flex', justifyContent: 'center', margin: '16px 0' }}>
+            <QRCodeSVG value={confirmedBooking.depositQrCode} size={200} level="M" />
+          </div>
+        )}
 
         <div className="gbk-modal-rows">
           <div className="swi-summary-row">
@@ -434,18 +439,29 @@ export default function GuestBookingPage() {
               {formatDate(confirmedBooking.startTime)} · {formatTime(confirmedBooking.startTime)} - {formatTime(confirmedBooking.endTime)}
             </strong>
           </div>
-          <div className="swi-summary-row">
-            <span>Payment</span>
-            <strong>{getPaymentMethodLabel(confirmedBooking.paymentMethod)}</strong>
-          </div>
           <div className="swi-summary-divider" />
           <div className="swi-summary-row swi-summary-total">
+            <span>Deposit (30%)</span>
+            <strong className="swi-summary-price">{formatMoney(confirmedBooking.depositAmount)}</strong>
+          </div>
+          <div className="swi-summary-row">
             <span>Total</span>
-            <strong className="swi-summary-price">{formatMoney(confirmedBooking.finalPrice)}</strong>
+            <strong>{formatMoney(confirmedBooking.finalPrice)}</strong>
           </div>
         </div>
-        <button type="button" className="swi-submit-btn" style={{ marginTop: 20 }} onClick={resetForm}>
-          Book another appointment
+        {confirmedBooking.depositCheckoutUrl && (
+          <a
+            href={confirmedBooking.depositCheckoutUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="swi-submit-btn"
+            style={{ marginTop: 12, display: 'block', textAlign: 'center', textDecoration: 'none' }}
+          >
+            Open PayOS page
+          </a>
+        )}
+        <button type="button" className="swi-submit-btn" style={{ marginTop: 10 }} onClick={resetForm}>
+          Close
         </button>
       </div>
     </div>
@@ -732,25 +748,10 @@ export default function GuestBookingPage() {
 
           <section className="swi-section">
             <h2 className="swi-section-title">Payment</h2>
-            <div className="swi-payment-options">
-              <button
-                type="button"
-                className={`swi-payment-option${form.paymentMethod === 'CASH' ? ' swi-payment-option--active' : ''}`}
-                onClick={() => setForm((prev) => ({ ...prev, paymentMethod: 'CASH' }))}
-              >
-                <span>Cash</span>
-                <small>Pay in cash after service is complete.</small>
-              </button>
-
-              <button
-                type="button"
-                className={`swi-payment-option${form.paymentMethod === 'PAYOS' ? ' swi-payment-option--active' : ''}`}
-                onClick={() => setForm((prev) => ({ ...prev, paymentMethod: 'PAYOS' }))}
-              >
-                <span>PayOS</span>
-                <small>Pay via PayOS QR code after service is complete.</small>
-              </button>
-            </div>
+            <p className="swi-help">
+              A 30% deposit is required to confirm your booking. After submitting, you'll get a
+              PayOS QR code to pay the deposit within 15 minutes.
+            </p>
           </section>
 
           <section className="swi-section">
@@ -818,17 +819,16 @@ export default function GuestBookingPage() {
                 : <em>Not selected</em>}
             </strong>
           </div>
-          <div className="swi-summary-row">
-            <span>Payment</span>
-            <strong>{getPaymentMethodLabel(form.paymentMethod)}</strong>
-          </div>
-
           {selectedPackage && (
             <>
               <div className="swi-summary-divider" />
               <div className="swi-summary-row swi-summary-total">
                 <span>Total</span>
                 <strong className="swi-summary-price">{formatMoney(totalPrice)}</strong>
+              </div>
+              <div className="swi-summary-row">
+                <span>Deposit (30%)</span>
+                <strong>{formatMoney(totalPrice * 0.3)}</strong>
               </div>
               {totalDuration > 0 && (
                 <div className="swi-summary-row">

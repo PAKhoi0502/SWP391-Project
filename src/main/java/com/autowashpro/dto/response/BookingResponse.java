@@ -29,6 +29,9 @@ public class BookingResponse {
     private String depositStatus;
     private LocalDateTime depositPaidAt;
     private Long depositTransactionId;
+    private String depositCheckoutUrl;
+    private String depositQrCode;
+    private BigDecimal refundAmount;
     private Boolean isWalkIn;
     private Integer usedPoints;
     private String note;

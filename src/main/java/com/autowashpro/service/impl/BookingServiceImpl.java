@@ -18,7 +18,6 @@ import com.autowashpro.dto.response.WalkInCustomerLookupResponse;
 import com.autowashpro.entity.*;
 import com.autowashpro.entity.enums.WashBayStatus;
 import com.autowashpro.repository.*;
-import com.autowashpro.entity.PromotionUsage;
 import com.autowashpro.service.BookingService;
 import com.autowashpro.service.LoyaltyService;
 import com.autowashpro.service.PromotionService;
@@ -50,11 +49,29 @@ import java.util.HashMap;
 public class BookingServiceImpl implements BookingService {
 
         private static final String ASSIGNED_STAFF_STATUS = "ASSIGNED";
+        // ===================== ISSUE #54 =====================
+
+        private static final BigDecimal DEPOSIT_PERCENT = BigDecimal.valueOf(0.30);
+
+        private static final BigDecimal REFUND_PERCENT_100 = BigDecimal.ONE;
+        private static final BigDecimal REFUND_PERCENT_80 = BigDecimal.valueOf(0.80);
+        private static final BigDecimal REFUND_PERCENT_50 = BigDecimal.valueOf(0.50);
+        private static final BigDecimal REFUND_PERCENT_0 = BigDecimal.ZERO;
+
+        private static final long PAYMENT_TIMEOUT_MINUTES = 15L;
+        private static final long GRACE_PERIOD_MINUTES = 30L;
+
+        private static final long GRACE_MIN_HOURS_BEFORE_SERVICE = 2L;
+
+        private static final long REFUND_RULE_24_HOURS = 24L;
+        private static final long REFUND_RULE_12_HOURS = 12L;
+        private static final long REFUND_RULE_6_HOURS = 6L;
 
         private final GarageRepository garageRepository;
         private final ServicePackageRepository servicePackageRepository;
         private final WashBayRepository washBayRepository;
         private final BookingRepository bookingRepository;
+        private final PaymentTransactionRepository paymentTransactionRepository;
         private final VehicleRepository vehicleRepository;
         private final CustomerLoyaltyRepository customerLoyaltyRepository;
         private final LoyaltyTierRuleRepository loyaltyTierRuleRepository;
@@ -224,7 +241,8 @@ public class BookingServiceImpl implements BookingService {
 
                         if (!isVehicleTypeCompatible(vehicle, addOn)) {
                                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                                "Vehicle is not compatible with selected add-on service package: " + addOnId);
+                                                "Vehicle is not compatible with selected add-on service package: "
+                                                                + addOnId);
                         }
 
                         addOns.add(addOn);
@@ -306,7 +324,8 @@ public class BookingServiceImpl implements BookingService {
                         long totalStaff = staffProfileRepository
                                         .countByGarageIdAndStaffTypeAndIsActiveTrue(garageId, entry.getKey());
                         long assignedStaff = bookingAssignedStaffRepository
-                                        .countAssignedStaffByGarageAndTypeAndTime(garageId, entry.getKey(), startTime, endTime);
+                                        .countAssignedStaffByGarageAndTypeAndTime(garageId, entry.getKey(), startTime,
+                                                        endTime);
 
                         if ((totalStaff - assignedStaff) < entry.getValue()) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -316,11 +335,13 @@ public class BookingServiceImpl implements BookingService {
         }
 
         private boolean requiresWashBay(List<ServicePackage> servicePackages) {
-                return servicePackages.stream().anyMatch(servicePackage -> Boolean.TRUE.equals(servicePackage.getRequiresWashBay()));
+                return servicePackages.stream()
+                                .anyMatch(servicePackage -> Boolean.TRUE.equals(servicePackage.getRequiresWashBay()));
         }
 
         private List<Long> getBookingAddOnIds(Long bookingId) {
-                if (bookingId == null) return List.of();
+                if (bookingId == null)
+                        return List.of();
 
                 return bookingAddOnServicePackageRepository.findByBookingIdOrderBySortOrderAsc(bookingId).stream()
                                 .map(BookingAddOnServicePackage::getServicePackageId)
@@ -585,8 +606,11 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 BigDecimal finalPrice = originalPrice.subtract(discountAmount);
-                BigDecimal depositAmount = finalPrice.multiply(BigDecimal.valueOf(0.3)).setScale(2,
-                                RoundingMode.HALF_UP);
+                BigDecimal depositAmount = finalPrice
+                                .multiply(DEPOSIT_PERCENT)
+                                .setScale(2, RoundingMode.HALF_UP);
+                LocalDateTime paymentExpiredAt = LocalDateTime.now()
+                                .plusMinutes(PAYMENT_TIMEOUT_MINUTES);
 
                 Booking booking = new Booking();
                 booking.setCustomerId(customerId);
@@ -598,24 +622,52 @@ public class BookingServiceImpl implements BookingService {
                 booking.setBookingDate(startTime.toLocalDate());
                 booking.setStartTime(startTime);
                 booking.setEndTime(endTime);
-                booking.setStatus("CONFIRMED");
+
+                booking.setStatus("PENDING_DEPOSIT");
+
                 booking.setPaymentStatus("UNPAID");
+
+                booking.setPaymentMethod("PAYOS");
+
                 booking.setOriginalPrice(originalPrice);
                 booking.setSurchargeAmount(BigDecimal.ZERO);
                 booking.setDiscountAmount(discountAmount);
                 booking.setPromotionDiscountAmount(
                                 promotionDiscountAmount);
                 booking.setFinalPrice(finalPrice);
+
                 booking.setDepositAmount(depositAmount);
+
                 booking.setDepositStatus("UNPAID");
+
+                booking.setPaymentExpiredAt(paymentExpiredAt);
+
                 booking.setRefundAmount(BigDecimal.ZERO);
+
                 booking.setIsWalkIn(false);
                 booking.setRewardProcessed(false);
                 booking.setUsedPoints(usedPoints);
                 booking.setNote(request.getNote());
-                booking.setPaymentMethod(request.getPaymentMethod());
 
                 Booking saved = bookingRepository.save(booking);
+                PaymentTransaction transaction = new PaymentTransaction();
+
+                transaction.setBookingId(saved.getId());
+
+                transaction.setPaymentMethod("PAYOS");
+
+                transaction.setAmount(saved.getDepositAmount());
+
+                transaction.setStatus("PENDING");
+
+                transaction.setOrderCode(
+                                System.currentTimeMillis());
+
+                transaction.setExpiredAt(
+                                paymentExpiredAt);
+
+                paymentTransactionRepository.save(
+                                transaction);
 
                 if (usedPoints > 0) {
                         loyalty.setAvailablePoints(loyalty.getAvailablePoints() - usedPoints);
@@ -642,26 +694,32 @@ public class BookingServiceImpl implements BookingService {
                         bookingAddOnServicePackageRepository.save(bookingAddOn);
                 }
 
-                loyaltyService.updateBookingStatistics(booking.getId());
+                // TODO ISSUE-55
+                // loyaltyService.updateBookingStatistics(saved.getId());
 
-                // Niêm phong promotion ngay khi booking được tạo
-                if (promotionId != null && !promotionUsageRepository.existsByBookingId(saved.getId())) {
-                        PromotionUsage usage = new PromotionUsage();
-                        usage.setPromotionId(promotionId);
-                        usage.setBookingId(saved.getId());
-                        usage.setCustomerId(customerId);
-                        usage.setDiscountAmount(promotionDiscountAmount);
-                        usage.setUsedAt(LocalDateTime.now());
-                        promotionUsageRepository.save(usage);
+                // TODO ISSUE-55
+                // Promotion will be locked after successful deposit payment.
+                // if (promotionId != null
+                // && !promotionUsageRepository.existsByBookingId(saved.getId())) {
+                //
+                // PromotionUsage usage = new PromotionUsage();
+                // usage.setPromotionId(promotionId);
+                // usage.setBookingId(saved.getId());
+                // usage.setCustomerId(customerId);
+                // usage.setDiscountAmount(promotionDiscountAmount);
+                // usage.setUsedAt(LocalDateTime.now());
+                // promotionUsageRepository.save(usage);
+                //
+                // promotionRepository.findById(promotionId).ifPresent(p -> {
+                // p.setUsedCount(p.getUsedCount() + 1);
+                // promotionRepository.save(p);
+                // });
+                // }
 
-                        promotionRepository.findById(promotionId).ifPresent(p -> {
-                                p.setUsedCount(p.getUsedCount() + 1);
-                                promotionRepository.save(p);
-                        });
-                }
+                // TODO ISSUE-55
+                // notificationService.notifyDepositCreated(saved.getId());
 
-                notificationService.notifyBookingConfirmed(booking.getId());
-
+                // notificationService.notifyBookingConfirmed(saved.getId());
                 BookingResponse response = toResponse(saved);
                 response.setAddOnServicePackageIds(addOns.stream().map(ServicePackage::getId).toList());
                 return response;
@@ -719,9 +777,7 @@ public class BookingServiceImpl implements BookingService {
                                         "Garage does not support vehicle type: " + request.getVehicleType());
                 }
 
-                if (!isWalkInVehicleCompatible(
-                                request,
-                                pkg)) {
+                if (!isWalkInVehicleCompatible(request, pkg)) {
 
                         throw new ResponseStatusException(
                                         HttpStatus.BAD_REQUEST,
@@ -760,18 +816,20 @@ public class BookingServiceImpl implements BookingService {
                         }
                 }
 
-                // Auto-save new vehicle for known customers when the plate is not in their profile yet
                 if (matchedCustomer != null && matchedVehicle == null && normalizedPlate != null) {
                         Vehicle newVehicle = new Vehicle();
                         newVehicle.setCustomer(matchedCustomer);
                         newVehicle.setRawLicensePlate(request.getLicensePlate().trim().toUpperCase());
                         newVehicle.setNormalizedLicensePlate(normalizedPlate);
                         newVehicle.setVehicleType(request.getVehicleType() != null
-                                        ? request.getVehicleType().toUpperCase() : "CAR");
+                                        ? request.getVehicleType().toUpperCase()
+                                        : "CAR");
                         String brand = request.getVehicleBrand() != null && !request.getVehicleBrand().isBlank()
-                                        ? request.getVehicleBrand().trim() : "Không rõ";
+                                        ? request.getVehicleBrand().trim()
+                                        : "Không rõ";
                         String model = request.getVehicleModel() != null && !request.getVehicleModel().isBlank()
-                                        ? request.getVehicleModel().trim() : "Không rõ";
+                                        ? request.getVehicleModel().trim()
+                                        : "Không rõ";
                         newVehicle.setBrand(brand);
                         newVehicle.setModel(model);
                         newVehicle.setSeatCount(request.getSeatCount());
@@ -781,7 +839,40 @@ public class BookingServiceImpl implements BookingService {
                         matchedVehicle = vehicleRepository.save(newVehicle);
                 }
 
-                String paymentMethod = normalizeWalkInPaymentMethod(request.getPaymentMethod());
+                String depositPaymentMethod = normalizeWalkInPaymentMethod(
+                                request.getPaymentMethod());
+
+                BigDecimal originalPrice = sumBasePrice(selectedPackages);
+
+                BigDecimal depositAmount = BigDecimal.ZERO;
+
+                String bookingStatus = "CONFIRMED";
+
+                String depositStatus = "PAID";
+
+                LocalDateTime paymentExpiredAt = null;
+
+                if ("CASH".equals(depositPaymentMethod)) {
+
+                        depositAmount = originalPrice
+                                        .multiply(DEPOSIT_PERCENT)
+                                        .setScale(2, RoundingMode.HALF_UP);
+
+                } else if ("PAYOS".equals(depositPaymentMethod)) {
+
+                        depositAmount = originalPrice
+                                        .multiply(DEPOSIT_PERCENT)
+                                        .setScale(2, RoundingMode.HALF_UP);
+
+                        bookingStatus = "PENDING_DEPOSIT";
+
+                        depositStatus = "UNPAID";
+
+                        paymentExpiredAt = LocalDateTime.now()
+                                        .plusMinutes(
+                                                        PAYMENT_TIMEOUT_MINUTES);
+
+                }
 
                 Booking booking = new Booking();
                 booking.setCustomerId(matchedCustomer != null ? matchedCustomer.getId() : null);
@@ -795,8 +886,7 @@ public class BookingServiceImpl implements BookingService {
                 booking.setEndTime(endTime);
                 booking.setStatus("CONFIRMED");
                 booking.setPaymentStatus("UNPAID");
-                booking.setPaymentMethod(paymentMethod);
-                BigDecimal originalPrice = sumBasePrice(selectedPackages);
+                booking.setPaymentMethod(depositPaymentMethod);
                 booking.setOriginalPrice(originalPrice);
                 booking.setSurchargeAmount(BigDecimal.ZERO);
                 booking.setDiscountAmount(BigDecimal.ZERO);
@@ -806,14 +896,33 @@ public class BookingServiceImpl implements BookingService {
                 booking.setRefundAmount(BigDecimal.ZERO);
                 booking.setIsWalkIn(true);
                 booking.setGuestName(matchedCustomer != null ? matchedCustomer.getFullName() : request.getGuestName());
-                booking.setGuestPhone(matchedCustomer != null ? matchedCustomer.getPhone() : normalizePhone(request.getGuestPhone()));
+                booking.setGuestPhone(matchedCustomer != null ? matchedCustomer.getPhone()
+                                : normalizePhone(request.getGuestPhone()));
                 booking.setLicensePlate(normalizedPlate);
                 booking.setRewardProcessed(false);
                 booking.setUsedPoints(0);
                 booking.setNote(request.getNote());
 
                 Booking saved = bookingRepository.save(booking);
+                if ("PAYOS".equalsIgnoreCase(depositPaymentMethod)) {
 
+                        PaymentTransaction transaction = new PaymentTransaction();
+
+                        transaction.setBookingId(saved.getId());
+
+                        transaction.setPaymentMethod("PAYOS");
+
+                        transaction.setAmount(saved.getDepositAmount());
+
+                        transaction.setStatus("PENDING");
+
+                        transaction.setOrderCode(System.currentTimeMillis());
+
+                        transaction.setExpiredAt(paymentExpiredAt);
+
+                        paymentTransactionRepository.save(transaction);
+
+                }
                 int sortOrder = 1;
                 for (ServicePackage addOn : addOns) {
                         BookingAddOnServicePackage bookingAddOn = new BookingAddOnServicePackage();
@@ -926,7 +1035,12 @@ public class BookingServiceImpl implements BookingService {
                         matchedVehicle = vehicleRepository.save(newVehicle);
                 }
 
-                String paymentMethod = normalizeWalkInPaymentMethod(request.getPaymentMethod());
+                BigDecimal originalPrice = sumBasePrice(selectedPackages);
+                BigDecimal depositAmount = originalPrice
+                                .multiply(DEPOSIT_PERCENT)
+                                .setScale(2, RoundingMode.HALF_UP);
+                LocalDateTime paymentExpiredAt = LocalDateTime.now()
+                                .plusMinutes(PAYMENT_TIMEOUT_MINUTES);
 
                 Booking booking = new Booking();
                 booking.setCustomerId(matchedCustomer != null ? matchedCustomer.getId() : null);
@@ -937,16 +1051,16 @@ public class BookingServiceImpl implements BookingService {
                 booking.setBookingDate(startTime.toLocalDate());
                 booking.setStartTime(startTime);
                 booking.setEndTime(endTime);
-                booking.setStatus("CONFIRMED");
+                booking.setStatus("PENDING_DEPOSIT");
                 booking.setPaymentStatus("UNPAID");
-                booking.setPaymentMethod(paymentMethod);
-                BigDecimal originalPrice = sumBasePrice(selectedPackages);
+                booking.setPaymentMethod("PAYOS");
                 booking.setOriginalPrice(originalPrice);
                 booking.setSurchargeAmount(BigDecimal.ZERO);
                 booking.setDiscountAmount(BigDecimal.ZERO);
                 booking.setFinalPrice(originalPrice);
-                booking.setDepositAmount(BigDecimal.ZERO);
+                booking.setDepositAmount(depositAmount);
                 booking.setDepositStatus("UNPAID");
+                booking.setPaymentExpiredAt(paymentExpiredAt);
                 booking.setRefundAmount(BigDecimal.ZERO);
                 booking.setIsWalkIn(false);
                 booking.setGuestName(matchedCustomer != null ? matchedCustomer.getFullName() : request.getGuestName());
@@ -967,8 +1081,6 @@ public class BookingServiceImpl implements BookingService {
                         bookingAddOnServicePackageRepository.save(bookingAddOn);
                 }
 
-                loyaltyService.updateBookingStatistics(saved.getId());
-                notificationService.notifyBookingConfirmed(saved.getId());
                 return toResponse(saved);
         }
 
@@ -988,19 +1100,19 @@ public class BookingServiceImpl implements BookingService {
 
                 String matchedVehicleName = buildVehicleName(matchedVehicle);
 
-                List<WalkInCustomerLookupResponse.VehicleSummary> vehicleSummaries =
-                                vehicleRepository.findByCustomer_IdAndIsActiveTrue(customer.getId())
-                                                .stream()
-                                                .map(v -> WalkInCustomerLookupResponse.VehicleSummary.builder()
-                                                                .id(v.getId())
-                                                                .licensePlate(v.getRawLicensePlate() != null
-                                                                                && !v.getRawLicensePlate().isBlank()
-                                                                                                ? v.getRawLicensePlate()
-                                                                                                : v.getNormalizedLicensePlate())
-                                                                .vehicleType(v.getVehicleType())
-                                                                .vehicleName(buildVehicleName(v))
-                                                                .build())
-                                                .collect(java.util.stream.Collectors.toList());
+                List<WalkInCustomerLookupResponse.VehicleSummary> vehicleSummaries = vehicleRepository
+                                .findByCustomer_IdAndIsActiveTrue(customer.getId())
+                                .stream()
+                                .map(v -> WalkInCustomerLookupResponse.VehicleSummary.builder()
+                                                .id(v.getId())
+                                                .licensePlate(v.getRawLicensePlate() != null
+                                                                && !v.getRawLicensePlate().isBlank()
+                                                                                ? v.getRawLicensePlate()
+                                                                                : v.getNormalizedLicensePlate())
+                                                .vehicleType(v.getVehicleType())
+                                                .vehicleName(buildVehicleName(v))
+                                                .build())
+                                .collect(java.util.stream.Collectors.toList());
 
                 return WalkInCustomerLookupResponse.builder()
                                 .found(true)
@@ -1022,7 +1134,8 @@ public class BookingServiceImpl implements BookingService {
         }
 
         private String buildVehicleName(Vehicle v) {
-                if (v == null) return null;
+                if (v == null)
+                        return null;
                 String brand = v.getBrand();
                 String model = v.getModel();
                 if (brand != null && !brand.isBlank() && model != null && !model.isBlank()
@@ -1033,6 +1146,39 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // ===================== ISSUE #13 =====================
+        @Override
+        @Transactional(readOnly = true)
+        public List<BookingSummaryResponse> getPendingRefundBookings(
+                        Long staffUserId,
+                        String role) {
+
+                List<Booking> bookings;
+
+                if ("ROLE_ADMIN".equals(role)) {
+
+                        bookings = bookingRepository.findRefundPendingBookings();
+
+                } else {
+
+                        StaffProfile staffProfile = staffProfileRepository.findByUser_Id(staffUserId)
+                                        .orElseThrow(() -> new ResponseStatusException(
+                                                        HttpStatus.FORBIDDEN,
+                                                        "Staff profile not found"));
+
+                        bookings = bookingRepository
+                                        .findRefundPendingBookings()
+                                        .stream()
+                                        .filter(b -> staffProfile.getGarageId()
+                                                        .equals(b.getGarageId()))
+                                        .toList();
+
+                }
+
+                return bookings.stream()
+                                .map(this::toSummaryResponse)
+                                .toList();
+
+        }
 
         @Override
         public List<BookingSummaryResponse> getCustomerBookings(
@@ -1370,64 +1516,120 @@ public class BookingServiceImpl implements BookingService {
         public BookingResponse cancelBooking(Long bookingId, Long currentUserId, String role, String reason) {
 
                 Booking booking = bookingRepository.findById(bookingId)
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
                                                 "Booking not found: " + bookingId));
 
                 String status = booking.getStatus();
 
                 if ("ROLE_CUSTOMER".equals(role)) {
+
                         if (!currentUserId.equals(booking.getCustomerId())) {
-                                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                                throw new ResponseStatusException(
+                                                HttpStatus.FORBIDDEN,
                                                 "You can only cancel your own bookings");
                         }
-                        if (!"CONFIRMED".equals(status) && !"PENDING_DEPOSIT".equals(status)) {
-                                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+
+                        if (!"CONFIRMED".equals(status)
+                                        && !"PENDING_DEPOSIT".equals(status)) {
+
+                                throw new ResponseStatusException(
+                                                HttpStatus.BAD_REQUEST,
                                                 "Customer can only cancel booking before check-in. Current status: "
                                                                 + status);
                         }
+
                 } else {
+
                         if ("ROLE_STAFF".equals(role)) {
-                                StaffProfile staffProfile = staffProfileRepository.findByUser_Id(currentUserId)
-                                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
+
+                                StaffProfile staffProfile = staffProfileRepository
+                                                .findByUser_Id(currentUserId)
+                                                .orElseThrow(() -> new ResponseStatusException(
+                                                                HttpStatus.FORBIDDEN,
                                                                 "No staff profile found"));
+
                                 if (!staffProfile.getGarageId().equals(booking.getGarageId())) {
-                                        throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+
+                                        throw new ResponseStatusException(
+                                                        HttpStatus.FORBIDDEN,
                                                         "Staff can only cancel bookings in their assigned garage");
                                 }
                         }
-                        if (!"CONFIRMED".equals(status) && !"CHECKED_IN".equals(status)
+
+                        if (!"CONFIRMED".equals(status)
+                                        && !"CHECKED_IN".equals(status)
                                         && !"PENDING_DEPOSIT".equals(status)) {
-                                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+
+                                throw new ResponseStatusException(
+                                                HttpStatus.BAD_REQUEST,
                                                 "Cannot cancel booking with status: " + status);
                         }
                 }
 
-                if (booking.getWashBayId() != null) {
-                        washBayRepository.findById(booking.getWashBayId()).ifPresent(washBay -> {
-                                washBay.setStatus(WashBayStatus.AVAILABLE);
-                                washBay.setCurrentBookingId(null);
-                                washBayRepository.save(washBay);
-                        });
-                        booking.setWashBayId(null);
-                }
+                releaseBookingResources(booking);
 
-                List<BookingAssignedStaff> assignedStaffs = bookingAssignedStaffRepository
-                                .findByBookingId(bookingId);
-                for (BookingAssignedStaff assignedStaff : assignedStaffs) {
-                        assignedStaff.setStatus("RELEASED");
-                        bookingAssignedStaffRepository.save(assignedStaff);
+                BigDecimal refundAmount = calculateRefundAmount(
+                                booking,
+                                role);
+
+                booking.setRefundAmount(refundAmount);
+
+                if (refundAmount.compareTo(BigDecimal.ZERO) > 0) {
+
+                        validateManualRefund(booking);
+
                 }
 
                 booking.setStatus("CANCELED");
+
+                if (refundAmount.compareTo(BigDecimal.ZERO) > 0) {
+
+                        booking.setDepositStatus("REFUND_PENDING");
+
+                } else if (booking.getDepositAmount() != null
+                                && booking.getDepositAmount().compareTo(BigDecimal.ZERO) > 0) {
+
+                        booking.setDepositStatus("FORFEITED");
+
+                }
+
+                if ("PENDING_DEPOSIT".equals(status)) {
+
+                        booking.setPaymentStatus("CANCELED");
+
+                }
+
                 booking.setNote(reason != null ? reason : booking.getNote());
+
                 booking.setRewardProcessed(false);
 
                 Booking saved = bookingRepository.save(booking);
+
+                if (booking.getPaymentMethod() != null
+                                && "PAYOS".equalsIgnoreCase(
+                                                booking.getPaymentMethod())) {
+
+                        paymentTransactionRepository
+                                        .findByBookingIdAndStatus(
+                                                        booking.getId(),
+                                                        "SUCCESS")
+                                        .ifPresent(transaction -> {
+
+                                                transaction.setStatus("REFUNDED");
+
+                                                paymentTransactionRepository.save(transaction);
+
+                                        });
+
+                }
+
                 notificationService.notifyBookingCanceled(saved.getId());
                 // Hoàn điểm nếu có — không hoàn khi đã CHECKED_IN (điểm bị giữ làm phí)
                 if (!"CHECKED_IN".equals(status)) {
                         loyaltyService.refundPointsForCanceledBooking(saved.getId());
                 }
+
                 // Trả lại promotion khi hủy booking
                 if (saved.getPromotionId() != null) {
                         promotionUsageRepository.findByBookingId(saved.getId()).ifPresent(usage -> {
@@ -1438,6 +1640,7 @@ public class BookingServiceImpl implements BookingService {
                                 });
                         });
                 }
+
                 return toResponse(saved);
         }
 
@@ -1495,6 +1698,129 @@ public class BookingServiceImpl implements BookingService {
                         });
                 }
                 return toResponse(saved);
+        }
+
+        @Override
+        @Transactional
+        public BookingResponse completeManualRefund(
+                        Long bookingId,
+                        Long staffUserId,
+                        String role,
+                        String note) {
+
+                Booking booking = bookingRepository.findById(bookingId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
+
+                if (!"ROLE_ADMIN".equals(role)) {
+
+                        StaffProfile staffProfile = staffProfileRepository.findByUser_Id(
+                                        staffUserId)
+                                        .orElseThrow(() -> new ResponseStatusException(
+                                                        HttpStatus.FORBIDDEN,
+                                                        "Staff profile not found"));
+
+                        if (!Boolean.TRUE.equals(
+                                        staffProfile.getIsActive())) {
+
+                                throw new ResponseStatusException(
+                                                HttpStatus.FORBIDDEN,
+                                                "Staff profile is inactive");
+
+                        }
+
+                        if (!staffProfile.getGarageId()
+                                        .equals(booking.getGarageId())) {
+
+                                throw new ResponseStatusException(
+                                                HttpStatus.FORBIDDEN,
+                                                "You cannot update booking from another garage");
+
+                        }
+
+                }
+
+                if (!"REFUND_PENDING".equals(
+                                booking.getDepositStatus())) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Booking is not waiting for manual refund");
+
+                }
+
+                booking.setDepositStatus("REFUNDED");
+
+                booking.setNote(
+                                note != null && !note.isBlank()
+                                                ? note
+                                                : booking.getNote());
+
+                if (booking.getPaymentMethod() != null
+                                && "PAYOS".equalsIgnoreCase(
+                                                booking.getPaymentMethod())) {
+
+                        paymentTransactionRepository
+                                        .findByBookingIdAndStatus(
+                                                        booking.getId(),
+                                                        "SUCCESS")
+                                        .ifPresent(transaction -> {
+
+                                                transaction.setStatus("REFUNDED");
+
+                                                paymentTransactionRepository.save(transaction);
+
+                                        });
+
+                }
+
+                Booking saved = bookingRepository.save(booking);
+
+                return toResponse(saved);
+        }
+
+        @Override
+        @Transactional
+        public void expirePendingDeposits() {
+
+                List<Booking> bookings = bookingRepository.findExpiredPendingDeposits(
+                                "PENDING_DEPOSIT",
+                                "UNPAID",
+                                LocalDateTime.now());
+
+                for (Booking booking : bookings) {
+
+                        releaseBookingResources(booking);
+
+                        booking.setStatus("CANCELED");
+
+                        booking.setPaymentStatus("EXPIRED");
+
+                        booking.setDepositStatus("UNPAID");
+
+                        booking.setNote("Deposit payment expired");
+
+                        bookingRepository.save(booking);
+
+                        paymentTransactionRepository
+                                        .findByBookingIdAndStatus(
+                                                        booking.getId(),
+                                                        "PENDING")
+                                        .ifPresent(transaction -> {
+
+                                                transaction.setStatus("EXPIRED");
+
+                                                transaction.setCancelReason(
+                                                                "Payment timeout");
+
+                                                paymentTransactionRepository.save(
+                                                                transaction);
+
+                                        });
+
+                }
+
         }
         // ===================== ISSUE #17 =====================
 
@@ -1821,7 +2147,7 @@ public class BookingServiceImpl implements BookingService {
 
                         throw new ResponseStatusException(
                                         HttpStatus.FORBIDDEN,
-                                        "You cannot update booking from another garage");
+                                        "Staff cannot refund booking from another garage");
                 }
 
                 if (!"COMPLETED".equals(booking.getStatus())) {
@@ -1859,12 +2185,12 @@ public class BookingServiceImpl implements BookingService {
 
                 Booking saved = bookingRepository.save(booking);
 
-loyaltyService.updateBookingStatistics(saved.getId());
-promotionService.recordPromotionUsageAfterPaidBooking(saved.getId());
-loyaltyService.earnPointsAfterPaidBooking(saved.getId());
-washHistoryService.createWashHistoryAfterPaidBooking(saved.getId());
-notificationService.notifyPaymentAndReward(saved.getId());
-return toResponse(saved);
+                loyaltyService.updateBookingStatistics(saved.getId());
+                promotionService.recordPromotionUsageAfterPaidBooking(saved.getId());
+                loyaltyService.earnPointsAfterPaidBooking(saved.getId());
+                washHistoryService.createWashHistoryAfterPaidBooking(saved.getId());
+                notificationService.notifyPaymentAndReward(saved.getId());
+                return toResponse(saved);
         }
         // ===================== UPDATE PAYMENT METHOD =====================
 
@@ -1959,6 +2285,154 @@ return toResponse(saved);
                 return normalized.isBlank() ? null : normalized;
         }
 
+        private boolean isGarageFaultCancellation(String role) {
+
+                return "ROLE_ADMIN".equals(role)
+                                || "ROLE_STAFF".equals(role);
+
+        }
+
+        private boolean isGracePeriod(Booking booking) {
+
+                LocalDateTime now = LocalDateTime.now();
+
+                long minutesFromCreated = java.time.Duration.between(
+                                booking.getCreatedAt(),
+                                now)
+                                .toMinutes();
+
+                long hoursBeforeService = java.time.Duration.between(
+                                now,
+                                booking.getStartTime())
+                                .toHours();
+
+                return minutesFromCreated <= GRACE_PERIOD_MINUTES
+                                && hoursBeforeService >= GRACE_MIN_HOURS_BEFORE_SERVICE;
+
+        }
+
+        private BigDecimal calculateRefundPercentage(
+                        LocalDateTime cancelTime,
+                        LocalDateTime startTime) {
+
+                long hours = java.time.Duration
+                                .between(cancelTime, startTime)
+                                .toHours();
+
+                if (hours >= REFUND_RULE_24_HOURS) {
+
+                        return REFUND_PERCENT_100;
+
+                }
+
+                if (hours >= REFUND_RULE_12_HOURS) {
+
+                        return REFUND_PERCENT_80;
+
+                }
+
+                if (hours >= REFUND_RULE_6_HOURS) {
+
+                        return REFUND_PERCENT_50;
+
+                }
+
+                return REFUND_PERCENT_0;
+
+        }
+
+        private BigDecimal calculateRefundAmount(
+                        Booking booking,
+                        String role) {
+
+                if (booking.getDepositAmount() == null) {
+
+                        return BigDecimal.ZERO;
+
+                }
+
+                if (isGarageFaultCancellation(role)) {
+
+                        return booking.getDepositAmount();
+
+                }
+
+                if (isGracePeriod(booking)) {
+
+                        return booking.getDepositAmount();
+
+                }
+
+                BigDecimal percent = calculateRefundPercentage(
+                                LocalDateTime.now(),
+                                booking.getStartTime());
+
+                return booking.getDepositAmount()
+                                .multiply(percent)
+                                .setScale(2, RoundingMode.HALF_UP);
+
+        }
+
+        private void validateManualRefund(
+                        Booking booking) {
+
+                if (booking.getRefundAmount() == null
+                                || booking.getRefundAmount().compareTo(BigDecimal.ZERO) <= 0) {
+
+                        return;
+
+                }
+
+                User customer = userRepository.findById(booking.getCustomerId())
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.NOT_FOUND,
+                                                "Customer not found"));
+
+                if (customer.getBankAccountNumber() == null
+                                || customer.getBankAccountNumber().isBlank()) {
+
+                        throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Please update bank account before requesting refund");
+
+                }
+
+        }
+
+        private void releaseBookingResources(
+                        Booking booking) {
+
+                if (booking.getWashBayId() != null) {
+
+                        washBayRepository.findById(
+                                        booking.getWashBayId())
+                                        .ifPresent(washBay -> {
+
+                                                washBay.setStatus(WashBayStatus.AVAILABLE);
+
+                                                washBay.setCurrentBookingId(null);
+
+                                                washBayRepository.save(washBay);
+
+                                        });
+
+                        booking.setWashBayId(null);
+
+                }
+
+                List<BookingAssignedStaff> assigned = bookingAssignedStaffRepository.findByBookingId(
+                                booking.getId());
+
+                for (BookingAssignedStaff item : assigned) {
+
+                        item.setStatus("RELEASED");
+
+                        bookingAssignedStaffRepository.save(item);
+
+                }
+
+        }
+
         private BookingResponse toResponse(Booking b) {
                 return BookingResponse.builder()
                                 .id(b.getId())
@@ -1980,6 +2454,7 @@ return toResponse(saved);
                                 .depositStatus(b.getDepositStatus())
                                 .depositPaidAt(b.getDepositPaidAt())
                                 .depositTransactionId(b.getDepositTransactionId())
+                                .refundAmount(b.getRefundAmount())
                                 .isWalkIn(b.getIsWalkIn())
                                 .usedPoints(b.getUsedPoints())
                                 .note(b.getNote())
@@ -1997,11 +2472,11 @@ return toResponse(saved);
                                 .paidAt(b.getPaidAt())
                                 .rewardProcessed(b.getRewardProcessed())
                                 .pointsEarned(Boolean.TRUE.equals(b.getRewardProcessed())
-                                        ? pointTransactionRepository
-                                                .findByBookingIdAndType(b.getId(), "EARN")
-                                                .map(PointTransaction::getPoints)
-                                                .orElse(null)
-                                        : null)
+                                                ? pointTransactionRepository
+                                                                .findByBookingIdAndType(b.getId(), "EARN")
+                                                                .map(PointTransaction::getPoints)
+                                                                .orElse(null)
+                                                : null)
                                 .assignedCareStaffIds(resolveAssignedCareStaffIds(b.getId()))
                                 .build();
         }

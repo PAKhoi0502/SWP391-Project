@@ -17,6 +17,7 @@ import CompleteServiceModal from '../../components/Booking/CompleteServiceModal'
 import NoShowBookingModal from '../../components/Booking/NoShowBookingModal'
 import PayOSQrModal from '../../components/Booking/PayOSQrModal'
 import DepositQrModal from '../../components/Booking/DepositQrModal'
+import DepositRefundPanel from '../../components/Booking/DepositRefundPanel'
 import PaymentCollectionModal from '../../components/Booking/PaymentCollectionModal'
 import ServiceStepsProgress from '../../components/Booking/ServiceStepsProgress'
 import StartServiceModal from '../../components/Booking/StartServiceModal'
@@ -280,6 +281,9 @@ const getDepositStatusText = (status) => {
   if (value === 'FAILED') return 'Failed'
   if (value === 'CANCELED' || value === 'CANCELLED') return 'Canceled'
   if (value === 'EXPIRED') return 'Expired'
+  if (value === 'REFUND_PENDING') return 'Refund pending'
+  if (value === 'REFUNDED') return 'Refunded'
+  if (value === 'FORFEITED') return 'Forfeited'
 
   return status || 'Not required'
 }
@@ -677,9 +681,13 @@ function BookingDetailPage() {
   const isCashPayment = paymentMethod === 'CASH' || paymentNote.includes('tien mat')
   const paymentMethodText = isBankTransfer ? TEXT.bankTransfer : isCashPayment ? TEXT.cash : TEXT.notUpdated
   const isPaid = String(booking?.paymentStatus || '').toUpperCase() === 'PAID'
-  const canCreatePayOS = role !== 'customer' && currentStatus === 'COMPLETED' && !isPaid && isBankTransfer
+  // PayOS payment links can now only be created for PENDING_DEPOSIT bookings (deposit-at-booking-time
+  // flow) — the old "create a PayOS link for the final balance after COMPLETED" path is no longer
+  // supported by the backend, so this standalone button is disabled to avoid a guaranteed 400.
+  const canCreatePayOS = false
   const depositStatus = String(booking?.depositStatus || 'NOT_REQUIRED').toUpperCase()
-  const canPayDeposit = role === 'customer' && Number(booking?.depositAmount) > 0 && depositStatus !== 'PAID' && depositStatus !== 'NOT_REQUIRED'
+  const canPayDeposit = role === 'customer' && currentStatus === 'PENDING_DEPOSIT' && Number(booking?.depositAmount) > 0 && depositStatus !== 'PAID'
+  const canRequestRefund = role === 'customer' && depositStatus === 'REFUND_PENDING' && Number(booking?.refundAmount) > 0
   const canCustomerCancel = role === 'customer' && (currentStatus === 'CONFIRMED' || currentStatus === 'PENDING_DEPOSIT') && !canPayDeposit
   const canMarkNoShow = canEditBooking && currentStatus === 'CONFIRMED'
   const canCheckIn = canEditBooking && currentStatus === 'CONFIRMED'
@@ -1018,7 +1026,7 @@ function BookingDetailPage() {
             refreshBookingCount()
           }
         } else {
-          const txs = await bookingApi.getDepositTransactions(id)
+          const txs = await bookingApi.getPaymentTransactions(id)
           const paidTx = txs.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
           if (paidTx) {
             setDepositTransaction((prev) => ({ ...prev, ...paidTx }))
@@ -1427,7 +1435,7 @@ function BookingDetailPage() {
     setDepositQrError('')
     setDepositSuccess(false)
     try {
-      const result = await bookingApi.createDepositPayment(id)
+      const result = await bookingApi.createPayOSPayment(id)
       persistPayOSReturnPath(location.pathname, result)
 
       let txData = {
@@ -1439,7 +1447,7 @@ function BookingDetailPage() {
       }
 
       try {
-        const transactions = await bookingApi.getDepositTransactions(id)
+        const transactions = await bookingApi.getPaymentTransactions(id)
         const matchingTx =
           transactions.find((tx) => String(tx.orderCode) === String(result.orderCode)) ||
           transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PENDING')
@@ -1447,7 +1455,7 @@ function BookingDetailPage() {
           txData = { ...matchingTx, qrCode: matchingTx.qrCode || result.qrCode }
         }
       } catch {
-        // silently ignore — use data from createDepositPayment response
+        // silently ignore — use data from createPayOSPayment response
       }
 
       setDepositTransaction(txData)
@@ -1474,7 +1482,7 @@ function BookingDetailPage() {
           refreshBookingCount()
         }
       } else {
-        const transactions = await bookingApi.getDepositTransactions(id)
+        const transactions = await bookingApi.getPaymentTransactions(id)
         const paidTx = transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
         if (paidTx) {
           setDepositTransaction((prev) => ({ ...prev, ...paidTx }))
@@ -1875,6 +1883,14 @@ function BookingDetailPage() {
                 </span>
               </div>
             )}
+            {Number(booking.refundAmount) > 0 && (
+              <div className="bd-info-cell">
+                <span className="bd-info-label">Refund</span>
+                <span className="bd-info-value">
+                  <strong>{formatMoney(booking.refundAmount)}</strong>
+                </span>
+              </div>
+            )}
             {booking.rewardProcessed !== undefined && booking.rewardProcessed !== null && isPaid && (
               <div className="bd-info-cell bd-info-cell--full">
                 <span className="bd-info-label">Loyalty points</span>
@@ -1917,6 +1933,14 @@ function BookingDetailPage() {
               )}
             </div>
           </div>
+
+          {role === 'customer' && Number(booking.refundAmount) > 0 && (
+            <DepositRefundPanel
+              bookingId={booking.id}
+              refundAmount={booking.refundAmount}
+              onRefunded={() => loadDetail()}
+            />
+          )}
 
           {/* ── Assigned resources ── */}
           {hasAssignedResources && (

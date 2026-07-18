@@ -129,18 +129,6 @@ export const bookingApi = {
     return unwrap(response)
   },
 
-  async createDepositPayment(bookingId) {
-    const response = await api.post(`/bookings/${bookingId}/deposit/payment`)
-    return unwrap(response)
-  },
-
-  async getDepositTransactions(bookingId) {
-    const response = await api.get(`/bookings/${bookingId}/payment-transactions`, {
-      params: { purpose: 'DEPOSIT' },
-    })
-    return toArray(response)
-  },
-
   async getPaymentTransaction(transactionId) {
     const response = await api.get(`/payments/transactions/${transactionId}`)
     return unwrap(response)

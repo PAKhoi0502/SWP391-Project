@@ -12,6 +12,8 @@ import com.autowashpro.dto.response.BookingSummaryResponse;
 import com.autowashpro.dto.response.WalkInCustomerLookupResponse;
 import com.autowashpro.service.BookingService;
 import com.autowashpro.service.AuditLogService;
+import com.autowashpro.service.PaymentService;
+import com.autowashpro.dto.response.CreatePayOSPaymentResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -24,6 +26,7 @@ import java.util.List;
 import com.autowashpro.dto.request.StartServiceRequest;
 import java.time.LocalDate;
 import com.autowashpro.dto.request.CancelBookingRequest;
+import com.autowashpro.dto.request.ManualRefundRequest;
 import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
 import com.autowashpro.dto.request.CompleteServiceRequest;
 import com.autowashpro.dto.request.MarkBookingPaidRequest;
@@ -31,9 +34,6 @@ import com.autowashpro.dto.request.UpdatePaymentMethodRequest;
 import com.autowashpro.dto.request.NoShowBookingRequest;
 import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
 import com.autowashpro.dto.response.BookingServiceStepResponse;
-import com.autowashpro.dto.response.CreatePayOSPaymentResponse;
-import com.autowashpro.dto.response.PaymentTransactionResponse;
-import com.autowashpro.service.PaymentService;
 import org.springframework.security.core.Authentication;
 
 @RestController
@@ -56,7 +56,8 @@ public class BookingController {
                 return ApiResponse.<AvailableSlotResponse>builder()
                                 .success(true)
                                 .message("Available slots retrieved")
-                                .data(bookingService.getAvailableSlots(garageId, servicePackageId, vehicleType, date, isWalkIn))
+                                .data(bookingService.getAvailableSlots(garageId, servicePackageId, vehicleType, date,
+                                                isWalkIn))
                                 .build();
         }
 
@@ -107,6 +108,11 @@ public class BookingController {
                         @Valid @RequestBody WalkInBookingCreateRequest request) {
 
                 BookingResponse response = bookingService.createGuestBooking(request);
+
+                CreatePayOSPaymentResponse depositPayment = paymentService.createPayOSPaymentForGuest(response.getId());
+                response.setDepositCheckoutUrl(depositPayment.getCheckoutUrl());
+                response.setDepositQrCode(depositPayment.getQrCode());
+
                 auditLogService.createAuditLog(
                                 null,
                                 AuditAction.BOOKING_GUEST_CREATED,
@@ -296,6 +302,74 @@ public class BookingController {
                                 .build();
         }
 
+        @GetMapping("/refund-pending")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<List<BookingSummaryResponse>> getPendingRefundBookings(
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+
+                String role = userDetails.getAuthorities()
+                                .iterator()
+                                .next()
+                                .getAuthority();
+
+                return ApiResponse.<List<BookingSummaryResponse>>builder()
+                                .success(true)
+                                .message("Pending refund bookings retrieved successfully")
+                                .data(
+                                                bookingService.getPendingRefundBookings(
+                                                                staffUserId,
+                                                                role))
+                                .build();
+
+        }
+
+        @PatchMapping("/{id}/refund-completed")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> completeManualRefund(
+
+                        @PathVariable Long id,
+
+                        @Valid @RequestBody(required = false) ManualRefundRequest request,
+
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+
+                String role = userDetails.getAuthorities()
+                                .iterator()
+                                .next()
+                                .getAuthority();
+
+                String note = request != null ? request.getNote() : null;
+
+                BookingResponse response = bookingService.completeManualRefund(
+                                id,
+                                staffUserId,
+                                role,
+                                note);
+
+                auditLogService.createAuditLog(
+                                staffUserId,
+                                AuditAction.BOOKING_REFUND_COMPLETED,
+                                AuditTargetType.BOOKING,
+                                id,
+                                AuditMetadata.of(
+                                                "depositStatus",
+                                                response.getDepositStatus(),
+                                                "refundAmount",
+                                                response.getRefundAmount(),
+                                                "note",
+                                                note));
+
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true)
+                                .message("Manual refund completed successfully")
+                                .data(response)
+                                .build();
+        }
+
         @PatchMapping("/{id}/no-show")
         @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
         public ApiResponse<BookingResponse> markNoShow(
@@ -476,39 +550,4 @@ public class BookingController {
                                 .build();
         }
 
-        @PostMapping("/{id}/deposit/payment")
-        @PreAuthorize("hasRole('CUSTOMER')")
-        public ApiResponse<CreatePayOSPaymentResponse> createDepositPayment(
-                        @PathVariable Long id,
-                        @AuthenticationPrincipal UserDetails userDetails) {
-
-                Long customerId = Long.valueOf(userDetails.getUsername());
-                CreatePayOSPaymentResponse response = paymentService.createDepositPayment(id, customerId);
-                auditLogService.createAuditLog(
-                                customerId,
-                                AuditAction.PAYMENT_LINK_CREATED,
-                                AuditTargetType.PAYMENT_TRANSACTION,
-                                response.getTransactionId(),
-                                AuditMetadata.of("bookingId", id, "purpose", "DEPOSIT", "status", response.getStatus()));
-                return ApiResponse.<CreatePayOSPaymentResponse>builder()
-                                .success(true)
-                                .message("Deposit payment link created successfully")
-                                .data(response)
-                                .build();
-        }
-
-        @GetMapping("/{id}/payment-transactions")
-        @PreAuthorize("hasRole('CUSTOMER')")
-        public ApiResponse<List<PaymentTransactionResponse>> getOwnPaymentTransactions(
-                        @PathVariable Long id,
-                        @RequestParam(required = false) String purpose,
-                        @AuthenticationPrincipal UserDetails userDetails) {
-
-                Long customerId = Long.valueOf(userDetails.getUsername());
-                return ApiResponse.<List<PaymentTransactionResponse>>builder()
-                                .success(true)
-                                .message("Payment transactions retrieved")
-                                .data(paymentService.getTransactionsByBookingForCustomer(id, customerId, purpose))
-                                .build();
-        }
 }

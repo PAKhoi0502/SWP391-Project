@@ -92,6 +92,7 @@ class BookingRepositoryOverlapTest {
                 .phone(phone)
                 .passwordHash("encoded")
                 .role("CUSTOMER")
+                .authProvider("LOCAL")
                 .isActive(true)
                 .build();
         entityManager.persist(customer);
@@ -124,6 +125,8 @@ class BookingRepositoryOverlapTest {
         booking.setVehicleId(vehicleId);
         booking.setGarageId(garageId);
         booking.setServicePackageId(1L);
+        Vehicle vehicle = vehicleId != null ? entityManager.find(Vehicle.class, vehicleId) : null;
+        booking.setVehicleType(vehicle != null ? vehicle.getVehicleType() : "CAR");
         booking.setBookingDate(start.toLocalDate());
         booking.setStartTime(start);
         booking.setEndTime(end);

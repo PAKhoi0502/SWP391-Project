@@ -807,7 +807,7 @@ export default function CustomerCreateBookingPage() {
     setDepositQrError('')
     setDepositSuccess(false)
     try {
-      const result = await bookingApi.createDepositPayment(bookingId)
+      const result = await bookingApi.createPayOSPayment(bookingId)
       persistPayOSReturnPath('/customer/booking-history', result)
 
       let txData = {
@@ -819,7 +819,7 @@ export default function CustomerCreateBookingPage() {
       }
 
       try {
-        const transactions = await bookingApi.getDepositTransactions(bookingId)
+        const transactions = await bookingApi.getPaymentTransactions(bookingId)
         const matchingTx =
           transactions.find((tx) => String(tx.orderCode) === String(result.orderCode)) ||
           transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PENDING')
@@ -827,7 +827,7 @@ export default function CustomerCreateBookingPage() {
           txData = { ...matchingTx, qrCode: matchingTx.qrCode || result.qrCode }
         }
       } catch {
-        // silently ignore — use data from createDepositPayment response
+        // silently ignore — use data from createPayOSPayment response
       }
 
       setDepositTransaction(txData)
@@ -853,7 +853,7 @@ export default function CustomerCreateBookingPage() {
           setDepositSuccess(true)
         }
       } else if (bookingId) {
-        const transactions = await bookingApi.getDepositTransactions(bookingId)
+        const transactions = await bookingApi.getPaymentTransactions(bookingId)
         const paidTx = transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
         if (paidTx) {
           setDepositTransaction((prev) => ({ ...prev, ...paidTx }))
@@ -915,7 +915,7 @@ export default function CustomerCreateBookingPage() {
             setDepositSuccess(true)
           }
         } else if (bookingId) {
-          const txs = await bookingApi.getDepositTransactions(bookingId)
+          const txs = await bookingApi.getPaymentTransactions(bookingId)
           const paidTx = txs.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
           if (paidTx) {
             setDepositTransaction((prev) => ({ ...prev, ...paidTx }))

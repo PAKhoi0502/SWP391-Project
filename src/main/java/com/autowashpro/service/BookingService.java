@@ -72,6 +72,19 @@ public interface BookingService {
         BookingResponse cancelBooking(Long bookingId, Long currentUserId, String role, String reason);
 
         BookingResponse markNoShow(Long bookingId, Long staffUserId, String reason);
+        // ===================== ISSUE #54 =====================
+
+        BookingResponse completeManualRefund(
+                        Long bookingId,
+                        Long staffUserId,
+                        String role,
+                        String note);
+
+        void expirePendingDeposits();
+
+        List<BookingSummaryResponse> getPendingRefundBookings(
+                        Long staffUserId,
+                        String role);
 
         // ===================== ISSUE #17 =====================
         List<BookingServiceStepResponse> getBookingServiceSteps(

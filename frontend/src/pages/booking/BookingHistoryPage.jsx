@@ -7,6 +7,7 @@ import { getServicePackageById, getPackageName } from '../../services/servicePac
 import { vehicleInspectionApi } from '../../api/vehicleInspectionApi'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import DepositQrModal from '../../components/Booking/DepositQrModal'
+import DepositRefundPanel from '../../components/Booking/DepositRefundPanel'
 import './BookingHistoryPage.css'
 
 /* ─── Cache keys ─── */
@@ -190,14 +191,18 @@ const getDepositText = (status) => {
   if (v === 'FAILED')       return 'Deposit failed'
   if (v === 'CANCELLED' || v === 'CANCELED') return 'Deposit canceled'
   if (v === 'EXPIRED')      return 'Deposit expired'
+  if (v === 'REFUND_PENDING') return 'Refund pending'
+  if (v === 'REFUNDED')     return 'Refunded'
+  if (v === 'FORFEITED')    return 'Forfeited'
   return 'Deposit pending'
 }
 
 const getDepositBadgeClass = (status) => {
   const v = String(status || '').toUpperCase()
-  if (v === 'PAID') return 'bhp-badge bhp-badge--paid'
-  if (v === 'FAILED' || v === 'CANCELLED' || v === 'CANCELED') return 'bhp-badge bhp-badge--cancelled'
+  if (v === 'PAID' || v === 'REFUNDED') return 'bhp-badge bhp-badge--paid'
+  if (v === 'FAILED' || v === 'CANCELLED' || v === 'CANCELED' || v === 'FORFEITED') return 'bhp-badge bhp-badge--cancelled'
   if (v === 'EXPIRED' || v === 'NOT_REQUIRED') return 'bhp-badge bhp-badge--deposit-neutral'
+  if (v === 'REFUND_PENDING') return 'bhp-badge bhp-badge--deposit-pending'
   return 'bhp-badge bhp-badge--deposit-pending'
 }
 
@@ -327,7 +332,7 @@ const getHistoryTimelineItems = (booking, serviceSteps = [], inspections = []) =
 /* ══════════════════════════════════════════════════
    BookingDetailModal — inline, same vibe
    ══════════════════════════════════════════════════ */
-function BookingDetailModal({ booking, steps, numberMap, onClose }) {
+function BookingDetailModal({ booking, steps, numberMap, onClose, onRefunded }) {
   if (!booking) return null
   const bookingId         = getBookingId(booking)
   const customerBookingNo = numberMap.get(String(bookingId)) ?? bookingId
@@ -432,7 +437,21 @@ function BookingDetailModal({ booking, steps, numberMap, onClose }) {
                 <span className="bhp-detail-row-value">{formatDateTime(booking.paidAt)}</span>
               </div>
             )}
+            {Number(booking?.refundAmount) > 0 && (
+              <div className="bhp-detail-row">
+                <span className="bhp-detail-row-label">Refund</span>
+                <span className="bhp-detail-row-value">{formatMoney(booking.refundAmount)}</span>
+              </div>
+            )}
           </div>
+
+          {Number(booking?.refundAmount) > 0 && (
+            <DepositRefundPanel
+              bookingId={bookingId}
+              refundAmount={booking.refundAmount}
+              onRefunded={onRefunded}
+            />
+          )}
 
           {/* Cancel / no-show reason */}
           {(isCanceledStatus(status) || isNoShowStatus(status)) && booking?.note && (
@@ -697,7 +716,7 @@ export default function BookingHistoryPage() {
     setDepositQrError('')
     setDepositSuccess(false)
     try {
-      const result = await bookingApi.createDepositPayment(bookingId)
+      const result = await bookingApi.createPayOSPayment(bookingId)
       persistPayOSReturnPath('/customer/booking-history', result)
 
       let txData = {
@@ -709,7 +728,7 @@ export default function BookingHistoryPage() {
       }
 
       try {
-        const transactions = await bookingApi.getDepositTransactions(bookingId)
+        const transactions = await bookingApi.getPaymentTransactions(bookingId)
         const matchingTx =
           transactions.find((tx) => String(tx.orderCode) === String(result.orderCode)) ||
           transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PENDING')
@@ -717,7 +736,7 @@ export default function BookingHistoryPage() {
           txData = { ...matchingTx, qrCode: matchingTx.qrCode || result.qrCode }
         }
       } catch {
-        // silently ignore — use data from createDepositPayment response
+        // silently ignore — use data from createPayOSPayment response
       }
 
       setDepositTransaction(txData)
@@ -744,7 +763,7 @@ export default function BookingHistoryPage() {
           loadBookings(true)
         }
       } else if (bookingId) {
-        const transactions = await bookingApi.getDepositTransactions(bookingId)
+        const transactions = await bookingApi.getPaymentTransactions(bookingId)
         const paidTx = transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
         if (paidTx) {
           setDepositTransaction((prev) => ({ ...prev, ...paidTx }))
@@ -806,7 +825,7 @@ export default function BookingHistoryPage() {
             loadBookings(true)
           }
         } else if (bookingId) {
-          const txs = await bookingApi.getDepositTransactions(bookingId)
+          const txs = await bookingApi.getPaymentTransactions(bookingId)
           const paidTx = txs.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
           if (paidTx) {
             setDepositTransaction((prev) => ({ ...prev, ...paidTx }))
@@ -916,7 +935,7 @@ export default function BookingHistoryPage() {
               const paymentStatus     = String(booking?.paymentStatus || '').toUpperCase()
               const status            = String(booking?.status || '').toUpperCase()
               const depositStatusRaw   = String(booking?.depositStatus || '').toUpperCase()
-              const depositPending     = Number(booking?.depositAmount) > 0 && depositStatusRaw !== 'PAID' && depositStatusRaw !== 'NOT_REQUIRED'
+              const depositPending     = status === 'PENDING_DEPOSIT' && Number(booking?.depositAmount) > 0 && depositStatusRaw !== 'PAID'
               const canCancel          = (status === 'CONFIRMED' || status === 'PENDING_DEPOSIT') && !depositPending
               const steps             = serviceStepsByBookingId[String(bookingId)] || []
               const timelineItems     = getHistoryTimelineItems(booking, steps)
@@ -1067,6 +1086,7 @@ export default function BookingHistoryPage() {
           steps={serviceStepsByBookingId[String(getBookingId(detailBooking))] || []}
           numberMap={customerBookingNumberMap}
           onClose={() => setDetailBooking(null)}
+          onRefunded={() => loadBookings(true)}
         />
       )}
 

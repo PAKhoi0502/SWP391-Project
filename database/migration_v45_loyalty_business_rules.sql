@@ -95,7 +95,7 @@ WHERE tier IN ('BRONZE', 'SILVER', 'GOLD', 'PLATINUM');
 
 
 
-SELECT * 
+SELECT *
 FROM loyalty_tier_rules;
 
 SELECT * FROM booking_service_steps
@@ -118,8 +118,8 @@ select * from bookings
 SELECT * FROM vehicles
 SELECT * FROM vehicle_inspections
 
-SELECT id, status, start_time, end_time FROM bookings 
-WHERE garage_id = <garage_id> 
-  AND start_time < '2026-07-05 08:00:00' 
+SELECT id, status, start_time, end_time FROM bookings
+WHERE garage_id = <garage_id>
+  AND start_time < '2026-07-05 08:00:00'
   AND end_time > '2026-07-05 07:30:00'
   AND status NOT IN ('CANCELED', 'NO_SHOW');

@@ -14,6 +14,7 @@ public final class AuditAction {
     public static final String BOOKING_SERVICE_COMPLETED = "BOOKING_SERVICE_COMPLETED";
     public static final String BOOKING_MARK_PAID = "BOOKING_MARK_PAID";
     public static final String BOOKING_PAYMENT_METHOD_UPDATED = "BOOKING_PAYMENT_METHOD_UPDATED";
+    public static final String BOOKING_REFUND_COMPLETED = "BOOKING_REFUND_COMPLETED";
     public static final String PAYMENT_LINK_CREATED = "PAYMENT_LINK_CREATED";
     public static final String PAYMENT_CONFIRMED = "PAYMENT_CONFIRMED";
     public static final String PAYMENT_FAILED = "PAYMENT_FAILED";
@@ -40,6 +41,10 @@ public final class AuditAction {
     public static final String LOYALTY_TIER_RULE_CREATED = "LOYALTY_TIER_RULE_CREATED";
     public static final String LOYALTY_TIER_RULE_UPDATED = "LOYALTY_TIER_RULE_UPDATED";
     public static final String LOYALTY_POINTS_ADJUSTED = "LOYALTY_POINTS_ADJUSTED";
+    public static final String DEPOSIT_REFUND_REQUESTED = "DEPOSIT_REFUND_REQUESTED";
+    public static final String DEPOSIT_REFUND_APPROVED = "DEPOSIT_REFUND_APPROVED";
+    public static final String DEPOSIT_REFUND_REJECTED = "DEPOSIT_REFUND_REJECTED";
+    public static final String DEPOSIT_REFUND_EXECUTED = "DEPOSIT_REFUND_EXECUTED";
 
     private AuditAction() {
     }

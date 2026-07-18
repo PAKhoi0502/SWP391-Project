@@ -13,6 +13,7 @@ public final class AuditTargetType {
     public static final String PROMOTION = "PROMOTION";
     public static final String LOYALTY_TIER_RULE = "LOYALTY_TIER_RULE";
     public static final String CUSTOMER_LOYALTY = "CUSTOMER_LOYALTY";
+    public static final String DEPOSIT_REFUND = "DEPOSIT_REFUND";
 
     private AuditTargetType() {
     }

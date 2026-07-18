@@ -122,6 +122,24 @@ public class Booking {
     @Column(name = "guest_phone")
     private String guestPhone;
 
+    @Column(name = "tracking_token", length = 255)
+    private String trackingToken;
+
+    @Column(name = "tracking_token_expired_at")
+    private LocalDateTime trackingTokenExpiredAt;
+
+    @Column(name = "refund_bank_name", length = 100)
+    private String refundBankName;
+
+    @Column(name = "refund_bank_account_name", length = 100)
+    private String refundBankAccountName;
+
+    @Column(name = "refund_bank_account_number", length = 50)
+    private String refundBankAccountNumber;
+
+    @Column(name = "refund_requested_at")
+    private LocalDateTime refundRequestedAt;
+
     @Column(name = "license_plate")
     private String licensePlate;
 
