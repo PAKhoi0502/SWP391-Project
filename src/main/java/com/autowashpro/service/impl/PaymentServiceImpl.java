@@ -57,6 +57,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final WashHistoryService washHistoryService;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
+    private final com.autowashpro.service.BookingReviewService bookingReviewService;
     private final EmailService emailService;
     private final org.springframework.transaction.PlatformTransactionManager transactionManager;
 
@@ -291,7 +292,7 @@ public class PaymentServiceImpl implements PaymentService {
                                 bookingId);
                         notificationService.notifyPaymentConfirmed(bookingId);
                         notificationService.notifyRewardEarned(bookingId);
-
+                        bookingReviewService.maybeCreateReviewRequestNotification(bookingId);
                     } catch (Exception e) {
                         log.error("Post-payment processing failed for booking {}: {}", bookingId, e.getMessage());
                     }

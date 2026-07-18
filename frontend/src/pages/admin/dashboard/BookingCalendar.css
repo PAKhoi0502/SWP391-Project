@@ -1,0 +1,168 @@
+/* ════ BOOKING CALENDAR (bkc-*) ════ */
+.bkc-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+
+.bkc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.bkc-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.bkc-month-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bkc-month-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1e293b;
+  min-width: 90px;
+  text-align: center;
+}
+
+.bkc-nav-btn {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  color: #475569;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  width: 28px;
+  transition: background 0.12s;
+}
+.bkc-nav-btn:hover { background: #e2e8f0; }
+.bkc-nav-btn:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+
+.bkc-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.bkc-dow th {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  padding: 4px 0 6px;
+}
+
+.bkc-day-cell {
+  padding: 1px;
+  text-align: center;
+}
+
+.bkc-day-btn {
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  height: 34px;
+  width: 100%;
+  padding: 0;
+  font-size: 12.5px;
+  color: #1e293b;
+  transition: background 0.12s, color 0.12s;
+  position: relative;
+}
+.bkc-day-btn:hover { background: #eff6ff; }
+.bkc-day-btn:focus-visible { outline: 2px solid #2563eb; outline-offset: 1px; }
+
+.bkc-day-btn--today {
+  box-shadow: 0 0 0 2px #2563eb;
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.bkc-day-btn--selected {
+  background: #2563eb !important;
+  color: #fff !important;
+  font-weight: 700;
+}
+.bkc-day-btn--selected .bkc-count { background: rgba(255,255,255,0.35); }
+
+/* Booking count badge */
+.bkc-count {
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0 4px;
+  line-height: 14px;
+  min-width: 14px;
+  color: #fff;
+}
+
+.bkc-out { color: #d1d5db; pointer-events: none; cursor: default; }
+.bkc-out:hover { background: transparent; }
+
+.bkc-clear-row {
+  text-align: center;
+  margin-top: 8px;
+}
+
+.bkc-clear-btn {
+  background: #f1f5f9;
+  border: none;
+  border-radius: 7px;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 14px;
+  transition: background 0.12s;
+}
+.bkc-clear-btn:hover { background: #e2e8f0; }
+
+.bkc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.bkc-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #64748b;
+}
+
+.bkc-legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.bkc-loading-msg {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 12px;
+  padding: 20px 0;
+}

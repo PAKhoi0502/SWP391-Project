@@ -8,13 +8,14 @@ import promotionApi from '../../api/promotionApi'
 import { customerBookingFlowApi } from '../../api/customerBookingFlowApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
 import { bookingApi } from '../../api/bookingApi'
+import ReviewModal from '../reviews/ReviewModal'
 import './NotificationDropdown.css'
 
 // Only show these event types in the dropdown (case-insensitive)
 const VISIBLE_TYPES = new Set([
   'TIER_UPGRADED', 'VOUCHER_RECEIVED', 'REWARD_EARNED',
   'BOOKING_CONFIRMED', 'BOOKING_CANCELED', 'PAYMENT_CONFIRMED',
-  'POINTS_ADJUSTED',
+  'POINTS_ADJUSTED', 'REVIEW_REQUEST',
 ])
 const isVisible = (eventType) => VISIBLE_TYPES.has(String(eventType || '').toUpperCase())
 
@@ -103,7 +104,15 @@ const buildTitle = (notif) => {
   if (notif.eventType === 'BOOKING_CANCELED') return 'Booking canceled'
   if (notif.eventType === 'PAYMENT_CONFIRMED') return 'Payment confirmed'
   if (notif.eventType === 'POINTS_ADJUSTED') return notif.title || 'Points adjusted'
+  if (notif.eventType === 'REVIEW_REQUEST') return 'Rate your experience'
   return notif.title || ''
+}
+
+const replaceBookingId = (message, bookingId, seqMap) => {
+  if (!message || bookingId == null) return message
+  const seq = seqMap.get(Number(bookingId))
+  if (seq == null) return message
+  return message.replace(new RegExp(`#${bookingId}\\b`, 'g'), `#${seq}`)
 }
 
 const buildMessage = (notif, bookingSeqMap) => {
@@ -127,6 +136,10 @@ const buildMessage = (notif, bookingSeqMap) => {
     const m = notif.message?.match(/voucher:\s*(.+?)\s*\(Code:\s*(.+?)\)/i)
     if (m) return `You received voucher "${m[1]}" — Code: ${m[2]}`
     return notif.message || ''
+  }
+  // For booking-related types, replace raw DB id with customer's sequential number
+  if (notif.bookingId != null) {
+    return replaceBookingId(notif.message || '', notif.bookingId, bookingSeqMap)
   }
   return notif.message || ''
 }
@@ -241,6 +254,8 @@ export default function NotificationDropdown() {
 
   // Mini modal state: { bookingId, seqNum } or null
   const [detailModal, setDetailModal] = useState(null)
+  // Review modal state: { bookingId } or null
+  const [reviewModal, setReviewModal] = useState(null)
 
   // Background poll: refresh badge + items every 15 s without F5.
   // Uses recursive setTimeout so a slow response never stacks intervals.
@@ -308,10 +323,10 @@ export default function NotificationDropdown() {
       const visible = (page.content ?? []).filter(n => isVisible(n.eventType))
       setUnreadCount(visible.filter(n => !n.isRead).length)
 
-      // 2. Build booking sequence map (CUSTOMER only, for REWARD_EARNED items)
+      // 2. Build booking sequence map (CUSTOMER only, for any notification with bookingId)
       let seqMap = new Map()
       if (user?.role === ROLES.CUSTOMER) {
-        const needsSeq = visible.some(n => n.eventType === 'REWARD_EARNED' && n.bookingId != null)
+        const needsSeq = visible.some(n => n.bookingId != null)
         if (needsSeq) {
           try {
             const bookings = await customerBookingFlowApi.getCustomerBookings()
@@ -364,6 +379,17 @@ export default function NotificationDropdown() {
         setItems(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n))
         setUnreadCount(prev => Math.max(0, prev - 1))
       } catch {}
+    }
+    // REVIEW_REQUEST: open review modal instead of navigating
+    if (notif.eventType === 'REVIEW_REQUEST') {
+      const bookingId = notif.bookingId
+        || notif.payload?.bookingId
+        || Number(notif.message?.match(/\d+/)?.[0] || 0) || null
+      if (bookingId) {
+        setOpen(false)
+        setReviewModal({ bookingId })
+      }
+      return
     }
     if (notif.bookingId) {
       // CUSTOMER: show inline mini modal instead of navigating away
@@ -541,6 +567,16 @@ export default function NotificationDropdown() {
           }}
         />,
         document.body
+      )}
+
+      {/* Review modal — triggered by REVIEW_REQUEST notification */}
+      {reviewModal && (
+        <ReviewModal
+          bookingId={reviewModal.bookingId}
+          open={!!reviewModal}
+          onClose={() => setReviewModal(null)}
+          onSubmitted={() => setReviewModal(null)}
+        />
       )}
     </>
   )

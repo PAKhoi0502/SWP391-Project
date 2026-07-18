@@ -500,6 +500,23 @@
   border-color: rgba(46, 194, 247, 0.60);
 }
 
+.bhp-rate-btn {
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 999px;
+  padding: 7px 18px;
+  background: rgba(245, 158, 11, 0.06);
+  color: #b45309;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 700;
+  transition: background 0.13s, border-color 0.13s;
+}
+
+.bhp-rate-btn:hover {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.55);
+}
+
 /* ══════════════════════════════════════════════════
    Detail Modal
    ══════════════════════════════════════════════════ */
