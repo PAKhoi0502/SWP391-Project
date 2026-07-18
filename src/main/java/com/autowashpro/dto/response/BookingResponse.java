@@ -27,6 +27,7 @@ public class BookingResponse {
     private BigDecimal finalPrice;
     private BigDecimal depositAmount;
     private String depositStatus;
+    private BigDecimal refundAmount;
     private Boolean isWalkIn;
     private Integer usedPoints;
     private String note;

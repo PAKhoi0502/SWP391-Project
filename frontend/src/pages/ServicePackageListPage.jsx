@@ -176,6 +176,12 @@ export default function ServicePackageListPage() {
               Choose the perfect package for your vehicle. Filter by vehicle type,
               package category, or search by name — then book in seconds.
             </p>
+            <Link
+              to={isAuthenticated ? '/booking' : '/guest-booking'}
+              className="spp-book-btn spp-hero-book-btn"
+            >
+              Book Now
+            </Link>
           </div>
 
           <div className="spp-stats">
@@ -285,7 +291,6 @@ export default function ServicePackageListPage() {
               <PackageCard
                 key={getPackageId(item)}
                 item={item}
-                isAuthenticated={isAuthenticated}
                 delay={idx * 0.045}
               />
             ))}
@@ -297,7 +302,7 @@ export default function ServicePackageListPage() {
   )
 }
 
-function PackageCard({ item, isAuthenticated, delay }) {
+function PackageCard({ item, delay }) {
   const id       = getPackageId(item)
   const price    = getPackagePrice(item)
   const duration = getPackageDuration(item)
@@ -333,12 +338,6 @@ function PackageCard({ item, isAuthenticated, delay }) {
       <div className="spp-card-actions">
         <Link to={`/customer/service-packages/${id}`} className="spp-detail-btn">
           View Details
-        </Link>
-        <Link
-          to={isAuthenticated ? '/booking' : '/login'}
-          className="spp-book-btn"
-        >
-          Book Now
         </Link>
       </div>
     </div>

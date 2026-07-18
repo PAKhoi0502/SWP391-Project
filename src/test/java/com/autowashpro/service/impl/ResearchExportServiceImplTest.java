@@ -243,6 +243,7 @@ class ResearchExportServiceImplTest {
                 .phone(phone)
                 .passwordHash("encoded-password")
                 .role("CUSTOMER")
+                .authProvider("LOCAL")
                 .isActive(true)
                 .createdAt(LocalDateTime.of(2026, 1, 1, 0, 0))
                 .updatedAt(LocalDateTime.of(2026, 1, 1, 0, 0))

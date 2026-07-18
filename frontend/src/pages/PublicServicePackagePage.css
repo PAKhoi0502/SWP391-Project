@@ -437,6 +437,13 @@
   flex-shrink: 0;
 }
 
+.spp-hero-book-btn {
+  margin-top: 20px;
+  padding: 12px 26px;
+  font-size: 14px;
+  box-shadow: 0 8px 20px rgba(46, 194, 247, 0.28);
+}
+
 .spp-book-btn:hover {
   filter: brightness(1.08);
   transform: translateY(-1px);

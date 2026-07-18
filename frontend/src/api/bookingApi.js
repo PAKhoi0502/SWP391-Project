@@ -55,6 +55,11 @@ export const bookingApi = {
     return unwrap(response)
   },
 
+  async createGuestBooking(payload) {
+    const response = await api.post('/bookings/guest', payload)
+    return unwrap(response)
+  },
+
   async lookupWalkInCustomer({ phone, licensePlate } = {}) {
     const response = await api.get('/bookings/walk-in/customer-lookup', {
       params: {

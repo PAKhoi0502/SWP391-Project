@@ -4,7 +4,6 @@ import com.autowashpro.common.AuditAction;
 import com.autowashpro.common.AuditMetadata;
 import com.autowashpro.common.AuditTargetType;
 
-
 import com.autowashpro.service.WashHistoryService;
 import com.autowashpro.service.AuditLogService;
 import com.autowashpro.dto.request.CreatePayOSPaymentRequest;
@@ -12,8 +11,11 @@ import com.autowashpro.dto.response.CreatePayOSPaymentResponse;
 import com.autowashpro.dto.response.PaymentTransactionResponse;
 import com.autowashpro.entity.Booking;
 import com.autowashpro.entity.PaymentTransaction;
+import com.autowashpro.entity.PromotionUsage;
 import com.autowashpro.repository.BookingRepository;
 import com.autowashpro.repository.PaymentTransactionRepository;
+import com.autowashpro.repository.PromotionRepository;
+import com.autowashpro.repository.PromotionUsageRepository;
 import com.autowashpro.service.EmailService;
 import com.autowashpro.service.LoyaltyService;
 import com.autowashpro.service.NotificationService;
@@ -31,7 +33,6 @@ import org.springframework.web.server.ResponseStatusException;
 import vn.payos.PayOS;
 import vn.payos.type.Webhook;
 import vn.payos.type.WebhookData;
-
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -48,6 +49,9 @@ public class PaymentServiceImpl implements PaymentService {
     private final BookingRepository bookingRepository;
     private final PaymentTransactionRepository transactionRepository;
     private final LoyaltyService loyaltyService;
+    private final PromotionRepository promotionRepository;
+
+    private final PromotionUsageRepository promotionUsageRepository;
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate;
     private final WashHistoryService washHistoryService;
@@ -83,9 +87,13 @@ public class PaymentServiceImpl implements PaymentService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Booking not found: " + request.getBookingId()));
 
-        if (!"COMPLETED".equals(booking.getStatus())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "PayOS payment can only be created for COMPLETED bookings. Current status: " + booking.getStatus());
+        if (!"PENDING_DEPOSIT".equals(booking.getStatus())) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "PayOS payment can only be created for PENDING_DEPOSIT booking. Current status: "
+                            + booking.getStatus());
+
         }
 
         if ("PAID".equals(booking.getPaymentStatus())) {
@@ -93,10 +101,19 @@ public class PaymentServiceImpl implements PaymentService {
                     "Booking has already been paid");
         }
 
-        transactionRepository.findByBookingIdAndStatus(request.getBookingId(), "PENDING")
+        transactionRepository
+                .findByBookingIdAndStatus(
+                        request.getBookingId(),
+                        "PENDING")
                 .ifPresent(existing -> {
-                    transactionRepository.delete(existing);
-                    transactionRepository.flush();
+
+                    existing.setStatus("EXPIRED");
+
+                    existing.setCancelReason(
+                            "Re-created payment link");
+
+                    transactionRepository.save(existing);
+
                 });
 
         long orderCode = System.currentTimeMillis() % 1_000_000_000L;
@@ -107,7 +124,7 @@ public class PaymentServiceImpl implements PaymentService {
             headers.set("x-api-key", apiKey);
             headers.setContentType(MediaType.APPLICATION_JSON);
 
-            String sigData = "amount=" + booking.getFinalPrice().intValue() +
+            String sigData = "amount=" + booking.getDepositAmount().intValue() +
                     "&cancelUrl=" + cancelUrl +
                     "&description=DH#" + booking.getId() +
                     "&orderCode=" + orderCode +
@@ -117,7 +134,7 @@ public class PaymentServiceImpl implements PaymentService {
 
             Map<String, Object> body = new HashMap<>();
             body.put("orderCode", orderCode);
-            body.put("amount", booking.getFinalPrice().intValue());
+            body.put("amount", booking.getDepositAmount().intValue());
             body.put("description", "DH#" + booking.getId());
             body.put("returnUrl", returnUrl);
             body.put("cancelUrl", cancelUrl);
@@ -128,8 +145,7 @@ public class PaymentServiceImpl implements PaymentService {
             ResponseEntity<Map> apiResponse = restTemplate.postForEntity(
                     payosApiUrl,
                     entity,
-                    Map.class
-            );
+                    Map.class);
 
             log.info("PayOS response status: {}", apiResponse.getStatusCode());
             log.info("PayOS response body: {}", apiResponse.getBody());
@@ -141,7 +157,7 @@ public class PaymentServiceImpl implements PaymentService {
             PaymentTransaction transaction = new PaymentTransaction();
             transaction.setBookingId(booking.getId());
             transaction.setPaymentMethod("PAYOS");
-            transaction.setAmount(booking.getFinalPrice());
+            transaction.setAmount(booking.getDepositAmount());
             transaction.setStatus("PENDING");
             transaction.setOrderCode(orderCode);
             transaction.setCheckoutUrl(checkoutUrl);
@@ -187,11 +203,12 @@ public class PaymentServiceImpl implements PaymentService {
             }
 
             if ("00".equals(code)) {
-                final long[] bookingIdRef = {0};
+                final long[] bookingIdRef = { 0 };
 
-                // Commit payment in its own transaction so a loyalty failure cannot roll it back
+                // Commit payment in its own transaction so a loyalty failure cannot roll it
+                // back
                 new org.springframework.transaction.support.TransactionTemplate(transactionManager).execute(status -> {
-                    transaction.setStatus("PAID");
+                    transaction.setStatus("SUCCESS");
                     transaction.setPaidAt(LocalDateTime.now());
                     transaction.setPayosTransactionId(String.valueOf(data.getPaymentLinkId()));
                     transactionRepository.save(transaction);
@@ -200,11 +217,57 @@ public class PaymentServiceImpl implements PaymentService {
                             .orElseThrow(() -> new RuntimeException("Booking not found"));
 
                     if (!"PAID".equals(booking.getPaymentStatus())) {
+
+                        booking.setStatus("CONFIRMED");
+
+                        booking.setDepositStatus("PAID");
+
                         booking.setPaymentStatus("PAID");
+
                         booking.setPaymentMethod("PAYOS");
+
                         booking.setPaidAt(LocalDateTime.now());
+                        if (booking.getPromotionId() != null
+                                && !promotionUsageRepository.existsByBookingId(
+                                        booking.getId())) {
+
+                            PromotionUsage usage = new PromotionUsage();
+
+                            usage.setPromotionId(
+                                    booking.getPromotionId());
+
+                            usage.setBookingId(
+                                    booking.getId());
+
+                            usage.setCustomerId(
+                                    booking.getCustomerId());
+
+                            usage.setDiscountAmount(
+                                    booking.getPromotionDiscountAmount());
+
+                            usage.setUsedAt(
+                                    LocalDateTime.now());
+
+                            promotionUsageRepository.save(
+                                    usage);
+
+                            promotionRepository.findById(
+                                    booking.getPromotionId())
+                                    .ifPresent(promotion -> {
+
+                                        promotion.setUsedCount(
+                                                promotion.getUsedCount() + 1);
+
+                                        promotionRepository.save(
+                                                promotion);
+
+                                    });
+
+                        }
+
                         bookingRepository.save(booking);
                         bookingIdRef[0] = booking.getId();
+
                     }
                     auditLogService.createAuditLog(
                             null,
@@ -215,14 +278,18 @@ public class PaymentServiceImpl implements PaymentService {
                     return null;
                 });
 
-                // Post-payment chain runs after payment is committed — failures are logged but do not
-                // roll back the payment. Missing points are covered by backfillMissingEarnPoints.
+                // Post-payment chain runs after payment is committed — failures are logged but
+                // do not
+                // roll back the payment. Missing points are covered by
+                // backfillMissingEarnPoints.
                 long bookingId = bookingIdRef[0];
                 if (bookingId != 0) {
                     try {
                         loyaltyService.updateBookingStatistics(bookingId);
                         loyaltyService.earnPointsAfterPaidBooking(bookingId);
                         washHistoryService.createWashHistoryAfterPaidBooking(bookingId);
+                        notificationService.notifyBookingConfirmed(
+                                bookingId);
                         notificationService.notifyPaymentConfirmed(bookingId);
                         notificationService.notifyRewardEarned(bookingId);
                         bookingReviewService.maybeCreateReviewRequestNotification(bookingId);
@@ -240,7 +307,8 @@ public class PaymentServiceImpl implements PaymentService {
                             AuditAction.PAYMENT_FAILED,
                             AuditTargetType.PAYMENT_TRANSACTION,
                             transaction.getId(),
-                            AuditMetadata.of("bookingId", transaction.getBookingId(), "status", transaction.getStatus(), "code", code));
+                            AuditMetadata.of("bookingId", transaction.getBookingId(), "status", transaction.getStatus(),
+                                    "code", code));
                     return null;
                 });
             }
@@ -312,14 +380,15 @@ public class PaymentServiceImpl implements PaymentService {
 
     private String hmacSHA256(String data, String key) throws Exception {
         javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
-        javax.crypto.spec.SecretKeySpec secretKey =
-                new javax.crypto.spec.SecretKeySpec(key.getBytes("UTF-8"), "HmacSHA256");
+        javax.crypto.spec.SecretKeySpec secretKey = new javax.crypto.spec.SecretKeySpec(key.getBytes("UTF-8"),
+                "HmacSHA256");
         mac.init(secretKey);
         byte[] hash = mac.doFinal(data.getBytes("UTF-8"));
         StringBuilder hexString = new StringBuilder();
         for (byte b : hash) {
             String hex = Integer.toHexString(0xff & b);
-            if (hex.length() == 1) hexString.append('0');
+            if (hex.length() == 1)
+                hexString.append('0');
             hexString.append(hex);
         }
         return hexString.toString();

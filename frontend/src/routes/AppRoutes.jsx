@@ -39,6 +39,7 @@ import CustomerBookingListPage from '../pages/booking/CustomerBookingListPage'
 import BookingDetailPage from '../pages/booking/BookingDetailPage'
 import StaffBookingListPage from '../pages/booking/StaffBookingListPage'
 import StaffWalkInBookingPage from '../pages/booking/StaffWalkInBookingPage'
+import GuestBookingPage from '../pages/booking/GuestBookingPage'
 import AdminBookingListPage from '../pages/booking/AdminBookingListPage'
 import PaymentReturnPage from '../pages/booking/PaymentReturnPage'
 import CustomerWashHistoryListPage from '../pages/washHistory/CustomerWashHistoryListPage'
@@ -93,6 +94,7 @@ function AppRoutes() {
       <Route element={<ProfileLayout />}>
         <Route path="customer/service-packages" element={<ServicePackageListPage />} />
         <Route path="customer/service-packages/:id" element={<ServicePackageDetailPage />} />
+        <Route path="guest-booking" element={<GuestBookingPage />} />
       </Route>
 
       <Route element={<ProtectedRoute allowedRoles={[ROLES.CUSTOMER]} />}>
