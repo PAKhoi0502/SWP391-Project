@@ -25,6 +25,7 @@ import com.autowashpro.service.PromotionService;
 import com.autowashpro.service.EmailService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +33,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.autowashpro.dto.response.BookingSummaryResponse;
 import com.autowashpro.dto.response.PromotionValidateResponse;
 import com.autowashpro.service.NotificationService;
+import com.autowashpro.service.BookingReviewService;
 
 import java.util.Objects;
 import java.math.BigDecimal;
@@ -45,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BookingServiceImpl implements BookingService {
@@ -74,6 +77,7 @@ public class BookingServiceImpl implements BookingService {
         private final PromotionService promotionService;
         private final NotificationService notificationService;
         private final EmailService emailService;
+        private final BookingReviewService bookingReviewService;
 
         // ===================== ISSUE #10 =====================
 
@@ -1475,6 +1479,12 @@ public class BookingServiceImpl implements BookingService {
 
                 Booking saved = bookingRepository.save(booking);
 
+                try {
+                        bookingReviewService.maybeCreateReviewRequestNotification(saved.getId());
+                } catch (Exception e) {
+                        log.warn("Failed to send review request notification for booking {}: {}", saved.getId(), e.getMessage());
+                }
+
                 return toResponse(saved);
         }
 
@@ -1720,6 +1730,11 @@ promotionService.recordPromotionUsageAfterPaidBooking(saved.getId());
 loyaltyService.earnPointsAfterPaidBooking(saved.getId());
 washHistoryService.createWashHistoryAfterPaidBooking(saved.getId());
 notificationService.notifyPaymentAndReward(saved.getId());
+try {
+        bookingReviewService.maybeCreateReviewRequestNotification(saved.getId());
+} catch (Exception e) {
+        log.warn("Failed to send review request notification for booking {}: {}", saved.getId(), e.getMessage());
+}
 return toResponse(saved);
         }
         // ===================== UPDATE PAYMENT METHOD =====================

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { TierGemIcon, getTierColor } from '../components/common/TierGem'
+import PublicReviewShowcase from '../components/reviews/PublicReviewShowcase'
 import './PublicCustomerDashboardPage.css'
 
 function CountUpNumber({ num, suffix = '', decimals = 0 }) {
@@ -258,7 +259,7 @@ export default function PublicCustomerDashboardPage() {
       {/* ── SERVICES ── */}
       <section className="pcd-section" id="services">
         <div className="pcd-section-inner">
-          <div className="pcd-section-header" data-animate>
+          <div className="pcd-section-header">
             <p className="pcd-section-eyebrow">Services</p>
             <h2 className="pcd-section-title">Wash packages for every need</h2>
             <p className="pcd-section-sub">
@@ -270,8 +271,7 @@ export default function PublicCustomerDashboardPage() {
               <div
                 className="pcd-service-card"
                 key={svc.title}
-                style={{ '--svc-color': svc.color, '--anim-delay': `${i * 0.09}s` }}
-                data-animate
+                style={{ '--svc-color': svc.color }}
               >
                 <div className="pcd-service-icon-wrap">{svc.icon}</div>
                 {svc.badge && <span className="pcd-service-badge">{svc.badge}</span>}
@@ -318,6 +318,9 @@ export default function PublicCustomerDashboardPage() {
           </div>
         </div>
       </section>
+
+      {/* ── CUSTOMER REVIEWS — before footer ── */}
+      <PublicReviewShowcase />
 
       {/* ── FOOTER ── */}
       <footer className="pcd-footer">
