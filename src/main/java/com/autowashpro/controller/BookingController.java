@@ -130,12 +130,13 @@ public class BookingController {
         @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
         public ApiResponse<WalkInCustomerLookupResponse> lookupWalkInCustomer(
                         @RequestParam String phone,
-                        @RequestParam(required = false) String licensePlate) {
+                        @RequestParam(required = false) String licensePlate,
+                        @RequestParam(required = false) String vehicleType) {
 
                 return ApiResponse.<WalkInCustomerLookupResponse>builder()
                                 .success(true)
                                 .message("Walk-in customer lookup completed")
-                                .data(bookingService.lookupWalkInCustomerByPhone(phone, licensePlate))
+                                .data(bookingService.lookupWalkInCustomerByPhone(phone, licensePlate, vehicleType))
                                 .build();
         }
 

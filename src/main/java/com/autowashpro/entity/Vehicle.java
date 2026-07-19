@@ -9,7 +9,10 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "vehicles")
+@Table(name = "vehicles", uniqueConstraints = @UniqueConstraint(
+        name = "UQ_vehicles_normalized_plate_type",
+        columnNames = {"normalized_license_plate", "vehicle_type"}
+))
 @Getter
 @Setter
 public class Vehicle {
@@ -25,7 +28,7 @@ public class Vehicle {
     @Column(name = "raw_license_plate", nullable = false, length = 50)
     private String rawLicensePlate;
 
-    @Column(name = "normalized_license_plate", nullable = false, unique = true, length = 50)
+    @Column(name = "normalized_license_plate", nullable = false, length = 50)
     private String normalizedLicensePlate;
 
     @Column(name = "vehicle_type", nullable = false, length = 30)

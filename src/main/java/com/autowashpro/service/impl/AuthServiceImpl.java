@@ -13,6 +13,7 @@ import com.autowashpro.repository.UserRepository;
 import com.autowashpro.security.JwtService;
 import com.autowashpro.service.AuthService;
 import com.autowashpro.service.EmailService;
+import com.autowashpro.service.support.VietnamesePhoneNumber;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import lombok.RequiredArgsConstructor;
@@ -49,14 +50,16 @@ public class AuthServiceImpl implements AuthService {
             throw new RuntimeException("Email already exists");
         }
 
-        if (userRepository.existsByPhone(request.getPhone())) {
+        String normalizedPhone = VietnamesePhoneNumber.normalizeMobile(request.getPhone());
+
+        if (userRepository.existsByPhone(normalizedPhone)) {
             throw new RuntimeException("Phone already exists");
         }
 
         User user = User.builder()
                 .fullName(request.getFullName())
                 .email(request.getEmail())
-                .phone(request.getPhone())
+                .phone(normalizedPhone)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .role("CUSTOMER")
                 .authProvider(AuthProvider.LOCAL)
@@ -88,7 +91,8 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse login(LoginRequest request) {
 
-        User user = userRepository.findByPhone(request.getPhone())
+        String normalizedPhone = VietnamesePhoneNumber.normalizeMobile(request.getPhone());
+        User user = userRepository.findByPhone(normalizedPhone)
                 .orElseThrow(() -> new RuntimeException("Invalid credentials"));
 
         if (!user.getIsActive()) {

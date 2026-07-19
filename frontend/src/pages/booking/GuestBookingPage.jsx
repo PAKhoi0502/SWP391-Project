@@ -13,6 +13,11 @@ import {
   getPackageType,
   getServicePackages,
 } from '../../services/servicePackageApi'
+import {
+  getLicensePlateError,
+  getVietnameseMobileError,
+  normalizeVietnameseMobile,
+} from '../../utils/identityValidation'
 import './StaffWalkInBookingPage.css'
 import './GuestBookingPage.css'
 
@@ -64,10 +69,6 @@ function normalizeVehicleType(type) {
   if (['BIKE', 'MOTORBIKE', 'MOTORCYCLE', 'XE_MAY', 'XE MÁY'].includes(value)) return 'MOTORBIKE'
   if (['CAR', 'AUTO', 'Ô TÔ'].includes(value)) return 'CAR'
   return value
-}
-
-function normalizePhone(phone) {
-  return String(phone || '').replace(/[\s.\-()]/g, '')
 }
 
 function toBackendVehicleType(type) {
@@ -325,8 +326,10 @@ export default function GuestBookingPage() {
     const requiredMotorbikeGroup = getPackageMotorbikeGroup(selectedPackage)
 
     if (!form.guestName.trim()) errors.guestName = 'Please enter your name.'
-    if (!form.guestPhone.trim()) errors.guestPhone = 'Please enter a phone number.'
-    if (!form.licensePlate.trim()) errors.licensePlate = 'Please enter the license plate.'
+    const phoneError = getVietnameseMobileError(form.guestPhone)
+    const plateError = getLicensePlateError(form.licensePlate, form.vehicleType)
+    if (phoneError) errors.guestPhone = phoneError
+    if (plateError) errors.licensePlate = plateError
     if (!form.vehicleType) errors.vehicleType = 'Please select a vehicle type.'
     if (selectedVehicleType === 'CAR' && requiredSeatCount && !form.seatCount) {
       errors.seatCount = 'Package requires a seat count.'
@@ -352,8 +355,8 @@ export default function GuestBookingPage() {
       const payload = {
         garageId: Number(form.garageId),
         guestName: form.guestName.trim(),
-        guestPhone: normalizePhone(form.guestPhone),
-        licensePlate: form.licensePlate.trim().toUpperCase(),
+        guestPhone: normalizeVietnameseMobile(form.guestPhone),
+        licensePlate: form.licensePlate.trim(),
         vehicleType: toBackendVehicleType(form.vehicleType),
         servicePackageId: Number(form.servicePackageId),
         addOnServicePackageIds: selectedAddOnIds.map(Number),
@@ -501,6 +504,7 @@ export default function GuestBookingPage() {
               <div className="swi-field">
                 <label>Phone number <span className="swi-required">*</span></label>
                 <input
+                  type="tel"
                   name="guestPhone"
                   value={form.guestPhone}
                   onChange={handleChange}

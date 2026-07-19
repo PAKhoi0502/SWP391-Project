@@ -73,6 +73,7 @@ class AuthServiceImplTest {
         verify(userRepository).save(captor.capture());
         User saved = captor.getValue();
         assertEquals("CUSTOMER", saved.getRole());
+        assertEquals("+84901999999", saved.getPhone());
         assertEquals("encoded-password", saved.getPasswordHash());
         assertTrue(saved.getIsActive());
         assertEquals(10L, response.getUser().getId());
@@ -94,7 +95,7 @@ class AuthServiceImplTest {
     @Test
     void registerRejectsDuplicatePhone() {
         RegisterRequest request = TestFixtures.registerRequest();
-        when(userRepository.existsByPhone(request.getPhone())).thenReturn(true);
+        when(userRepository.existsByPhone("+84901999999")).thenReturn(true);
 
         RuntimeException error = assertThrows(RuntimeException.class,
                 () -> authService.register(request));
@@ -106,7 +107,7 @@ class AuthServiceImplTest {
     @Test
     void loginReturnsTokensAndPersistsRefreshToken() {
         User customer = TestFixtures.customer();
-        LoginRequest request = new LoginRequest(customer.getPhone(), "password123");
+        LoginRequest request = new LoginRequest("0901 000 001", "password123");
         when(userRepository.findByPhone(customer.getPhone())).thenReturn(Optional.of(customer));
         when(passwordEncoder.matches(request.getPassword(), customer.getPasswordHash())).thenReturn(true);
         when(jwtService.generateToken(customer.getId(), customer.getRole())).thenReturn("access-token");
@@ -125,7 +126,7 @@ class AuthServiceImplTest {
     @Test
     void loginRejectsUnknownPhone() {
         LoginRequest request = new LoginRequest("0900000000", "password123");
-        when(userRepository.findByPhone(request.getPhone())).thenReturn(Optional.empty());
+        when(userRepository.findByPhone("+84900000000")).thenReturn(Optional.empty());
 
         RuntimeException error = assertThrows(RuntimeException.class,
                 () -> authService.login(request));

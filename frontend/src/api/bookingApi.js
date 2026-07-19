@@ -60,11 +60,12 @@ export const bookingApi = {
     return unwrap(response)
   },
 
-  async lookupWalkInCustomer({ phone, licensePlate } = {}) {
+  async lookupWalkInCustomer({ phone, licensePlate, vehicleType } = {}) {
     const response = await api.get('/bookings/walk-in/customer-lookup', {
       params: {
         phone,
         ...(licensePlate ? { licensePlate } : {}),
+        ...(vehicleType ? { vehicleType } : {}),
       },
     })
     return unwrap(response)
