@@ -1,12 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import notificationApi from '../../api/notificationApi'
+import { customerBookingFlowApi } from '../../api/customerBookingFlowApi'
+import ReviewModal from '../../components/reviews/ReviewModal'
 import './CustomerNotificationListPage.css'
+
+const replaceBookingId = (message, bookingId, seqMap) => {
+  if (!message || bookingId == null) return message
+  const seq = seqMap.get(Number(bookingId))
+  if (seq == null) return message
+  return message.replace(new RegExp(`#${bookingId}\\b`, 'g'), `#${seq}`)
+}
 
 const VISIBLE_TYPES = new Set([
   'TIER_UPGRADED', 'VOUCHER_RECEIVED', 'REWARD_EARNED',
   'BOOKING_CONFIRMED', 'BOOKING_CANCELED', 'PAYMENT_CONFIRMED',
-  'POINTS_ADJUSTED',
+  'POINTS_ADJUSTED', 'REVIEW_REQUEST',
 ])
 const isVisible = (t) => VISIBLE_TYPES.has(String(t || '').toUpperCase())
 
@@ -35,6 +44,7 @@ const buildTitle = (notif) => {
   if (notif.eventType === 'BOOKING_CANCELED')   return 'Booking canceled'
   if (notif.eventType === 'PAYMENT_CONFIRMED')  return 'Payment confirmed'
   if (notif.eventType === 'POINTS_ADJUSTED')    return notif.title || 'Points adjusted'
+  if (notif.eventType === 'REVIEW_REQUEST')     return 'Rate your experience'
   return notif.title || notif.eventType || ''
 }
 
@@ -45,11 +55,12 @@ const getTypeKey = (eventType) => {
   if (eventType === 'BOOKING_CONFIRMED') return 'booking'
   if (eventType === 'BOOKING_CANCELED')  return 'booking-canceled'
   if (eventType === 'PAYMENT_CONFIRMED') return 'payment'
+  if (eventType === 'REVIEW_REQUEST')    return 'review'
   return 'default'
 }
 
-const TYPE_ICON  = { reward: '★', tier: '▲', voucher: '%', booking: '✓', 'booking-canceled': '✕', payment: '$', default: '•' }
-const TYPE_LABEL = { reward: 'Reward', tier: 'Membership tier', voucher: 'Voucher', booking: 'Booking', 'booking-canceled': 'Booking', payment: 'Payment', default: 'Notification' }
+const TYPE_ICON  = { reward: '★', tier: '▲', voucher: '%', booking: '✓', 'booking-canceled': '✕', payment: '$', review: '★', default: '•' }
+const TYPE_LABEL = { reward: 'Reward', tier: 'Membership tier', voucher: 'Voucher', booking: 'Booking', 'booking-canceled': 'Booking', payment: 'Payment', review: 'Review', default: 'Notification' }
 
 export default function CustomerNotificationListPage() {
   const navigate = useNavigate()
@@ -62,6 +73,8 @@ export default function CustomerNotificationListPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [markingAll, setMarkingAll] = useState(false)
   const [deletingIds, setDeletingIds] = useState(new Set())
+  const [bookingSeqMap, setBookingSeqMap] = useState(new Map())
+  const [reviewModal, setReviewModal] = useState(null)
 
   const LIMIT = 20
 
@@ -78,6 +91,17 @@ export default function CustomerNotificationListPage() {
       const visible = all.filter(n => isVisible(n.eventType))
       setItems(visible)
       setTotalPages(result.totalPages ?? 1)
+
+      // Build seq map if any notification references a booking
+      if (visible.some(n => n.bookingId != null)) {
+        try {
+          const bookings = await customerBookingFlowApi.getCustomerBookings()
+          const sorted = [...bookings].sort((a, b) => Number(a.id) - Number(b.id))
+          const seqMap = new Map()
+          sorted.forEach((b, idx) => seqMap.set(Number(b.id), idx + 1))
+          setBookingSeqMap(seqMap)
+        } catch {}
+      }
     } catch {
       setError('Failed to load notifications.')
     } finally {
@@ -127,6 +151,15 @@ export default function CustomerNotificationListPage() {
         await notificationApi.markNotificationRead(notif.id)
         setItems(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n))
       } catch {}
+    }
+    if (notif.eventType === 'REVIEW_REQUEST') {
+      const bookingId = notif.bookingId
+        || notif.payload?.bookingId
+        || Number(notif.message?.match(/\d+/)?.[0] || 0) || null
+      if (bookingId) {
+        setReviewModal({ bookingId })
+      }
+      return
     }
     navigate(`/customer/notifications/${notif.id}`)
   }
@@ -214,7 +247,7 @@ export default function CustomerNotificationListPage() {
                           {TYPE_LABEL[typeKey]}
                         </span>
                       </div>
-                      <div className="cn-item-msg">{notif.message}</div>
+                      <div className="cn-item-msg">{replaceBookingId(notif.message, notif.bookingId, bookingSeqMap)}</div>
                       <div className="cn-item-time">{formatTime(notif.sentAt ?? notif.createdAt)}</div>
                     </div>
 
@@ -256,6 +289,15 @@ export default function CustomerNotificationListPage() {
         )}
 
       </div>
+
+      {reviewModal && (
+        <ReviewModal
+          bookingId={reviewModal.bookingId}
+          open={!!reviewModal}
+          onClose={() => setReviewModal(null)}
+          onSubmitted={() => setReviewModal(null)}
+        />
+      )}
     </div>
   )
 }

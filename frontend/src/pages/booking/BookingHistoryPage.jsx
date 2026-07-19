@@ -8,6 +8,7 @@ import { vehicleInspectionApi } from '../../api/vehicleInspectionApi'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import DepositQrModal from '../../components/Booking/DepositQrModal'
 import DepositRefundPanel from '../../components/Booking/DepositRefundPanel'
+import ReviewModal from '../../components/reviews/ReviewModal'
 import './BookingHistoryPage.css'
 
 /* ─── Cache keys ─── */
@@ -504,6 +505,8 @@ export default function BookingHistoryPage() {
   const [cancelingId,          setCancelingId]          = useState(null)
   const [cancelModalBookingId, setCancelModalBookingId] = useState(null)
   const [cancelModalBooking,   setCancelModalBooking]   = useState(null)
+  const [reviewModal,          setReviewModal]          = useState(null)
+  const [reviewedIds,          setReviewedIds]          = useState(new Set())
   const [serviceStepsByBookingId, setServiceStepsByBookingId] = useState({})
   const [detailBooking,        setDetailBooking]        = useState(null)
   const sentinelRef = useRef(null)
@@ -1061,6 +1064,15 @@ export default function BookingHistoryPage() {
                         {cancelingId === bookingId ? 'Cancelling…' : 'Cancel'}
                       </button>
                     )}
+                    {status === 'COMPLETED' && paymentStatus === 'PAID' && !reviewedIds.has(bookingId) && (
+                      <button
+                        type="button"
+                        className="bhp-rate-btn"
+                        onClick={() => setReviewModal({ bookingId })}
+                      >
+                        Rate service ★
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="bhp-detail-btn"
@@ -1113,6 +1125,19 @@ export default function BookingHistoryPage() {
         cancelLoading={depositCancelLoading}
         paymentSuccess={depositSuccess}
       />
+
+      {/* Review modal */}
+      {reviewModal && (
+        <ReviewModal
+          bookingId={reviewModal.bookingId}
+          open={!!reviewModal}
+          onClose={() => setReviewModal(null)}
+          onSubmitted={() => {
+            setReviewedIds((prev) => new Set(prev).add(reviewModal.bookingId))
+            setReviewModal(null)
+          }}
+        />
+      )}
     </div>
   )
 }

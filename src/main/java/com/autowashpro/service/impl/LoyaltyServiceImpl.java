@@ -93,7 +93,7 @@ public class LoyaltyServiceImpl implements LoyaltyService {
                         .minTotalSpent(rule.getMinTotalSpent()).minTotalVisits(rule.getMinTotalVisits())
                         .minTotalPoints(rule.getMinTotalPoints()).bookingWindowDays(rule.getBookingWindowDays())
                         .maxUpcomingBookings(rule.getMaxUpcomingBookings()).pointMultiplier(rule.getPointMultiplier())
-                        .priorityLevel(rule.getPriorityLevel()).isActive(rule.getIsActive()).build())
+                        .priorityLevel(rule.getPriorityLevel()).isActive(rule.getIsActive()).color(rule.getColor()).build())
                 .toList();
     }
 
@@ -189,8 +189,19 @@ String newTier = newTierHolder[0];
                         .minTotalSpent(rule.getMinTotalSpent()).minTotalVisits(rule.getMinTotalVisits())
                         .minTotalPoints(rule.getMinTotalPoints()).bookingWindowDays(rule.getBookingWindowDays())
                         .maxUpcomingBookings(rule.getMaxUpcomingBookings()).pointMultiplier(rule.getPointMultiplier())
-                        .priorityLevel(rule.getPriorityLevel()).isActive(rule.getIsActive()).build())
+                        .priorityLevel(rule.getPriorityLevel()).isActive(rule.getIsActive()).color(rule.getColor()).build())
                 .toList();
+    }
+
+    private static final String DEFAULT_TIER_COLOR = "#2563EB";
+    private static final java.util.regex.Pattern HEX_COLOR_PATTERN =
+            java.util.regex.Pattern.compile("^#[0-9A-Fa-f]{6}$");
+
+    private String resolveColor(String color) {
+        if (color != null && HEX_COLOR_PATTERN.matcher(color.trim()).matches()) {
+            return color.trim().toUpperCase();
+        }
+        return DEFAULT_TIER_COLOR;
     }
 
     @Override
@@ -209,6 +220,7 @@ String newTier = newTierHolder[0];
         rule.setPointMultiplier(request.getPointMultiplier());
         rule.setPriorityLevel(request.getPriorityLevel());
         rule.setIsActive(true);
+        rule.setColor(resolveColor(request.getColor()));
         loyaltyTierRuleRepository.save(rule);
 
         return LoyaltyTierRuleResponse.builder()
@@ -222,6 +234,7 @@ String newTier = newTierHolder[0];
                 .pointMultiplier(rule.getPointMultiplier())
                 .priorityLevel(rule.getPriorityLevel())
                 .isActive(rule.getIsActive())
+                .color(rule.getColor())
                 .build();
     }
 
@@ -242,6 +255,10 @@ String newTier = newTierHolder[0];
             rule.setIsActive(request.getIsActive());
         }
 
+        if (request.getColor() != null) {
+            rule.setColor(resolveColor(request.getColor()));
+        }
+
         loyaltyTierRuleRepository.save(rule);
 
         return LoyaltyTierRuleResponse.builder()
@@ -255,6 +272,7 @@ String newTier = newTierHolder[0];
                 .pointMultiplier(rule.getPointMultiplier())
                 .priorityLevel(rule.getPriorityLevel())
                 .isActive(rule.getIsActive())
+                .color(rule.getColor())
                 .build();
     }
 

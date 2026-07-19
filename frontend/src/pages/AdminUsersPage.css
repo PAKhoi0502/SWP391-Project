@@ -89,8 +89,47 @@
 
 /* User cell in table */
 .aup-user-cell {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.aup-user-cell-text {
   display: grid;
   gap: 3px;
+}
+
+.aup-user-avatar {
+  border-radius: 50%;
+  flex-shrink: 0;
+  height: 38px;
+  object-fit: cover;
+  width: 38px;
+}
+
+.aup-user-avatar-fallback {
+  align-items: center;
+  background: #eff6ff;
+  color: #2563eb;
+  display: flex;
+  font-size: 15px;
+  font-weight: 700;
+  justify-content: center;
+}
+
+.aup-detail-avatar-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.aup-detail-avatar-row .aup-user-avatar {
+  height: 64px;
+  width: 64px;
+}
+
+.aup-detail-avatar-row .aup-user-avatar-fallback {
+  font-size: 24px;
 }
 
 .aup-user-name {

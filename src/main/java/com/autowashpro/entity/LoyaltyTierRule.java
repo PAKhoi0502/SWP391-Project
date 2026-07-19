@@ -42,4 +42,7 @@ public class LoyaltyTierRule {
 
     @Column(name = "min_total_points", nullable = false)
     private Integer minTotalPoints;
+
+    @Column(name = "color", nullable = false, length = 9)
+    private String color;
 }

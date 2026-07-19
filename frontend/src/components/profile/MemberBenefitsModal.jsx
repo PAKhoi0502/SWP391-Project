@@ -48,6 +48,7 @@ export default function MemberBenefitsModal({ open, onClose }) {
 
   const currentTierKey = String(loyalty?.currentTier || '').toUpperCase()
   const sortedRules = [...tierRules].sort((a, b) => (a.priorityLevel ?? 0) - (b.priorityLevel ?? 0))
+  const currentTierColor = sortedRules.find((r) => String(r.tier || '').toUpperCase() === currentTierKey)?.color
 
   return (
     <>
@@ -72,7 +73,7 @@ export default function MemberBenefitsModal({ open, onClose }) {
               <>
                 {/* Tier hero */}
                 <div className="mbm-tier-hero">
-                  <span className="mbm-tier-icon"><TierGemIcon tier={currentTierKey} size={28} /></span>
+                  <span className="mbm-tier-icon"><TierGemIcon tier={currentTierKey} color={currentTierColor} size={28} /></span>
                   <div className="mbm-tier-info">
                     <p className="mbm-tier-label">Current Tier</p>
                     <p className="mbm-tier-name">{getTierLabel(currentTierKey)}</p>
@@ -145,7 +146,7 @@ export default function MemberBenefitsModal({ open, onClose }) {
                             <div key={ruleKey} className={`mbm-tier-item${isCurrent ? ' current' : ''}`}>
                               <div className="mbm-tier-item-row">
                                 <span className={`mbm-tier-item-name${isCurrent ? ' current-label' : ''}`}>
-                                  <TierGemIcon tier={ruleKey} size={16} /> {getTierLabel(ruleKey)}
+                                  <TierGemIcon tier={ruleKey} color={rule.color} size={16} /> {getTierLabel(ruleKey)}
                                   {isCurrent && <span className="mbm-tier-current-chip">Current</span>}
                                 </span>
                                 {rule.pointMultiplier && (

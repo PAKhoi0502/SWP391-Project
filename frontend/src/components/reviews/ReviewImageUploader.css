@@ -1,0 +1,84 @@
+.riu-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.riu-hidden-input {
+  display: none;
+}
+
+.riu-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(46, 194, 247, 0.08);
+  border: 1.5px dashed rgba(46, 194, 247, 0.45);
+  border-radius: 8px;
+  color: #0879B8;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  transition: background 0.14s, border-color 0.14s;
+  align-self: flex-start;
+}
+
+.riu-add-btn:hover {
+  background: rgba(46, 194, 247, 0.14);
+  border-color: rgba(46, 194, 247, 0.7);
+}
+
+.riu-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.riu-thumb {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(23, 32, 51, 0.10);
+  flex-shrink: 0;
+}
+
+.riu-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.riu-remove-btn {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  font-size: 10px;
+  height: 18px;
+  width: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.14s;
+  padding: 0;
+  line-height: 1;
+}
+
+.riu-thumb:hover .riu-remove-btn {
+  opacity: 1;
+}
+
+.riu-error {
+  color: #b91c1c;
+  font-size: 12px;
+  margin: 0;
+}

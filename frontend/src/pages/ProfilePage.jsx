@@ -117,6 +117,7 @@ export default function ProfilePage() {
   const navigate = useNavigate()
   const [profile, setProfile]     = useState(user || null)
   const [loyalty, setLoyalty]     = useState(null)
+  const [tierRules, setTierRules] = useState([])
   const [loading, setLoading]     = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -150,6 +151,9 @@ export default function ProfilePage() {
           loyaltyApi.getMyLoyalty()
             .then((ld) => { if (!ignore) setLoyalty(ld) })
             .catch(() => {})
+          loyaltyApi.getTierRules()
+            .then((rules) => { if (!ignore) setTierRules(Array.isArray(rules) ? rules : []) })
+            .catch(() => {})
         }
       })
       .catch((err) => {
@@ -176,6 +180,7 @@ export default function ProfilePage() {
   const isCustomer = String(profile?.role || user?.role || '').toUpperCase().replace('ROLE_', '') === 'CUSTOMER'
   const isActive   = profile?.isActive !== false
   const tierKey    = loyalty?.currentTier ? String(loyalty.currentTier).toUpperCase() : null
+  const tierColor  = tierRules.find((r) => String(r.tier || '').toUpperCase() === tierKey)?.color || getTierColor(tierKey)
   const sub        = profile?.email || profile?.phone || ''
 
   const openDetail   = () => { setDetailAutoOpenPw(false); setDetailOpen(true) }
@@ -241,8 +246,8 @@ export default function ProfilePage() {
                   {profile?.fullName || profile?.email || 'User'}
                 </h1>
                 {tierKey && (
-                  <span className="ps-tier-chip" style={{ '--tier-color': getTierColor(tierKey) }}>
-                    <TierGemIcon tier={tierKey} size={14} />
+                  <span className="ps-tier-chip" style={{ '--tier-color': tierColor }}>
+                    <TierGemIcon tier={tierKey} color={tierColor} size={14} />
                     {getTierLabel(tierKey)}
                   </span>
                 )}

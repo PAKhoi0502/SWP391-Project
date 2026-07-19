@@ -1,7 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { loyaltyApi } from '../api/loyaltyApi'
 import { TierGemIcon, getTierColor } from '../components/common/TierGem'
+import PublicReviewShowcase from '../components/reviews/PublicReviewShowcase'
 import './PublicCustomerDashboardPage.css'
 
 function CountUpNumber({ num, suffix = '', decimals = 0 }) {
@@ -127,12 +129,24 @@ const SERVICES = [
   },
 ]
 
-const TIERS = [
+// Shown to signed-out visitors, or as a fallback if the live tier list can't be loaded.
+const FALLBACK_TIERS = [
   { name: 'BRONZE',   desc: 'For new members · earn points every wash · ×1.0 multiplier' },
   { name: 'SILVER',   desc: '×1.2 point multiplier · book up to 10 days ahead' },
   { name: 'GOLD',     desc: '×1.35 point multiplier · book up to 12 days ahead · up to 2 queued bookings' },
   { name: 'PLATINUM', desc: '×1.5 point multiplier · book up to 14 days ahead · up to 3 queued bookings' },
-]
+].map((t) => ({ ...t, color: getTierColor(t.name) }))
+
+function describeTierRule(rule) {
+  const parts = []
+  if (Number(rule.minTotalSpent) === 0 && Number(rule.minTotalVisits) === 0) {
+    parts.push('For new members · earn points every wash')
+  }
+  if (rule.pointMultiplier) parts.push(`×${rule.pointMultiplier} point multiplier`)
+  if (rule.bookingWindowDays) parts.push(`book up to ${rule.bookingWindowDays} days ahead`)
+  if (rule.maxUpcomingBookings) parts.push(`up to ${rule.maxUpcomingBookings} queued bookings`)
+  return parts.join(' · ')
+}
 
 const STATS = [
   { num: 5000,  suffix: '+',  decimals: 0, label: 'Happy customers' },
@@ -145,6 +159,22 @@ const STATS = [
 export default function PublicCustomerDashboardPage() {
   const navigate = useNavigate()
   const { isAuthenticated, loading } = useAuth()
+  const [tierRules, setTierRules] = useState([])
+
+  useEffect(() => {
+    // Public endpoint — fetched regardless of auth state; falls back to the static list on failure.
+    let ignore = false
+    loyaltyApi.getTierRules()
+      .then((rules) => { if (!ignore) setTierRules(Array.isArray(rules) ? rules : []) })
+      .catch(() => {})
+    return () => { ignore = true }
+  }, [])
+
+  const displayTiers = tierRules.length > 0
+    ? [...tierRules]
+        .sort((a, b) => (a.priorityLevel ?? 0) - (b.priorityLevel ?? 0))
+        .map((rule) => ({ name: rule.tier, desc: describeTierRule(rule), color: rule.color || getTierColor(rule.tier) }))
+    : FALLBACK_TIERS
 
   useEffect(() => {
     const els = document.querySelectorAll('[data-animate]')
@@ -258,7 +288,7 @@ export default function PublicCustomerDashboardPage() {
       {/* ── SERVICES ── */}
       <section className="pcd-section" id="services">
         <div className="pcd-section-inner">
-          <div className="pcd-section-header" data-animate>
+          <div className="pcd-section-header">
             <p className="pcd-section-eyebrow">Services</p>
             <h2 className="pcd-section-title">Wash packages for every need</h2>
             <p className="pcd-section-sub">
@@ -270,8 +300,7 @@ export default function PublicCustomerDashboardPage() {
               <div
                 className="pcd-service-card"
                 key={svc.title}
-                style={{ '--svc-color': svc.color, '--anim-delay': `${i * 0.09}s` }}
-                data-animate
+                style={{ '--svc-color': svc.color }}
               >
                 <div className="pcd-service-icon-wrap">{svc.icon}</div>
                 {svc.badge && <span className="pcd-service-badge">{svc.badge}</span>}
@@ -297,14 +326,14 @@ export default function PublicCustomerDashboardPage() {
             </p>
           </div>
           <div className="pcd-tiers-grid">
-            {TIERS.map((tier, i) => (
+            {displayTiers.map((tier, i) => (
               <div
                 className="pcd-tier-card"
                 key={tier.name}
-                style={{ '--tier-color': getTierColor(tier.name), '--anim-delay': `${i * 0.09}s` }}
+                style={{ '--tier-color': tier.color, '--anim-delay': `${i * 0.09}s` }}
               >
                 <div className="pcd-tier-gem">
-                  <TierGemIcon tier={tier.name} size={32} />
+                  <TierGemIcon tier={tier.name} color={tier.color} size={32} />
                 </div>
                 <div className="pcd-tier-name">{tier.name}</div>
                 <p className="pcd-tier-desc">{tier.desc}</p>
@@ -318,6 +347,9 @@ export default function PublicCustomerDashboardPage() {
           </div>
         </div>
       </section>
+
+      {/* ── CUSTOMER REVIEWS — before footer ── */}
+      <PublicReviewShowcase />
 
       {/* ── FOOTER ── */}
       <footer className="pcd-footer">

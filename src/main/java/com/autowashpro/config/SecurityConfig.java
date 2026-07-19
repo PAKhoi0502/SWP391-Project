@@ -50,7 +50,9 @@ public class SecurityConfig {
                                 "/auth/logout",
                                 "/auth/forgot-password",
                                 "/auth/reset-password",
-                                "/payments/payos/webhook")
+                                "/payments/payos/webhook",
+                                "/public/reviews",
+                                "/public/reviews/stats")
                         .permitAll()
 
                         .requestMatchers(
@@ -93,6 +95,9 @@ public class SecurityConfig {
 .permitAll()
 
 .requestMatchers(HttpMethod.POST, "/bookings/guest")
+.permitAll()
+
+.requestMatchers(HttpMethod.GET, "/loyalty/tier-rules")
 .permitAll()
 
                         .anyRequest()

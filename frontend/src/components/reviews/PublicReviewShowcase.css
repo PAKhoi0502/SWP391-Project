@@ -1,0 +1,300 @@
+/* ════════════════════════════════════════════
+   PublicReviewShowcase — vertical conveyor belt
+   Before footer, full-width section
+   ════════════════════════════════════════════ */
+
+.prs-section {
+  background: #fff;
+  padding: 64px 24px 72px;
+  border-top: 1px solid rgba(23, 32, 51, 0.09);
+}
+
+.prs-inner {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* ── Header ── */
+.prs-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+.prs-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #2EC2F7;
+  margin: 0 0 5px;
+}
+
+.prs-title {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #172033;
+  margin: 0;
+  line-height: 1.2;
+}
+
+/* Average badge */
+.prs-avg-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 999px;
+  padding: 5px 14px 5px 10px;
+  flex-shrink: 0;
+}
+
+.prs-avg-num {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #172033;
+  line-height: 1;
+}
+
+.prs-avg-sub {
+  font-size: 11px;
+  color: #667085;
+  font-weight: 500;
+  margin-left: 3px;
+}
+
+/* ── Stars ── */
+.prs-stars {
+  display: inline-flex;
+  gap: 2px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+/* ── Avatar ── */
+.prs-avatar {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+  letter-spacing: 0.03em;
+}
+
+/* ════════════════════════════════════════════
+   CONVEYOR BELT CAROUSEL
+   ════════════════════════════════════════════
+
+   Stage: clips the belt. Height = 1 full card + gap + ~half card.
+   The ::after gradient covers the preview (lower) half,
+   creating the "dim zone". Cards escape it as they scroll up.
+
+   Track: 4 DOM slots in a flex column.
+   Track always starts at translateY = -(cardH + gap) so slot1 (main) is at y=0.
+   Advance scrolls to -(2·cardH + 2·gap); reset seamlessly to -(cardH+gap).
+*/
+
+.prs-stage {
+  overflow: hidden;
+  position: relative;
+  /* height set imperatively by useLayoutEffect */
+}
+
+/* Gradient "dim zone" covering the preview card area.
+   Starts at ~65% of stage height (just before the preview card begins)
+   and fades to near-white at the bottom. */
+.prs-stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 62%,
+    rgba(255, 255, 255, 0.75) 78%,
+    rgba(255, 255, 255, 0.97) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.prs-track {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* transform set imperatively */
+}
+
+.prs-slot {
+  width: 100%;
+  flex-shrink: 0;
+}
+
+/* ════════════════════════════════════════════
+   CARD INNER — same size for all cards
+   ════════════════════════════════════════════ */
+
+.prs-card-inner {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(23, 32, 51, 0.09);
+  border-radius: 18px;
+  padding: 24px 26px 20px;
+  box-shadow: 0 3px 20px rgba(23, 32, 51, 0.07);
+}
+
+/* Card top row */
+.prs-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.prs-card-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.prs-card-name {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #172033;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prs-card-service {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #2EC2F7;
+  background: rgba(46, 194, 247, 0.09);
+  border: 1px solid rgba(46, 194, 247, 0.20);
+  border-radius: 999px;
+  padding: 1px 7px;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+/* Quote block */
+.prs-card-quote {
+  font-size: 14.5px;
+  line-height: 1.68;
+  color: #374151;
+  margin: 0 0 14px;
+  font-style: italic;
+}
+
+.prs-qmark {
+  font-size: 20px;
+  line-height: 0;
+  vertical-align: -5px;
+  color: #2EC2F7;
+  font-style: normal;
+  font-weight: 900;
+  margin: 0 2px;
+}
+.prs-qmark--r { vertical-align: -7px; }
+
+/* Images */
+.prs-card-images {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.prs-card-img {
+  width: 66px;
+  height: 66px;
+  object-fit: cover;
+  border-radius: 9px;
+  border: 1px solid rgba(23, 32, 51, 0.07);
+  display: block;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.prs-card-img:hover {
+  transform: scale(1.07);
+  box-shadow: 0 4px 12px rgba(23, 32, 51, 0.13);
+}
+
+/* Garage tag */
+.prs-card-garage {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* ── Empty state ── */
+.prs-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 24px;
+  color: #94a3b8;
+  font-size: 13.5px;
+  text-align: center;
+  border: 1px dashed rgba(23, 32, 51, 0.12);
+  border-radius: 16px;
+}
+
+/* ── Loading skeleton ── */
+.prs-skel-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@keyframes prs-shimmer {
+  0%   { background-position: -500px 0; }
+  100% { background-position: 500px 0; }
+}
+
+.prs-skel {
+  border-radius: 8px;
+  background: linear-gradient(90deg, #f4f4f4 25%, #ececec 50%, #f4f4f4 75%);
+  background-size: 1000px 100%;
+  animation: prs-shimmer 1.5s infinite linear;
+}
+
+.prs-skel--label   { height: 12px; width: 36%; }
+.prs-skel--title   { height: 22px; width: 62%; }
+.prs-skel--card    { height: 160px; border-radius: 18px; }
+.prs-skel--preview { height: 66px; border-radius: 13px; }
+
+/* ════════════════════════════════════════════
+   RESPONSIVE
+   ════════════════════════════════════════════ */
+
+@media (max-width: 720px) {
+  .prs-section { padding: 48px 16px 56px; }
+
+  .prs-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .prs-title { font-size: 1.2rem; }
+
+  .prs-card-inner { padding: 18px 14px; }
+
+  .prs-card-img { width: 58px; height: 58px; }
+}
+
+@media (max-width: 480px) {
+  .prs-avg-num { font-size: 1.15rem; }
+}
