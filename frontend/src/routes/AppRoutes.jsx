@@ -60,6 +60,7 @@ import AdminResearchExportPage from '../pages/admin/AdminResearchExportPage'
 import AdminAuditLogPage from '../pages/admin/AdminAuditLogPage'
 import AdminDepositRefundsPage from '../pages/admin/AdminDepositRefundsPage'
 import AdminReviewsPage from '../pages/admin/AdminReviewsPage'
+import CustomerLeaderboardPage from '../pages/leaderboard/CustomerLeaderboardPage'
 
 
 function AppRoutes() {
@@ -88,6 +89,7 @@ function AppRoutes() {
           <Route path="/customer/notifications" element={<CustomerNotificationListPage />} />
           <Route path="/customer/notifications/:id" element={<CustomerNotificationDetailPage />} />
           <Route path="/customer/waitlist" element={<WaitlistPage />} />
+          <Route path="/customer/leaderboard" element={<CustomerLeaderboardPage />} />
         </Route>
       </Route>
 

@@ -14,6 +14,8 @@ public class ReviewResponse {
     private Long bookingId;
     private Long customerId;
     private String customerName;
+    private String avatarUrl;
+    private String initials;
     private Integer rating;
     private String comment;
     private List<String> imageUrls;

@@ -44,6 +44,9 @@ class AnalyticsControllerTest {
     private AnalyticsService analyticsService;
 
     @MockitoBean
+    private AdminDashboardBookingService adminDashboardBookingService;
+
+    @MockitoBean
     private JwtService jwtService;
 
     @MockitoBean

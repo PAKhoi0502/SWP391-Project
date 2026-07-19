@@ -1,6 +1,7 @@
 package com.autowashpro.service;
 
 import com.autowashpro.dto.request.UpdateLoyaltyTierRuleRequest;
+import com.autowashpro.dto.response.LeaderboardResponse;
 import com.autowashpro.dto.response.LoyaltyOverviewResponse;
 import com.autowashpro.dto.response.LoyaltyTierRuleResponse;
 import com.autowashpro.entity.CustomerLoyalty;
@@ -42,4 +43,6 @@ void adjustPoints(Long customerId, Integer points, String type, String reason);
 Page<PointTransactionResponse> getMyTransactions(Long customerId, int page, int limit, String type);
 
 RedeemPreviewResponse redeemPreview(Long customerId, RedeemPreviewRequest request);
+
+LeaderboardResponse getLeaderboard(String period, int page, int limit, Long currentCustomerId);
 }

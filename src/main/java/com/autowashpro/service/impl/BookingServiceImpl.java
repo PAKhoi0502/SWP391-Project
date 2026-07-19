@@ -20,6 +20,7 @@ import com.autowashpro.entity.enums.WashBayStatus;
 import com.autowashpro.repository.*;
 import com.autowashpro.service.BookingService;
 import com.autowashpro.service.LoyaltyService;
+import com.autowashpro.service.LoyaltyPointExpiryService;
 import com.autowashpro.service.PromotionService;
 import com.autowashpro.service.EmailService;
 
@@ -90,6 +91,7 @@ public class BookingServiceImpl implements BookingService {
         private final BookingAddOnServicePackageRepository bookingAddOnServicePackageRepository;
         private final PointTransactionRepository pointTransactionRepository;
         private final LoyaltyService loyaltyService;
+        private final LoyaltyPointExpiryService loyaltyPointExpiryService;
         private final WashHistoryService washHistoryService;
         private final PromotionService promotionService;
         private final NotificationService notificationService;
@@ -674,19 +676,7 @@ public class BookingServiceImpl implements BookingService {
                                 transaction);
 
                 if (usedPoints > 0) {
-                        loyalty.setAvailablePoints(loyalty.getAvailablePoints() - usedPoints);
-                        loyalty.setRedeemedPoints(loyalty.getRedeemedPoints() + usedPoints);
-                        customerLoyaltyRepository.save(loyalty);
-
-                        PointTransaction redeemTx = new PointTransaction();
-                        redeemTx.setCustomerId(customerId);
-                        redeemTx.setBookingId(saved.getId());
-                        redeemTx.setType("REDEEM");
-                        redeemTx.setPoints(-usedPoints);
-                        redeemTx.setRemainingPoints(0);
-                        redeemTx.setSource("BOOKING_REDEEM");
-                        redeemTx.setNote("Redeemed " + usedPoints + " points for booking #" + saved.getId());
-                        pointTransactionRepository.save(redeemTx);
+                        loyaltyPointExpiryService.consumePointsFifo(customerId, usedPoints, saved.getId());
                 }
 
                 int sortOrder = 1;

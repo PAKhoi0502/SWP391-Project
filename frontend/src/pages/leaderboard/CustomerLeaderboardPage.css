@@ -1,0 +1,431 @@
+/* ════ LEADERBOARD PAGE (lb-*  lbt-*) ════ */
+
+/* ── Page Shell ───────────────────────────────────────────────────────────── */
+.lb-page-shell {
+  position: relative;
+  min-height: 100vh;
+  isolation: isolate;
+  padding-top: 112px;
+}
+
+/* ── Hero Background ──────────────────────────────────────────────────────── */
+.lb-background {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+}
+.lb-background-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+.lb-background-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    160deg,
+    rgba(10, 20, 50, 0.84) 0%,
+    rgba(14, 30, 72, 0.80) 40%,
+    rgba(7, 25, 55, 0.90) 100%
+  );
+}
+
+/* ── Page Container ───────────────────────────────────────────────────────── */
+.lb-page {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+.lb-header { text-align: center; padding: 20px 16px 4px; }
+.lb-trophy-wrap {
+  color: #7dd3fc;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+.lb-title {
+  font-size: 30px;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 8px;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+.lb-subtitle { font-size: 15px; color: #bae6fd; margin: 0 0 4px; }
+.lb-note { font-size: 12px; color: #93c5fd; margin: 0; }
+
+/* ── Period Tabs — Glassmorphism ──────────────────────────────────────────── */
+.lb-period-tabs {
+  display: flex;
+  gap: 12px;
+  width: fit-content;
+  margin: 0 auto;
+}
+.lb-period-card {
+  border-radius: 14px;
+  padding: 14px 20px;
+  min-width: 175px;
+  max-width: 210px;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.18s, box-shadow 0.18s, border-color 0.18s;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.22);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: rgba(255,255,255,0.70);
+}
+.lb-period-card:hover:not(.lb-period-card--active) {
+  background: rgba(255,255,255,0.14);
+  border-color: rgba(255,255,255,0.38);
+  color: rgba(255,255,255,0.90);
+}
+.lb-period-card--active {
+  background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+  border: 1.5px solid #38bdf8;
+  box-shadow: 0 0 22px rgba(14,165,233,0.40), 0 4px 12px rgba(0,0,0,0.25);
+  color: #ffffff;
+}
+.lb-period-card:focus-visible { outline: 2px solid #38bdf8; outline-offset: 3px; }
+.lb-period-card-icon { display: flex; align-items: center; justify-content: center; margin-bottom: 2px; }
+.lb-period-card-label { font-size: 14px; font-weight: 700; line-height: 1.2; }
+.lb-period-card-sub { font-size: 11px; font-weight: 400; opacity: 0.80; line-height: 1.3; }
+
+/* ── Section Title ────────────────────────────────────────────────────────── */
+.lb-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.60);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 10px;
+}
+
+/* ── Podium ───────────────────────────────────────────────────────────────── */
+.lb-podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px 8px 0;
+}
+.lb-podium-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  max-width: 220px; /* widened for 160px PNG frame + label */
+}
+.lb-podium-name-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.lb-podium-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  text-align: center;
+  margin: 0;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+.lb-podium-score { font-size: 12px; color: #bae6fd; margin: 0; }
+.lb-podium-avatar-wrap { position: relative; }
+.lb-podium-block {
+  width: 100%;
+  border-radius: 12px 12px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+}
+.lb-podium-block--1 { height: 90px; background: linear-gradient(160deg,#1d4ed8 0%,#0e7490 100%); }
+.lb-podium-block--2 { height: 65px; background: linear-gradient(160deg,#3b82f6 0%,#0891b2 100%); }
+.lb-podium-block--3 { height: 48px; background: linear-gradient(160deg,#60a5fa 0%,#22d3ee 100%); }
+.lb-podium-num { color:#fff; font-size:14px; font-weight:800; }
+.lb-podium-slot--empty .lb-podium-empty-circle {
+  width:72px; height:72px; border-radius:50%;
+  background: rgba(255,255,255,0.10);
+  display:flex; align-items:center; justify-content:center;
+  font-size:22px; color:rgba(255,255,255,0.4);
+}
+
+/* lba-* avatar component styles live in LeaderboardAvatar.css (imported by the component) */
+
+/* ── Your Rank Badge ──────────────────────────────────────────────────────── */
+.lb-you-badge {
+  display: inline-block;
+  margin-left: 6px;
+  background: rgba(14,165,233,0.20);
+  color: #38bdf8;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 1px 7px;
+  border: 1px solid rgba(14,165,233,0.40);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* ── Current User Card ────────────────────────────────────────────────────── */
+.lb-current-card {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 16px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.lb-current-card--me {
+  border-color: rgba(14,165,233,0.50);
+  background: rgba(14,165,233,0.12);
+}
+.lb-current-left { display:flex; align-items:center; gap:14px; }
+.lb-current-info {}
+.lb-current-name { font-size:15px; font-weight:700; color:#fff; margin:0 0 2px; }
+.lb-current-score { font-size:13px; color:#bae6fd; margin:0; }
+.lb-current-right { text-align:right; flex-shrink:0; }
+.lb-current-rank { font-size:24px; font-weight:800; color:#38bdf8; margin:0; }
+.lb-current-rank--none { font-size:16px; color:rgba(255,255,255,0.40); }
+.lb-current-sub { font-size:11px; color:rgba(255,255,255,0.50); margin:2px 0 0; }
+.lb-current-sub--top3 { color:#4ade80; font-weight:600; }
+.lb-current-unranked { text-align:right; }
+.lb-current-hint { font-size:12px; color:rgba(255,255,255,0.50); margin:4px 0; }
+.lb-cta-link { font-size:12px; color:#38bdf8; font-weight:600; text-decoration:none; }
+.lb-cta-link:hover { text-decoration:underline; }
+
+/* ── Rank label colours in table ─────────────────────────────────────────── */
+.lb-rank--gold   { color: #f59e0b; font-weight: 800; }
+.lb-rank--silver { color: #94a3b8; font-weight: 800; }
+.lb-rank--bronze { color: #22d3ee; font-weight: 800; }
+
+/* ── Top Rankings Card (lbt-*) ────────────────────────────────────────────── */
+.lb-rankings-card {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 18px;
+  overflow: hidden;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.lbt-table { width: 100%; }
+
+.lbt-head {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  background: rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  gap: 10px;
+}
+
+.lbt-row {
+  display: flex;
+  align-items: center;
+  padding: 6px 16px;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  transition: background 0.12s;
+  min-height: 58px; /* accommodate 52px PNG frame for rank 1–3 */
+}
+.lbt-row:last-child { border-bottom: none; }
+.lbt-row:hover { background: rgba(255,255,255,0.05); }
+
+/* Top 3 row accents */
+.lbt-row--gold   { background: rgba(245,158,11,0.08); }
+.lbt-row--silver { background: rgba(148,163,184,0.08); }
+.lbt-row--bronze { background: rgba(34,211,238,0.08); }
+.lbt-row--me {
+  background: rgba(14,165,233,0.13) !important;
+  border-left: 3px solid #0ea5e9;
+}
+
+/* Cells */
+.lbt-cell { display:flex; align-items:center; flex-shrink:0; }
+.lbt-cell--rank  { width:46px; font-size:13px; font-weight:700; color:rgba(255,255,255,0.55); }
+.lbt-cell--player { flex:1; gap:10px; min-width:0; overflow:hidden; }
+.lbt-cell--washes { width:76px; font-size:13px; color:rgba(255,255,255,0.65); justify-content:flex-end; }
+.lbt-cell--score  { width:100px; font-size:13px; font-weight:700; color:#38bdf8; justify-content:flex-end; }
+
+.lbt-name {
+  font-size:13.5px;
+  font-weight:600;
+  color:#fff;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+/* ── Pagination ───────────────────────────────────────────────────────────── */
+.lb-pagination {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.lb-pagination-meta {
+  font-size: 12px;
+  color: rgba(255,255,255,0.45);
+  margin: 0;
+}
+.lb-pagination-btns {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.lb-page-btn {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 8px;
+  color: rgba(255,255,255,0.70);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  height: 34px;
+  min-width: 34px;
+  padding: 0 10px;
+  transition: background 0.12s;
+}
+.lb-page-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+}
+.lb-page-btn--active {
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: #fff;
+}
+.lb-page-btn:disabled { opacity:0.35; cursor:not-allowed; }
+.lb-page-btn:focus-visible { outline:2px solid #38bdf8; outline-offset:2px; }
+.lb-page-ellipsis { color:rgba(255,255,255,0.35); font-size:13px; padding:0 4px; }
+
+/* ── Skeleton ─────────────────────────────────────────────────────────────── */
+.lb-row--skeleton { pointer-events:none; display:flex; align-items:center; gap:12px; padding:10px 16px; }
+.lb-skeleton {
+  background: linear-gradient(90deg,rgba(255,255,255,0.06) 25%,rgba(255,255,255,0.12) 50%,rgba(255,255,255,0.06) 75%);
+  background-size: 200% 100%;
+  animation: lb-shimmer 1.2s infinite;
+  border-radius: 6px;
+}
+@keyframes lb-shimmer { 0% {background-position:200% 0} 100% {background-position:-200% 0} }
+.lb-skeleton--rank  { width:30px; height:14px; }
+.lb-skeleton--avatar { width:36px; height:36px; border-radius:50%; flex-shrink:0; }
+.lb-skeleton--name  { flex:1; height:14px; }
+.lb-skeleton--score { width:60px; height:14px; }
+.lb-skeleton--podium-card { height:200px; flex:1; border-radius:12px; }
+.lb-loading-podium { display:flex; gap:12px; padding:0 8px; }
+.lb-loading-list {
+  display:flex; flex-direction:column;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:16px; overflow:hidden;
+}
+
+/* ── Score Note ───────────────────────────────────────────────────────────── */
+.lb-score-note {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.45);
+  text-align: center;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.lb-score-note p { margin:0; }
+
+/* ── Error ────────────────────────────────────────────────────────────────── */
+.lb-error {
+  background: rgba(239,68,68,0.12);
+  border: 1px solid rgba(239,68,68,0.35);
+  border-radius: 12px;
+  padding: 14px 16px;
+  color: #fca5a5;
+  font-size: 13.5px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.lb-error p { margin:0; flex:1; }
+.lb-retry-btn {
+  background: rgba(239,68,68,0.15);
+  border: 1px solid rgba(239,68,68,0.40);
+  border-radius: 8px;
+  color: #fca5a5;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 6px 14px;
+}
+
+/* ── Empty States ─────────────────────────────────────────────────────────── */
+.lb-empty-podium {
+  text-align:center; padding:40px 16px;
+  color:rgba(255,255,255,0.40); font-size:15px;
+}
+.lb-empty-table {
+  text-align:center; padding:40px 16px;
+  color:rgba(255,255,255,0.40); font-size:14px;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .lb-page-shell { padding-top: 92px; }
+  .lbt-cell--washes { display: none; }
+  .lbt-head .lbt-cell--washes { display: none; }
+}
+@media (max-width: 600px) {
+  .lb-page-shell { padding-top: 88px; }
+  .lb-title { font-size: 24px; }
+  .lb-podium { gap: 4px; padding: 8px 2px 0; }
+  .lb-podium-name { font-size: 11px; max-width: 80px; }
+  .lb-podium-slot { max-width: 120px; }
+  /* Scale podium PNG frames on mobile — wrapper is inline so scale works */
+  .lb-podium-slot--1 .lba-framed { transform: scale(0.62); transform-origin: bottom center; }
+  .lb-podium-slot--2 .lba-framed,
+  .lb-podium-slot--3 .lba-framed { transform: scale(0.56); transform-origin: bottom center; }
+  .lb-current-card { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .lb-current-right { text-align: left; }
+  .lb-period-tabs { width: 100%; }
+  .lb-period-card { min-width: 0; flex: 1; }
+  .lbt-cell--score { width: 80px; font-size: 12px; }
+  .lbt-cell--rank { width: 38px; font-size: 12px; }
+}

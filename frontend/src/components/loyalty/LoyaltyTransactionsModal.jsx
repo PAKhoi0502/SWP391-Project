@@ -221,6 +221,11 @@ export default function LoyaltyTransactionsModal({ open, onClose }) {
                             Booking #{bookingNumberMap.get(String(tx.bookingId)) ?? tx.bookingId}
                           </span>
                         )}
+                        {meta.key === 'earn' && tx.expiredAt && (
+                          <span className="ltm-expiry-hint">
+                            Expires {formatDate(tx.expiredAt)}
+                          </span>
+                        )}
                       </div>
                       <div className="ltm-item-right">
                         {tx.balanceAfter != null && (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { getRedirectPathByRole, useAuth } from '../../contexts/AuthContext'
 import GoogleSignInButton from './GoogleSignInButton'
@@ -366,6 +366,12 @@ export default function AnimatedAuthShell() {
   const [isActive,   setIsActive]   = useState(isRegRoute)
   const [animReady,  setAnimReady]  = useState(false)
   const [entered,    setEntered]    = useState(false)
+
+  useLayoutEffect(() => {
+    // React Router preserves the previous page's scroll position. Reset it
+    // before paint so the fixed public navbar never overlaps the auth form.
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [location.pathname])
 
   useEffect(() => {
     // Lock body scroll on auth pages

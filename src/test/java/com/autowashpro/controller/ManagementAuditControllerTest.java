@@ -5,7 +5,10 @@ import com.autowashpro.common.AuditTargetType;
 import com.autowashpro.dto.request.AdjustPointsRequest;
 import com.autowashpro.dto.request.CreatePromotionRequest;
 import com.autowashpro.dto.response.PromotionResponse;
+import com.autowashpro.repository.ExpiryRunLogRepository;
+import com.autowashpro.scheduler.LoyaltyPointExpiryScheduler;
 import com.autowashpro.service.AuditLogService;
+import com.autowashpro.service.LoyaltyPointExpiryService;
 import com.autowashpro.service.LoyaltyService;
 import com.autowashpro.service.PromotionService;
 import org.junit.jupiter.api.AfterEach;
@@ -34,6 +37,15 @@ class ManagementAuditControllerTest {
 
     @Mock
     private LoyaltyService loyaltyService;
+
+    @Mock
+    private LoyaltyPointExpiryService loyaltyPointExpiryService;
+
+    @Mock
+    private LoyaltyPointExpiryScheduler loyaltyPointExpiryScheduler;
+
+    @Mock
+    private ExpiryRunLogRepository expiryRunLogRepository;
 
     @Mock
     private AuditLogService auditLogService;
@@ -78,7 +90,7 @@ class ManagementAuditControllerTest {
         when(request.getPoints()).thenReturn(100);
         when(request.getType()).thenReturn("ADMIN_ADJUSTMENT");
         when(request.getReason()).thenReturn("Service recovery");
-        LoyaltyController controller = new LoyaltyController(loyaltyService, auditLogService);
+        LoyaltyController controller = new LoyaltyController(loyaltyService, loyaltyPointExpiryService, auditLogService, loyaltyPointExpiryScheduler, expiryRunLogRepository);
 
         controller.adjustPoints(request);
 
