@@ -142,11 +142,6 @@
   border-color: #f1f5f9;
 }
 
-.tier-rule-card--bronze   { border-left-color: #cd7f32; }
-.tier-rule-card--silver   { border-left-color: #94a3b8; }
-.tier-rule-card--gold     { border-left-color: #f59e0b; }
-.tier-rule-card--platinum { border-left-color: #818cf8; }
-
 .tier-rule-card-header {
   display: flex;
   justify-content: space-between;
@@ -168,11 +163,6 @@
   padding: 3px 10px;
   text-transform: uppercase;
 }
-
-.tier-rule-badge--bronze   { background: #fdf6ec; color: #92400e; border-color: #cd7f32; }
-.tier-rule-badge--silver   { background: #f8fafc; color: #475569; border-color: #94a3b8; }
-.tier-rule-badge--gold     { background: #fffbeb; color: #78350f; border-color: #f59e0b; }
-.tier-rule-badge--platinum { background: #f5f3ff; color: #5b21b6; border-color: #818cf8; }
 
 .tier-rule-card-header-right {
   display: flex;
@@ -416,6 +406,46 @@
 .tier-form-error {
   color: #dc2626;
   font-size: 12px;
+}
+
+.tier-color-row {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.tier-color-swatch {
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  height: 38px;
+  padding: 2px;
+  width: 44px;
+}
+
+.tier-color-hex {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-sizing: border-box;
+  color: #0f172a;
+  font-size: 13.5px;
+  outline: none;
+  padding: 9px 12px;
+  text-transform: uppercase;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+
+.tier-color-hex:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.tier-color-hex.has-error {
+  border-color: #fca5a5;
 }
 
 .tier-form-checkbox-field {

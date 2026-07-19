@@ -24,4 +24,6 @@ public class CreateLoyaltyTierRuleRequest {
     private BigDecimal pointMultiplier;
 
     private Integer priorityLevel;
+
+    private String color;
 }

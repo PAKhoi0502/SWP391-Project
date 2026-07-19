@@ -1039,7 +1039,12 @@ public class BookingServiceImpl implements BookingService {
                         matchedVehicle = vehicleRepository.save(newVehicle);
                 }
 
-                String paymentMethod = normalizeWalkInPaymentMethod(request.getPaymentMethod());
+                BigDecimal originalPrice = sumBasePrice(selectedPackages);
+                BigDecimal depositAmount = originalPrice
+                                .multiply(DEPOSIT_PERCENT)
+                                .setScale(2, RoundingMode.HALF_UP);
+                LocalDateTime paymentExpiredAt = LocalDateTime.now()
+                                .plusMinutes(PAYMENT_TIMEOUT_MINUTES);
 
                 Booking booking = new Booking();
                 booking.setCustomerId(matchedCustomer != null ? matchedCustomer.getId() : null);
@@ -1050,16 +1055,16 @@ public class BookingServiceImpl implements BookingService {
                 booking.setBookingDate(startTime.toLocalDate());
                 booking.setStartTime(startTime);
                 booking.setEndTime(endTime);
-                booking.setStatus("CONFIRMED");
+                booking.setStatus("PENDING_DEPOSIT");
                 booking.setPaymentStatus("UNPAID");
-                booking.setPaymentMethod(paymentMethod);
-                BigDecimal originalPrice = sumBasePrice(selectedPackages);
+                booking.setPaymentMethod("PAYOS");
                 booking.setOriginalPrice(originalPrice);
                 booking.setSurchargeAmount(BigDecimal.ZERO);
                 booking.setDiscountAmount(BigDecimal.ZERO);
                 booking.setFinalPrice(originalPrice);
-                booking.setDepositAmount(BigDecimal.ZERO);
+                booking.setDepositAmount(depositAmount);
                 booking.setDepositStatus("UNPAID");
+                booking.setPaymentExpiredAt(paymentExpiredAt);
                 booking.setRefundAmount(BigDecimal.ZERO);
                 booking.setIsWalkIn(false);
                 booking.setGuestName(matchedCustomer != null ? matchedCustomer.getFullName() : request.getGuestName());
@@ -1080,8 +1085,6 @@ public class BookingServiceImpl implements BookingService {
                         bookingAddOnServicePackageRepository.save(bookingAddOn);
                 }
 
-                loyaltyService.updateBookingStatistics(saved.getId());
-                notificationService.notifyBookingConfirmed(saved.getId());
                 return toResponse(saved);
         }
 
@@ -2464,6 +2467,8 @@ public class BookingServiceImpl implements BookingService {
                                 .finalPrice(b.getFinalPrice())
                                 .depositAmount(b.getDepositAmount())
                                 .depositStatus(b.getDepositStatus())
+                                .depositPaidAt(b.getDepositPaidAt())
+                                .depositTransactionId(b.getDepositTransactionId())
                                 .refundAmount(b.getRefundAmount())
                                 .isWalkIn(b.getIsWalkIn())
                                 .usedPoints(b.getUsedPoints())

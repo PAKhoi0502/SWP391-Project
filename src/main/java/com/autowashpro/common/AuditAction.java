@@ -41,6 +41,10 @@ public final class AuditAction {
     public static final String LOYALTY_TIER_RULE_CREATED = "LOYALTY_TIER_RULE_CREATED";
     public static final String LOYALTY_TIER_RULE_UPDATED = "LOYALTY_TIER_RULE_UPDATED";
     public static final String LOYALTY_POINTS_ADJUSTED = "LOYALTY_POINTS_ADJUSTED";
+    public static final String DEPOSIT_REFUND_REQUESTED = "DEPOSIT_REFUND_REQUESTED";
+    public static final String DEPOSIT_REFUND_APPROVED = "DEPOSIT_REFUND_APPROVED";
+    public static final String DEPOSIT_REFUND_REJECTED = "DEPOSIT_REFUND_REJECTED";
+    public static final String DEPOSIT_REFUND_EXECUTED = "DEPOSIT_REFUND_EXECUTED";
 
     private AuditAction() {
     }

@@ -6,6 +6,8 @@ import { loyaltyApi } from '../../api/loyaltyApi'
 import { getServicePackageById, getPackageName } from '../../services/servicePackageApi'
 import { vehicleInspectionApi } from '../../api/vehicleInspectionApi'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
+import DepositQrModal from '../../components/Booking/DepositQrModal'
+import DepositRefundPanel from '../../components/Booking/DepositRefundPanel'
 import ReviewModal from '../../components/reviews/ReviewModal'
 import './BookingHistoryPage.css'
 
@@ -141,6 +143,18 @@ const getStatusText = (status) => {
   return status || 'N/A'
 }
 
+const persistPayOSReturnPath = (path, result) => {
+  const orderCode = result?.orderCode || result?.order_code
+  ;[localStorage, sessionStorage].forEach((storage) => {
+    storage.setItem('payosReturnPath', path)
+    storage.setItem('payosLastReturnPath', path)
+  })
+  if (orderCode) {
+    localStorage.setItem(`payosReturnPath-${orderCode}`, path)
+    sessionStorage.setItem(`payosReturnPath-${orderCode}`, path)
+  }
+}
+
 const getPaymentText = (status) => {
   const v = String(status || '').toUpperCase()
   if (v === 'PAID')                          return 'Paid'
@@ -168,6 +182,29 @@ const getStatusBadgeClass = (status) => {
 const getPaymentBadgeClass = (status) => {
   const v = String(status || '').toUpperCase()
   return v === 'PAID' ? 'bhp-badge bhp-badge--paid' : 'bhp-badge bhp-badge--unpaid'
+}
+
+const getDepositText = (status) => {
+  const v = String(status || '').toUpperCase()
+  if (v === 'NOT_REQUIRED') return 'No deposit'
+  if (v === 'PENDING' || v === 'UNPAID') return 'Deposit pending'
+  if (v === 'PAID')         return 'Deposit paid'
+  if (v === 'FAILED')       return 'Deposit failed'
+  if (v === 'CANCELLED' || v === 'CANCELED') return 'Deposit canceled'
+  if (v === 'EXPIRED')      return 'Deposit expired'
+  if (v === 'REFUND_PENDING') return 'Refund pending'
+  if (v === 'REFUNDED')     return 'Refunded'
+  if (v === 'FORFEITED')    return 'Forfeited'
+  return 'Deposit pending'
+}
+
+const getDepositBadgeClass = (status) => {
+  const v = String(status || '').toUpperCase()
+  if (v === 'PAID' || v === 'REFUNDED') return 'bhp-badge bhp-badge--paid'
+  if (v === 'FAILED' || v === 'CANCELLED' || v === 'CANCELED' || v === 'FORFEITED') return 'bhp-badge bhp-badge--cancelled'
+  if (v === 'EXPIRED' || v === 'NOT_REQUIRED') return 'bhp-badge bhp-badge--deposit-neutral'
+  if (v === 'REFUND_PENDING') return 'bhp-badge bhp-badge--deposit-pending'
+  return 'bhp-badge bhp-badge--deposit-pending'
 }
 
 const getCardClass = (status) => {
@@ -296,7 +333,7 @@ const getHistoryTimelineItems = (booking, serviceSteps = [], inspections = []) =
 /* ══════════════════════════════════════════════════
    BookingDetailModal — inline, same vibe
    ══════════════════════════════════════════════════ */
-function BookingDetailModal({ booking, steps, numberMap, onClose }) {
+function BookingDetailModal({ booking, steps, numberMap, onClose, onRefunded }) {
   if (!booking) return null
   const bookingId         = getBookingId(booking)
   const customerBookingNo = numberMap.get(String(bookingId)) ?? bookingId
@@ -320,6 +357,9 @@ function BookingDetailModal({ booking, steps, numberMap, onClose }) {
             )}
             <span className={getStatusBadgeClass(status)}>{getStatusText(status)}</span>
             <span className={getPaymentBadgeClass(paymentStatus)}>{getPaymentText(paymentStatus)}</span>
+            {Number(booking?.depositAmount) > 0 && (
+              <span className={getDepositBadgeClass(booking?.depositStatus)}>{getDepositText(booking?.depositStatus)}</span>
+            )}
           </div>
 
           {/* Booking info */}
@@ -398,7 +438,21 @@ function BookingDetailModal({ booking, steps, numberMap, onClose }) {
                 <span className="bhp-detail-row-value">{formatDateTime(booking.paidAt)}</span>
               </div>
             )}
+            {Number(booking?.refundAmount) > 0 && (
+              <div className="bhp-detail-row">
+                <span className="bhp-detail-row-label">Refund</span>
+                <span className="bhp-detail-row-value">{formatMoney(booking.refundAmount)}</span>
+              </div>
+            )}
           </div>
+
+          {Number(booking?.refundAmount) > 0 && (
+            <DepositRefundPanel
+              bookingId={bookingId}
+              refundAmount={booking.refundAmount}
+              onRefunded={onRefunded}
+            />
+          )}
 
           {/* Cancel / no-show reason */}
           {(isCanceledStatus(status) || isNoShowStatus(status)) && booking?.note && (
@@ -457,6 +511,16 @@ export default function BookingHistoryPage() {
   const [detailBooking,        setDetailBooking]        = useState(null)
   const sentinelRef = useRef(null)
   const [inspectionsByBookingId, setInspectionsByBookingId] = useState({})
+
+  const [depositBooking,        setDepositBooking]        = useState(null)
+  const [depositLoading,        setDepositLoading]        = useState(false)
+  const [depositQrOpen,         setDepositQrOpen]         = useState(false)
+  const [depositTransaction,    setDepositTransaction]    = useState(null)
+  const [depositCheckoutUrl,    setDepositCheckoutUrl]    = useState('')
+  const [depositRefreshLoading, setDepositRefreshLoading] = useState(false)
+  const [depositCancelLoading,  setDepositCancelLoading]  = useState(false)
+  const [depositSuccess,        setDepositSuccess]        = useState(false)
+  const [depositQrError,        setDepositQrError]        = useState('')
 
   const fetchInspectionsForBookings = async (bookingList) => {
     if (!Array.isArray(bookingList) || bookingList.length === 0) return
@@ -647,6 +711,140 @@ export default function BookingHistoryPage() {
     }
   }
 
+  const handlePayDeposit = async (booking) => {
+    const bookingId = getBookingId(booking)
+    if (!bookingId) return
+    setDepositBooking(booking)
+    setDepositLoading(true)
+    setDepositQrError('')
+    setDepositSuccess(false)
+    try {
+      const result = await bookingApi.createPayOSPayment(bookingId)
+      persistPayOSReturnPath('/customer/booking-history', result)
+
+      let txData = {
+        orderCode: result.orderCode,
+        qrCode: result.qrCode,
+        checkoutUrl: result.checkoutUrl,
+        amount: booking?.depositAmount,
+        status: 'PENDING',
+      }
+
+      try {
+        const transactions = await bookingApi.getPaymentTransactions(bookingId)
+        const matchingTx =
+          transactions.find((tx) => String(tx.orderCode) === String(result.orderCode)) ||
+          transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PENDING')
+        if (matchingTx) {
+          txData = { ...matchingTx, qrCode: matchingTx.qrCode || result.qrCode }
+        }
+      } catch {
+        // silently ignore — use data from createPayOSPayment response
+      }
+
+      setDepositTransaction(txData)
+      setDepositCheckoutUrl(result.checkoutUrl || '')
+      setDepositQrOpen(true)
+    } catch (err) {
+      setDepositQrError(err?.response?.data?.message || err?.message || 'Failed to create deposit payment.')
+      setDepositQrOpen(true)
+    } finally {
+      setDepositLoading(false)
+    }
+  }
+
+  const handleDepositRefresh = async () => {
+    const bookingId = getBookingId(depositBooking)
+    setDepositRefreshLoading(true)
+    setDepositQrError('')
+    try {
+      if (depositTransaction?.id) {
+        const tx = await bookingApi.getPaymentTransaction(depositTransaction.id)
+        setDepositTransaction((prev) => ({ ...prev, ...tx }))
+        if (String(tx?.status || '').toUpperCase() === 'PAID') {
+          setDepositSuccess(true)
+          loadBookings(true)
+        }
+      } else if (bookingId) {
+        const transactions = await bookingApi.getPaymentTransactions(bookingId)
+        const paidTx = transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
+        if (paidTx) {
+          setDepositTransaction((prev) => ({ ...prev, ...paidTx }))
+          setDepositSuccess(true)
+          loadBookings(true)
+        } else {
+          const pendingTx = transactions.find(
+            (tx) => String(tx.orderCode) === String(depositTransaction?.orderCode),
+          )
+          if (pendingTx) setDepositTransaction((prev) => ({ ...prev, ...pendingTx }))
+        }
+      }
+    } catch {
+      setDepositQrError('Refresh failed. Please try again.')
+    } finally {
+      setDepositRefreshLoading(false)
+    }
+  }
+
+  const handleDepositCancelTransaction = async () => {
+    setDepositCancelLoading(true)
+    setDepositQrError('')
+    try {
+      if (depositTransaction?.id) {
+        await bookingApi.cancelPaymentTransaction(depositTransaction.id)
+      }
+      setDepositQrOpen(false)
+      setDepositBooking(null)
+      setDepositTransaction(null)
+      setDepositCheckoutUrl('')
+    } catch (err) {
+      setDepositQrError(err?.response?.data?.message || err?.message || 'Failed to cancel transaction.')
+    } finally {
+      setDepositCancelLoading(false)
+    }
+  }
+
+  const handleDepositQrClose = () => {
+    if (depositRefreshLoading || depositCancelLoading) return
+    setDepositQrOpen(false)
+    setDepositSuccess(false)
+    setDepositQrError('')
+    setDepositBooking(null)
+  }
+
+  useEffect(() => {
+    if (!depositQrOpen || depositSuccess) return undefined
+
+    const bookingId = getBookingId(depositBooking)
+    const txId = depositTransaction?.id
+
+    const poll = async () => {
+      try {
+        if (txId) {
+          const tx = await bookingApi.getPaymentTransaction(txId)
+          if (String(tx?.status || '').toUpperCase() === 'PAID') {
+            setDepositTransaction((prev) => ({ ...prev, ...tx }))
+            setDepositSuccess(true)
+            loadBookings(true)
+          }
+        } else if (bookingId) {
+          const txs = await bookingApi.getPaymentTransactions(bookingId)
+          const paidTx = txs.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
+          if (paidTx) {
+            setDepositTransaction((prev) => ({ ...prev, ...paidTx }))
+            setDepositSuccess(true)
+            loadBookings(true)
+          }
+        }
+      } catch {
+        // silently ignore
+      }
+    }
+
+    const timer = setInterval(poll, 4000)
+    return () => clearInterval(timer)
+  }, [depositQrOpen, depositSuccess, depositTransaction?.id, depositBooking])
+
   const customerBookingNumberMap = useMemo(() => buildCustomerBookingNumberMap(bookings), [bookings])
 
   const filteredBookings = useMemo(
@@ -739,7 +937,9 @@ export default function BookingHistoryPage() {
               const customerBookingNo = customerBookingNumberMap.get(String(bookingId)) ?? bookingId
               const paymentStatus     = String(booking?.paymentStatus || '').toUpperCase()
               const status            = String(booking?.status || '').toUpperCase()
-              const canCancel         = status === 'CONFIRMED' || status === 'PENDING_DEPOSIT'
+              const depositStatusRaw   = String(booking?.depositStatus || '').toUpperCase()
+              const depositPending     = status === 'PENDING_DEPOSIT' && Number(booking?.depositAmount) > 0 && depositStatusRaw !== 'PAID'
+              const canCancel          = (status === 'CONFIRMED' || status === 'PENDING_DEPOSIT') && !depositPending
               const steps             = serviceStepsByBookingId[String(bookingId)] || []
               const timelineItems     = getHistoryTimelineItems(booking, steps)
               const batchDelay        = `${(idx % PAGE_SIZE) * 0.06}s`
@@ -764,6 +964,9 @@ export default function BookingHistoryPage() {
                       )}
                       <span className={getStatusBadgeClass(status)}>{getStatusText(status)}</span>
                       <span className={getPaymentBadgeClass(paymentStatus)}>{getPaymentText(paymentStatus)}</span>
+                      {Number(booking?.depositAmount) > 0 && (
+                        <span className={getDepositBadgeClass(booking?.depositStatus)}>{getDepositText(booking?.depositStatus)}</span>
+                      )}
                     </div>
                   </div>
 
@@ -839,6 +1042,18 @@ export default function BookingHistoryPage() {
 
                   {/* Card footer */}
                   <div className="bhp-card-foot">
+                    {depositPending && (
+                      <button
+                        type="button"
+                        className="bhp-pay-deposit-btn"
+                        onClick={() => handlePayDeposit(booking)}
+                        disabled={depositLoading && String(getBookingId(depositBooking)) === String(bookingId)}
+                      >
+                        {depositLoading && String(getBookingId(depositBooking)) === String(bookingId)
+                          ? 'Creating...'
+                          : 'Pay deposit'}
+                      </button>
+                    )}
                     {canCancel && (
                       <button
                         type="button"
@@ -883,6 +1098,7 @@ export default function BookingHistoryPage() {
           steps={serviceStepsByBookingId[String(getBookingId(detailBooking))] || []}
           numberMap={customerBookingNumberMap}
           onClose={() => setDetailBooking(null)}
+          onRefunded={() => loadBookings(true)}
         />
       )}
 
@@ -893,6 +1109,21 @@ export default function BookingHistoryPage() {
         loading={cancelingId === cancelModalBookingId}
         onClose={closeCancelModal}
         onConfirm={handleCancelBooking}
+      />
+
+      {/* Deposit payment modal */}
+      <DepositQrModal
+        open={depositQrOpen}
+        onClose={handleDepositQrClose}
+        booking={depositBooking}
+        transaction={depositTransaction}
+        checkoutUrl={depositCheckoutUrl}
+        error={depositQrError}
+        onRefresh={handleDepositRefresh}
+        onCancelTransaction={handleDepositCancelTransaction}
+        refreshLoading={depositRefreshLoading}
+        cancelLoading={depositCancelLoading}
+        paymentSuccess={depositSuccess}
       />
 
       {/* Review modal */}

@@ -191,7 +191,7 @@ class PaymentServiceImplTest {
 
         paymentService.handlePayOSWebhook(webhookPayload(transaction.getOrderCode(), "00"));
 
-        assertEquals("SUCCESS", transaction.getStatus());
+        assertEquals("PAID", transaction.getStatus());
         assertNotNull(transaction.getPaidAt());
         assertEquals("payment-link-123", transaction.getPayosTransactionId());
         assertEquals("PAID", booking.getPaymentStatus());
@@ -227,7 +227,7 @@ class PaymentServiceImplTest {
     void handlePayOSWebhookIgnoresAlreadyProcessedTransaction() throws Exception {
         Booking booking = completedBooking();
         PaymentTransaction transaction = pendingTransaction(booking);
-        transaction.setStatus("SUCCESS");
+        transaction.setStatus("PAID");
         when(payOS.verifyPaymentWebhookData(any(Webhook.class))).thenReturn(webhookData(transaction.getOrderCode(), "00"));
         when(transactionRepository.findByOrderCode(transaction.getOrderCode())).thenReturn(Optional.of(transaction));
 
@@ -250,7 +250,7 @@ class PaymentServiceImplTest {
 
         paymentService.handlePayOSWebhook(webhookPayload(transaction.getOrderCode(), "00"));
 
-        assertEquals("SUCCESS", transaction.getStatus());
+        assertEquals("PAID", transaction.getStatus());
         verify(transactionRepository).save(transaction);
         verify(bookingRepository, never()).save(booking);
         verify(loyaltyService, never()).earnPointsAfterPaidBooking(any());

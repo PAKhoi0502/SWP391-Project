@@ -10,4 +10,5 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     List<PaymentTransaction> findByBookingIdOrderByCreatedAtDesc(Long bookingId);
     Optional<PaymentTransaction> findByOrderCode(Long orderCode);
     Optional<PaymentTransaction> findByBookingIdAndStatus(Long bookingId, String status);
+    List<PaymentTransaction> findByBookingIdAndPurposeOrderByCreatedAtDesc(Long bookingId, String purpose);
 }

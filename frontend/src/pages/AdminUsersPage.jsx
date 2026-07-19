@@ -133,12 +133,26 @@ export default function AdminUsersPage() {
   )
 }
 
+function getInitial(user) {
+  return String(user?.fullName || user?.email || 'U').trim().charAt(0).toUpperCase()
+}
+
+function UserAvatar({ user }) {
+  if (user.avatarUrl) {
+    return <img className="aup-user-avatar" src={user.avatarUrl} alt="" />
+  }
+  return <div className="aup-user-avatar aup-user-avatar-fallback">{getInitial(user)}</div>
+}
+
 function UserCell({ user }) {
   return (
     <div className="aup-user-cell">
-      <span className="aup-user-name">{user.fullName || 'No name'}</span>
-      <span className="aup-user-email">{user.email || '-'}</span>
-      <span className="aup-user-phone">{user.phone || '-'}</span>
+      <UserAvatar user={user} />
+      <div className="aup-user-cell-text">
+        <span className="aup-user-name">{user.fullName || 'No name'}</span>
+        <span className="aup-user-email">{user.email || '-'}</span>
+        <span className="aup-user-phone">{user.phone || '-'}</span>
+      </div>
     </div>
   )
 }
@@ -167,6 +181,7 @@ function UserDetailModal({ user, onClose, onAction }) {
   return (
     <Modal open={Boolean(user)} title="User detail" onClose={onClose}>
       <div style={{ display: 'grid', gap: 14 }}>
+        <div className="aup-detail-avatar-row"><UserAvatar user={user} /></div>
         <DetailRow label="ID" value={user.id} />
         <DetailRow label="Full name" value={user.fullName || '-'} />
         <DetailRow label="Email" value={user.email || '-'} />

@@ -3,6 +3,8 @@ package com.autowashpro.service;
 import com.autowashpro.dto.response.NotificationResponse;
 import org.springframework.data.domain.Page;
 
+import java.math.BigDecimal;
+
 public interface NotificationService {
 
     // ===================== INTERNAL =====================
@@ -25,7 +27,13 @@ public interface NotificationService {
     void notifyVoucherReceived(Long customerId, String promotionCode, String promotionName);
 
     void notifyPointsAdjusted(Long customerId, Integer points, String reason);
-    
+
+    void notifyDepositRefundApproved(Long customerId, Long bookingId, BigDecimal amount);
+
+    void notifyDepositRefundRejected(Long customerId, Long bookingId, String reason);
+
+    void notifyDepositRefundCompleted(Long customerId, Long bookingId, BigDecimal amount);
+
     // ===================== API =====================
     Page<NotificationResponse> getMyNotifications(Long userId, Boolean isRead, int page, int limit);
 

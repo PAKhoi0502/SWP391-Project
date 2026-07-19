@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import loyaltyApi from '../../api/loyaltyApi'
+import { TierGemIcon } from '../../components/common/TierGem'
 import './AdminTierRulesPage.css'
+
+const DEFAULT_TIER_COLOR = '#2563eb'
 
 const EMPTY_CREATE = {
   tier: '',
@@ -11,7 +14,10 @@ const EMPTY_CREATE = {
   maxUpcomingBookings: '',
   pointMultiplier: '',
   priorityLevel: '',
+  color: DEFAULT_TIER_COLOR,
 }
+
+const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/
 
 function validateForm(form, isCreate) {
   const errors = {}
@@ -81,28 +87,26 @@ function validateForm(form, isCreate) {
     errors.priorityLevel = 'Must be >= 1'
   }
 
+  if (!form.color || !HEX_COLOR_RE.test(form.color)) {
+    errors.color = 'Pick a valid color'
+  }
+
   return errors
 }
 
-const TIER_COLORS = {
-  BRONZE:   { dot: '#cd7f32', badge: 'tier-rule-badge--bronze',   card: 'tier-rule-card--bronze' },
-  SILVER:   { dot: '#94a3b8', badge: 'tier-rule-badge--silver',   card: 'tier-rule-card--silver' },
-  GOLD:     { dot: '#f59e0b', badge: 'tier-rule-badge--gold',     card: 'tier-rule-card--gold' },
-  PLATINUM: { dot: '#818cf8', badge: 'tier-rule-badge--platinum', card: 'tier-rule-card--platinum' },
+function getTierColor(rule) {
+  const color = rule?.color
+  return HEX_COLOR_RE.test(String(color || '')) ? color : DEFAULT_TIER_COLOR
 }
 
-function getTierStyle(tier) {
-  return TIER_COLORS[String(tier || '').toUpperCase()] || { dot: '#2563eb', badge: '', card: '' }
+function hexToRgba(hex, alpha) {
+  const clean = hex.replace('#', '')
+  const r = parseInt(clean.substring(0, 2), 16)
+  const g = parseInt(clean.substring(2, 4), 16)
+  const b = parseInt(clean.substring(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
-function TierDot({ tier }) {
-  const { dot } = getTierStyle(tier)
-  return (
-    <span
-      style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: dot, flexShrink: 0 }}
-    />
-  )
-}
 
 function Field({ label, name, value, onChange, error, min, step, placeholder, type = 'number' }) {
   return (
@@ -179,6 +183,7 @@ export default function AdminTierRulesPage() {
       pointMultiplier: rule.pointMultiplier ?? '',
       priorityLevel: rule.priorityLevel ?? '',
       isActive: rule.isActive !== undefined ? rule.isActive : true,
+      color: getTierColor(rule),
     })
     setErrors({})
     setSubmitError(null)
@@ -221,6 +226,7 @@ export default function AdminTierRulesPage() {
           maxUpcomingBookings: Number(form.maxUpcomingBookings),
           pointMultiplier: Number(form.pointMultiplier),
           priorityLevel: Number(form.priorityLevel),
+          color: form.color,
         })
       } else {
         await loyaltyApi.updateTierRule(editingRule.id, {
@@ -232,6 +238,7 @@ export default function AdminTierRulesPage() {
           pointMultiplier: Number(form.pointMultiplier),
           priorityLevel: Number(form.priorityLevel),
           isActive: form.isActive,
+          color: form.color,
         })
       }
       closeModal()
@@ -265,6 +272,7 @@ export default function AdminTierRulesPage() {
         pointMultiplier: Number(rule.pointMultiplier),
         priorityLevel: Number(rule.priorityLevel),
         isActive: !rule.isActive,
+        color: getTierColor(rule),
       })
       await loadRules()
     } catch {
@@ -313,15 +321,19 @@ export default function AdminTierRulesPage() {
       ) : (
         <div className="tier-rules-grid">
           {sorted.map((rule) => {
-            const tierStyle = getTierStyle(rule.tier)
+            const color = getTierColor(rule)
             return (
             <div
               key={rule.id ?? rule.tier}
-              className={`tier-rule-card ${tierStyle.card}${rule.isActive === false ? ' inactive' : ''}`}
+              className={`tier-rule-card${rule.isActive === false ? ' inactive' : ''}`}
+              style={{ borderLeftColor: color }}
             >
               <div className="tier-rule-card-header">
-                <span className={`tier-rule-badge ${tierStyle.badge}`}>
-                  <TierDot tier={rule.tier} />
+                <span
+                  className="tier-rule-badge"
+                  style={{ background: hexToRgba(color, 0.1), borderColor: color, color }}
+                >
+                  <TierGemIcon tier={rule.tier} color={color} size={14} />
                   {rule.tier}
                 </span>
                 <div className="tier-rule-card-header-right">
@@ -495,6 +507,31 @@ export default function AdminTierRulesPage() {
                 step={0.05}
                 placeholder="1.0"
               />
+
+              <div className="tier-form-field">
+                <label htmlFor="color">Tier color</label>
+                <div className="tier-color-row">
+                  <input
+                    type="color"
+                    id="color"
+                    name="color"
+                    value={HEX_COLOR_RE.test(form.color) ? form.color : DEFAULT_TIER_COLOR}
+                    onChange={handleChange}
+                    className="tier-color-swatch"
+                  />
+                  <input
+                    type="text"
+                    name="color"
+                    value={form.color}
+                    onChange={handleChange}
+                    placeholder="#2563EB"
+                    className={`tier-color-hex${errors.color ? ' has-error' : ''}`}
+                    maxLength={7}
+                    autoComplete="off"
+                  />
+                </div>
+                {errors.color && <span className="tier-form-error">{errors.color}</span>}
+              </div>
 
               {!isCreate && (
                 <div className="tier-form-field tier-form-checkbox-field">

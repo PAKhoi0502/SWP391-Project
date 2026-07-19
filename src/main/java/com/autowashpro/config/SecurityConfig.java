@@ -97,6 +97,9 @@ public class SecurityConfig {
 .requestMatchers(HttpMethod.POST, "/bookings/guest")
 .permitAll()
 
+.requestMatchers(HttpMethod.GET, "/loyalty/tier-rules")
+.permitAll()
+
                         .anyRequest()
                         .authenticated())
                 .addFilterBefore(

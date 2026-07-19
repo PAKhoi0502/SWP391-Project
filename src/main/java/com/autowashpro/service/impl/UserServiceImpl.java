@@ -18,7 +18,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -123,9 +125,24 @@ public class UserServiceImpl implements UserService {
     @Override
     public List<UserDetailResponse> getAllUsers() {
 
-        return userRepository.findAll()
+        List<User> users = userRepository.findAll();
+        List<Long> userIds = users.stream().map(User::getId).toList();
+
+        Map<Long, Upload> avatarsByOwnerId = uploadRepository
+                .findByOwnerIdInAndEntityTypeOrderByCreatedAtDesc(userIds, UploadFolder.AVATARS.getEntityType())
                 .stream()
-                .map(this::map)
+                .collect(Collectors.toMap(Upload::getOwnerId, upload -> upload, (latest, older) -> latest));
+
+        return users.stream()
+                .map(user -> {
+                    UserDetailResponse response = map(user);
+                    Upload avatar = avatarsByOwnerId.get(user.getId());
+                    if (avatar != null) {
+                        response.setAvatarUrl(avatar.getFileUrl());
+                        response.setAvatarPublicId(avatar.getPublicId());
+                    }
+                    return response;
+                })
                 .toList();
     }
 
@@ -136,7 +153,7 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() ->
                         new RuntimeException("User not found"));
 
-        return map(user);
+        return mapCurrent(user);
     }
 
     @Override
@@ -152,7 +169,7 @@ public class UserServiceImpl implements UserService {
 
         userRepository.save(user);
 
-        return map(user);
+        return mapCurrent(user);
     }
 
     @Override
@@ -177,6 +194,6 @@ public class UserServiceImpl implements UserService {
 
         userRepository.save(user);
 
-        return map(user);
+        return mapCurrent(user);
     }
 }

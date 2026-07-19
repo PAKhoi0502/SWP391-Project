@@ -34,8 +34,8 @@ export function getTierLabel(tier) {
   return key ? key.charAt(0) + key.slice(1).toLowerCase() : 'Member'
 }
 
-export function TierGemIcon({ tier, size = 32 }) {
-  const color = getTierColor(tier)
+export function TierGemIcon({ tier, size = 32, color: colorOverride }) {
+  const color = colorOverride || getTierColor(tier)
   return (
     <svg
       width={size}
