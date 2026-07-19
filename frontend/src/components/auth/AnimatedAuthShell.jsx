@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { getRedirectPathByRole, useAuth } from '../../contexts/AuthContext'
 import GoogleSignInButton from './GoogleSignInButton'
+import { getVietnameseMobileError, normalizeVietnameseMobile } from '../../utils/identityValidation'
 import './AnimatedAuthShell.css'
 
 /* ── Validators ─────────────────────────────────── */
@@ -10,9 +11,7 @@ const V = {
   email:           (v)     => !v.trim()            ? 'Email is required.'
                             : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
                               ? 'Invalid email address.' : '',
-  phone:           (v)     => !v.trim()            ? 'Phone number is required.'
-                            : !/^[0-9]{9,11}$/.test(v.replace(/\s/g,''))
-                              ? 'Invalid phone (9–11 digits).' : '',
+  phone:           (v)     => getVietnameseMobileError(v),
   password:        (v)     => !v                   ? 'Password is required.'
                             : v.length < 6         ? 'Minimum 6 characters.' : '',
   confirmPassword: (v, pw) => !v                   ? 'Please confirm your password.'
@@ -93,11 +92,12 @@ function LoginForm({ active, justRegistered }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!form.identifier.trim()) { setError('Please enter your phone number.'); return }
+    const phoneError = getVietnameseMobileError(form.identifier)
+    if (phoneError) { setError(phoneError); return }
     if (!form.password.trim())   { setError('Please enter your password.');      return }
     setLoading(true)
     try {
-      const user = await login({ phone: form.identifier.trim(), password: form.password })
+      const user = await login({ phone: normalizeVietnameseMobile(form.identifier), password: form.password })
       navigate(getRedirectPathByRole(getRole(user)), { replace: true, state: { loginSuccess: true } })
     } catch (err) {
       setError(err.response?.data?.message || err.response?.data?.error || 'Incorrect phone or password.')
@@ -227,7 +227,7 @@ function RegisterForm({ active }) {
     }
     setLoading(true); setServerError('')
     try {
-      await register({ fullName: form.fullName.trim(), email: form.email.trim(), phone: form.phone.trim(), password: form.password })
+      await register({ fullName: form.fullName.trim(), email: form.email.trim(), phone: normalizeVietnameseMobile(form.phone), password: form.password })
       setSuccess(true)
       setTimeout(() => navigate('/login', { state: { registered: true } }), 2200)
     } catch (err) {

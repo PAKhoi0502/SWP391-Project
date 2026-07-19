@@ -23,6 +23,8 @@ import com.autowashpro.service.LoyaltyService;
 import com.autowashpro.service.LoyaltyPointExpiryService;
 import com.autowashpro.service.PromotionService;
 import com.autowashpro.service.EmailService;
+import com.autowashpro.service.support.VietnameseLicensePlate;
+import com.autowashpro.service.support.VietnamesePhoneNumber;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -758,12 +760,13 @@ public class BookingServiceImpl implements BookingService {
                                 request);
                 List<ServicePackage> selectedPackages = buildSelectedPackages(pkg, addOns);
 
-                String normalizedPlate = normalizeLicensePlate(request.getLicensePlate());
+                String bayType = VietnameseLicensePlate.normalizeVehicleType(request.getVehicleType());
+                String normalizedPlate = VietnameseLicensePlate.normalizeAndValidate(
+                                request.getLicensePlate(), bayType);
 
                 LocalDateTime startTime = request.getStartTime();
                 LocalDateTime endTime = startTime.plusMinutes(resolveSlotDurationMinutes(selectedPackages, garage));
 
-                String bayType = mapVehicleTypeToBayType(request.getVehicleType());
                 List<String> supportedTypes = washBayRepository
                                 .findDistinctVehicleTypesByGarageId(request.getGarageId());
                 if (resolveGarageBayType(supportedTypes, request.getVehicleType()) == null) {
@@ -778,8 +781,8 @@ public class BookingServiceImpl implements BookingService {
                                         "Vehicle is not compatible with selected service package");
                 }
 
-                long plateOverlap = bookingRepository.countOverlappingBookingsByLicensePlate(
-                                normalizedPlate, startTime, endTime);
+                long plateOverlap = bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(
+                                normalizedPlate, bayType, startTime, endTime);
                 if (plateOverlap > 0) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT,
                                         "License plate already has an active booking during this time");
@@ -799,7 +802,7 @@ public class BookingServiceImpl implements BookingService {
                 validateCareStaffAvailability(request.getGarageId(), selectedPackages, startTime, endTime);
 
                 User matchedCustomer = findActiveCustomerByPhone(request.getGuestPhone());
-                Vehicle matchedVehicle = findMatchedCustomerVehicle(matchedCustomer, normalizedPlate);
+                Vehicle matchedVehicle = findMatchedCustomerVehicle(matchedCustomer, normalizedPlate, bayType);
 
                 if (matchedCustomer != null) {
                         long customerGarageOverlap = bookingRepository.countOverlappingBookingsByCustomerAndGarage(
@@ -810,14 +813,13 @@ public class BookingServiceImpl implements BookingService {
                         }
                 }
 
-                if (matchedCustomer != null && matchedVehicle == null && normalizedPlate != null) {
+                if (matchedCustomer != null && matchedVehicle == null) {
+                        assertLicensePlateAvailable(normalizedPlate, bayType);
                         Vehicle newVehicle = new Vehicle();
                         newVehicle.setCustomer(matchedCustomer);
-                        newVehicle.setRawLicensePlate(request.getLicensePlate().trim().toUpperCase());
+                        newVehicle.setRawLicensePlate(request.getLicensePlate().trim());
                         newVehicle.setNormalizedLicensePlate(normalizedPlate);
-                        newVehicle.setVehicleType(request.getVehicleType() != null
-                                        ? request.getVehicleType().toUpperCase()
-                                        : "CAR");
+                        newVehicle.setVehicleType(bayType);
                         String brand = request.getVehicleBrand() != null && !request.getVehicleBrand().isBlank()
                                         ? request.getVehicleBrand().trim()
                                         : "Không rõ";
@@ -891,7 +893,7 @@ public class BookingServiceImpl implements BookingService {
                 booking.setIsWalkIn(true);
                 booking.setGuestName(matchedCustomer != null ? matchedCustomer.getFullName() : request.getGuestName());
                 booking.setGuestPhone(matchedCustomer != null ? matchedCustomer.getPhone()
-                                : normalizePhone(request.getGuestPhone()));
+                                : VietnamesePhoneNumber.normalizeMobile(request.getGuestPhone()));
                 booking.setLicensePlate(normalizedPlate);
                 booking.setRewardProcessed(false);
                 booking.setUsedPoints(0);
@@ -954,12 +956,13 @@ public class BookingServiceImpl implements BookingService {
                                 request);
                 List<ServicePackage> selectedPackages = buildSelectedPackages(pkg, addOns);
 
-                String normalizedPlate = normalizeLicensePlate(request.getLicensePlate());
+                String bayType = VietnameseLicensePlate.normalizeVehicleType(request.getVehicleType());
+                String normalizedPlate = VietnameseLicensePlate.normalizeAndValidate(
+                                request.getLicensePlate(), bayType);
 
                 LocalDateTime startTime = request.getStartTime();
                 LocalDateTime endTime = startTime.plusMinutes(resolveSlotDurationMinutes(selectedPackages, garage));
 
-                String bayType = mapVehicleTypeToBayType(request.getVehicleType());
                 List<String> supportedTypes = washBayRepository
                                 .findDistinctVehicleTypesByGarageId(request.getGarageId());
                 if (resolveGarageBayType(supportedTypes, request.getVehicleType()) == null) {
@@ -976,8 +979,8 @@ public class BookingServiceImpl implements BookingService {
                                         "Vehicle is not compatible with selected service package");
                 }
 
-                long plateOverlap = bookingRepository.countOverlappingBookingsByLicensePlate(
-                                normalizedPlate, startTime, endTime);
+                long plateOverlap = bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(
+                                normalizedPlate, bayType, startTime, endTime);
                 if (plateOverlap > 0) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT,
                                         "License plate already has an active booking during this time");
@@ -997,7 +1000,7 @@ public class BookingServiceImpl implements BookingService {
                 validateCareStaffAvailability(request.getGarageId(), selectedPackages, startTime, endTime);
 
                 User matchedCustomer = findActiveCustomerByPhone(request.getGuestPhone());
-                Vehicle matchedVehicle = findMatchedCustomerVehicle(matchedCustomer, normalizedPlate);
+                Vehicle matchedVehicle = findMatchedCustomerVehicle(matchedCustomer, normalizedPlate, bayType);
 
                 if (matchedCustomer != null) {
                         long customerGarageOverlap = bookingRepository.countOverlappingBookingsByCustomerAndGarage(
@@ -1009,13 +1012,13 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 // Auto-save new vehicle for known customers when the plate is not in their profile yet
-                if (matchedCustomer != null && matchedVehicle == null && normalizedPlate != null) {
+                if (matchedCustomer != null && matchedVehicle == null) {
+                        assertLicensePlateAvailable(normalizedPlate, bayType);
                         Vehicle newVehicle = new Vehicle();
                         newVehicle.setCustomer(matchedCustomer);
-                        newVehicle.setRawLicensePlate(request.getLicensePlate().trim().toUpperCase());
+                        newVehicle.setRawLicensePlate(request.getLicensePlate().trim());
                         newVehicle.setNormalizedLicensePlate(normalizedPlate);
-                        newVehicle.setVehicleType(request.getVehicleType() != null
-                                        ? request.getVehicleType().toUpperCase() : "CAR");
+                        newVehicle.setVehicleType(bayType);
                         String brand = request.getVehicleBrand() != null && !request.getVehicleBrand().isBlank()
                                         ? request.getVehicleBrand().trim() : "Không rõ";
                         String model = request.getVehicleModel() != null && !request.getVehicleModel().isBlank()
@@ -1058,7 +1061,9 @@ public class BookingServiceImpl implements BookingService {
                 booking.setRefundAmount(BigDecimal.ZERO);
                 booking.setIsWalkIn(false);
                 booking.setGuestName(matchedCustomer != null ? matchedCustomer.getFullName() : request.getGuestName());
-                booking.setGuestPhone(matchedCustomer != null ? matchedCustomer.getPhone() : normalizePhone(request.getGuestPhone()));
+                booking.setGuestPhone(matchedCustomer != null
+                                ? matchedCustomer.getPhone()
+                                : VietnamesePhoneNumber.normalizeMobile(request.getGuestPhone()));
                 booking.setLicensePlate(normalizedPlate);
                 booking.setRewardProcessed(false);
                 booking.setUsedPoints(0);
@@ -1079,7 +1084,10 @@ public class BookingServiceImpl implements BookingService {
         }
 
         @Override
-        public WalkInCustomerLookupResponse lookupWalkInCustomerByPhone(String phone, String licensePlate) {
+        public WalkInCustomerLookupResponse lookupWalkInCustomerByPhone(
+                        String phone,
+                        String licensePlate,
+                        String vehicleType) {
                 User customer = findActiveCustomerByPhone(phone);
                 if (customer == null) {
                         return WalkInCustomerLookupResponse.builder()
@@ -1087,10 +1095,17 @@ public class BookingServiceImpl implements BookingService {
                                         .build();
                 }
 
-                String normalizedPlate = normalizeLicensePlate(licensePlate);
+                boolean hasPlate = licensePlate != null && !licensePlate.isBlank();
+                boolean hasVehicleType = vehicleType != null && !vehicleType.isBlank();
+                String normalizedType = hasVehicleType
+                                ? VietnameseLicensePlate.normalizeVehicleType(vehicleType)
+                                : null;
+                String normalizedPlate = hasPlate && normalizedType != null
+                                ? VietnameseLicensePlate.normalizeAndValidate(licensePlate, normalizedType)
+                                : null;
                 Vehicle matchedVehicle = normalizedPlate == null
                                 ? null
-                                : findMatchedCustomerVehicle(customer, normalizedPlate);
+                                : findMatchedCustomerVehicle(customer, normalizedPlate, normalizedType);
 
                 String matchedVehicleName = buildVehicleName(matchedVehicle);
 
@@ -2230,10 +2245,7 @@ public class BookingServiceImpl implements BookingService {
         // ===================== HELPER =====================
 
         private User findActiveCustomerByPhone(String phone) {
-                String normalizedPhone = normalizePhone(phone);
-                if (normalizedPhone == null) {
-                        return null;
-                }
+                String normalizedPhone = VietnamesePhoneNumber.normalizeMobile(phone);
 
                 return userRepository.findByPhone(normalizedPhone)
                                 .filter(user -> Boolean.TRUE.equals(user.getIsActive()))
@@ -2258,36 +2270,28 @@ public class BookingServiceImpl implements BookingService {
                                 "Unsupported walk-in payment method: " + paymentMethod);
         }
 
-        private Vehicle findMatchedCustomerVehicle(User customer, String normalizedPlate) {
-                if (customer == null || normalizedPlate == null) {
+        private Vehicle findMatchedCustomerVehicle(
+                        User customer,
+                        String normalizedPlate,
+                        String vehicleType) {
+                if (customer == null || normalizedPlate == null || vehicleType == null) {
                         return null;
                 }
 
                 return vehicleRepository
-                                .findByCustomer_IdAndNormalizedLicensePlateAndIsActiveTrue(
+                                .findByCustomer_IdAndNormalizedLicensePlateAndVehicleTypeAndIsActiveTrue(
                                                 customer.getId(),
-                                                normalizedPlate)
+                                                normalizedPlate,
+                                                vehicleType)
                                 .orElse(null);
         }
 
-        private String normalizePhone(String phone) {
-                if (phone == null) {
-                        return null;
+        private void assertLicensePlateAvailable(String normalizedPlate, String vehicleType) {
+                if (vehicleRepository.existsByNormalizedLicensePlateAndVehicleType(
+                                normalizedPlate, vehicleType)) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                        "License plate already exists: " + normalizedPlate);
                 }
-
-                String normalized = phone.trim().replaceAll("[\\s.\\-()]", "");
-                return normalized.isBlank() ? null : normalized;
-        }
-
-        private String normalizeLicensePlate(String licensePlate) {
-                if (licensePlate == null) {
-                        return null;
-                }
-
-                String normalized = licensePlate.toUpperCase()
-                                .replaceAll("[\\s.\\-]", "")
-                                .replaceAll("[^A-Z0-9]", "");
-                return normalized.isBlank() ? null : normalized;
         }
 
         private boolean isGarageFaultCancellation(String role) {
