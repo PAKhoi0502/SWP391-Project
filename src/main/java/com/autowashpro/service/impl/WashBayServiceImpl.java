@@ -89,8 +89,8 @@ public class WashBayServiceImpl implements WashBayService {
     @Override
     public PageResponse<WashBayResponse> list(int page, int limit, Long garageId,
                                                String vehicleType, WashBayStatus status) {
-        Specification<WashBay> spec = Specification
-                .where(WashBaySpecifications.garageIdEquals(garageId))
+        Specification<WashBay> spec = ((Specification<WashBay>) (root, query, cb) -> null)
+                .and(WashBaySpecifications.garageIdEquals(garageId))
                 .and(WashBaySpecifications.vehicleTypeEquals(vehicleType))
                 .and(WashBaySpecifications.statusEquals(status));
 

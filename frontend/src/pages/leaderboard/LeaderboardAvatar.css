@@ -1,0 +1,193 @@
+/* ════════════════════════════════════════════════════════════
+   LeaderboardAvatar component styles
+   Shared by: CustomerLeaderboardPage, PublicReviewShowcase
+   Import this file in LeaderboardAvatar.jsx — do NOT import
+   CustomerLeaderboardPage.css from other pages.
+   ════════════════════════════════════════════════════════════ */
+
+/* ── CSS-ringed avatar (rank 4–100 and unranked) ─────────────── */
+.lba {
+  border-radius: 50%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  flex-shrink: 0;
+}
+.lba__img {
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+.lba__initials {
+  font-weight: 700;
+  color: #fff;
+  user-select: none;
+  line-height: 1;
+}
+.lba__badge {
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1d4ed8;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  border: 2px solid rgba(10,20,50,0.7);
+  z-index: 2;
+}
+.lba__you {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #0ea5e9;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 1px 5px;
+  white-space: nowrap;
+  border: 2px solid rgba(10,20,50,0.7);
+  z-index: 2;
+}
+
+/* Avatar CSS ring variants */
+.lba--gold {
+  box-shadow: 0 0 0 3px #f59e0b, 0 0 0 5px #fde68a, 0 0 14px rgba(245,158,11,0.35);
+  background: #d97706;
+}
+.lba--gold .lba__badge { background: #b45309; }
+
+.lba--silver {
+  box-shadow: 0 0 0 3px #94a3b8, 0 0 0 5px #e2e8f0, 0 0 10px rgba(148,163,184,0.30);
+  background: #64748b;
+}
+.lba--silver .lba__badge { background: #475569; }
+
+.lba--bronze {
+  box-shadow: 0 0 0 3px #22d3ee, 0 0 0 5px #a5f3fc, 0 0 10px rgba(34,211,238,0.30);
+  background: #0891b2;
+}
+.lba--bronze .lba__badge { background: #0e7490; }
+
+.lba--top10 {
+  box-shadow: 0 0 0 2px #818cf8, 0 0 0 4px rgba(129,140,248,0.25);
+  background: #4f46e5;
+}
+
+.lba--ranked {
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.25);
+  background: #334155;
+}
+
+.lba--default {
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.15);
+  background: #334155;
+}
+
+.lba--current {
+  outline: 2.5px solid #0ea5e9;
+  outline-offset: 3px;
+}
+
+/* ── PNG-framed avatar (rank 1–3) ────────────────────────────── */
+/* Wrapper: overflow MUST remain visible — PNG wings extend outside the ring. */
+.lba-framed {
+  display: inline-block;
+  position: relative;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+/* Per-rank photo hole positioning.
+   Measured from transparent region of each 512×512 PNG; values are slightly
+   LARGER than raw hole so the photo edge hides under the ring border.
+   The PNG frame (z-index 2) covers any tiny overhang.
+   Only tune these three lines after a PNG asset update.
+
+   Hole measurements (raw):
+     rank-1: x=128..353, y=119..339 → 226×221 px
+     rank-2: x=129..378, y=126..364 → 250×239 px
+     rank-3: x=128..348, y=123..338 → 221×216 px  */
+.lba-framed--rank-1 { --photo-size: 45.5%; --photo-left: 24.2%; --photo-top: 22%;   }
+.lba-framed--rank-2 { --photo-size: 49.5%; --photo-left: 24.8%; --photo-top: 23%;   }
+.lba-framed--rank-3 { --photo-size: 44.5%; --photo-left: 24.2%; --photo-top: 22.7%; }
+
+/* Layer 1 — photo circle */
+.lba-photo {
+  position: absolute;
+  width: var(--photo-size);
+  aspect-ratio: 1 / 1;
+  height: auto;
+  left: var(--photo-left);
+  top: var(--photo-top);
+  border-radius: 50%;
+  overflow: hidden;
+  background: #1e3a5f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+}
+
+/* Avatar image inside photo circle */
+.lba-photo__img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+/* Fallback initials — font size via --frame-size set inline on wrapper */
+.lba-photo__initials {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+  font-size: clamp(10px, calc(var(--frame-size, 100px) * 0.145), 28px);
+}
+
+/* Layer 2 — PNG frame image */
+.lba-frame-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  z-index: 2;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Rank badge for framed avatars (bottom-centre, above frame) */
+.lba__badge--framed {
+  position: absolute;
+  bottom: 8%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(29, 78, 216, 0.90);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  border: 2px solid rgba(10,20,50,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 3;
+}

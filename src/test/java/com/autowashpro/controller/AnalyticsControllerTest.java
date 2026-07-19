@@ -7,6 +7,7 @@ import com.autowashpro.exception.GlobalExceptionHandler;
 import com.autowashpro.security.CustomUserDetailsService;
 import com.autowashpro.security.JwtAuthenticationFilter;
 import com.autowashpro.security.JwtService;
+import com.autowashpro.service.AdminDashboardBookingService;
 import com.autowashpro.service.AnalyticsService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +42,9 @@ class AnalyticsControllerTest {
 
     @MockitoBean
     private AnalyticsService analyticsService;
+
+    @MockitoBean
+    private AdminDashboardBookingService adminDashboardBookingService;
 
     @MockitoBean
     private JwtService jwtService;

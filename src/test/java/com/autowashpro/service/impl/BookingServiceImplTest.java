@@ -46,6 +46,7 @@ import com.autowashpro.repository.VehicleRepository;
 import com.autowashpro.repository.VehicleInspectionRepository;
 import com.autowashpro.repository.WashBayRepository;
 import com.autowashpro.service.EmailService;
+import com.autowashpro.service.LoyaltyPointExpiryService;
 import com.autowashpro.service.LoyaltyService;
 import com.autowashpro.service.NotificationService;
 import com.autowashpro.service.PromotionService;
@@ -145,6 +146,9 @@ class BookingServiceImplTest {
 
     @Mock
     private LoyaltyService loyaltyService;
+
+    @Mock
+    private LoyaltyPointExpiryService loyaltyPointExpiryService;
 
     @Mock
     private WashHistoryService washHistoryService;
@@ -370,10 +374,9 @@ class BookingServiceImplTest {
         assertMoney("150000.00", response.getOriginalPrice());
         assertMoney("35000.00", response.getDiscountAmount());
         assertMoney("115000.00", response.getFinalPrice());
-        assertEquals(80, loyalty.getAvailablePoints());
-        assertEquals(20, loyalty.getRedeemedPoints());
+        // Point redemption is now delegated to LoyaltyPointExpiryService.consumePointsFifo
+        verify(loyaltyPointExpiryService).consumePointsFifo(eq(customer.getId()), eq(20), any());
         assertEquals(0, promotion.getUsedCount());
-        verify(pointTransactionRepository).save(any(PointTransaction.class));
         verify(promotionUsageRepository, never()).save(any(PromotionUsage.class));
         verify(bookingAddOnServicePackageRepository).save(any(BookingAddOnServicePackage.class));
     }

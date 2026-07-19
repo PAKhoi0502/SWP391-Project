@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { TierGemIcon, getTierColor } from '../components/common/TierGem'
 import PublicReviewShowcase from '../components/reviews/PublicReviewShowcase'
@@ -325,15 +325,45 @@ export default function PublicCustomerDashboardPage() {
       {/* ── FOOTER ── */}
       <footer className="pcd-footer">
         <div className="pcd-footer-inner">
-          <div className="pcd-footer-brand">
-            <svg width="22" height="15" viewBox="0 0 48 32" fill="none" aria-hidden="true">
-              <path d="M5 8 Q14 2 24 8 Q34 14 43 8"  stroke="#0855b3" strokeWidth="3.8" strokeLinecap="round"/>
-              <path d="M4 15 Q14 9 24 15 Q34 21 44 15" stroke="#2EC2F7" strokeWidth="2.8" strokeLinecap="round"/>
-              <path d="M5 22 Q15 16 25 22 Q35 28 43 22" stroke="#82cde8" strokeWidth="2.2" strokeLinecap="round"/>
-            </svg>
-            <span>AutoWash Pro</span>
+          <div className="pcd-footer-grid">
+            <div className="pcd-footer-intro">
+              <Link className="pcd-footer-brand" to="/" aria-label="Audela Washing home">
+                <svg width="25" height="18" viewBox="0 0 48 32" fill="none" aria-hidden="true">
+                  <path d="M5 8 Q14 2 24 8 Q34 14 43 8" stroke="#73dcff" strokeWidth="3.8" strokeLinecap="round"/>
+                  <path d="M4 15 Q14 9 24 15 Q34 21 44 15" stroke="#2ec2f7" strokeWidth="2.8" strokeLinecap="round"/>
+                  <path d="M5 22 Q15 16 25 22 Q35 28 43 22" stroke="#b7ecff" strokeWidth="2.2" strokeLinecap="round"/>
+                </svg>
+                <span>Audela Washing</span>
+              </Link>
+              <p>Premium car care, made simple.</p>
+              <Link className="pcd-footer-book" to="/booking">Book a wash <span aria-hidden="true">→</span></Link>
+            </div>
+
+            <nav className="pcd-footer-column" aria-label="Explore Audela Washing">
+              <h3>Explore</h3>
+              <Link to="/customer/service-packages">Services</Link>
+              <Link to="/customer/garages">Garages</Link>
+              <Link to="/customer/leaderboard">Leaderboard</Link>
+            </nav>
+
+            <nav className="pcd-footer-column" aria-label="Customer support">
+              <h3>Support</h3>
+              <Link to="/about">About Us</Link>
+              <Link to="/customer/booking-history">Booking History</Link>
+              <Link to="/customer/promotions">Promotions</Link>
+            </nav>
+
+            <div className="pcd-footer-column pcd-footer-contact">
+              <h3>Contact</h3>
+              <a href="mailto:audelabooking@gmail.com">audelabooking@gmail.com</a>
+              <a href="tel:+84984643093">0984 643 093</a>
+            </div>
           </div>
-          <p className="pcd-footer-copy">© {new Date().getFullYear()} AutoWash Pro. All rights reserved.</p>
+
+          <div className="pcd-footer-bottom">
+            <p className="pcd-footer-copy">© {new Date().getFullYear()} Audela Washing. All rights reserved.</p>
+            <Link to="/about">Care in every detail.</Link>
+          </div>
         </div>
       </footer>
     </div>

@@ -79,7 +79,7 @@ const NAV_GROUPS = [
     icon: 'star',
     items: [
       { to: '/admin/loyalty/tier-rules',    label: 'Loyalty Tiers', icon: 'star'    },
-      { to: '/admin/loyalty/adjust-points', label: 'Adjust Points', icon: 'dollar'  },
+      { to: '/admin/loyalty/adjust-points', label: 'Loyalty Management', icon: 'dollar'  },
       { to: '/admin/promotions',            label: 'Promotions',    icon: 'tag'     },
       { to: '/admin/reviews',               label: 'Reviews',       icon: 'message' },
     ],

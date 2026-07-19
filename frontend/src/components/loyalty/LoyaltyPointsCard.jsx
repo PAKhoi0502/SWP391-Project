@@ -87,6 +87,17 @@ export default function LoyaltyPointsCard() {
         </div>
       </div>
 
+      {/* Next-expiry warning */}
+      {loyalty.nextExpiryAt && loyalty.nextExpiringPoints > 0 && (
+        <div className="lpc-expiry-warning">
+          <span className="lpc-expiry-icon">⚠</span>
+          <span>
+            <strong>{loyalty.nextExpiringPoints} pts</strong> will expire on{' '}
+            <strong>{new Date(loyalty.nextExpiryAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}</strong>
+          </span>
+        </div>
+      )}
+
       {/* Stats */}
       <div className="lpc-stats">
         <div className="lpc-stat">

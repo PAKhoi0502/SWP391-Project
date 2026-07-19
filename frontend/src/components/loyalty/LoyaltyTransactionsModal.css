@@ -278,6 +278,11 @@
   font-weight: 600;
 }
 
+.ltm-expiry-hint {
+  font-size: 11px;
+  color: #b45309;
+}
+
 .ltm-balance {
   font-size: 11px;
   color: #94a3b8;

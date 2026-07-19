@@ -1,6 +1,7 @@
 package com.autowashpro.service;
 
 import com.autowashpro.dto.review.AdminReviewStatsResponse;
+import com.autowashpro.dto.review.PublicReviewResponse;
 import com.autowashpro.dto.review.ReviewCreateRequest;
 import com.autowashpro.dto.review.ReviewEligibilityResponse;
 import com.autowashpro.dto.review.ReviewResponse;
@@ -20,7 +21,7 @@ public interface BookingReviewService {
 
     void maybeCreateReviewRequestNotification(Long bookingId);
 
-    Page<ReviewResponse> getPublicReviews(int page, int limit);
+    Page<PublicReviewResponse> getPublicReviews(int page, int limit);
 
     AdminReviewStatsResponse getPublicStats();
 }

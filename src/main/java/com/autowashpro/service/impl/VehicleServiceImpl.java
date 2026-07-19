@@ -153,8 +153,8 @@ public class VehicleServiceImpl implements VehicleService {
     @Override
     public PageResponse<VehicleResponse> adminList(int page, int limit,
                                                     String vehicleType, String keyword) {
-        Specification<Vehicle> spec = Specification
-                .where(VehicleSpecifications.vehicleTypeEquals(vehicleType))
+        Specification<Vehicle> spec = ((Specification<Vehicle>) (root, query, cb) -> null)
+                .and(VehicleSpecifications.vehicleTypeEquals(vehicleType))
                 .and(VehicleSpecifications.keywordContains(keyword));
 
         Page<Vehicle> result = vehicleRepository.findAll(spec,

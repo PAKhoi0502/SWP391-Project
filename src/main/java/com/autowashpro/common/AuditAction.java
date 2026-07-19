@@ -41,6 +41,8 @@ public final class AuditAction {
     public static final String LOYALTY_TIER_RULE_CREATED = "LOYALTY_TIER_RULE_CREATED";
     public static final String LOYALTY_TIER_RULE_UPDATED = "LOYALTY_TIER_RULE_UPDATED";
     public static final String LOYALTY_POINTS_ADJUSTED = "LOYALTY_POINTS_ADJUSTED";
+    public static final String LOYALTY_LOT_EXPIRY_EXTENDED = "LOYALTY_LOT_EXPIRY_EXTENDED";
+    public static final String LOYALTY_EXPIRY_RUN_MANUAL = "LOYALTY_EXPIRY_RUN_MANUAL";
 
     private AuditAction() {
     }

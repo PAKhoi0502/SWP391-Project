@@ -190,6 +190,38 @@
 .ar-item:last-child { border-bottom: none; }
 .ar-item:hover { background: #f8fafc; }
 
+/* ── Plain avatar (admin reviews) ── */
+.ar-plain-avatar {
+  border-radius: 50%;
+  background: #4f46e5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.ar-plain-avatar__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+}
+.ar-plain-avatar__initials {
+  color: #fff;
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+}
+
+.ar-item-customer-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
 .ar-item-head {
   display: flex;
   align-items: center;
@@ -201,7 +233,7 @@
 .ar-item-meta {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 

@@ -87,8 +87,8 @@ public class GarageServiceImpl implements GarageService {
 
     @Override
     public PageResponse<GarageResponse> list(int page, int limit, Boolean isActive, String keyword) {
-        Specification<Garage> spec = Specification
-                .where(GarageSpecifications.isActiveEquals(isActive))
+        Specification<Garage> spec = ((Specification<Garage>) (root, query, cb) -> null)
+                .and(GarageSpecifications.isActiveEquals(isActive))
                 .and(GarageSpecifications.keywordContains(keyword));
 
         Page<Garage> result = garageRepository.findAll(spec, PageRequest.of(Math.max(page - 1, 0), limit));

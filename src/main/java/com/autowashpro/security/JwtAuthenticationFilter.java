@@ -38,29 +38,33 @@ public class JwtAuthenticationFilter
             return;
         }
 
-        String token =
-                authHeader.substring(7);
+        String token = authHeader.substring(7);
 
-        Long userId =
-                jwtService.extractUserId(token);
+        try {
+            Long userId = jwtService.extractUserId(token);
 
-        UserDetails userDetails =
-                userDetailsService.loadUserByUsername(
-                        userId.toString());
+            if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails =
+                        userDetailsService.loadUserByUsername(userId.toString());
 
-        UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities()
-                );
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities()
+                        );
 
-        authentication.setDetails(
-                new WebAuthenticationDetailsSource()
-                        .buildDetails(request));
+                authentication.setDetails(
+                        new WebAuthenticationDetailsSource()
+                                .buildDetails(request));
 
-        SecurityContextHolder.getContext()
-                .setAuthentication(authentication);
+                SecurityContextHolder.getContext()
+                        .setAuthentication(authentication);
+            }
+        } catch (Exception e) {
+            // Token invalid/expired — continue as anonymous; permitAll endpoints still work
+            SecurityContextHolder.clearContext();
+        }
 
         filterChain.doFilter(request, response);
     }

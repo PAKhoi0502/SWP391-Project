@@ -1,21 +1,27 @@
 package com.autowashpro.service.impl;
 
 import com.autowashpro.dto.review.AdminReviewStatsResponse;
+import com.autowashpro.dto.review.PublicReviewResponse;
 import com.autowashpro.dto.review.ReviewCreateRequest;
 import com.autowashpro.dto.review.ReviewEligibilityResponse;
 import com.autowashpro.dto.review.ReviewResponse;
 import com.autowashpro.entity.Booking;
 import com.autowashpro.entity.BookingReview;
 import com.autowashpro.entity.BookingReviewImage;
+import com.autowashpro.entity.Upload;
+import com.autowashpro.entity.User;
 import com.autowashpro.repository.BookingRepository;
 import com.autowashpro.repository.BookingReviewImageRepository;
 import com.autowashpro.repository.BookingReviewRepository;
 import com.autowashpro.repository.GarageRepository;
 import com.autowashpro.repository.NotificationRepository;
+import com.autowashpro.repository.PointTransactionRepository;
 import com.autowashpro.repository.ServicePackageRepository;
+import com.autowashpro.repository.UploadRepository;
 import com.autowashpro.repository.UserRepository;
 import com.autowashpro.service.BookingReviewService;
 import com.autowashpro.service.NotificationService;
+import com.autowashpro.util.DisplayNameHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -25,9 +31,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -43,6 +53,8 @@ public class BookingReviewServiceImpl implements BookingReviewService {
     private final UserRepository userRepository;
     private final GarageRepository garageRepository;
     private final ServicePackageRepository servicePackageRepository;
+    private final UploadRepository uploadRepository;
+    private final PointTransactionRepository pointTransactionRepository;
 
     @Override
     public ReviewEligibilityResponse checkEligibility(Long bookingId, Long customerId) {
@@ -50,13 +62,11 @@ public class BookingReviewServiceImpl implements BookingReviewService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Booking not found: " + bookingId));
 
-        // Must belong to this customer
         if (!customerId.equals(booking.getCustomerId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "You cannot review this booking");
         }
 
-        // Already reviewed?
         if (bookingReviewRepository.existsByBookingId(bookingId)) {
             BookingReview existing = bookingReviewRepository.findByBookingId(bookingId).orElse(null);
             ReviewResponse existingResponse = existing != null
@@ -70,7 +80,6 @@ public class BookingReviewServiceImpl implements BookingReviewService {
                     .build();
         }
 
-        // Must be COMPLETED
         if (!"COMPLETED".equals(booking.getStatus())) {
             return ReviewEligibilityResponse.builder()
                     .eligible(false)
@@ -79,7 +88,6 @@ public class BookingReviewServiceImpl implements BookingReviewService {
                     .build();
         }
 
-        // Must be PAID
         if (!"PAID".equals(booking.getPaymentStatus())) {
             return ReviewEligibilityResponse.builder()
                     .eligible(false)
@@ -114,7 +122,6 @@ public class BookingReviewServiceImpl implements BookingReviewService {
 
         BookingReview saved = bookingReviewRepository.save(review);
 
-        // Attach images if provided
         if (request.getImageUrls() != null && !request.getImageUrls().isEmpty()) {
             List<String> urls = request.getImageUrls().stream()
                     .filter(u -> u != null && !u.isBlank())
@@ -129,7 +136,6 @@ public class BookingReviewServiceImpl implements BookingReviewService {
                         .build();
                 bookingReviewImageRepository.save(img);
             }
-            // Reload to pick up images
             saved = bookingReviewRepository.findById(saved.getId()).orElse(saved);
         }
 
@@ -155,14 +161,129 @@ public class BookingReviewServiceImpl implements BookingReviewService {
         return buildReviewResponse(review, booking);
     }
 
+    // ── Admin reviews — batch-loaded, full PII, with avatar ──────────────────
+
     @Override
     public Page<ReviewResponse> getAdminReviews(int page, int limit) {
-        PageRequest pageable = PageRequest.of(page - 1, limit);
-        return bookingReviewRepository.findAllByOrderByCreatedAtDesc(pageable)
-                .map(review -> {
-                    Booking booking = bookingRepository.findById(review.getBookingId()).orElse(null);
-                    return buildReviewResponse(review, booking);
-                });
+        PageRequest pageable = PageRequest.of(Math.max(0, page - 1), limit);
+        Page<BookingReview> reviewPage = bookingReviewRepository.findAllByOrderByCreatedAtDesc(pageable);
+        List<BookingReview> reviews = reviewPage.getContent();
+
+        if (reviews.isEmpty()) return reviewPage.map(r -> buildReviewResponse(r, null));
+
+        // Batch-load bookings
+        List<Long> bookingIds = reviews.stream().map(BookingReview::getBookingId)
+                .filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        Map<Long, Booking> bookingMap = bookingRepository.findAllById(bookingIds).stream()
+                .collect(Collectors.toMap(Booking::getId, b -> b));
+
+        // Batch-load users
+        List<Long> customerIds = reviews.stream().map(BookingReview::getCustomerId)
+                .filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        Map<Long, User> userMap = userRepository.findAllById(customerIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
+        // Batch-load avatars
+        Map<Long, String> avatarMap = batchLoadAvatars(customerIds);
+
+        // Batch-load garages
+        List<Long> garageIds = bookingMap.values().stream().map(Booking::getGarageId)
+                .filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        Map<Long, String> garageNameMap = garageRepository.findAllById(garageIds).stream()
+                .collect(Collectors.toMap(g -> g.getId(), g -> g.getName()));
+
+        // Batch-load service packages
+        List<Long> packageIds = bookingMap.values().stream().map(Booking::getServicePackageId)
+                .filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        Map<Long, String> packageNameMap = servicePackageRepository.findAllById(packageIds).stream()
+                .collect(Collectors.toMap(p -> p.getId(), p -> p.getName()));
+
+        return reviewPage.map(review -> {
+            User user = userMap.get(review.getCustomerId());
+            Booking booking = bookingMap.get(review.getBookingId());
+            List<String> imageUrls = extractImageUrls(review);
+            return ReviewResponse.builder()
+                    .id(review.getId())
+                    .bookingId(review.getBookingId())
+                    .customerId(review.getCustomerId())
+                    .customerName(user != null ? user.getFullName() : "Unknown")
+                    .avatarUrl(avatarMap.get(review.getCustomerId()))
+                    .initials(DisplayNameHelper.buildInitials(user != null ? user.getFullName() : null))
+                    .rating(review.getRating())
+                    .comment(review.getComment())
+                    .imageUrls(imageUrls)
+                    .createdAt(review.getCreatedAt())
+                    .garageName(booking != null && booking.getGarageId() != null
+                            ? garageNameMap.get(booking.getGarageId()) : null)
+                    .servicePackageName(booking != null && booking.getServicePackageId() != null
+                            ? packageNameMap.get(booking.getServicePackageId()) : null)
+                    .build();
+        });
+    }
+
+    // ── Public reviews — masked PII, with avatar and leaderboard rank ─────────
+
+    @Override
+    public Page<PublicReviewResponse> getPublicReviews(int page, int limit) {
+        PageRequest pageable = PageRequest.of(Math.max(0, page - 1), Math.min(limit, 20));
+        Page<BookingReview> reviewPage = bookingReviewRepository.findAllByOrderByCreatedAtDesc(pageable);
+        List<BookingReview> reviews = reviewPage.getContent();
+
+        if (reviews.isEmpty()) {
+            return reviewPage.map(r -> PublicReviewResponse.builder().build());
+        }
+
+        // Batch-load bookings
+        List<Long> bookingIds = reviews.stream().map(BookingReview::getBookingId)
+                .filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        Map<Long, Booking> bookingMap = bookingRepository.findAllById(bookingIds).stream()
+                .collect(Collectors.toMap(Booking::getId, b -> b));
+
+        // Batch-load users
+        List<Long> customerIds = reviews.stream().map(BookingReview::getCustomerId)
+                .filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        Map<Long, User> userMap = userRepository.findAllById(customerIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
+        // Batch-load avatars
+        Map<Long, String> avatarMap = batchLoadAvatars(customerIds);
+
+        // Batch-load garages
+        List<Long> garageIds = bookingMap.values().stream().map(Booking::getGarageId)
+                .filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        Map<Long, String> garageNameMap = garageRepository.findAllById(garageIds).stream()
+                .collect(Collectors.toMap(g -> g.getId(), g -> g.getName()));
+
+        // Batch-load service packages
+        List<Long> packageIds = bookingMap.values().stream().map(Booking::getServicePackageId)
+                .filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        Map<Long, String> packageNameMap = servicePackageRepository.findAllById(packageIds).stream()
+                .collect(Collectors.toMap(p -> p.getId(), p -> p.getName()));
+
+        // Compute all-time leaderboard ranks for page customers only (1 query total)
+        Map<Long, Integer> rankMap = computeAllTimeRanks(customerIds);
+
+        return reviewPage.map(review -> {
+            User user = userMap.get(review.getCustomerId());
+            String fullName = user != null ? user.getFullName() : null;
+            Booking booking = bookingMap.get(review.getBookingId());
+            List<String> imageUrls = extractImageUrls(review);
+            return PublicReviewResponse.builder()
+                    .id(review.getId())
+                    .displayName(DisplayNameHelper.buildDisplayName(fullName))
+                    .initials(DisplayNameHelper.buildInitials(fullName))
+                    .avatarUrl(avatarMap.get(review.getCustomerId()))
+                    .leaderboardRank(rankMap.get(review.getCustomerId()))
+                    .rating(review.getRating())
+                    .comment(review.getComment())
+                    .imageUrls(imageUrls)
+                    .createdAt(review.getCreatedAt())
+                    .garageName(booking != null && booking.getGarageId() != null
+                            ? garageNameMap.get(booking.getGarageId()) : null)
+                    .servicePackageName(booking != null && booking.getServicePackageId() != null
+                            ? packageNameMap.get(booking.getServicePackageId()) : null)
+                    .build();
+        });
     }
 
     @Override
@@ -172,7 +293,6 @@ public class BookingReviewServiceImpl implements BookingReviewService {
         double avg = total == 0 ? 0.0
                 : all.stream().mapToInt(BookingReview::getRating).average().orElse(0.0);
 
-        // Build distribution 5 → 1 descending
         Map<Integer, Long> dist = new LinkedHashMap<>();
         for (int i = 5; i >= 1; i--) {
             final int r = i;
@@ -187,6 +307,11 @@ public class BookingReviewServiceImpl implements BookingReviewService {
     }
 
     @Override
+    public AdminReviewStatsResponse getPublicStats() {
+        return getAdminStats();
+    }
+
+    @Override
     public void maybeCreateReviewRequestNotification(Long bookingId) {
         try {
             Booking booking = bookingRepository.findById(bookingId).orElse(null);
@@ -195,7 +320,6 @@ public class BookingReviewServiceImpl implements BookingReviewService {
             if (!"COMPLETED".equals(booking.getStatus())) return;
             if (!"PAID".equals(booking.getPaymentStatus())) return;
 
-            // Duplicate guard
             if (notificationRepository.existsByBookingIdAndEventType(bookingId, "REVIEW_REQUEST")) {
                 return;
             }
@@ -215,26 +339,12 @@ public class BookingReviewServiceImpl implements BookingReviewService {
         }
     }
 
-    @Override
-    public Page<ReviewResponse> getPublicReviews(int page, int limit) {
-        PageRequest pageable = PageRequest.of(Math.max(0, page - 1), Math.min(limit, 20));
-        return bookingReviewRepository.findAllByOrderByCreatedAtDesc(pageable)
-                .map(review -> {
-                    Booking booking = bookingRepository.findById(review.getBookingId()).orElse(null);
-                    return buildReviewResponse(review, booking);
-                });
-    }
+    // ── Private helpers ───────────────────────────────────────────────────────
 
-    @Override
-    public AdminReviewStatsResponse getPublicStats() {
-        return getAdminStats();
-    }
-
-    // ── Helper ───────────────────────────────────────────────────────────────
-
+    /** Builds ReviewResponse for single-review operations (eligibility check, create, getMyReview). */
     private ReviewResponse buildReviewResponse(BookingReview review, Booking booking) {
         String customerName = userRepository.findById(review.getCustomerId())
-                .map(u -> u.getFullName())
+                .map(User::getFullName)
                 .orElse("Unknown");
 
         String garageName = null;
@@ -243,33 +353,67 @@ public class BookingReviewServiceImpl implements BookingReviewService {
         if (booking != null) {
             if (booking.getGarageId() != null) {
                 garageName = garageRepository.findById(booking.getGarageId())
-                        .map(g -> g.getName())
-                        .orElse(null);
+                        .map(g -> g.getName()).orElse(null);
             }
             if (booking.getServicePackageId() != null) {
                 servicePackageName = servicePackageRepository.findById(booking.getServicePackageId())
-                        .map(p -> p.getName())
-                        .orElse(null);
+                        .map(p -> p.getName()).orElse(null);
             }
         }
-
-        List<String> imageUrls = review.getImages() != null
-                ? review.getImages().stream()
-                        .map(BookingReviewImage::getImageUrl)
-                        .collect(Collectors.toList())
-                : List.of();
 
         return ReviewResponse.builder()
                 .id(review.getId())
                 .bookingId(review.getBookingId())
                 .customerId(review.getCustomerId())
                 .customerName(customerName)
+                .initials(DisplayNameHelper.buildInitials(customerName))
                 .rating(review.getRating())
                 .comment(review.getComment())
-                .imageUrls(imageUrls)
+                .imageUrls(extractImageUrls(review))
                 .createdAt(review.getCreatedAt())
                 .garageName(garageName)
                 .servicePackageName(servicePackageName)
                 .build();
+    }
+
+    /** Batch-loads latest avatar URL per owner from uploads system. */
+    private Map<Long, String> batchLoadAvatars(List<Long> ownerIds) {
+        if (ownerIds.isEmpty()) return new HashMap<>();
+        List<Upload> uploads = uploadRepository.findAvatarsByOwnerIds(ownerIds);
+        // findAvatarsByOwnerIds orders by id DESC — first occurrence per owner is the latest
+        Map<Long, String> map = new HashMap<>();
+        for (Upload u : uploads) {
+            map.putIfAbsent(u.getOwnerId(), u.getFileUrl());
+        }
+        return map;
+    }
+
+    /** Extracts review image URLs from the entity's images collection. */
+    private List<String> extractImageUrls(BookingReview review) {
+        return review.getImages() != null
+                ? review.getImages().stream()
+                        .map(BookingReviewImage::getImageUrl)
+                        .collect(Collectors.toList())
+                : List.of();
+    }
+
+    /**
+     * Computes all-time leaderboard ranks for a specific set of customers.
+     * Runs one aggregate query over all point transactions; O(1) per customer lookup.
+     */
+    private Map<Long, Integer> computeAllTimeRanks(List<Long> customerIds) {
+        if (customerIds.isEmpty()) return new HashMap<>();
+        Set<Long> target = new HashSet<>(customerIds);
+        List<Object[]> rows = pointTransactionRepository.findLeaderboardAggregateAllTime();
+        Map<Long, Integer> rankMap = new HashMap<>();
+        int rank = 1;
+        for (Object[] row : rows) {
+            long cid = ((Number) row[0]).longValue();
+            if (target.contains(cid)) {
+                rankMap.put(cid, rank);
+            }
+            rank++;
+        }
+        return rankMap;
     }
 }
