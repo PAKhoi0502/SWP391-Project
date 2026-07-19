@@ -1,4 +1,4 @@
--- v58: point_transaction_allocations — links REDEEM/EXPIRE debit transactions
+-- v69: point_transaction_allocations — links REDEEM/EXPIRE debit transactions
 --      to the EARN/REFUND credit lots they consumed (FIFO tracking).
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'point_transaction_allocations')
 BEGIN

@@ -90,6 +90,7 @@ const NAV_GROUPS = [
     icon: 'shield',
     items: [
       { to: '/admin/audit-logs',               label: 'Audit Logs',      icon: 'shield'   },
+      { to: '/admin/deposit-refunds',          label: 'Deposit Refunds', icon: 'dollar'   },
       { to: '/admin/research/export',          label: 'Research Export', icon: 'download' },
       { to: '/admin/notifications/test-email', label: 'Test Email',      icon: 'mail'     },
     ],

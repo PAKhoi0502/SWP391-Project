@@ -28,4 +28,6 @@ public class LoyaltyTierRuleResponse {
     private Integer priorityLevel;
 
     private Boolean isActive;
+
+    private String color;
 }

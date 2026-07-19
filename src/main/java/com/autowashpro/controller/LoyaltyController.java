@@ -62,7 +62,6 @@ public class LoyaltyController {
     }
 
     @GetMapping("/tier-rules")
-    @PreAuthorize("hasAnyRole('CUSTOMER','STAFF','ADMIN')")
     public ApiResponse<List<LoyaltyTierRuleResponse>> getTierRules() {
         return ApiResponse.<List<LoyaltyTierRuleResponse>>builder()
                 .success(true)

@@ -24,4 +24,6 @@ public class UpdateLoyaltyTierRuleRequest {
     private Integer priorityLevel;
 
     private Boolean isActive;
+
+    private String color;
 }

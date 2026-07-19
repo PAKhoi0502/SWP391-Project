@@ -23,4 +23,8 @@ public interface UploadRepository extends JpaRepository<Upload, Long> {
         ORDER BY u.id DESC
         """)
     List<Upload> findAvatarsByOwnerIds(@Param("ownerIds") List<Long> ownerIds);
+
+    List<Upload> findByOwnerIdInAndEntityTypeOrderByCreatedAtDesc(
+            List<Long> ownerIds,
+            String entityType);
 }

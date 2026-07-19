@@ -50,6 +50,7 @@ export default function LoyaltyPointsCard() {
 
   const currentTierKey = String(loyalty.currentTier || '').toUpperCase()
   const sortedRules = [...tierRules].sort((a, b) => (a.priorityLevel ?? 0) - (b.priorityLevel ?? 0))
+  const currentTierColor = sortedRules.find((r) => String(r.tier || '').toUpperCase() === currentTierKey)?.color
 
   return (
     <div className="lpc-root">
@@ -58,7 +59,7 @@ export default function LoyaltyPointsCard() {
         <div>
           <p className="lpc-label">Membership Tier</p>
           <div className="lpc-tier-badge">
-            <span className="lpc-tier-icon"><TierGemIcon tier={currentTierKey} size={22} /></span>
+            <span className="lpc-tier-icon"><TierGemIcon tier={currentTierKey} color={currentTierColor} size={22} /></span>
             <span>{getTierLabel(currentTierKey)}</span>
           </div>
         </div>
@@ -140,7 +141,7 @@ export default function LoyaltyPointsCard() {
                   <div key={ruleKey} className={`lpc-tier-item${isCurrent ? ' current' : ''}`}>
                     <div className="lpc-tier-item-header">
                       <span className={`lpc-tier-item-name${isCurrent ? ' current-label' : ''}`}>
-                        <TierGemIcon tier={ruleKey} size={16} /> {getTierLabel(ruleKey)}
+                        <TierGemIcon tier={ruleKey} color={rule.color} size={16} /> {getTierLabel(ruleKey)}
                         {isCurrent && <span className="lpc-tier-current-chip">Current</span>}
                       </span>
                       {rule.pointMultiplier && (

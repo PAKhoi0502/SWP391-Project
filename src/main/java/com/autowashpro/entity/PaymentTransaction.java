@@ -31,6 +31,9 @@ public class PaymentTransaction {
     @Column(name = "status", nullable = false, length = 30)
     private String status = "PENDING";
 
+    @Column(name = "purpose", nullable = false, length = 20)
+    private String purpose = "FINAL";
+
     @Column(name = "order_code", nullable = false, unique = true)
     private Long orderCode;
 

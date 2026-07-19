@@ -195,6 +195,45 @@ public void notifyVoucherReceived(Long customerId, String promotionCode, String 
         createInAppNotification(customerId, null, "POINTS_ADJUSTED", title, body);
     }
 
+    @Override
+    @Transactional
+    public void notifyDepositRefundApproved(Long customerId, Long bookingId, java.math.BigDecimal amount) {
+        createInAppNotification(
+                customerId,
+                bookingId,
+                "DEPOSIT_REFUND_APPROVED",
+                "Refund Request Approved",
+                "Your deposit refund request of " + amount + " for booking #" + bookingId
+                        + " has been approved and will be processed soon."
+        );
+    }
+
+    @Override
+    @Transactional
+    public void notifyDepositRefundRejected(Long customerId, Long bookingId, String reason) {
+        createInAppNotification(
+                customerId,
+                bookingId,
+                "DEPOSIT_REFUND_REJECTED",
+                "Refund Request Rejected",
+                "Your deposit refund request for booking #" + bookingId + " was rejected." +
+                        (reason != null && !reason.isBlank() ? " Reason: " + reason : "")
+        );
+    }
+
+    @Override
+    @Transactional
+    public void notifyDepositRefundCompleted(Long customerId, Long bookingId, java.math.BigDecimal amount) {
+        createInAppNotification(
+                customerId,
+                bookingId,
+                "DEPOSIT_REFUND_COMPLETED",
+                "Deposit Refunded",
+                "Your deposit refund of " + amount + " for booking #" + bookingId
+                        + " has been transferred to your bank account."
+        );
+    }
+
     // ===================== API =====================
 
     @Override

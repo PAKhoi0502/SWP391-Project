@@ -58,6 +58,7 @@ import ProfileLayout from '../layouts/ProfileLayout'
 import AboutUsPage from '../pages/AboutUsPage'
 import AdminResearchExportPage from '../pages/admin/AdminResearchExportPage'
 import AdminAuditLogPage from '../pages/admin/AdminAuditLogPage'
+import AdminDepositRefundsPage from '../pages/admin/AdminDepositRefundsPage'
 import AdminReviewsPage from '../pages/admin/AdminReviewsPage'
 import CustomerLeaderboardPage from '../pages/leaderboard/CustomerLeaderboardPage'
 
@@ -149,6 +150,7 @@ function AppRoutes() {
           <Route path="admin/notifications/test-email" element={<AdminTestEmailPage />} />
           <Route path="admin/research/export" element={<AdminResearchExportPage />} />
           <Route path="admin/audit-logs" element={<AdminAuditLogPage />} />
+          <Route path="admin/deposit-refunds" element={<AdminDepositRefundsPage />} />
           <Route path="admin/reviews" element={<AdminReviewsPage />} />
         </Route>
       </Route>

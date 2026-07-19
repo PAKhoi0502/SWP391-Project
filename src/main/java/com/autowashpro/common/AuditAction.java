@@ -43,6 +43,10 @@ public final class AuditAction {
     public static final String LOYALTY_POINTS_ADJUSTED = "LOYALTY_POINTS_ADJUSTED";
     public static final String LOYALTY_LOT_EXPIRY_EXTENDED = "LOYALTY_LOT_EXPIRY_EXTENDED";
     public static final String LOYALTY_EXPIRY_RUN_MANUAL = "LOYALTY_EXPIRY_RUN_MANUAL";
+    public static final String DEPOSIT_REFUND_REQUESTED = "DEPOSIT_REFUND_REQUESTED";
+    public static final String DEPOSIT_REFUND_APPROVED = "DEPOSIT_REFUND_APPROVED";
+    public static final String DEPOSIT_REFUND_REJECTED = "DEPOSIT_REFUND_REJECTED";
+    public static final String DEPOSIT_REFUND_EXECUTED = "DEPOSIT_REFUND_EXECUTED";
 
     private AuditAction() {
     }

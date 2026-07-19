@@ -1,4 +1,4 @@
--- v60: expiry_run_logs — persists both scheduled and manual expiry run results
+-- v67: expiry_run_logs — persists both scheduled and manual expiry run results
 --      so run history survives backend restarts.
 --      Idempotent: protected by the IF NOT EXISTS guard.
 

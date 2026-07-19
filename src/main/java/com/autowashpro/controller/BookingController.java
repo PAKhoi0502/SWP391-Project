@@ -12,6 +12,8 @@ import com.autowashpro.dto.response.BookingSummaryResponse;
 import com.autowashpro.dto.response.WalkInCustomerLookupResponse;
 import com.autowashpro.service.BookingService;
 import com.autowashpro.service.AuditLogService;
+import com.autowashpro.service.PaymentService;
+import com.autowashpro.dto.response.CreatePayOSPaymentResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -41,6 +43,7 @@ public class BookingController {
 
         private final BookingService bookingService;
         private final AuditLogService auditLogService;
+        private final PaymentService paymentService;
 
         @GetMapping("/available-slots")
         public ApiResponse<AvailableSlotResponse> getAvailableSlots(
@@ -105,6 +108,11 @@ public class BookingController {
                         @Valid @RequestBody WalkInBookingCreateRequest request) {
 
                 BookingResponse response = bookingService.createGuestBooking(request);
+
+                CreatePayOSPaymentResponse depositPayment = paymentService.createPayOSPaymentForGuest(response.getId());
+                response.setDepositCheckoutUrl(depositPayment.getCheckoutUrl());
+                response.setDepositQrCode(depositPayment.getQrCode());
+
                 auditLogService.createAuditLog(
                                 null,
                                 AuditAction.BOOKING_GUEST_CREATED,
@@ -541,4 +549,5 @@ public class BookingController {
                                 .data(response)
                                 .build();
         }
+
 }

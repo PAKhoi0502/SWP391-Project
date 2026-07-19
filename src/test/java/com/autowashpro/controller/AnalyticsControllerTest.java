@@ -52,6 +52,9 @@ class AnalyticsControllerTest {
     @MockitoBean
     private CustomUserDetailsService customUserDetailsService;
 
+    @MockitoBean
+    private AdminDashboardBookingService adminDashboardBookingService;
+
     @Test
     void rejectsCustomerAnalyticsAccess() throws Exception {
         mockMvc.perform(get("/admin/analytics/overview")
