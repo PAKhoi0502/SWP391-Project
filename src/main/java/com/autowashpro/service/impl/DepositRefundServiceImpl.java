@@ -29,12 +29,16 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class DepositRefundServiceImpl implements DepositRefundService {
 
     private static final List<String> OPEN_STATUSES = List.of("REQUESTED", "APPROVED", "PROCESSING");
+    private static final Set<String> VALID_STATUSES = Set.of(
+            "REQUESTED", "APPROVED", "REJECTED", "PROCESSING", "REFUNDED", "FAILED", "CANCELED");
 
     private final DepositRefundRepository depositRefundRepository;
     private final BookingRepository bookingRepository;
@@ -51,7 +55,9 @@ public class DepositRefundServiceImpl implements DepositRefundService {
     @Override
     @Transactional
     public DepositRefundResponse createRequest(Long bookingId, Long customerId, CreateDepositRefundRequest request) {
-        Booking booking = loadOwnedBooking(bookingId, customerId);
+        // Serialize requests for the same booking so two quick clicks cannot create
+        // two simultaneously open refund requests.
+        Booking booking = loadOwnedBookingForUpdate(bookingId, customerId);
         DepositRefundEligibilityResponse eligibility = evaluateEligibility(booking);
         if (!eligibility.isEligible()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, eligibility.getMessage());
@@ -102,14 +108,20 @@ public class DepositRefundServiceImpl implements DepositRefundService {
 
     @Override
     public PageResponse<DepositRefundResponse> listForAdmin(int page, int limit, String status) {
-        PageRequest pageable = PageRequest.of(Math.max(page - 1, 0), limit);
-        Page<DepositRefund> result = (status != null && !status.isBlank())
-                ? depositRefundRepository.findByStatusOrderByRequestedAtDesc(status.toUpperCase(), pageable)
+        int safePage = Math.max(page, 1);
+        if (limit < 1 || limit > 100) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "limit must be between 1 and 100");
+        }
+
+        String normalizedStatus = normalizeStatus(status);
+        PageRequest pageable = PageRequest.of(safePage - 1, limit);
+        Page<DepositRefund> result = normalizedStatus != null
+                ? depositRefundRepository.findByStatusOrderByRequestedAtDesc(normalizedStatus, pageable)
                 : depositRefundRepository.findAllByOrderByRequestedAtDesc(pageable);
 
         return PageResponse.<DepositRefundResponse>builder()
                 .data(result.getContent().stream().map(this::toResponse).toList())
-                .page(page)
+                .page(safePage)
                 .limit(limit)
                 .totalItems(result.getTotalElements())
                 .totalPages(result.getTotalPages())
@@ -124,11 +136,17 @@ public class DepositRefundServiceImpl implements DepositRefundService {
     @Override
     @Transactional
     public DepositRefundResponse approve(Long refundId, Long adminId) {
-        DepositRefund refund = loadRefund(refundId);
+        DepositRefund refund = loadRefundForUpdate(refundId);
+        if ("APPROVED".equals(refund.getStatus())) {
+            return toResponse(refund);
+        }
         if (!"REQUESTED".equals(refund.getStatus())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Only REQUESTED refunds can be approved. Current status: " + refund.getStatus());
         }
+        Booking booking = loadRefundBookingForUpdate(refund);
+        validateBookingStillRefundable(booking, refund);
+
         refund.setStatus("APPROVED");
         refund.setReviewedBy(adminId);
         refund.setReviewedAt(LocalDateTime.now());
@@ -136,7 +154,7 @@ public class DepositRefundServiceImpl implements DepositRefundService {
 
         auditLogService.createAuditLog(adminId, AuditAction.DEPOSIT_REFUND_APPROVED, AuditTargetType.DEPOSIT_REFUND,
                 saved.getId(), AuditMetadata.of("bookingId", saved.getBookingId()));
-        notificationService.notifyDepositRefundApproved(saved.getCustomerId(), saved.getBookingId(), saved.getRequestedAmount());
+        // Task 7: No customer notification on approve — only notify when refund is actually transferred (execute)
 
         return toResponse(saved);
     }
@@ -144,7 +162,10 @@ public class DepositRefundServiceImpl implements DepositRefundService {
     @Override
     @Transactional
     public DepositRefundResponse reject(Long refundId, Long adminId, RejectDepositRefundRequest request) {
-        DepositRefund refund = loadRefund(refundId);
+        DepositRefund refund = loadRefundForUpdate(refundId);
+        if ("REJECTED".equals(refund.getStatus())) {
+            return toResponse(refund);
+        }
         if (!"REQUESTED".equals(refund.getStatus())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Only REQUESTED refunds can be rejected. Current status: " + refund.getStatus());
@@ -157,7 +178,7 @@ public class DepositRefundServiceImpl implements DepositRefundService {
 
         auditLogService.createAuditLog(adminId, AuditAction.DEPOSIT_REFUND_REJECTED, AuditTargetType.DEPOSIT_REFUND,
                 saved.getId(), AuditMetadata.of("bookingId", saved.getBookingId(), "reason", request.getReason()));
-        notificationService.notifyDepositRefundRejected(saved.getCustomerId(), saved.getBookingId(), request.getReason());
+        // Task 7: No customer notification on reject — only notify when refund is actually transferred (execute)
 
         return toResponse(saved);
     }
@@ -165,20 +186,31 @@ public class DepositRefundServiceImpl implements DepositRefundService {
     @Override
     @Transactional
     public DepositRefundResponse execute(Long refundId, Long adminId, ExecuteDepositRefundRequest request) {
-        DepositRefund refund = loadRefund(refundId);
+        DepositRefund refund = loadRefundForUpdate(refundId);
+        if ("REFUNDED".equals(refund.getStatus())) {
+            return toResponse(refund);
+        }
         if (!"APPROVED".equals(refund.getStatus())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Only APPROVED refunds can be executed. Current status: " + refund.getStatus());
         }
 
-        Booking booking = bookingRepository.findById(refund.getBookingId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+        Booking booking = loadRefundBookingForUpdate(refund);
+        validateBookingStillRefundable(booking, refund);
+
+        boolean success = Boolean.TRUE.equals(request.getSuccess());
+        String transactionReference = trimToNull(request.getTransactionReference());
+        if (success && transactionReference == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Transaction reference is required when the refund transfer succeeds");
+        }
 
         refund.setExecutedBy(adminId);
         refund.setExecutedAt(LocalDateTime.now());
-        refund.setAdminNote(request.getNote());
+        refund.setAdminNote(trimToNull(request.getNote()));
+        refund.setTransactionReference(transactionReference);
 
-        if (request.isSuccess()) {
+        if (success) {
             refund.setStatus("REFUNDED");
             booking.setDepositStatus("REFUNDED");
         } else {
@@ -195,7 +227,7 @@ public class DepositRefundServiceImpl implements DepositRefundService {
                         "status", saved.getStatus(),
                         "transactionReference", request.getTransactionReference()));
 
-        if (request.isSuccess()) {
+        if (success) {
             notificationService.notifyDepositRefundCompleted(saved.getCustomerId(), saved.getBookingId(), saved.getRequestedAmount());
         }
 
@@ -243,9 +275,56 @@ public class DepositRefundServiceImpl implements DepositRefundService {
         return booking;
     }
 
+    private Booking loadOwnedBookingForUpdate(Long bookingId, Long customerId) {
+        Booking booking = bookingRepository.findByIdWithLock(bookingId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found: " + bookingId));
+        if (booking.getCustomerId() == null || !booking.getCustomerId().equals(customerId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This booking does not belong to you");
+        }
+        return booking;
+    }
+
     private DepositRefund loadRefund(Long refundId) {
         return depositRefundRepository.findById(refundId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Refund request not found: " + refundId));
+    }
+
+    private DepositRefund loadRefundForUpdate(Long refundId) {
+        return depositRefundRepository.findByIdWithLock(refundId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Refund request not found: " + refundId));
+    }
+
+    private Booking loadRefundBookingForUpdate(DepositRefund refund) {
+        return bookingRepository.findByIdWithLock(refund.getBookingId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+    }
+
+    private void validateBookingStillRefundable(Booking booking, DepositRefund refund) {
+        if (!"CANCELED".equals(booking.getStatus())
+                || !"REFUND_PENDING".equals(booking.getDepositStatus())
+                || booking.getRefundAmount() == null
+                || booking.getRefundAmount().compareTo(refund.getRequestedAmount()) != 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Booking refund state changed. Refresh and review the request again.");
+        }
+    }
+
+    private String normalizeStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        String normalized = status.trim().toUpperCase(Locale.ROOT);
+        if (!VALID_STATUSES.contains(normalized)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid refund status: " + status);
+        }
+        return normalized;
+    }
+
+    private String trimToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     private DepositRefundResponse toResponse(DepositRefund r) {
@@ -261,6 +340,7 @@ public class DepositRefundServiceImpl implements DepositRefundService {
                 .status(r.getStatus())
                 .rejectReason(r.getRejectReason())
                 .adminNote(r.getAdminNote())
+                .transactionReference(r.getTransactionReference())
                 .requestedAt(r.getRequestedAt())
                 .reviewedBy(r.getReviewedBy())
                 .reviewedAt(r.getReviewedAt())

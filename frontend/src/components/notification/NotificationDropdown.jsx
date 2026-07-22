@@ -11,11 +11,14 @@ import { bookingApi } from '../../api/bookingApi'
 import ReviewModal from '../reviews/ReviewModal'
 import './NotificationDropdown.css'
 
-// Only show these event types in the dropdown (case-insensitive)
+// Only show these event types in the dropdown (case-insensitive).
+// DEPOSIT_REFUND_APPROVED and DEPOSIT_REFUND_REJECTED are NOT shown — customers only
+// see DEPOSIT_REFUND_COMPLETED (after the admin actually executes the bank transfer).
 const VISIBLE_TYPES = new Set([
   'TIER_UPGRADED', 'VOUCHER_RECEIVED', 'REWARD_EARNED',
   'BOOKING_CONFIRMED', 'BOOKING_CANCELED', 'PAYMENT_CONFIRMED',
   'POINTS_ADJUSTED', 'REVIEW_REQUEST',
+  'DEPOSIT_REFUND_COMPLETED',
 ])
 const isVisible = (eventType) => VISIBLE_TYPES.has(String(eventType || '').toUpperCase())
 
@@ -105,6 +108,7 @@ const buildTitle = (notif) => {
   if (notif.eventType === 'PAYMENT_CONFIRMED') return 'Payment confirmed'
   if (notif.eventType === 'POINTS_ADJUSTED') return notif.title || 'Points adjusted'
   if (notif.eventType === 'REVIEW_REQUEST') return 'Rate your experience'
+  if (notif.eventType === 'DEPOSIT_REFUND_COMPLETED') return 'Deposit refunded'
   return notif.title || ''
 }
 
@@ -257,11 +261,12 @@ export default function NotificationDropdown() {
   // Review modal state: { bookingId } or null
   const [reviewModal, setReviewModal] = useState(null)
 
-  // Background poll: refresh badge + items every 15 s without F5.
+  // Background silent poll: refresh badge + items every 5 s without F5.
   // Uses recursive setTimeout so a slow response never stacks intervals.
   // Dependency on user?.id (primitive) prevents the effect from restarting
   // on every parent re-render (scroll, hover, etc.) that would kill the timer.
   const pollTimerRef = useRef(null)
+  const silentRef    = useRef(false)
   useEffect(() => {
     if (!user?.id && !user?.email) return
     const isCustomer = String(user.role || '').toUpperCase() === 'CUSTOMER'
@@ -269,8 +274,9 @@ export default function NotificationDropdown() {
 
     const poll = async () => {
       if (cancelled) return
+      silentRef.current = true
       try {
-        const page = await notificationApi.getNotifications({ page: 1, limit: 50 })
+        const page = await notificationApi.getNotifications({ page: 1, limit: 10 })
         const visible = (page.content ?? []).filter(n => isVisible(n.eventType))
         if (!cancelled) {
           setItems(visible)
@@ -292,15 +298,30 @@ export default function NotificationDropdown() {
           setUnreadCount(count)
         }
       } catch {}
+      silentRef.current = false
       if (!cancelled) {
-        pollTimerRef.current = setTimeout(poll, 15_000)
+        pollTimerRef.current = setTimeout(poll, 5_000)
       }
     }
 
+    // Re-poll immediately on window focus or tab visibility regained
+    const handleFocus = () => {
+      if (cancelled) return
+      clearTimeout(pollTimerRef.current)
+      poll()
+    }
+    const handleVisibility = () => {
+      if (!document.hidden) handleFocus()
+    }
+
     poll()
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
     return () => {
       cancelled = true
       clearTimeout(pollTimerRef.current)
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id ?? user?.email])
@@ -319,19 +340,21 @@ export default function NotificationDropdown() {
     setError(null)
     try {
       // 1. Fetch notifications and filter to visible types
-      const page = await notificationApi.getNotifications({ page: 1, limit: 50 })
+      const page = await notificationApi.getNotifications({ page: 1, limit: 10 })
       const visible = (page.content ?? []).filter(n => isVisible(n.eventType))
       setUnreadCount(visible.filter(n => !n.isRead).length)
 
-      // 2. Build booking sequence map (CUSTOMER only, for any notification with bookingId)
+      // 2. Build booking sequence map (CUSTOMER only, for any notification with bookingId).
+      //    Use server-computed customerBookingNumber from the response — no local recompute.
       let seqMap = new Map()
       if (user?.role === ROLES.CUSTOMER) {
         const needsSeq = visible.some(n => n.bookingId != null)
         if (needsSeq) {
           try {
             const bookings = await customerBookingFlowApi.getCustomerBookings()
-            const sorted = [...bookings].sort((a, b) => Number(a.id) - Number(b.id))
-            sorted.forEach((b, idx) => seqMap.set(Number(b.id), idx + 1))
+            bookings.forEach((b) => {
+              if (b.customerBookingNumber != null) seqMap.set(Number(b.id), b.customerBookingNumber)
+            })
           } catch {}
         }
       }

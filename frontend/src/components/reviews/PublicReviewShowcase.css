@@ -243,6 +243,17 @@
   color: #374151;
   margin: 0 0 14px;
   font-style: italic;
+  min-height: calc(1.68em * 2);
+  max-height: calc(1.68em * 2);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.prs-card-quote--empty {
+  visibility: hidden;
 }
 
 .prs-qmark {

@@ -5,10 +5,18 @@ import com.autowashpro.common.AuditAction;
 import com.autowashpro.common.AuditMetadata;
 import com.autowashpro.common.AuditTargetType;
 import com.autowashpro.dto.request.BookingCreateRequest;
+import com.autowashpro.dto.request.CareAssignmentRequest;
+import com.autowashpro.dto.request.OperationPhaseRequest;
 import com.autowashpro.dto.request.WalkInBookingCreateRequest;
+import com.autowashpro.dto.response.AssignedCareStaffResponse;
+import com.autowashpro.dto.response.AvailableCareStaffResponse;
 import com.autowashpro.dto.response.AvailableSlotResponse;
 import com.autowashpro.dto.response.BookingResponse;
 import com.autowashpro.dto.response.BookingSummaryResponse;
+import com.autowashpro.dto.response.CareAssignmentStatusResponse;
+import com.autowashpro.dto.response.StaffBookingSummaryResponse;
+import com.autowashpro.dto.response.StaffCalendarDayResponse;
+import com.autowashpro.dto.response.CareTaskResponse;
 import com.autowashpro.dto.response.WalkInCustomerLookupResponse;
 import com.autowashpro.service.BookingService;
 import com.autowashpro.service.AuditLogService;
@@ -34,6 +42,7 @@ import com.autowashpro.dto.request.UpdatePaymentMethodRequest;
 import com.autowashpro.dto.request.NoShowBookingRequest;
 import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
 import com.autowashpro.dto.response.BookingServiceStepResponse;
+import com.autowashpro.dto.response.CancellationPreviewResponse;
 import org.springframework.security.core.Authentication;
 
 @RestController
@@ -51,13 +60,14 @@ public class BookingController {
                         @RequestParam("service_package_id") Long servicePackageId,
                         @RequestParam("vehicle_type") String vehicleType,
                         @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-                        @RequestParam(value = "is_walk_in", required = false, defaultValue = "false") boolean isWalkIn) {
+                        @RequestParam(value = "is_walk_in", required = false, defaultValue = "false") boolean isWalkIn,
+                        @RequestParam(value = "add_on_service_package_ids", required = false) List<Long> addOnServicePackageIds) {
 
                 return ApiResponse.<AvailableSlotResponse>builder()
                                 .success(true)
                                 .message("Available slots retrieved")
                                 .data(bookingService.getAvailableSlots(garageId, servicePackageId, vehicleType, date,
-                                                isWalkIn))
+                                                isWalkIn, addOnServicePackageIds))
                                 .build();
         }
 
@@ -86,10 +96,12 @@ public class BookingController {
         @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
         public ApiResponse<BookingResponse> createWalkInBooking(
                         @Valid @RequestBody WalkInBookingCreateRequest request,
-                        @AuthenticationPrincipal UserDetails userDetails) {
+                        @AuthenticationPrincipal UserDetails userDetails,
+                        Authentication authentication) {
 
                 Long staffUserId = Long.valueOf(userDetails.getUsername());
-                BookingResponse response = bookingService.createWalkInBooking(request, staffUserId);
+                String role = authentication.getAuthorities().stream().findFirst().orElseThrow().getAuthority();
+                BookingResponse response = bookingService.createWalkInBooking(request, staffUserId, role);
                 auditLogService.createAuditLog(
                                 staffUserId,
                                 AuditAction.BOOKING_WALK_IN_CREATED,
@@ -130,12 +142,16 @@ public class BookingController {
         @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
         public ApiResponse<WalkInCustomerLookupResponse> lookupWalkInCustomer(
                         @RequestParam String phone,
-                        @RequestParam(required = false) String licensePlate) {
+                        @RequestParam(required = false) String licensePlate,
+                        @AuthenticationPrincipal UserDetails userDetails,
+                        Authentication authentication) {
 
+                Long callerId = Long.valueOf(userDetails.getUsername());
+                String role = authentication.getAuthorities().stream().findFirst().orElseThrow().getAuthority();
                 return ApiResponse.<WalkInCustomerLookupResponse>builder()
                                 .success(true)
                                 .message("Walk-in customer lookup completed")
-                                .data(bookingService.lookupWalkInCustomerByPhone(phone, licensePlate))
+                                .data(bookingService.lookupWalkInCustomerByPhone(phone, licensePlate, callerId, role))
                                 .build();
         }
 
@@ -190,6 +206,7 @@ public class BookingController {
                         LocalDate date) {
 
                 Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
 
                 return ApiResponse.<List<BookingSummaryResponse>>builder()
                                 .success(true)
@@ -197,6 +214,7 @@ public class BookingController {
                                 .data(
                                                 bookingService.getStaffBookings(
                                                                 staffUserId,
+                                                                role,
                                                                 status,
                                                                 date))
                                 .build();
@@ -274,6 +292,22 @@ public class BookingController {
                                 .success(true)
                                 .message("Service started successfully")
                                 .data(response)
+                                .build();
+        }
+
+        // ===================== TASK 4: Cancellation Preview =====================
+
+        @GetMapping("/{id}/cancellation-preview")
+        @PreAuthorize("hasRole('CUSTOMER')")
+        public ApiResponse<CancellationPreviewResponse> getCancellationPreview(
+                        @PathVariable Long id,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long customerId = Long.valueOf(userDetails.getUsername());
+                return ApiResponse.<CancellationPreviewResponse>builder()
+                                .success(true)
+                                .message("Cancellation preview retrieved")
+                                .data(bookingService.getCancellationPreview(id, customerId))
                                 .build();
         }
 
@@ -375,11 +409,13 @@ public class BookingController {
         public ApiResponse<BookingResponse> markNoShow(
                         @PathVariable Long id,
                         @RequestBody(required = false) NoShowBookingRequest request,
-                        @AuthenticationPrincipal UserDetails userDetails) {
+                        @AuthenticationPrincipal UserDetails userDetails,
+                        Authentication authentication) {
 
                 Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String role = authentication.getAuthorities().stream().findFirst().orElseThrow().getAuthority();
                 String reason = request != null ? request.getReason() : null;
-                BookingResponse response = bookingService.markNoShow(id, staffUserId, reason);
+                BookingResponse response = bookingService.markNoShow(id, staffUserId, role, reason);
                 auditLogService.createAuditLog(
                                 staffUserId,
                                 AuditAction.BOOKING_MARKED_NO_SHOW,
@@ -426,10 +462,12 @@ public class BookingController {
         public ApiResponse<BookingServiceStepResponse> completeServiceStep(
                         @PathVariable Long stepId,
                         @Valid @RequestBody CompleteBookingServiceStepRequest request,
-                        @AuthenticationPrincipal UserDetails userDetails) {
+                        @AuthenticationPrincipal UserDetails userDetails,
+                        Authentication authentication) {
 
                 Long staffUserId = Long.valueOf(userDetails.getUsername());
-                BookingServiceStepResponse response = bookingService.completeServiceStep(stepId, staffUserId, request);
+                String role = authentication.getAuthorities().stream().findFirst().orElseThrow().getAuthority();
+                BookingServiceStepResponse response = bookingService.completeServiceStep(stepId, staffUserId, role, request);
                 auditLogService.createAuditLog(
                                 staffUserId,
                                 AuditAction.BOOKING_SERVICE_STEP_COMPLETED,
@@ -449,10 +487,12 @@ public class BookingController {
         public ApiResponse<BookingServiceStepResponse> reopenServiceStep(
                         @PathVariable Long stepId,
                         @Valid @RequestBody ReopenBookingServiceStepRequest request,
-                        @AuthenticationPrincipal UserDetails userDetails) {
+                        @AuthenticationPrincipal UserDetails userDetails,
+                        Authentication authentication) {
 
                 Long staffUserId = Long.valueOf(userDetails.getUsername());
-                BookingServiceStepResponse response = bookingService.reopenServiceStep(stepId, staffUserId, request);
+                String role = authentication.getAuthorities().stream().findFirst().orElseThrow().getAuthority();
+                BookingServiceStepResponse response = bookingService.reopenServiceStep(stepId, staffUserId, role, request);
                 auditLogService.createAuditLog(
                                 staffUserId,
                                 AuditAction.BOOKING_SERVICE_STEP_REOPENED,
@@ -547,6 +587,217 @@ public class BookingController {
                                 .success(true)
                                 .message("Payment method updated successfully")
                                 .data(response)
+                                .build();
+        }
+
+        // ===================== ISSUE #169 Operation Phase Endpoints =====================
+
+        @PatchMapping("/{id}/operations/start-wash")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> startWash(
+                        @PathVariable Long id,
+                        @RequestBody(required = false) OperationPhaseRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                BookingResponse response = bookingService.startWash(id, staffUserId, role, request);
+                auditLogService.createAuditLog(staffUserId, AuditAction.BOOKING_SERVICE_STARTED,
+                                AuditTargetType.BOOKING, id,
+                                AuditMetadata.of("operationPhase", response.getOperationPhase()));
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true).message("Wash started successfully").data(response).build();
+        }
+
+        @PatchMapping("/{id}/operations/complete-wash")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> completeWash(
+                        @PathVariable Long id,
+                        @RequestBody(required = false) OperationPhaseRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                BookingResponse response = bookingService.completeWash(id, staffUserId, role, request);
+                auditLogService.createAuditLog(staffUserId, AuditAction.BOOKING_SERVICE_STARTED,
+                                AuditTargetType.BOOKING, id,
+                                AuditMetadata.of("operationPhase", response.getOperationPhase()));
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true).message("Wash completed successfully").data(response).build();
+        }
+
+        @PatchMapping("/{id}/operations/start-care")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> startCare(
+                        @PathVariable Long id,
+                        @RequestBody(required = false) OperationPhaseRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                BookingResponse response = bookingService.startCare(id, staffUserId, role, request);
+                auditLogService.createAuditLog(staffUserId, AuditAction.BOOKING_SERVICE_STARTED,
+                                AuditTargetType.BOOKING, id,
+                                AuditMetadata.of("operationPhase", response.getOperationPhase()));
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true).message("Vehicle care started successfully").data(response).build();
+        }
+
+        @PatchMapping("/{id}/operations/complete-care")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> completeCare(
+                        @PathVariable Long id,
+                        @RequestBody(required = false) OperationPhaseRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                BookingResponse response = bookingService.completeCare(id, staffUserId, role, request);
+                auditLogService.createAuditLog(staffUserId, AuditAction.BOOKING_SERVICE_COMPLETED,
+                                AuditTargetType.BOOKING, id,
+                                AuditMetadata.of("operationPhase", response.getOperationPhase()));
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true).message("Vehicle care completed successfully").data(response).build();
+        }
+
+        @PatchMapping("/{id}/operations/complete-final-inspection")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> completeFinalInspection(
+                        @PathVariable Long id,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                BookingResponse response = bookingService.completeFinalInspection(id, staffUserId, role);
+                auditLogService.createAuditLog(staffUserId, AuditAction.BOOKING_SERVICE_COMPLETED,
+                                AuditTargetType.BOOKING, id,
+                                AuditMetadata.of("operationPhase", response.getOperationPhase()));
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true).message("Final inspection completed — booking is ready for handover").data(response).build();
+        }
+
+        @PostMapping("/{id}/operations/recover-care-workflow")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> recoverCareWorkflow(
+                        @PathVariable Long id,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                BookingResponse response = bookingService.recoverCareWorkflow(id, staffUserId, role);
+                auditLogService.createAuditLog(staffUserId, AuditAction.BOOKING_SERVICE_STARTED,
+                                AuditTargetType.BOOKING, id,
+                                AuditMetadata.of("action", "recover-care-workflow", "newPhase", response.getOperationPhase()));
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true).message("Booking recovered to WAITING_FOR_CARE").data(response).build();
+        }
+
+        @PatchMapping("/{id}/care-assignment")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> assignCareStaff(
+                        @PathVariable Long id,
+                        @Valid @RequestBody CareAssignmentRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                BookingResponse response = bookingService.assignCareStaff(id, staffUserId, role, request);
+                auditLogService.createAuditLog(staffUserId, AuditAction.BOOKING_SERVICE_STARTED,
+                                AuditTargetType.BOOKING, id,
+                                AuditMetadata.of("careStaffId", String.valueOf(request.getStaffProfileId())));
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true).message("Care staff assigned successfully").data(response).build();
+        }
+
+        @GetMapping("/{id}/available-care-staff")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<List<AvailableCareStaffResponse>> getAvailableCareStaff(
+                        @PathVariable Long id,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long userId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                return ApiResponse.<List<AvailableCareStaffResponse>>builder()
+                                .success(true)
+                                .message("Available care staff retrieved")
+                                .data(bookingService.getAvailableCareStaff(id, userId, role))
+                                .build();
+        }
+
+        @GetMapping("/{id}/care-assignment-status")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<CareAssignmentStatusResponse> getCareAssignmentStatus(
+                        @PathVariable Long id,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long userId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                return ApiResponse.<CareAssignmentStatusResponse>builder()
+                                .success(true)
+                                .message("Care assignment status retrieved")
+                                .data(bookingService.getCareAssignmentStatus(id, userId, role))
+                                .build();
+        }
+
+        @GetMapping("/{id}/assigned-care-staff")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<List<AssignedCareStaffResponse>> getAssignedCareStaff(
+                        @PathVariable Long id,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long userId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                return ApiResponse.<List<AssignedCareStaffResponse>>builder()
+                                .success(true)
+                                .message("Assigned care staff retrieved")
+                                .data(bookingService.getAssignedCareStaff(id, userId, role))
+                                .build();
+        }
+
+        @GetMapping("/staff/summary")
+        @PreAuthorize("hasRole('STAFF')")
+        public ApiResponse<StaffBookingSummaryResponse> getStaffBookingSummary(
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                return ApiResponse.<StaffBookingSummaryResponse>builder()
+                                .success(true)
+                                .message("Staff booking summary retrieved")
+                                .data(bookingService.getStaffBookingSummary(staffUserId, role))
+                                .build();
+        }
+
+        @GetMapping("/staff/calendar")
+        @PreAuthorize("hasRole('STAFF')")
+        public ApiResponse<List<StaffCalendarDayResponse>> getStaffCalendar(
+                        @AuthenticationPrincipal UserDetails userDetails,
+                        @RequestParam int year,
+                        @RequestParam int month) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                return ApiResponse.<List<StaffCalendarDayResponse>>builder()
+                                .success(true)
+                                .message("Staff calendar retrieved")
+                                .data(bookingService.getStaffCalendar(staffUserId, role, year, month))
+                                .build();
+        }
+
+        @GetMapping("/care-tasks/me")
+        @PreAuthorize("hasRole('STAFF')")
+        public ApiResponse<List<CareTaskResponse>> getMyCareTasksForStaff(
+                        @AuthenticationPrincipal UserDetails userDetails,
+                        @RequestParam(required = false) String status,
+                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                        @RequestParam(required = false, defaultValue = "0") int page,
+                        @RequestParam(required = false, defaultValue = "20") int limit) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+                return ApiResponse.<List<CareTaskResponse>>builder()
+                                .success(true)
+                                .message("Care tasks retrieved")
+                                .data(bookingService.getCareTasksForCurrentStaff(staffUserId, status, date, page, limit))
                                 .build();
         }
 

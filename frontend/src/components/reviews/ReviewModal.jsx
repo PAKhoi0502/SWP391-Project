@@ -27,7 +27,7 @@ function StarDisplay({ rating }) {
   )
 }
 
-export default function ReviewModal({ bookingId, open, onClose, onSubmitted }) {
+export default function ReviewModal({ bookingId, open, onClose, onSubmitted, onAlreadyReviewed }) {
   const [phase, setPhase] = useState('loading') // loading | ineligible | already | form | submitting | success
   const [eligibility, setEligibility] = useState(null)
   const [rating, setRating] = useState(0)
@@ -49,6 +49,7 @@ export default function ReviewModal({ bookingId, open, onClose, onSubmitted }) {
         setEligibility(data)
         if (data?.alreadyReviewed) {
           setPhase('already')
+          onAlreadyReviewed?.()
         } else if (data?.eligible) {
           setPhase('form')
         } else {

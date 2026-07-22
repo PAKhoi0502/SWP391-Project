@@ -18,3 +18,8 @@ SET color = CASE tier
     WHEN 'DIAMOND'  THEN '#F472B6'
     ELSE color
 END;
+
+
+
+select * from users
+select * from bookings

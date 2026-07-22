@@ -70,14 +70,13 @@ public class AdminDepositRefundController {
     @PostMapping("/{refundId}/execute")
     public ApiResponse<DepositRefundResponse> execute(
             @PathVariable Long refundId,
-            @Valid @RequestBody(required = false) ExecuteDepositRefundRequest request,
+            @Valid @RequestBody ExecuteDepositRefundRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
         Long adminId = Long.valueOf(userDetails.getUsername());
-        ExecuteDepositRefundRequest body = request != null ? request : new ExecuteDepositRefundRequest();
         return ApiResponse.<DepositRefundResponse>builder()
                 .success(true)
                 .message("Deposit refund executed successfully")
-                .data(depositRefundService.execute(refundId, adminId, body))
+                .data(depositRefundService.execute(refundId, adminId, request))
                 .build();
     }
 }

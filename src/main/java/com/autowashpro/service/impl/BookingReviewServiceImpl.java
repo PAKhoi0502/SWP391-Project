@@ -339,6 +339,14 @@ public class BookingReviewServiceImpl implements BookingReviewService {
         }
     }
 
+    @Override
+    public List<Long> getMyReviewedBookingIds(Long customerId) {
+        return bookingReviewRepository.findByCustomerId(customerId)
+                .stream()
+                .map(BookingReview::getBookingId)
+                .toList();
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /** Builds ReviewResponse for single-review operations (eligibility check, create, getMyReview). */

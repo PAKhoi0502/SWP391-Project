@@ -76,13 +76,18 @@ function ReviewCard({ review }) {
         <Stars rating={review.rating} size={14} />
       </div>
 
-      {review.comment && (
-        <blockquote className="prs-card-quote">
+      <blockquote
+        className={`prs-card-quote${review.comment ? '' : ' prs-card-quote--empty'}`}
+        aria-hidden={review.comment ? undefined : 'true'}
+      >
+        {review.comment ? (
+          <>
           <span className="prs-qmark">"</span>
           {review.comment}
           <span className="prs-qmark prs-qmark--r">"</span>
-        </blockquote>
-      )}
+          </>
+        ) : '\u00a0'}
+      </blockquote>
 
       {Array.isArray(review.imageUrls) && review.imageUrls.length > 0 && (
         <div className="prs-card-images">

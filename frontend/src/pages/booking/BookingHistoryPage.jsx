@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useTransientMessage } from '../../hooks/useTransientMessage'
 import { bookingApi } from '../../api/bookingApi'
 import customerBookingFlowApi from '../../api/customerBookingFlowApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
@@ -13,14 +14,13 @@ import './BookingHistoryPage.css'
 
 /* ─── Cache keys ─── */
 const BOOKING_CACHE_PREFIX        = 'booking-detail-cache-'
-const PAYOS_PAID_CACHE_PREFIX     = 'booking-payos-paid-'
 const PAYMENT_METHOD_CACHE_PREFIX = 'booking-payment-method-'
 
 /* ─── Filter tabs ─── */
-const STATUS_FILTERS = ['ALL', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELED']
+const STATUS_FILTERS = ['ALL', 'CONFIRMED', 'PENDING_DEPOSIT', 'IN_PROGRESS', 'COMPLETED', 'CANCELED']
 
 const getFilterLabel = (f) =>
-  ({ ALL: 'All', CONFIRMED: 'Upcoming', IN_PROGRESS: 'In Progress', COMPLETED: 'Completed', CANCELED: 'Cancelled' }[f] || f)
+  ({ ALL: 'All', CONFIRMED: 'Upcoming', PENDING_DEPOSIT: 'Pending Deposit', IN_PROGRESS: 'In Progress', COMPLETED: 'Completed', CANCELED: 'Cancelled' }[f] || f)
 
 /* ─── Formatters ─── */
 const formatMoney = (value) =>
@@ -48,20 +48,14 @@ const readCachedPaymentMethod = (bookingId) => {
   return localStorage.getItem(`${PAYMENT_METHOD_CACHE_PREFIX}${bookingId}`) || ''
 }
 
-const readCachedPayOSPaidAt = (bookingId) => {
-  if (!bookingId) return ''
-  return localStorage.getItem(`${PAYOS_PAID_CACHE_PREFIX}${bookingId}`) || ''
-}
-
 const mergeBookingWithCache = (booking) => {
   const bookingId = getBookingId(booking)
   const cached    = readCachedBooking(bookingId)
-  const paidAt    = readCachedPayOSPaidAt(bookingId)
   const merged    = { ...cached, ...booking }
   if (!merged.paymentMethod) {
     merged.paymentMethod = cached.paymentMethod || readCachedPaymentMethod(bookingId)
   }
-  if (paidAt) { merged.paymentStatus = 'PAID'; merged.paidAt = merged.paidAt || paidAt }
+  // NOTE: paymentStatus is NEVER inferred from localStorage — always use server response
   return merged
 }
 
@@ -118,10 +112,7 @@ const resolveAddOnServicePackageNames = async (addOnIds) => {
 const enrichBookingsWithDetail = async (items) => {
   if (!Array.isArray(items)) return []
   const results = await Promise.allSettled(items.map(async (booking) => {
-    const bookingId = getBookingId(booking)
-    if (!bookingId) return booking
-    const detail         = await bookingApi.getCustomerBookingDetail(bookingId)
-    const enrichedBooking = mergeBookingWithCache({ ...booking, ...detail })
+    const enrichedBooking = mergeBookingWithCache({ ...booking })
     enrichedBooking.addOnServicePackageNames = await resolveAddOnServicePackageNames(enrichedBooking.addOnServicePackageIds)
     cacheBookingDetail(enrichedBooking)
     return enrichedBooking
@@ -133,7 +124,7 @@ const enrichBookingsWithDetail = async (items) => {
 /* ─── Status / payment text ─── */
 const getStatusText = (status) => {
   const v = String(status || '').toUpperCase()
-  if (v === 'CONFIRMED')       return 'Upcoming'
+  if (v === 'CONFIRMED')       return 'Confirmed'
   if (v === 'PENDING_DEPOSIT') return 'Pending Deposit'
   if (v === 'CHECKED_IN')      return 'Checked In'
   if (v === 'IN_PROGRESS')     return 'In Progress'
@@ -215,24 +206,6 @@ const getCardClass = (status) => {
 }
 
 /* ─── User / booking number helpers ─── */
-const getCurrentUserId = () => {
-  try {
-    const user = JSON.parse(localStorage.getItem('user') || '{}')
-    return String(user?.id || user?.userId || user?.customerId || '')
-  } catch { return '' }
-}
-
-const buildCustomerBookingNumberMap = (items) => {
-  const currentUserId = getCurrentUserId()
-  const ownItems = currentUserId
-    ? items.filter((b) => String(b?.customerId || '') === currentUserId)
-    : items
-  const map = new Map()
-  ;[...ownItems]
-    .sort((l, r) => Number(getBookingId(l) || 0) - Number(getBookingId(r) || 0))
-    .forEach((booking, index) => { map.set(String(getBookingId(booking)), index + 1) })
-  return map
-}
 
 const getPaymentMethodText = (booking) => {
   const method = String(booking?.paymentMethod || '').toUpperCase()
@@ -247,6 +220,50 @@ const getPaymentMethodText = (booking) => {
   }
 
   return 'Not updated'
+}
+
+/* ─── Deposit countdown ─── */
+function useDepositCountdown(paymentExpiredAt) {
+  const [remaining, setRemaining] = useState(() => {
+    if (!paymentExpiredAt) return null
+    return Math.max(0, Math.floor((new Date(paymentExpiredAt).getTime() - Date.now()) / 1000))
+  })
+
+  useEffect(() => {
+    if (!paymentExpiredAt) return
+    const update = () => {
+      const secs = Math.max(0, Math.floor((new Date(paymentExpiredAt).getTime() - Date.now()) / 1000))
+      setRemaining(secs)
+    }
+    update()
+    const timer = setInterval(update, 1000)
+    return () => clearInterval(timer)
+  }, [paymentExpiredAt])
+
+  return remaining
+}
+
+function DepositCountdown({ paymentExpiredAt, onExpired }) {
+  const remaining = useDepositCountdown(paymentExpiredAt)
+
+  useEffect(() => {
+    if (remaining === 0 && onExpired) onExpired()
+  }, [remaining, onExpired])
+
+  if (remaining === null || !paymentExpiredAt) return null
+
+  const mins = Math.floor(remaining / 60)
+  const secs = remaining % 60
+  const isUrgent = remaining < 120
+  const display = `${mins}:${String(secs).padStart(2, '0')}`
+
+  return (
+    <div className={`bhp-deposit-countdown${isUrgent ? ' bhp-deposit-countdown--urgent' : ''}`}>
+      {remaining === 0
+        ? 'Deposit window expired — this booking may be cancelled shortly.'
+        : `Deposit required · Pay within ${display} to keep this booking.`}
+    </div>
+  )
 }
 
 let pkgStepsCache = {}
@@ -286,57 +303,68 @@ const getInspectionByType = (inspections, type) =>
 const getHistoryTimelineItems = (booking, serviceSteps = [], inspections = []) => {
   const status = String(booking?.status || '').toUpperCase()
   const paymentStatus = String(booking?.paymentStatus || '').toUpperCase()
-  const checkedInAt   = booking?.checkedInAt
+  const checkedInAt = booking?.checkedInAt
+  const operationPhase = String(booking?.operationPhase || '').toUpperCase()
 
   if (status === 'NO_SHOW') {
     return [
-      { label: 'Booked',  active: true, time: booking?.startTime },
+      { label: 'Booked', active: true, time: booking?.startTime },
       { label: 'No Show', active: true, danger: true, time: booking?.updatedAt || booking?.startTime },
     ]
   }
 
   if (status === 'CANCELED' || status === 'CANCELLED') {
     return [
-      { label: 'Booked',    active: true, time: booking?.startTime },
+      { label: 'Booked', active: true, time: booking?.startTime },
       { label: 'Cancelled', active: true, danger: true, time: booking?.updatedAt || booking?.startTime },
     ]
   }
 
   const checkinActive = ['CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'].includes(status) || Boolean(checkedInAt)
   const beforeWashInspection = getInspectionByType(inspections, 'BEFORE_WASH')
-  const inspectionActive = Boolean(beforeWashInspection) || ['IN_PROGRESS', 'COMPLETED'].includes(status)
+  const afterWashInspection  = getInspectionByType(inspections, 'AFTER_WASH')
+  const inspectionActive = Boolean(beforeWashInspection)
 
-  const normLabel = (v) => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+  const requiresCare = Boolean(booking?.requiresCareStaff) || Boolean(booking?.plannedCareStartAt)
 
-  const stepItems = Array.isArray(serviceSteps) && serviceSteps.length > 0
-    ? serviceSteps
-        .map((step, index) => ({
-          label:  step.title || step.name || step.stepName || `Step ${index + 1}`,
-          active: String(step.status || '').toUpperCase() === 'COMPLETED',
-          time:   step.completedAt || null,
-          order:  Number(step.stepOrder || step.order || step.sequence || index + 1),
-        }))
-        .filter((item) => !normLabel(item.label).startsWith('kiem tra'))
-        .sort((a, b) => a.order - b.order)
-    : []
+  const washPhases = ['AUTOMATED_WASH', 'WAITING_FOR_CARE', 'VEHICLE_CARE', 'FINAL_INSPECTION', 'READY_FOR_HANDOVER', 'DONE']
+  const carePhases = ['VEHICLE_CARE', 'FINAL_INSPECTION', 'READY_FOR_HANDOVER', 'DONE']
+  const finalPhases = ['FINAL_INSPECTION', 'READY_FOR_HANDOVER', 'DONE']
 
-  return [
+  const washActive = washPhases.includes(operationPhase) || status === 'COMPLETED'
+  const careActive = requiresCare && (carePhases.includes(operationPhase) || status === 'COMPLETED')
+  const finalCheckActive = Boolean(afterWashInspection) || finalPhases.includes(operationPhase) || status === 'COMPLETED'
+  const completedActive = status === 'COMPLETED'
+
+  const nodes = [
     { label: 'Booked', active: true, time: booking?.startTime },
+    { label: 'Confirmed', active: status !== 'PENDING_DEPOSIT' && status !== 'CANCELED' && status !== 'CANCELLED', time: booking?.createdAt },
     { label: 'Check-in', active: checkinActive, time: checkedInAt },
-    { label: 'Inspection', active: inspectionActive, time: beforeWashInspection?.createdAt },
-    ...stepItems,
-    { label: 'Completed', active: status === 'COMPLETED', time: booking?.completedAt },
-    { label: 'Paid', active: paymentStatus === 'PAID', time: booking?.paidAt },
+    { label: 'Intake', active: inspectionActive, time: beforeWashInspection?.createdAt },
+    { label: 'Wash', active: washActive, time: booking?.washBayStartTime },
   ]
+
+  if (requiresCare) {
+    nodes.push({ label: 'Care', active: careActive, time: booking?.careStartedAt })
+    nodes.push({ label: 'Final Check', active: finalCheckActive, time: afterWashInspection?.createdAt || booking?.careCompletedAt })
+  }
+
+  nodes.push({ label: 'Completed', active: completedActive, time: booking?.completedAt })
+
+  if (paymentStatus === 'PAID') {
+    nodes.push({ label: 'Paid', active: true, time: booking?.paidAt })
+  }
+
+  return nodes
 }
 
 /* ══════════════════════════════════════════════════
    BookingDetailModal — inline, same vibe
    ══════════════════════════════════════════════════ */
-function BookingDetailModal({ booking, steps, numberMap, onClose, onRefunded }) {
+function BookingDetailModal({ booking, steps, onClose, onRefunded }) {
   if (!booking) return null
   const bookingId         = getBookingId(booking)
-  const customerBookingNo = numberMap.get(String(bookingId)) ?? bookingId
+  const customerBookingNo = booking.customerBookingNumber ?? bookingId
   const status            = String(booking?.status || '').toUpperCase()
   const paymentStatus     = String(booking?.paymentStatus || '').toUpperCase()
   const timelineItems     = getHistoryTimelineItems(booking, steps || [])
@@ -493,13 +521,20 @@ const PAGE_SIZE = 5
 
 export default function BookingHistoryPage() {
   const location = useLocation()
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
   const [bookings,             setBookings]             = useState([])
   const [loading,              setLoading]              = useState(true)
-  const [message,              setMessage]              = useState(
-    location.state?.bookingCreated ? 'Booking created successfully!' : '',
-  )
+  // Task 1: success messages auto-clear after 7 s; errors stay until overwritten
+  const [successMessage, setSuccessMessage] = useTransientMessage(7000)
+  const [errorMessage,   setErrorMessage]   = useState('')
+  // Unified accessor used by existing error-setting code paths
+  const setMessage = (msg, isError = false) => {
+    if (!msg) { setSuccessMessage(''); setErrorMessage(''); return }
+    if (isError) { setErrorMessage(msg); setSuccessMessage('') }
+    else          { setSuccessMessage(msg); setErrorMessage('') }
+  }
   const [filter,               setFilter]               = useState('CONFIRMED')
   const [visibleCount,         setVisibleCount]         = useState(PAGE_SIZE)
   const [cancelingId,          setCancelingId]          = useState(null)
@@ -507,9 +542,12 @@ export default function BookingHistoryPage() {
   const [cancelModalBooking,   setCancelModalBooking]   = useState(null)
   const [reviewModal,          setReviewModal]          = useState(null)
   const [reviewedIds,          setReviewedIds]          = useState(new Set())
+  const [reviewedIdsLoaded,    setReviewedIdsLoaded]    = useState(false)
+  const [reviewedIdsError,     setReviewedIdsError]     = useState(false)
   const [serviceStepsByBookingId, setServiceStepsByBookingId] = useState({})
   const [detailBooking,        setDetailBooking]        = useState(null)
-  const sentinelRef = useRef(null)
+  const sentinelRef  = useRef(null)
+  const loadSeqRef   = useRef(0)
   const [inspectionsByBookingId, setInspectionsByBookingId] = useState({})
 
   const [depositBooking,        setDepositBooking]        = useState(null)
@@ -591,55 +629,101 @@ export default function BookingHistoryPage() {
   }
 
   const loadBookings = async (silent = false) => {
+    const seq = ++loadSeqRef.current
     try {
       if (!silent) setLoading(true)
-      if (!silent && !location.state?.bookingCreated) setMessage('')
-      const data        = await customerBookingFlowApi.getCustomerBookings()
+      if (!silent) setErrorMessage('')
+      const data         = await customerBookingFlowApi.getCustomerBookings()
+      if (seq !== loadSeqRef.current) return
       const enrichedData = await enrichBookingsWithDetail(Array.isArray(data) ? data : [])
+      if (seq !== loadSeqRef.current) return
       setBookings(enrichedData)
-      clearPackageStepsCache()
-      setServiceStepsByBookingId({})
+      if (!silent) clearPackageStepsCache()
       fetchServiceStepsForBookings(enrichedData)
-      setInspectionsByBookingId({})
       fetchInspectionsForBookings(enrichedData)
     } catch (error) {
+      if (seq !== loadSeqRef.current) return
       if (!silent) {
-        setMessage(error.message || 'Could not load booking history.')
+        setErrorMessage(error.message || 'Could not load booking history.')
         setBookings([])
       }
     } finally {
-      if (!silent) setLoading(false)
+      if (seq === loadSeqRef.current && !silent) setLoading(false)
     }
   }
 
+  // Task 1: Show "Booking created" banner from navigation state and immediately clear the state
+  // so that a page refresh does not re-show the banner.
+  useEffect(() => {
+    if (location.state?.bookingCreated) {
+      setSuccessMessage('Booking created successfully!')
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    // Clean up legacy localStorage keys that used to force paymentStatus=PAID
+    try {
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('booking-payos-paid-'))
+        .forEach(k => localStorage.removeItem(k))
+    } catch (_) {}
+  }, [])
+
   useEffect(() => {
     let mounted = true
-    const load  = async () => {
+    bookingApi.getMyReviewedBookingIds()
+      .then((ids) => {
+        if (mounted) {
+          setReviewedIds(new Set(ids.map(String)))
+          setReviewedIdsLoaded(true)
+          setReviewedIdsError(false)
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setReviewedIdsLoaded(true)
+          setReviewedIdsError(true)
+        }
+      })
+    return () => { mounted = false }
+  }, [])
+
+  useEffect(() => {
+    let mounted = true
+    let timer
+    const scheduleNext = () => {
+      timer = setTimeout(async () => {
+        if (mounted) {
+          await loadBookings(true)
+          if (mounted) scheduleNext()
+        }
+      }, 15_000)
+    }
+    const load = async () => {
       try {
         setLoading(true)
-        if (!location.state?.bookingCreated) setMessage('')
+        setErrorMessage('')
         const data         = await customerBookingFlowApi.getCustomerBookings()
         const enrichedData = await enrichBookingsWithDetail(Array.isArray(data) ? data : [])
         if (mounted) {
           setBookings(enrichedData)
           clearPackageStepsCache()
-          setServiceStepsByBookingId({})
           fetchServiceStepsForBookings(enrichedData)
-          setInspectionsByBookingId({})
           fetchInspectionsForBookings(enrichedData)
         }
       } catch (error) {
         if (mounted) {
-          setMessage(error.message || 'Could not load booking history.')
+          setErrorMessage(error.message || 'Could not load booking history.')
           setBookings([])
         }
       } finally {
         if (mounted) setLoading(false)
       }
     }
-    load()
-    const timer = setInterval(() => { if (mounted) loadBookings(true) }, 15_000)
-    return () => { mounted = false; clearInterval(timer) }
+    load().then(() => { if (mounted) scheduleNext() })
+    return () => { mounted = false; clearTimeout(timer) }
   }, [])
 
   /* Auto-open detail overlay when navigated from notification with ?open=bookingId */
@@ -672,17 +756,24 @@ export default function BookingHistoryPage() {
     const bookingId = cancelModalBookingId
     if (!bookingId) return
     const usedPoints = cancelModalBooking?.usedPoints ?? 0
+    // Save ref before clearing — needed for post-cancel redirect
+    const cancellingBooking = cancelModalBooking
     try {
       setCancelingId(bookingId)
-      setMessage('')
-      await customerBookingFlowApi.cancelBooking(bookingId, reason)
+      setErrorMessage('')
+      const cancelResponse = await customerBookingFlowApi.cancelBooking(bookingId, reason)
       setCancelModalBookingId(null)
       setCancelModalBooking(null)
+      // Merge full server response so refundAmount/depositStatus are up-to-date
+      const updatedBooking = {
+        ...(cancellingBooking || {}),
+        ...(cancelResponse || {}),
+        status: 'CANCELED',
+        note: reason || cancellingBooking?.note,
+      }
       setBookings((prev) =>
         prev.map((booking) =>
-          String(getBookingId(booking)) === String(bookingId)
-            ? { ...booking, status: 'CANCELED', note: reason || booking.note }
-            : booking,
+          String(getBookingId(booking)) === String(bookingId) ? updatedBooking : booking,
         ),
       )
       if (usedPoints > 0) {
@@ -693,19 +784,25 @@ export default function BookingHistoryPage() {
             (tx) => String(tx?.bookingId) === String(bookingId) && tx?.type === 'REFUND',
           )
           if (refundTx) {
-            setMessage(`Booking cancelled. ${refundTx.points} pts refunded to your account.`)
+            setSuccessMessage(`Booking cancelled. ${refundTx.points} pts refunded to your account.`)
           } else {
-            setMessage(`Booking cancelled. Up to ${usedPoints} pts will be refunded if deducted.`)
+            setSuccessMessage(`Booking cancelled. Up to ${usedPoints} pts will be refunded if deducted.`)
           }
         } catch {
-          setMessage(`Booking cancelled. Up to ${usedPoints} pts will be refunded if deducted.`)
+          setSuccessMessage(`Booking cancelled. Up to ${usedPoints} pts will be refunded if deducted.`)
         }
       } else {
-        const cancelNo = customerBookingNumberMap.get(String(bookingId)) ?? bookingId
-        setMessage(`Booking #${cancelNo} cancelled.`)
+        const cancelNo = cancelResponse?.customerBookingNumber ?? cancellingBooking?.customerBookingNumber ?? bookingId
+        // Task 4: if a deposit refund is pending, auto-open the detail modal so the refund panel is visible
+        if (cancelResponse?.depositStatus === 'REFUND_PENDING' && Number(cancelResponse?.refundAmount) > 0) {
+          setSuccessMessage(`Booking #${cancelNo} cancelled. A deposit refund is pending — see details below.`)
+          setDetailBooking(updatedBooking)
+        } else {
+          setSuccessMessage(`Booking #${cancelNo} cancelled.`)
+        }
       }
     } catch (error) {
-      setMessage(error?.response?.data?.message || error.message || 'Could not cancel booking.')
+      setErrorMessage(error?.response?.data?.message || error.message || 'Could not cancel booking.')
     } finally {
       setCancelingId(null)
     }
@@ -845,16 +942,16 @@ export default function BookingHistoryPage() {
     return () => clearInterval(timer)
   }, [depositQrOpen, depositSuccess, depositTransaction?.id, depositBooking])
 
-  const customerBookingNumberMap = useMemo(() => buildCustomerBookingNumberMap(bookings), [bookings])
-
   const filteredBookings = useMemo(
     () =>
       bookings
         .filter((booking) => {
           const status = String(booking?.status || '').toUpperCase()
-          if (filter === 'ALL')      return true
-          if (filter === 'CANCELED') return status === 'CANCELED' || status === 'CANCELLED' || status === 'NO_SHOW'
-          if (filter === 'COMPLETED') return status === 'COMPLETED'
+          if (filter === 'ALL')             return true
+          if (filter === 'CANCELED')        return status === 'CANCELED' || status === 'CANCELLED' || status === 'NO_SHOW'
+          if (filter === 'COMPLETED')       return status === 'COMPLETED'
+          if (filter === 'CONFIRMED')       return status === 'CONFIRMED'
+          if (filter === 'PENDING_DEPOSIT') return status === 'PENDING_DEPOSIT'
           return status === filter
         })
         .sort((l, r) => Number(getBookingId(r) || 0) - Number(getBookingId(l) || 0)),
@@ -915,8 +1012,9 @@ export default function BookingHistoryPage() {
           ))}
         </div>
 
-        {/* Message */}
-        {message && <div className="bhp-message">{message}</div>}
+        {/* Messages: success auto-clears after 7s; errors persist */}
+        {successMessage && <div className="bhp-message bhp-message--success">{successMessage}</div>}
+        {errorMessage   && <div className="bhp-message bhp-message--error">{errorMessage}</div>}
 
         {/* Content */}
         {loading ? (
@@ -934,11 +1032,14 @@ export default function BookingHistoryPage() {
           <div className="bhp-list" key={filter}>
             {visibleBookings.map((booking, idx) => {
               const bookingId         = getBookingId(booking)
-              const customerBookingNo = customerBookingNumberMap.get(String(bookingId)) ?? bookingId
+              const customerBookingNo = booking.customerBookingNumber ?? bookingId
               const paymentStatus     = String(booking?.paymentStatus || '').toUpperCase()
               const status            = String(booking?.status || '').toUpperCase()
               const depositStatusRaw   = String(booking?.depositStatus || '').toUpperCase()
               const depositPending     = status === 'PENDING_DEPOSIT' && Number(booking?.depositAmount) > 0 && depositStatusRaw !== 'PAID'
+              const depositExpired     = depositPending
+                && Boolean(booking?.paymentExpiredAt)
+                && new Date(booking.paymentExpiredAt).getTime() <= Date.now()
               const canCancel          = (status === 'CONFIRMED' || status === 'PENDING_DEPOSIT') && !depositPending
               const steps             = serviceStepsByBookingId[String(bookingId)] || []
               const timelineItems     = getHistoryTimelineItems(booking, steps)
@@ -1042,7 +1143,13 @@ export default function BookingHistoryPage() {
 
                   {/* Card footer */}
                   <div className="bhp-card-foot">
-                    {depositPending && (
+                    {depositPending && booking?.paymentExpiredAt && (
+                      <DepositCountdown
+                        paymentExpiredAt={booking.paymentExpiredAt}
+                        onExpired={() => loadBookings(true)}
+                      />
+                    )}
+                    {depositPending && !depositExpired && (
                       <button
                         type="button"
                         className="bhp-pay-deposit-btn"
@@ -1064,14 +1171,18 @@ export default function BookingHistoryPage() {
                         {cancelingId === bookingId ? 'Cancelling…' : 'Cancel'}
                       </button>
                     )}
-                    {status === 'COMPLETED' && paymentStatus === 'PAID' && !reviewedIds.has(bookingId) && (
-                      <button
-                        type="button"
-                        className="bhp-rate-btn"
-                        onClick={() => setReviewModal({ bookingId })}
-                      >
-                        Rate service ★
-                      </button>
+                    {status === 'COMPLETED' && paymentStatus === 'PAID' && reviewedIdsLoaded && !reviewedIdsError && (
+                      reviewedIds.has(String(bookingId))
+                        ? <span className="bhp-rated-badge">Rated ✓</span>
+                        : (
+                          <button
+                            type="button"
+                            className="bhp-rate-btn"
+                            onClick={() => setReviewModal({ bookingId })}
+                          >
+                            Rate service ★
+                          </button>
+                        )
                     )}
                     <button
                       type="button"
@@ -1096,7 +1207,6 @@ export default function BookingHistoryPage() {
         <BookingDetailModal
           booking={detailBooking}
           steps={serviceStepsByBookingId[String(getBookingId(detailBooking))] || []}
-          numberMap={customerBookingNumberMap}
           onClose={() => setDetailBooking(null)}
           onRefunded={() => loadBookings(true)}
         />
@@ -1105,7 +1215,8 @@ export default function BookingHistoryPage() {
       {/* Cancel modal */}
       <CancelBookingModal
         open={cancelModalBookingId !== null}
-        bookingId={cancelModalBookingId}
+        bookingId={cancelModalBooking?.customerBookingNumber ?? cancelModalBookingId}
+        rawBookingId={cancelModalBookingId}
         loading={cancelingId === cancelModalBookingId}
         onClose={closeCancelModal}
         onConfirm={handleCancelBooking}
@@ -1116,6 +1227,7 @@ export default function BookingHistoryPage() {
         open={depositQrOpen}
         onClose={handleDepositQrClose}
         booking={depositBooking}
+        bookingDisplayNumber={depositBooking?.customerBookingNumber ?? getBookingId(depositBooking)}
         transaction={depositTransaction}
         checkoutUrl={depositCheckoutUrl}
         error={depositQrError}
@@ -1133,8 +1245,11 @@ export default function BookingHistoryPage() {
           open={!!reviewModal}
           onClose={() => setReviewModal(null)}
           onSubmitted={() => {
-            setReviewedIds((prev) => new Set(prev).add(reviewModal.bookingId))
+            setReviewedIds((prev) => new Set(prev).add(String(reviewModal.bookingId)))
             setReviewModal(null)
+          }}
+          onAlreadyReviewed={() => {
+            setReviewedIds((prev) => new Set(prev).add(String(reviewModal.bookingId)))
           }}
         />
       )}

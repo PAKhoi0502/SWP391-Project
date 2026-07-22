@@ -7,8 +7,10 @@ import com.autowashpro.dto.response.WashBayResponse;
 import com.autowashpro.entity.Garage;
 import com.autowashpro.entity.WashBay;
 import com.autowashpro.entity.enums.WashBayStatus;
+import com.autowashpro.entity.StaffProfile;
 import com.autowashpro.repository.GarageRepository;
 import com.autowashpro.repository.WashBayRepository;
+import com.autowashpro.service.support.StaffOperationAccessPolicy;
 import com.autowashpro.support.TestFixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -37,6 +40,9 @@ class WashBayServiceImplTest {
 
     @Mock
     private GarageRepository garageRepository;
+
+    @Mock
+    private StaffOperationAccessPolicy staffOperationAccessPolicy;
 
     @InjectMocks
     private WashBayServiceImpl washBayService;
@@ -90,9 +96,11 @@ class WashBayServiceImplTest {
         WashBayStatusUpdateRequest request = new WashBayStatusUpdateRequest();
         request.setStatus(WashBayStatus.INACTIVE);
         when(washBayRepository.findById(bay.getId())).thenReturn(Optional.of(bay));
+        when(staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(anyLong(), any(), anyLong()))
+                .thenReturn(null);
         when(washBayRepository.save(bay)).thenReturn(bay);
 
-        WashBayResponse response = washBayService.updateStatus(bay.getId(), request);
+        WashBayResponse response = washBayService.updateStatus(bay.getId(), request, 1L, "ROLE_ADMIN");
 
         assertEquals(WashBayStatus.INACTIVE, response.getStatus());
         assertFalse(response.getIsActive());
@@ -115,7 +123,7 @@ class WashBayServiceImplTest {
         when(washBayRepository.countAvailableByGarageAndVehicleType(garage.getId(), "CAR"))
                 .thenReturn(3L);
 
-        WashBayCapacityResponse response = washBayService.getCapacity(garage.getId(), "CAR");
+        WashBayCapacityResponse response = washBayService.getCapacity(garage.getId(), "CAR", 1L, "ROLE_ADMIN");
 
         assertEquals(3L, response.getAvailableCountByVehicleType().get("CAR"));
     }
@@ -127,7 +135,7 @@ class WashBayServiceImplTest {
         when(washBayRepository.countAvailableGroupedByVehicleType(garage.getId()))
                 .thenReturn(List.of(new Object[]{"CAR", 2L}, new Object[]{"BIKE", 1L}));
 
-        WashBayCapacityResponse response = washBayService.getCapacity(garage.getId(), null);
+        WashBayCapacityResponse response = washBayService.getCapacity(garage.getId(), null, 1L, "ROLE_ADMIN");
 
         assertEquals(2L, response.getAvailableCountByVehicleType().get("CAR"));
         assertEquals(1L, response.getAvailableCountByVehicleType().get("BIKE"));

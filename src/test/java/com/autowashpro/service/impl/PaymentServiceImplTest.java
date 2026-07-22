@@ -89,6 +89,9 @@ class PaymentServiceImplTest {
     @Mock
     private PlatformTransactionManager transactionManager;
 
+    @Mock
+    private com.autowashpro.service.support.StaffOperationAccessPolicy staffOperationAccessPolicy;
+
     @InjectMocks
     private PaymentServiceImpl paymentService;
 
@@ -113,14 +116,13 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    void createPayOSPaymentRejectsBookingThatIsNotCompleted() {
-        Booking booking = completedBooking();
+    void createPayOSPaymentRejectsBookingWithWrongStatus() {
+        Booking booking = pendingDepositBooking();
         booking.setStatus("IN_PROGRESS");
-        CreatePayOSPaymentRequest request = paymentRequest(booking.getId());
         when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
-                () -> paymentService.createPayOSPayment(request, 2L));
+                () -> paymentService.createPayOSPaymentForStaff(paymentRequest(booking.getId()), 1L, "ROLE_ADMIN"));
 
         assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
         verify(restTemplate, never()).postForEntity(any(String.class), any(), eq(Map.class));
@@ -128,14 +130,15 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    void createPayOSPaymentRejectsAlreadyPaidBooking() {
+    void createFinalPaymentRejectsAlreadyFullyPaidBooking() {
         Booking booking = completedBooking();
         booking.setPaymentStatus("PAID");
         CreatePayOSPaymentRequest request = paymentRequest(booking.getId());
+        request.setPurpose("FINAL");
         when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
-                () -> paymentService.createPayOSPayment(request, 2L));
+                () -> paymentService.createPayOSPaymentForStaff(request, 1L, "ROLE_ADMIN"));
 
         assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
         verify(restTemplate, never()).postForEntity(any(String.class), any(), eq(Map.class));
@@ -144,7 +147,6 @@ class PaymentServiceImplTest {
     @Test
     void createPayOSPaymentPostsRequestAndSavesPendingTransaction() {
         Booking booking = pendingDepositBooking();
-        CreatePayOSPaymentRequest request = paymentRequest(booking.getId());
         when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
         when(restTemplate.postForEntity(
                 eq("https://api-merchant.payos.vn/v2/payment-requests"),
@@ -157,7 +159,8 @@ class PaymentServiceImplTest {
         ArgumentCaptor<HttpEntity<Map<String, Object>>> httpEntityCaptor = ArgumentCaptor.forClass(HttpEntity.class);
         ArgumentCaptor<PaymentTransaction> transactionCaptor = ArgumentCaptor.forClass(PaymentTransaction.class);
 
-        CreatePayOSPaymentResponse response = paymentService.createPayOSPayment(request, 2L);
+        CreatePayOSPaymentResponse response = paymentService.createPayOSPaymentForStaff(
+                paymentRequest(booking.getId()), 1L, "ROLE_ADMIN");
 
         assertEquals(99L, response.getTransactionId());
         assertEquals("PENDING", response.getStatus());

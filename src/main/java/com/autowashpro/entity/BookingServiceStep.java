@@ -38,6 +38,13 @@ public class BookingServiceStep {
 
     private String status;
 
+    /** Execution phase copied from ServicePackageStep at booking start time */
+    @Column(name = "execution_phase", length = 30)
+    private String executionPhase;
+
+    @Column(name = "duration_minutes")
+    private Integer durationMinutes = 0;
+
     @Column(name = "started_at")
     private LocalDateTime startedAt;
 

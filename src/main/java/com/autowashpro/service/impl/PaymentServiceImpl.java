@@ -4,6 +4,7 @@ import com.autowashpro.common.AuditAction;
 import com.autowashpro.common.AuditMetadata;
 import com.autowashpro.common.AuditTargetType;
 
+import com.autowashpro.service.BookingService;
 import com.autowashpro.service.WashHistoryService;
 import com.autowashpro.service.AuditLogService;
 import com.autowashpro.dto.request.CreatePayOSPaymentRequest;
@@ -20,6 +21,7 @@ import com.autowashpro.service.EmailService;
 import com.autowashpro.service.LoyaltyService;
 import com.autowashpro.service.NotificationService;
 import com.autowashpro.service.PaymentService;
+import com.autowashpro.service.support.StaffOperationAccessPolicy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,6 +64,14 @@ public class PaymentServiceImpl implements PaymentService {
     private final com.autowashpro.service.BookingReviewService bookingReviewService;
     private final EmailService emailService;
     private final org.springframework.transaction.PlatformTransactionManager transactionManager;
+    private final StaffOperationAccessPolicy staffOperationAccessPolicy;
+
+    /**
+     * BookingService is injected here to call reserveCareStaffIfNeeded after deposit confirmation.
+     * There is no circular dependency: BookingServiceImpl depends only on repositories,
+     * not on PaymentServiceImpl.
+     */
+    private final BookingService bookingService;
 
     @Value("${payos.return-url}")
     private String returnUrl;
@@ -81,49 +91,104 @@ public class PaymentServiceImpl implements PaymentService {
     @Value("${payos.checksum-key}")
     private String checksumKey;
 
-    @Override
     @Transactional
-    public CreatePayOSPaymentResponse createPayOSPayment(CreatePayOSPaymentRequest request, Long staffUserId) {
+    private CreatePayOSPaymentResponse createPayOSPaymentCore(CreatePayOSPaymentRequest request) {
 
         Booking booking = bookingRepository.findById(request.getBookingId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Booking not found: " + request.getBookingId()));
 
-        if (!"PENDING_DEPOSIT".equals(booking.getStatus())) {
+        // Normalise purpose — default to DEPOSIT for backward compatibility
+        String purpose = (request.getPurpose() == null || request.getPurpose().isBlank())
+                ? "DEPOSIT"
+                : request.getPurpose().trim().toUpperCase();
 
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "PayOS payment can only be created for PENDING_DEPOSIT booking. Current status: "
-                            + booking.getStatus());
-
-        }
-
-        if ("PAID".equals(booking.getPaymentStatus())) {
+        if (!"DEPOSIT".equals(purpose) && !"FINAL".equals(purpose)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Booking has already been paid");
+                    "purpose must be DEPOSIT or FINAL, got: " + request.getPurpose());
         }
 
-        transactionRepository
-                .findByBookingIdAndStatus(
-                        request.getBookingId(),
-                        "PENDING")
-                .ifPresent(existing -> {
+        BigDecimal amount;
 
-                    existing.setStatus("EXPIRED");
+        if ("DEPOSIT".equals(purpose)) {
+            // ── DEPOSIT validation ────────────────────────────────────────────────
+            if (!"PENDING_DEPOSIT".equals(booking.getStatus())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "PayOS DEPOSIT payment can only be created for PENDING_DEPOSIT booking. "
+                                + "Current status: " + booking.getStatus());
+            }
+            if ("PAID".equals(booking.getDepositStatus())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Deposit has already been paid");
+            }
+            if (booking.getPaymentExpiredAt() != null
+                    && !LocalDateTime.now().isBefore(booking.getPaymentExpiredAt())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Deposit payment deadline has expired. This booking can no longer be paid.");
+            }
+            if (booking.getDepositAmount() == null
+                    || booking.getDepositAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Booking has no deposit amount");
+            }
 
-                    existing.setCancelReason(
-                            "Re-created payment link");
+            // Expire any existing PENDING DEPOSIT transactions for this booking
+            transactionRepository
+                    .findByBookingIdAndPurposeOrderByCreatedAtDesc(request.getBookingId(), "DEPOSIT")
+                    .stream()
+                    .filter(t -> "PENDING".equals(t.getStatus()))
+                    .forEach(t -> {
+                        t.setStatus("EXPIRED");
+                        t.setCancelReason("Re-created payment link");
+                        transactionRepository.save(t);
+                    });
 
-                    transactionRepository.save(existing);
+            // A previous attempt may have left depositStatus stuck on CANCELED/EXPIRED —
+            // reset it so the fresh link is the authoritative one awaiting payment.
+            if (!"PAID".equals(booking.getDepositStatus())) {
+                booking.setDepositStatus("UNPAID");
+                bookingRepository.save(booking);
+            }
 
-                });
+            amount = booking.getDepositAmount();
 
-        // A previous attempt may have left depositStatus stuck on CANCELED/FAILED/EXPIRED
-        // (e.g. customer cancelled a QR then re-opened one) — reset it since this fresh
-        // payment link is now the active one awaiting payment.
-        if (!"PAID".equals(booking.getDepositStatus())) {
-            booking.setDepositStatus("UNPAID");
-            bookingRepository.save(booking);
+        } else {
+            // ── FINAL validation ──────────────────────────────────────────────────
+            if (!"COMPLETED".equals(booking.getStatus())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "PayOS FINAL payment can only be created for COMPLETED booking. "
+                                + "Current status: " + booking.getStatus());
+            }
+            if ("PAID".equals(booking.getPaymentStatus())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Booking has already been fully paid");
+            }
+
+            // Backend computes remaining amount — never trust frontend amounts
+            BigDecimal finalPrice = booking.getFinalPrice() != null
+                    ? booking.getFinalPrice() : BigDecimal.ZERO;
+            BigDecimal paidDeposit = "PAID".equals(booking.getDepositStatus())
+                    ? (booking.getDepositAmount() != null
+                            ? booking.getDepositAmount().min(finalPrice)
+                            : BigDecimal.ZERO)
+                    : BigDecimal.ZERO;
+            amount = finalPrice.subtract(paidDeposit).max(BigDecimal.ZERO);
+
+            if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Remaining amount is zero — booking may already be covered by deposit");
+            }
+
+            // Expire any existing PENDING FINAL transactions — do NOT touch DEPOSIT ones
+            transactionRepository
+                    .findByBookingIdAndPurposeOrderByCreatedAtDesc(request.getBookingId(), "FINAL")
+                    .stream()
+                    .filter(t -> "PENDING".equals(t.getStatus()))
+                    .forEach(t -> {
+                        t.setStatus("EXPIRED");
+                        t.setCancelReason("Re-created payment link");
+                        transactionRepository.save(t);
+                    });
         }
 
         long orderCode = System.currentTimeMillis() % 1_000_000_000L;
@@ -134,7 +199,7 @@ public class PaymentServiceImpl implements PaymentService {
             headers.set("x-api-key", apiKey);
             headers.setContentType(MediaType.APPLICATION_JSON);
 
-            String sigData = "amount=" + booking.getDepositAmount().intValue() +
+            String sigData = "amount=" + amount.intValue() +
                     "&cancelUrl=" + cancelUrl +
                     "&description=DH#" + booking.getId() +
                     "&orderCode=" + orderCode +
@@ -144,7 +209,7 @@ public class PaymentServiceImpl implements PaymentService {
 
             Map<String, Object> body = new HashMap<>();
             body.put("orderCode", orderCode);
-            body.put("amount", booking.getDepositAmount().intValue());
+            body.put("amount", amount.intValue());
             body.put("description", "DH#" + booking.getId());
             body.put("returnUrl", returnUrl);
             body.put("cancelUrl", cancelUrl);
@@ -167,8 +232,8 @@ public class PaymentServiceImpl implements PaymentService {
             PaymentTransaction transaction = new PaymentTransaction();
             transaction.setBookingId(booking.getId());
             transaction.setPaymentMethod("PAYOS");
-            transaction.setPurpose("DEPOSIT");
-            transaction.setAmount(booking.getDepositAmount());
+            transaction.setPurpose(purpose);
+            transaction.setAmount(amount);
             transaction.setStatus("PENDING");
             transaction.setOrderCode(orderCode);
             transaction.setCheckoutUrl(checkoutUrl);
@@ -194,6 +259,16 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
+    public CreatePayOSPaymentResponse createPayOSPaymentForStaff(CreatePayOSPaymentRequest request, Long staffUserId, String role) {
+        Booking booking = bookingRepository.findById(request.getBookingId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Booking not found: " + request.getBookingId()));
+        staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role, booking.getGarageId());
+        return createPayOSPaymentCore(request);
+    }
+
+    @Override
+    @Transactional
     public CreatePayOSPaymentResponse createPayOSPaymentForCustomer(CreatePayOSPaymentRequest request, Long customerId) {
         Booking booking = bookingRepository.findById(request.getBookingId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
@@ -203,15 +278,25 @@ public class PaymentServiceImpl implements PaymentService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This booking does not belong to you");
         }
 
-        return createPayOSPayment(request, customerId);
+        return createPayOSPaymentCore(request);
     }
 
     @Override
     @Transactional
     public CreatePayOSPaymentResponse createPayOSPaymentForGuest(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Booking not found: " + bookingId));
+
+        if (booking.getCustomerId() != null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "PayOS guest payment is only allowed for guest bookings (no registered customer)");
+        }
+
         CreatePayOSPaymentRequest request = new CreatePayOSPaymentRequest();
         request.setBookingId(bookingId);
-        return createPayOSPayment(request, null);
+        request.setPurpose("DEPOSIT");
+        return createPayOSPaymentCore(request);
     }
 
     @Override
@@ -303,7 +388,18 @@ public class PaymentServiceImpl implements PaymentService {
             }
 
             if ("00".equals(code)) {
+                // Validate purpose strictly before processing any state change.
+                // A null or unknown purpose must NEVER fall through to the FINAL branch —
+                // that would incorrectly mark the full booking as paid.
+                String txPurpose = transaction.getPurpose();
+                if (!"DEPOSIT".equals(txPurpose) && !"FINAL".equals(txPurpose)) {
+                    log.error("Unknown transaction purpose '{}' for orderCode {}; skipping webhook processing",
+                            txPurpose, orderCode);
+                    return;
+                }
+
                 final long[] bookingIdRef = { 0 };
+                final boolean[] isDepositRef = { false };
 
                 // Commit payment in its own transaction so a loyalty failure cannot roll it back
                 new org.springframework.transaction.support.TransactionTemplate(transactionManager).execute(status -> {
@@ -315,60 +411,50 @@ public class PaymentServiceImpl implements PaymentService {
                     Booking booking = bookingRepository.findById(transaction.getBookingId())
                             .orElseThrow(() -> new RuntimeException("Booking not found"));
 
-                    if (!"PAID".equals(booking.getPaymentStatus())) {
+                    boolean isDeposit = "DEPOSIT".equals(transaction.getPurpose());
+                    isDepositRef[0] = isDeposit;
 
+                    if (isDeposit) {
+                        // Deposit payment: confirm booking and mark deposit paid.
+                        // Do NOT touch paymentStatus or paidAt — those belong to the final payment.
                         booking.setStatus("CONFIRMED");
-
                         booking.setDepositStatus("PAID");
                         booking.setDepositPaidAt(LocalDateTime.now());
                         booking.setDepositTransactionId(transaction.getId());
-
-                        booking.setPaymentStatus("PAID");
-
-                        booking.setPaymentMethod("PAYOS");
-
-                        booking.setPaidAt(LocalDateTime.now());
-                        if (booking.getPromotionId() != null
-                                && !promotionUsageRepository.existsByBookingId(
-                                        booking.getId())) {
-
-                            PromotionUsage usage = new PromotionUsage();
-
-                            usage.setPromotionId(
-                                    booking.getPromotionId());
-
-                            usage.setBookingId(
-                                    booking.getId());
-
-                            usage.setCustomerId(
-                                    booking.getCustomerId());
-
-                            usage.setDiscountAmount(
-                                    booking.getPromotionDiscountAmount());
-
-                            usage.setUsedAt(
-                                    LocalDateTime.now());
-
-                            promotionUsageRepository.save(
-                                    usage);
-
-                            promotionRepository.findById(
-                                    booking.getPromotionId())
-                                    .ifPresent(promotion -> {
-
-                                        promotion.setUsedCount(
-                                                promotion.getUsedCount() + 1);
-
-                                        promotionRepository.save(
-                                                promotion);
-
-                                    });
-
-                        }
-
                         bookingRepository.save(booking);
                         bookingIdRef[0] = booking.getId();
+                    } else {
+                        // Final payment — only update payment fields; do NOT touch
+                        // booking.status (must stay COMPLETED) or any deposit fields.
+                        if (!"PAID".equals(booking.getPaymentStatus())) {
 
+                            booking.setPaymentStatus("PAID");
+                            booking.setPaymentMethod("PAYOS");
+                            booking.setPaidAt(LocalDateTime.now());
+
+                            if (booking.getPromotionId() != null
+                                    && !promotionUsageRepository.existsByBookingId(
+                                            booking.getId())) {
+
+                                PromotionUsage usage = new PromotionUsage();
+                                usage.setPromotionId(booking.getPromotionId());
+                                usage.setBookingId(booking.getId());
+                                usage.setCustomerId(booking.getCustomerId());
+                                usage.setDiscountAmount(booking.getPromotionDiscountAmount());
+                                usage.setUsedAt(LocalDateTime.now());
+                                promotionUsageRepository.save(usage);
+
+                                promotionRepository.findById(booking.getPromotionId())
+                                        .ifPresent(promotion -> {
+                                            promotion.setUsedCount(
+                                                    promotion.getUsedCount() + 1);
+                                            promotionRepository.save(promotion);
+                                        });
+                            }
+
+                            bookingRepository.save(booking);
+                            bookingIdRef[0] = booking.getId();
+                        }
                     }
                     auditLogService.createAuditLog(
                             null,
@@ -385,14 +471,22 @@ public class PaymentServiceImpl implements PaymentService {
                 long bookingId = bookingIdRef[0];
                 if (bookingId != 0) {
                     try {
-                        loyaltyService.updateBookingStatistics(bookingId);
-                        loyaltyService.earnPointsAfterPaidBooking(bookingId);
-                        washHistoryService.createWashHistoryAfterPaidBooking(bookingId);
-                        notificationService.notifyBookingConfirmed(
-                                bookingId);
-                        notificationService.notifyPaymentConfirmed(bookingId);
-                        notificationService.notifyRewardEarned(bookingId);
-                        bookingReviewService.maybeCreateReviewRequestNotification(bookingId);
+                        if (isDepositRef[0]) {
+                            // Deposit confirmed — reserve care staff if the package needs it,
+                            // then send booking-confirmed notification.
+                            // Points, wash history, and review request belong to the FINAL payment.
+                            bookingService.reserveCareStaffIfNeeded(bookingId);
+                            notificationService.notifyBookingConfirmed(bookingId);
+                        } else {
+                            // Full / final payment — run complete post-payment chain.
+                            loyaltyService.updateBookingStatistics(bookingId);
+                            loyaltyService.earnPointsAfterPaidBooking(bookingId);
+                            washHistoryService.createWashHistoryAfterPaidBooking(bookingId);
+                            notificationService.notifyBookingConfirmed(bookingId);
+                            notificationService.notifyPaymentConfirmed(bookingId);
+                            notificationService.notifyRewardEarned(bookingId);
+                            bookingReviewService.maybeCreateReviewRequestNotification(bookingId);
+                        }
                     } catch (Exception e) {
                         log.error("Post-payment processing failed for booking {}: {}", bookingId, e.getMessage());
                     }
@@ -403,12 +497,16 @@ public class PaymentServiceImpl implements PaymentService {
                     transaction.setCancelReason("PayOS code: " + code);
                     transactionRepository.save(transaction);
 
-                    bookingRepository.findById(transaction.getBookingId()).ifPresent(booking -> {
-                        if (!"PAID".equals(booking.getDepositStatus())) {
-                            booking.setDepositStatus("CANCELED");
-                            bookingRepository.save(booking);
-                        }
-                    });
+                    // Only reflect cancellation in depositStatus for DEPOSIT transactions.
+                    // A failed FINAL transaction must NOT alter deposit fields.
+                    if ("DEPOSIT".equals(transaction.getPurpose())) {
+                        bookingRepository.findById(transaction.getBookingId()).ifPresent(booking -> {
+                            if (!"PAID".equals(booking.getDepositStatus())) {
+                                booking.setDepositStatus("CANCELED");
+                                bookingRepository.save(booking);
+                            }
+                        });
+                    }
 
                     auditLogService.createAuditLog(
                             null,
@@ -429,28 +527,35 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    public PaymentTransactionResponse getTransactionById(Long id) {
+    public PaymentTransactionResponse getTransactionById(Long id, Long callerId, String role) {
         PaymentTransaction transaction = transactionRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Transaction not found: " + id));
+        Booking booking = bookingRepository.findById(transaction.getBookingId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+        staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(callerId, role, booking.getGarageId());
         return toResponse(transaction);
     }
 
     @Override
-    public List<PaymentTransactionResponse> getTransactionsByBooking(Long bookingId) {
-        bookingRepository.findById(bookingId)
+    public List<PaymentTransactionResponse> getTransactionsByBooking(Long bookingId, Long callerId, String role) {
+        Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Booking not found: " + bookingId));
+        staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(callerId, role, booking.getGarageId());
         return transactionRepository.findByBookingIdOrderByCreatedAtDesc(bookingId)
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Override
     @Transactional
-    public PaymentTransactionResponse cancelTransaction(Long id, Long staffUserId) {
+    public PaymentTransactionResponse cancelTransaction(Long id, Long staffUserId, String role) {
         PaymentTransaction transaction = transactionRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Transaction not found: " + id));
+        Booking booking = bookingRepository.findById(transaction.getBookingId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+        staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role, booking.getGarageId());
 
         if (!"PENDING".equals(transaction.getStatus())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -476,6 +581,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .paymentMethod(t.getPaymentMethod())
                 .amount(t.getAmount())
                 .status(t.getStatus())
+                .purpose(t.getPurpose())
                 .orderCode(t.getOrderCode())
                 .checkoutUrl(t.getCheckoutUrl())
                 .qrCode(t.getQrCode())

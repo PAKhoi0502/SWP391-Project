@@ -19,4 +19,10 @@ public class CreateServicePackageStepRequest {
     private Boolean isRequired;
 
     private List<String> instructions;
+
+    /** Which execution phase this step belongs to: AUTOMATED_WASH, VEHICLE_CARE, FINAL_INSPECTION */
+    private String executionPhase;
+
+    /** Estimated duration of this step in minutes (>= 0, default 0) */
+    private Integer durationMinutes;
 }

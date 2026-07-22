@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { StaffBookingCountProvider, useStaffBookingCount } from '../contexts/StaffBookingCountContext'
+import { staffProfileService } from '../services/staffProfileService'
 import './StaffLayout.css'
 
 function NavIcon({ name }) {
@@ -23,7 +25,7 @@ function NavIcon({ name }) {
   )
 }
 
-const NAV_ITEMS = [
+const CSS_NAV_ITEMS = [
   { to: '/staff',                  label: 'Dashboard',   icon: 'grid',     end: true },
   { to: '/staff/bookings/walk-in', label: 'New Walk-in', icon: 'plus',     exact: true },
   { to: '/staff/bookings',         label: 'Bookings',    icon: 'calendar', booking: true, showCount: true },
@@ -31,11 +33,25 @@ const NAV_ITEMS = [
   { to: '/staff/profile',          label: 'Profile',     icon: 'user' },
 ]
 
-function StaffLayoutInner() {
+const CARE_NAV_ITEMS = [
+  { to: '/staff',         label: 'Dashboard', icon: 'grid', end: true },
+  { to: '/staff/profile', label: 'Profile',   icon: 'user' },
+]
+
+// Shown while loading or on error — never exposes CSS_NAV_ITEMS to unknown staff types.
+const SAFE_NAV_ITEMS = [
+  { to: '/staff/profile', label: 'Profile', icon: 'user' },
+]
+
+function StaffLayoutInner({ staffType, staffTypeLoaded, staffTypeError }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { logout, user } = useAuth()
   const bookingCount = useStaffBookingCount()
+
+  const isCss  = staffTypeLoaded && !staffTypeError && staffType === 'CUSTOMER_SERVICE_STAFF'
+  const isCare = staffTypeLoaded && !staffTypeError && staffType === 'VEHICLE_CARE_STAFF'
+  const navItems = isCss ? CSS_NAV_ITEMS : isCare ? CARE_NAV_ITEMS : SAFE_NAV_ITEMS
 
   const handleLogout = async () => {
     await logout()
@@ -53,6 +69,13 @@ function StaffLayoutInner() {
 
   const initials = (user?.fullName || user?.email || 'S')
     .split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
+
+  let roleLabel = 'Staff'
+  if (staffTypeLoaded && !staffTypeError) {
+    if (isCss)       roleLabel = 'Customer Service'
+    else if (isCare) roleLabel = 'Vehicle Care Staff'
+    else             roleLabel = staffType || 'Staff'
+  }
 
   return (
     <div className="sl-layout">
@@ -72,7 +95,7 @@ function StaffLayoutInner() {
         </div>
 
         <nav className="sl-nav" aria-label="Staff navigation">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -94,7 +117,7 @@ function StaffLayoutInner() {
           <div className="sl-avatar">{initials}</div>
           <div className="sl-user-info">
             <span className="sl-user-name">{user?.fullName || user?.email || 'Staff'}</span>
-            <span className="sl-user-role">Staff</span>
+            <span className="sl-user-role">{roleLabel}</span>
           </div>
           <button className="sl-logout" type="button" title="Sign out" onClick={handleLogout}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -108,7 +131,13 @@ function StaffLayoutInner() {
 
       <div className="sl-shell">
         <main className="sl-main">
-          <Outlet />
+          {staffTypeError ? (
+            <div style={{ padding: '2rem', color: 'var(--color-danger, #c0392b)' }}>
+              Unable to load staff profile. Please refresh or contact support.
+            </div>
+          ) : (
+            <Outlet context={{ staffType, staffTypeLoaded }} />
+          )}
         </main>
       </div>
     </div>
@@ -116,9 +145,39 @@ function StaffLayoutInner() {
 }
 
 export default function StaffLayout() {
+  const [staffType, setStaffType] = useState(null)
+  const [staffTypeLoaded, setStaffTypeLoaded] = useState(false)
+  const [staffTypeError, setStaffTypeError] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    staffProfileService.getMe()
+      .then((data) => {
+        if (!cancelled) {
+          const profile = data?.data ?? data
+          setStaffType(String(profile?.staffType || '').toUpperCase())
+          setStaffTypeLoaded(true)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setStaffTypeError(true)
+          setStaffTypeLoaded(true)
+        }
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  // Polling is enabled only for CUSTOMER_SERVICE_STAFF — never starts for care staff or on error.
+  const enableBookingCount = staffTypeLoaded && !staffTypeError && staffType === 'CUSTOMER_SERVICE_STAFF'
+
   return (
-    <StaffBookingCountProvider>
-      <StaffLayoutInner />
+    <StaffBookingCountProvider enabled={enableBookingCount}>
+      <StaffLayoutInner
+        staffType={staffType}
+        staffTypeLoaded={staffTypeLoaded}
+        staffTypeError={staffTypeError}
+      />
     </StaffBookingCountProvider>
   )
 }

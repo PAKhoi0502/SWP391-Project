@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { waitlistApi } from '../../api/waitlistApi'
 import { useAuth } from '../../contexts/AuthContext'
 import './StaffWaitlistPage.css'
@@ -8,7 +8,7 @@ const STATUS_OPTIONS = [
   { value: 'OFFERED', label: 'Slot offered' },
   { value: 'ACCEPTED', label: 'Slot accepted' },
   { value: 'EXPIRED', label: 'Expired' },
-  { value: 'CANCELED', label: 'Canceled by customer' },
+  { value: 'CANCELED', label: 'Canceled' },
   { value: 'ALL', label: 'All' },
 ]
 
@@ -75,72 +75,92 @@ function getErrorMessage(error, fallback) {
   return error?.response?.data?.message || error?.message || fallback
 }
 
-function StaffWaitlistCard({ item, actionKey, onOffer, onExpire }) {
+function isExpiryWarning(expiresAt) {
+  if (!expiresAt) return false
+  const diff = new Date(expiresAt).getTime() - Date.now()
+  return diff > 0 && diff < 3600000 // within 1 hour
+}
+
+// ── Redesigned waitlist item ──
+function StaffWaitlistItem({ item, actionKey, onOffer, onExpire }) {
   const status = String(item?.status || 'WAITING').toUpperCase()
   const canOffer = status === 'WAITING'
   const canExpire = status === 'WAITING' || status === 'OFFERED'
   const isOffering = actionKey === `offer-${item.id}`
   const isExpiring = actionKey === `expire-${item.id}`
-  const offerExpiresAt = formatDateTime(item?.offerExpiresAt)
+  const offerExpiresAt = item?.offerExpiresAt
+  const expiryWarn = isExpiryWarning(offerExpiresAt)
 
   return (
-    <article className="staff-waitlist-card">
-      <div className="staff-waitlist-card-header">
-        <div>
-          <span className="staff-waitlist-label">Customer</span>
-          <h2>{item?.customerName || `Customer #${item?.customerId || '-'}`}</h2>
+    <article className="swl-item">
+      <div className="swl-item-body">
+        {/* Header row */}
+        <div className="swl-item-header">
+          <div className="swl-item-customer-col">
+            <span className="swl-item-id">#{item.id}</span>
+            <h3 className="swl-item-customer-name">
+              {item?.customerName || `Customer #${item?.customerId || '-'}`}
+            </h3>
+            <span className="swl-item-customer-sub">
+              Customer ID: {item?.customerId || '-'} &middot; {item?.customerTier || 'BRONZE'}
+            </span>
+          </div>
+          <span className={`swl-badge swl-badge--${getStatusTone(status)}`}>
+            {getStatusLabel(status)}
+          </span>
         </div>
 
-        <span className={`staff-waitlist-status staff-waitlist-status-${getStatusTone(status)}`}>
-          {getStatusLabel(status)}
-        </span>
+        {/* Detail grid */}
+        <dl className="swl-item-details">
+          <div className="swl-detail">
+            <dt>Vehicle</dt>
+            <dd>
+              {item?.vehicleName || '-'}
+              <span className="swl-detail-type"> · {getVehicleTypeLabel(item?.vehicleType)}</span>
+            </dd>
+          </div>
+          <div className="swl-detail">
+            <dt>Service package</dt>
+            <dd>{item?.servicePackageName || `#${item?.servicePackageId || '-'}`}</dd>
+          </div>
+          <div className="swl-detail">
+            <dt>Desired date</dt>
+            <dd>{formatDate(item?.desiredStartTime)}</dd>
+          </div>
+          <div className="swl-detail">
+            <dt>Time window</dt>
+            <dd>{formatTime(item?.desiredStartTime)} – {formatTime(item?.desiredEndTime)}</dd>
+          </div>
+          <div className="swl-detail">
+            <dt>Reason</dt>
+            <dd>{getReasonLabel(item?.reason)}</dd>
+          </div>
+          <div className="swl-detail">
+            <dt>Garage</dt>
+            <dd>{item?.garageName || `#${item?.garageId || '-'}`}</dd>
+          </div>
+        </dl>
+
+        {/* Offer expiry */}
+        {status === 'OFFERED' && offerExpiresAt && (
+          <div className={`swl-expiry${expiryWarn ? ' swl-expiry--warn' : ''}`}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            Offer expires: {formatDateTime(offerExpiresAt)}
+            {expiryWarn && <span className="swl-expiry-badge">Expires soon</span>}
+          </div>
+        )}
       </div>
 
-      <dl className="staff-waitlist-details">
-        <div>
-          <dt>Garage</dt>
-          <dd>{item?.garageName || `Garage #${item?.garageId || '-'}`}</dd>
-        </div>
-        <div>
-          <dt>Vehicle</dt>
-          <dd>{item?.vehicleName || `Vehicle #${item?.vehicleId || '-'}`}</dd>
-        </div>
-        <div>
-          <dt>Service package</dt>
-          <dd>{item?.servicePackageName || `Package #${item?.servicePackageId || '-'}`}</dd>
-        </div>
-        <div>
-          <dt>Vehicle type</dt>
-          <dd>{getVehicleTypeLabel(item?.vehicleType)}</dd>
-        </div>
-        <div>
-          <dt>Desired date</dt>
-          <dd>{formatDate(item?.desiredStartTime)}</dd>
-        </div>
-        <div>
-          <dt>Desired time window</dt>
-          <dd>{formatTime(item?.desiredStartTime)} - {formatTime(item?.desiredEndTime)}</dd>
-        </div>
-        <div>
-          <dt>Waitlist reason</dt>
-          <dd>{getReasonLabel(item?.reason)}</dd>
-        </div>
-        <div>
-          <dt>Membership tier</dt>
-          <dd>{item?.customerTier || 'BRONZE'}</dd>
-        </div>
-      </dl>
-
-      {status === 'OFFERED' && offerExpiresAt && (
-        <p className="staff-waitlist-reason">Offer expires at: {offerExpiresAt}</p>
-      )}
-
+      {/* Actions */}
       {(canOffer || canExpire) && (
-        <div className="staff-waitlist-actions">
+        <div className="swl-item-actions">
           {canOffer && (
             <button
               type="button"
-              className="staff-waitlist-btn staff-waitlist-btn--primary"
+              className="swl-btn swl-btn--primary"
               disabled={Boolean(actionKey)}
               onClick={() => onOffer(item)}
             >
@@ -150,16 +170,31 @@ function StaffWaitlistCard({ item, actionKey, onOffer, onExpire }) {
           {canExpire && (
             <button
               type="button"
-              className="staff-waitlist-btn staff-waitlist-btn--ghost"
+              className="swl-btn swl-btn--ghost"
               disabled={Boolean(actionKey)}
               onClick={() => onExpire(item)}
             >
-              {isExpiring ? 'Processing...' : 'Mark as expired'}
+              {isExpiring ? 'Processing...' : 'Mark expired'}
             </button>
           )}
         </div>
       )}
     </article>
+  )
+}
+
+// ── Loading skeleton ──
+function WaitlistSkeleton() {
+  return (
+    <div className="swl-skeleton-list">
+      {[1, 2, 3].map((n) => (
+        <div key={n} className="swl-skeleton-item">
+          <div className="swl-skeleton-row swl-skeleton-row--title" />
+          <div className="swl-skeleton-row swl-skeleton-row--med" />
+          <div className="swl-skeleton-row swl-skeleton-row--short" />
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -176,6 +211,9 @@ export default function StaffWaitlistPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [actionKey, setActionKey] = useState('')
+
+  // UI-only: client-side search term
+  const [searchTerm, setSearchTerm] = useState('')
 
   const fetchQueue = useCallback(async () => {
     try {
@@ -236,95 +274,171 @@ export default function StaffWaitlistPage() {
     }
   }
 
+  // Client-side filter by customer name / ID
+  const filteredItems = useMemo(() => {
+    if (!searchTerm.trim()) return items
+    const q = searchTerm.trim().toLowerCase()
+    return items.filter(
+      (item) =>
+        (item.customerName || '').toLowerCase().includes(q) ||
+        String(item.customerId || '').includes(q),
+    )
+  }, [items, searchTerm])
+
   return (
-    <div className="staff-waitlist-page">
-      <section className="staff-waitlist-hero">
-        <div>
-          <p className="staff-waitlist-eyebrow">{isAdmin ? 'Admin waitlist' : 'Staff waitlist'}</p>
-          <h1>Waitlist Management</h1>
-          <p>View the queue, offer open slots, or mark customer waitlist requests as expired.</p>
+    <div className="swl-page">
+      {/* ── Hero ── */}
+      <section className="swl-hero">
+        <div className="swl-hero-content">
+          <p className="swl-hero-kicker">{isAdmin ? 'Admin' : 'Staff'} &middot; Queue Management</p>
+          <h1 className="swl-hero-title">Waitlist Management</h1>
+          <p className="swl-hero-desc">
+            View the customer queue, offer open time slots, or mark waitlist requests as expired.
+          </p>
         </div>
       </section>
 
-      <section className="staff-waitlist-filters">
+      {/* ── Toolbar ── */}
+      <div className="swl-toolbar">
+        <div className="swl-search-wrap">
+          <svg className="swl-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            type="search"
+            className="swl-search-input"
+            placeholder="Search by customer name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        <div className="swl-status-tabs">
+          {STATUS_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              className={`swl-status-tab${status === opt.value ? ' swl-status-tab--active' : ''}`}
+              onClick={() => { setStatus(opt.value); setPage(1) }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          className="swl-refresh-btn"
+          onClick={fetchQueue}
+          disabled={loading}
+          aria-label="Refresh waitlist"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+          </svg>
+          Refresh
+        </button>
+
         {isAdmin && (
-          <label className="staff-waitlist-garage-filter">
-            <span>Garage ID</span>
+          <div className="swl-garage-filter">
             <input
-              placeholder="All garages"
+              className="swl-garage-input"
+              placeholder="Filter garage ID"
               value={garageId}
-              onChange={(event) => setGarageId(event.target.value)}
+              onChange={(e) => setGarageId(e.target.value)}
               onBlur={handleApplyGarageFilter}
-              onKeyDown={(event) => event.key === 'Enter' && handleApplyGarageFilter()}
+              onKeyDown={(e) => e.key === 'Enter' && handleApplyGarageFilter()}
             />
-          </label>
-        )}
-
-        <label className="staff-waitlist-status-filter">
-          <span>Status</span>
-          <select
-            value={status}
-            onChange={(e) => { setStatus(e.target.value); setPage(1) }}
-          >
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </label>
-      </section>
-
-      {success && <p className="staff-waitlist-message staff-waitlist-message-success">{success}</p>}
-      {error && !loading && <p className="staff-waitlist-message staff-waitlist-message-error">{error}</p>}
-
-      {loading && <div className="staff-waitlist-state">Loading waitlist...</div>}
-      {!loading && error && (
-        <div className="staff-waitlist-state staff-waitlist-state--error">
-          <p>{error}</p>
-          <button type="button" className="staff-waitlist-btn staff-waitlist-btn--ghost" onClick={fetchQueue}>Retry</button>
-        </div>
-      )}
-      {!loading && !error && items.length === 0 && (
-        <div className="staff-waitlist-state">
-          <p className="staff-waitlist-state-title">No waitlist requests</p>
-          <p>Customer waitlist requests will appear here.</p>
-        </div>
-      )}
-      {!loading && !error && items.length > 0 && (
-        <>
-          <div className="staff-waitlist-grid">
-            {items.map((item) => (
-              <StaffWaitlistCard
-                key={item.id}
-                item={item}
-                actionKey={actionKey}
-                onOffer={offer}
-                onExpire={expire}
-              />
-            ))}
           </div>
+        )}
+      </div>
 
-          {totalPages > 1 && (
-            <div className="staff-waitlist-pagination">
-              <button
-                type="button"
-                className="staff-waitlist-page-btn"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                ← Previous
-              </button>
-              <span className="staff-waitlist-page-info">Page {page} / {totalPages}</span>
-              <button
-                type="button"
-                className="staff-waitlist-page-btn"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-              >
-                Next →
-              </button>
-            </div>
+      {/* ── Feedback messages ── */}
+      {success && (
+        <p className="swl-message swl-message--success">{success}</p>
+      )}
+      {error && !loading && (
+        <p className="swl-message swl-message--error">{error}</p>
+      )}
+
+      {/* ── Content ── */}
+      {loading ? (
+        <WaitlistSkeleton />
+      ) : error && items.length === 0 ? (
+        <div className="swl-empty swl-empty--error">
+          <p className="swl-empty-title">Could not load waitlist</p>
+          <p className="swl-empty-desc">{error}</p>
+          <button type="button" className="swl-btn swl-btn--ghost" onClick={fetchQueue}>
+            Retry
+          </button>
+        </div>
+      ) : filteredItems.length === 0 ? (
+        <div className="swl-empty">
+          <div className="swl-empty-icon" aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 00-3-3.87"/>
+              <path d="M16 3.13a4 4 0 010 7.75"/>
+            </svg>
+          </div>
+          <p className="swl-empty-title">
+            {searchTerm ? 'No results found' : 'No waitlist requests'}
+          </p>
+          <p className="swl-empty-desc">
+            {searchTerm
+              ? `No customers match "${searchTerm}".`
+              : 'Customer waitlist requests will appear here once submitted.'}
+          </p>
+          {searchTerm && (
+            <button type="button" className="swl-btn swl-btn--ghost" onClick={() => setSearchTerm('')}>
+              Clear search
+            </button>
           )}
-        </>
+        </div>
+      ) : (
+        <div className="swl-list">
+          {filteredItems.map((item) => (
+            <StaffWaitlistItem
+              key={item.id}
+              item={item}
+              actionKey={actionKey}
+              onOffer={offer}
+              onExpire={expire}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ── Pagination ── */}
+      {!loading && !error && totalPages > 1 && (
+        <div className="swl-pagination">
+          <button
+            type="button"
+            className="swl-page-btn"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            Previous
+          </button>
+          <span className="swl-page-info">Page {page} of {totalPages}</span>
+          <button
+            type="button"
+            className="swl-page-btn"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+          >
+            Next
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
+        </div>
       )}
     </div>
   )

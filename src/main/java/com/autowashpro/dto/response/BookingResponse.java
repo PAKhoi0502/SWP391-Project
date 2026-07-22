@@ -50,4 +50,28 @@ public class BookingResponse {
     private Integer pointsEarned;
 
     private List<Long> assignedCareStaffIds;
+
+    // ===================== ISSUE #169 Operation Phase =====================
+    private String operationPhase;
+    private LocalDateTime plannedWashStartAt;
+    private LocalDateTime plannedWashEndAt;
+    private LocalDateTime plannedCareStartAt;
+    private LocalDateTime plannedCareEndAt;
+    private LocalDateTime careStartedAt;
+    private LocalDateTime careCompletedAt;
+
+    /** True when the booking's service requires vehicle care staff (AFTER_WASH inspection needed). */
+    private Boolean requiresCareStaff;
+
+    /** True when care staff is required but fewer RESERVED/ACTIVE assignments exist than required. */
+    private Boolean careStaffShortage;
+
+    /** Deadline for deposit payment; null when not applicable. */
+    private LocalDateTime paymentExpiredAt;
+
+    /**
+     * 1-based sequential booking number for this customer (their 1st, 2nd, … booking).
+     * Null for guest bookings (no customerId) and walk-in bookings without a linked account.
+     */
+    private Integer customerBookingNumber;
 }

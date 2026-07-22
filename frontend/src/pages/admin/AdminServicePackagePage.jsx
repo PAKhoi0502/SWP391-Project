@@ -17,6 +17,21 @@ import {
 } from '../../services/servicePackageApi'
 import './AdminServicePackagePage.css'
 
+const EXECUTION_PHASES = [
+  { value: 'INTAKE_INSPECTION', label: 'Intake Inspection (auto-completed by BEFORE_WASH inspection)' },
+  { value: 'AUTOMATED_WASH', label: 'Automated Wash' },
+  { value: 'VEHICLE_CARE', label: 'Vehicle Care' },
+  { value: 'FINAL_INSPECTION', label: 'Final Inspection' },
+]
+
+const EXECUTION_MODES = [
+  { value: 'AUTOMATED_WASH', label: 'Automated Wash Only (wash bay required)' },
+  { value: 'VEHICLE_CARE', label: 'Vehicle Care Only (care staff required)' },
+  { value: 'MIXED', label: 'Mixed — Wash + Care (both required)' },
+]
+
+const blankStep = () => ({ name: '', executionPhase: 'AUTOMATED_WASH', durationMinutes: '' })
+
 const initialForm = {
   name: '',
   description: '',
@@ -27,13 +42,10 @@ const initialForm = {
   includedServiceIds: '',
   comboMainId: '',
   comboAddOnIds: [],
-  stepsTemplate: '',
-  requiresWashBay: true,
-  requiresCareStaff: false,
+  steps: [blankStep()],
+  executionMode: 'AUTOMATED_WASH',
   careStaffDurationMinutes: '0',
-  careStaffRequiredCount: '0',
-  careStaffType: 'NONE',
-  pointsEarned: '0',
+  careStaffRequiredCount: '1',
 }
 
 const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
@@ -103,6 +115,25 @@ export default function AdminServicePackagePage() {
     [packages, form.vehicleType],
   )
 
+  function handleStepChange(index, field, value) {
+    setForm((prev) => {
+      const next = [...prev.steps]
+      next[index] = { ...next[index], [field]: value }
+      return { ...prev, steps: next }
+    })
+  }
+
+  function handleAddStep() {
+    setForm((prev) => ({ ...prev, steps: [...prev.steps, blankStep()] }))
+  }
+
+  function handleRemoveStep(index) {
+    setForm((prev) => ({
+      ...prev,
+      steps: prev.steps.length > 1 ? prev.steps.filter((_, i) => i !== index) : prev.steps,
+    }))
+  }
+
   function buildPayload() {
     const isCombo = form.packageType === 'COMBO'
     const serviceIds = isCombo
@@ -111,16 +142,16 @@ export default function AdminServicePackagePage() {
 
     const steps = isCombo
       ? []
-      : form.stepsTemplate
-          .split('\n')
-          .map((line) => line.trim())
-          .filter(Boolean)
-          .map((line, index) => ({
+      : form.steps
+          .filter((s) => s.name.trim())
+          .map((s, index) => ({
             stepOrder: index + 1,
-            name: line,
-            description: line,
+            name: s.name.trim(),
+            description: s.name.trim(),
             isRequired: true,
             instructions: [],
+            executionPhase: s.executionPhase || '',
+            durationMinutes: Number(s.durationMinutes) || 0,
           }))
 
     const cleanName = form.name.trim()
@@ -130,6 +161,14 @@ export default function AdminServicePackagePage() {
       .replace(/[̀-ͯ]/g, '')
       .replace(/[^A-Z0-9]+/g, '_')
       .replace(/^_+|_+$/g, '')
+
+    const mode = isCombo ? 'AUTOMATED_WASH' : (form.executionMode || 'AUTOMATED_WASH')
+    const requiresWashBay = !isCombo && mode !== 'VEHICLE_CARE'
+    const requiresCareStaff = !isCombo && mode !== 'AUTOMATED_WASH'
+    const washBayDurationMinutes = requiresWashBay ? Number(form.durationMinutes) : 0
+    const careStaffDurationMinutes = requiresCareStaff ? (Number(form.careStaffDurationMinutes) || 0) : 0
+    const careStaffRequiredCount = requiresCareStaff ? Math.max(1, Number(form.careStaffRequiredCount) || 1) : 0
+    const careStaffType = requiresCareStaff ? 'VEHICLE_CARE_STAFF' : 'NONE'
 
     return {
       name: cleanName,
@@ -144,12 +183,12 @@ export default function AdminServicePackagePage() {
       basePrice: Number(form.price),
       durationMinutes: Number(form.durationMinutes),
       estimatedDurationMinutes: Number(form.durationMinutes),
-      washBayDurationMinutes: Number(form.durationMinutes),
-      requiresWashBay: true,
-      requiresCareStaff: false,
-      careStaffDurationMinutes: 0,
-      careStaffRequiredCount: 0,
-      careStaffType: 'NONE',
+      washBayDurationMinutes,
+      requiresWashBay,
+      requiresCareStaff,
+      careStaffDurationMinutes,
+      careStaffRequiredCount,
+      careStaffType,
       pointsEarned: 0,
       includedServiceIds: serviceIds,
       serviceIds,
@@ -165,6 +204,25 @@ export default function AdminServicePackagePage() {
     if (!form.name.trim()) { setAlertMsg('Please enter a package name.'); return }
     if (!form.price || Number(form.price) < 0) { setAlertMsg('Please enter a valid price.'); return }
     if (!form.durationMinutes || Number(form.durationMinutes) <= 0) { setAlertMsg('Please enter a valid duration.'); return }
+    const isComboValidation = form.packageType === 'COMBO'
+    const modeValidation = form.executionMode || 'AUTOMATED_WASH'
+    if (!isComboValidation && modeValidation !== 'AUTOMATED_WASH') {
+      if (!form.careStaffDurationMinutes || Number(form.careStaffDurationMinutes) <= 0) {
+        setAlertMsg('Please enter a valid care staff duration (minutes) for care-based packages.'); return
+      }
+      if (!form.careStaffRequiredCount || Number(form.careStaffRequiredCount) < 1) {
+        setAlertMsg('Please enter at least 1 required care staff for care-based packages.'); return
+      }
+    }
+
+    const isComboForSteps = form.packageType === 'COMBO'
+    if (!isComboForSteps) {
+      const badSteps = form.steps.filter((s) => s.name.trim() && !s.executionPhase)
+      if (badSteps.length > 0) {
+        setAlertMsg(`Configuration error: ${badSteps.length} step(s) have no execution phase assigned. Each step must have a phase (Intake Inspection, Automated Wash, Vehicle Care, or Final Inspection).`)
+        return
+      }
+    }
 
     try {
       setSaving(true)
@@ -178,7 +236,7 @@ export default function AdminServicePackagePage() {
         await createServicePackage(payload)
         setSuccess('Service package created successfully')
       }
-      setForm(initialForm)
+      setForm({ ...initialForm, steps: [blankStep()] })
       setEditingId(null)
       await loadPackages()
     } catch (err) {
@@ -205,6 +263,18 @@ export default function AdminServicePackagePage() {
       })
       .map(String)
 
+    const structuredSteps = Array.isArray(steps) && steps.length > 0
+      ? steps.map((step) => ({
+          name: typeof step === 'string' ? step : (step.name || step.title || step.description || ''),
+          executionPhase: step.executionPhase || '',
+          durationMinutes: step.durationMinutes != null ? String(step.durationMinutes) : '',
+        }))
+      : [blankStep()]
+
+    const derivedMode = (item.requiresWashBay && item.requiresCareStaff) ? 'MIXED'
+      : item.requiresCareStaff ? 'VEHICLE_CARE'
+      : 'AUTOMATED_WASH'
+
     setEditingId(getPackageId(item))
     setForm({
       name: getPackageName(item),
@@ -216,22 +286,17 @@ export default function AdminServicePackagePage() {
       includedServiceIds: includedIds.join(', '),
       comboMainId: comboMainId ? String(comboMainId) : '',
       comboAddOnIds,
-      stepsTemplate: Array.isArray(steps)
-        ? steps.map((step) => step.title || step.name || step.description || step).join('\n')
-        : '',
-      requiresWashBay: item.requiresWashBay ?? true,
-      requiresCareStaff: item.requiresCareStaff ?? false,
-      careStaffDurationMinutes: String(item.careStaffDurationMinutes ?? 0),
-      careStaffRequiredCount: String(item.careStaffRequiredCount ?? 0),
-      careStaffType: item.careStaffType || 'NONE',
-      pointsEarned: String(item.pointsEarned ?? 0),
+      steps: structuredSteps,
+      executionMode: derivedMode,
+      careStaffDurationMinutes: String(item.careStaffDurationMinutes ?? '0'),
+      careStaffRequiredCount: String(item.careStaffRequiredCount > 0 ? item.careStaffRequiredCount : '1'),
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   function handleCancelEdit() {
     setEditingId(null)
-    setForm(initialForm)
+    setForm({ ...initialForm, steps: [blankStep()] })
     setError('')
     setSuccess('')
   }
@@ -332,21 +397,98 @@ export default function AdminServicePackagePage() {
                 })}
               </div>
               <p className="asp-combo-note">Combo steps are derived automatically from selected MAIN + ADD_ON packages.</p>
+              <p className="asp-combo-note">Resource requirements (wash bay, care staff) are also derived from included packages — no need to configure them here.</p>
             </div>
           ) : (
-            <>
-              <textarea
-                className="service-package-textarea"
-                name="stepsTemplate"
-                value={form.stepsTemplate}
-                onChange={handleChange}
-                placeholder={'Steps template, one step per line\nExample:\nExterior wash\nDry'}
-                style={{ marginTop: 12 }}
-              />
-              <p style={{ marginTop: 8, color: '#64748b', fontSize: 13 }}>
-                No need to add "inspection" or "handover" steps — the system automatically adds these to the start and end of every booking. Only enter the actual processing steps for the package (e.g. wash, wax).
+            <div className="asp-steps-editor" style={{ marginTop: 16 }}>
+              <div className="asp-steps-header">
+                <span className="asp-steps-label">Service steps</span>
+                <button type="button" className="asp-ghost-btn" onClick={handleAddStep}>+ Add step</button>
+              </div>
+              <p style={{ color: '#64748b', fontSize: 13, marginBottom: 10 }}>
+                Enter each step name, its execution phase, and estimated duration. Inspection and handover steps are added automatically — only list the actual service steps here.
               </p>
-            </>
+              {form.steps.map((step, index) => (
+                <div key={index} className="asp-step-row">
+                  <span className="asp-step-num">{index + 1}</span>
+                  <input
+                    className="asp-input asp-step-name"
+                    placeholder="Step name (e.g. Exterior wash)"
+                    value={step.name}
+                    onChange={(e) => handleStepChange(index, 'name', e.target.value)}
+                  />
+                  <select
+                    className="asp-select asp-step-phase"
+                    value={step.executionPhase}
+                    onChange={(e) => handleStepChange(index, 'executionPhase', e.target.value)}
+                  >
+                    {EXECUTION_PHASES.map((ep) => (
+                      <option key={ep.value} value={ep.value}>{ep.label}</option>
+                    ))}
+                  </select>
+                  <input
+                    className="asp-input asp-step-duration"
+                    type="number"
+                    min="0"
+                    placeholder="Min"
+                    value={step.durationMinutes}
+                    onChange={(e) => handleStepChange(index, 'durationMinutes', e.target.value)}
+                    title="Duration in minutes"
+                  />
+                  <button
+                    type="button"
+                    className="asp-step-remove"
+                    onClick={() => handleRemoveStep(index)}
+                    disabled={form.steps.length === 1}
+                    title="Remove step"
+                  >
+                    &times;
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {form.packageType !== 'COMBO' && (
+            <div className="asp-steps-editor" style={{ marginTop: 16 }}>
+              <div className="asp-steps-header">
+                <span className="asp-steps-label">Resource requirements</span>
+              </div>
+              <div className="asp-form-grid" style={{ marginTop: 8 }}>
+                <select
+                  className="asp-select"
+                  name="executionMode"
+                  value={form.executionMode}
+                  onChange={handleChange}
+                >
+                  {EXECUTION_MODES.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+              {(form.executionMode === 'VEHICLE_CARE' || form.executionMode === 'MIXED') && (
+                <div className="asp-form-grid" style={{ marginTop: 8 }}>
+                  <input
+                    className="asp-input"
+                    name="careStaffDurationMinutes"
+                    value={form.careStaffDurationMinutes}
+                    onChange={handleChange}
+                    placeholder="Care staff duration (minutes)"
+                    type="number"
+                    min="1"
+                  />
+                  <input
+                    className="asp-input"
+                    name="careStaffRequiredCount"
+                    value={form.careStaffRequiredCount}
+                    onChange={handleChange}
+                    placeholder="Required care staff count"
+                    type="number"
+                    min="1"
+                  />
+                </div>
+              )}
+            </div>
           )}
 
           <div className="asp-form-actions">

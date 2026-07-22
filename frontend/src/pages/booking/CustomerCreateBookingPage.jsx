@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useTransientMessage } from '../../hooks/useTransientMessage'
 import {
   bookingFlowUtils,
   customerBookingFlowApi,
@@ -182,9 +183,47 @@ const isPastSlot = (slot, selectedDate) => {
   return slotStart.getTime() <= Date.now()
 }
 
+/** Return 0-23 start hour of a slot, or -1 if unparseable */
+const getSlotStartHour = (slot, selectedDate) => {
+  const raw = slot?.startTime || slot?.start || slot?.from
+  if (!raw) return -1
+  const value = String(raw)
+  // "HH:MM" or "HH:MM:SS"
+  if (/^\d{2}:\d{2}/.test(value)) return parseInt(value.slice(0, 2), 10)
+  const dt = getSlotStartDateTime(slot, selectedDate)
+  return dt ? dt.getHours() : -1
+}
+
+/** Split slots into Morning (0–11), Afternoon (12–16), Evening (17–23) */
+const groupSlotsByPeriod = (slots, selectedDate) => {
+  const groups = { Morning: [], Afternoon: [], Evening: [] }
+  slots.forEach((slot) => {
+    const h = getSlotStartHour(slot, selectedDate)
+    if (h < 12)       groups.Morning.push(slot)
+    else if (h < 17)  groups.Afternoon.push(slot)
+    else              groups.Evening.push(slot)
+  })
+  return groups
+}
+
+/** Extract just the start time portion for bold display */
+const getSlotStart = (slot) => {
+  const raw = slot?.startTime || slot?.start || slot?.from
+  return raw ? formatTime(raw) : ''
+}
+
+/** Extract just the end time portion for small display */
+const getSlotEnd = (slot) => {
+  const raw = slot?.endTime || slot?.end || slot?.to
+  return raw ? formatTime(raw) : ''
+}
+
 export default function CustomerCreateBookingPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const promoDropdownRef = useRef(null)
+  // Task 1: success messages (e.g., booking created) auto-clear after 7 s
+  const [successMessage, setSuccessMessage] = useTransientMessage(7000)
 
   const [currentStep, setCurrentStep] = useState(1)
 
@@ -951,7 +990,8 @@ export default function CustomerCreateBookingPage() {
           onGoTo={(step) => { setMessage(''); setCurrentStep(step) }}
         />
 
-        {/* Message banner */}
+        {/* Message banner: success auto-clears after 7 s; validation/errors persist */}
+        {successMessage && <div className="bk-msg bk-msg--success">{successMessage}</div>}
         {message && <div className="bk-msg">{message}</div>}
 
         {/* Loading state */}
@@ -1218,53 +1258,72 @@ export default function CustomerCreateBookingPage() {
                       <h2 className="bk-step-title">Select Date & Time</h2>
                     </div>
 
-                    <div className="bk-date-field">
-                      <label className="bk-field-label" style={{ marginBottom: 10, display: 'block' }}>Booking date</label>
-                      <BkCalendar
-                        value={selectedDate}
-                        min={minBookingDateIso()}
-                        max={maxBookingDateIso(bookingWindowDays)}
-                        onChange={(iso) => setSelectedDate(clampBookingDate(iso, bookingWindowDays))}
-                      />
-                    </div>
-
-                    {loadingSlots ? (
-                      <div className="bk-loading-inline">
-                        <div className="bk-spinner-sm" />
-                        Loading time slots...
+                    {/* 2-column layout: calendar left, slots right */}
+                    <div className="bk-datetime-cols">
+                      {/* ── Left: calendar ── */}
+                      <div className="bk-datetime-cal">
+                        <p className="bk-field-label">Booking date</p>
+                        <BkCalendar
+                          value={selectedDate}
+                          min={minBookingDateIso()}
+                          max={maxBookingDateIso(bookingWindowDays)}
+                          onChange={(iso) => setSelectedDate(clampBookingDate(iso, bookingWindowDays))}
+                        />
                       </div>
-                    ) : (
-                      <>
-                        {visibleSlots.length > 0 && (
-                          <div className="bk-slot-grid">
-                            {visibleSlots.map((slot) => {
-                              const full = isSlotFull(slot)
-                              const sel = String(selectedSlotId) === String(getId(slot))
+
+                      {/* ── Right: slot groups ── */}
+                      <div className="bk-datetime-slots">
+                        <p className="bk-field-label">Available times</p>
+
+                        {loadingSlots ? (
+                          <div className="bk-loading-inline">
+                            <div className="bk-spinner-sm" />
+                            Loading...
+                          </div>
+                        ) : visibleSlots.length > 0 ? (
+                          <div className="bk-slot-scroll">
+                            {Object.entries(groupSlotsByPeriod(visibleSlots, selectedDate)).map(([period, periodSlots]) => {
+                              if (periodSlots.length === 0) return null
                               return (
-                                <button
-                                  type="button"
-                                  key={getId(slot)}
-                                  className={`bk-slot${sel ? ' bk-slot--sel' : ''}${full ? ' bk-slot--full' : ''}`}
-                                  onClick={() => {
-                                    if (full) { handleJoinWaitlist(slot); return }
-                                    setSelectedSlotId(String(getId(slot)))
-                                  }}
-                                >
-                                  <span className="bk-slot-time">{getSlotLabel(slot)}</span>
-                                  {full && <span className="bk-slot-full-tag">Full</span>}
-                                </button>
+                                <div className="bk-slot-group" key={period}>
+                                  <p className="bk-slot-group-label">{period}</p>
+                                  <div className="bk-slot-row">
+                                    {periodSlots.map((slot) => {
+                                      const full = isSlotFull(slot)
+                                      const sel = String(selectedSlotId) === String(getId(slot))
+                                      return (
+                                        <button
+                                          type="button"
+                                          key={getId(slot)}
+                                          className={`bk-slot${sel ? ' bk-slot--sel' : ''}${full ? ' bk-slot--full' : ''}`}
+                                          onClick={() => {
+                                            if (full) { handleJoinWaitlist(slot); return }
+                                            setSelectedSlotId(String(getId(slot)))
+                                          }}
+                                        >
+                                          <strong className="bk-slot-start">{getSlotStart(slot)}</strong>
+                                          {getSlotEnd(slot) && (
+                                            <small className="bk-slot-end">{getSlotEnd(slot)}</small>
+                                          )}
+                                          {full && <span className="bk-slot-full-tag">Full</span>}
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
                               )
                             })}
                           </div>
+                        ) : (
+                          selectedPackage && (
+                            <div className="bk-empty">
+                              <p>No slots available</p>
+                              <span>No available slots for this date, or today's slots have already passed.</span>
+                            </div>
+                          )
                         )}
-                        {selectedPackage && visibleSlots.length === 0 && (
-                          <div className="bk-empty">
-                            <p>No slots available</p>
-                            <span>No available slots for this date, or today's slots have already passed.</span>
-                          </div>
-                        )}
-                      </>
-                    )}
+                      </div>
+                    </div>
 
                     <div className="bk-step-nav">
                       <button type="button" className="bk-btn-ghost" onClick={handlePrevStep}>← Back</button>
@@ -1620,6 +1679,7 @@ export default function CustomerCreateBookingPage() {
         open={depositQrOpen}
         onClose={handleDepositQrClose}
         booking={depositConfirm ? { id: depositConfirm.id, depositAmount: depositConfirm.depositAmount } : null}
+        bookingDisplayNumber={depositConfirm?.customerBookingNumber ?? depositConfirm?.id}
         transaction={depositTransaction}
         checkoutUrl={depositCheckoutUrl}
         error={depositQrError}

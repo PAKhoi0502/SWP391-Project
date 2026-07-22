@@ -95,6 +95,22 @@ function getPaymentMethodLabel(paymentMethod) {
   return paymentMethod === 'PAYOS' ? 'PayOS transfer' : 'Cash'
 }
 
+// UI helper — builds calendar day cells for a given month
+function buildCalendar(year, month) {
+  const firstDay = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const cells = []
+  for (let i = 0; i < firstDay; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+  return cells
+}
+
+const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
 const INIT_FORM = {
   guestName: '',
   guestPhone: '',
@@ -133,6 +149,11 @@ export default function StaffWalkInBookingPage() {
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [customerConflictSlots, setCustomerConflictSlots] = useState(new Set())
+
+  // UI-only state
+  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth())
+  const [calendarYear, setCalendarYear] = useState(new Date().getFullYear())
+  const [packageTab, setPackageTab] = useState('MAIN')
 
   useEffect(() => {
     let active = true
@@ -254,6 +275,14 @@ export default function StaffWalkInBookingPage() {
     [slots, form.startTime],
   )
 
+  // Slot groups (UI-only derived from existing `slots`)
+  const morningSlots = useMemo(() => slots.filter((s) => new Date(s.startTime).getHours() < 12), [slots])
+  const afternoonSlots = useMemo(() => slots.filter((s) => {
+    const h = new Date(s.startTime).getHours()
+    return h >= 12 && h < 17
+  }), [slots])
+  const eveningSlots = useMemo(() => slots.filter((s) => new Date(s.startTime).getHours() >= 17), [slots])
+
   useEffect(() => {
     if (!selectedPackage) return
     const seatCount = getPackageSeatCount(selectedPackage)
@@ -266,6 +295,14 @@ export default function StaffWalkInBookingPage() {
           ? String(motorbikeGroup)
           : prev.motorbikeGroup,
     }))
+  }, [selectedPackage])
+
+  // Sync packageTab when selectedPackage type changes (UI-only)
+  useEffect(() => {
+    if (!selectedPackage) return
+    const type = normalizePackageType(selectedPackage)
+    if (type === 'COMBO') setPackageTab('COMBO')
+    else if (type === 'MAIN') setPackageTab('MAIN')
   }, [selectedPackage])
 
   useEffect(() => {
@@ -502,17 +539,72 @@ export default function StaffWalkInBookingPage() {
     document.getElementById('staff-walk-in-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  // Calendar navigation (UI-only)
+  const prevMonth = () => {
+    if (calendarMonth === 0) { setCalendarYear((y) => y - 1); setCalendarMonth(11) }
+    else setCalendarMonth((m) => m - 1)
+  }
+  const nextMonth = () => {
+    if (calendarMonth === 11) { setCalendarYear((y) => y + 1); setCalendarMonth(0) }
+    else setCalendarMonth((m) => m + 1)
+  }
+
   const garageLocked = Boolean(staffProfile?.garageId)
   const selectedVehicleType = normalizeVehicleType(form.vehicleType)
   const packageSeatCount = getPackageSeatCount(selectedPackage)
   const packageMotorbikeGroup = getPackageMotorbikeGroup(selectedPackage)
 
+  // Render a time slot group (Morning / Afternoon / Evening)
+  const renderSlotGroup = (groupSlots, label) => {
+    if (groupSlots.length === 0) return null
+    return (
+      <div className="swi-slot-group" key={label}>
+        <p className="swi-slot-group-label">{label}</p>
+        <div className="swi-slots-grid">
+          {groupSlots.map((slot) => {
+            const isFull = !slot.available
+            const isCustomerBooked = customerConflictSlots.has(slot.startTime)
+            const isDisabled = isFull || isCustomerBooked
+            return (
+              <button
+                key={slot.startTime}
+                type="button"
+                disabled={isDisabled}
+                className={[
+                  'swi-slot',
+                  form.startTime === slot.startTime ? 'swi-slot--selected' : '',
+                  isFull ? 'swi-slot--full' : '',
+                  isCustomerBooked ? 'swi-slot--customer-booked' : '',
+                ].filter(Boolean).join(' ')}
+                onClick={() => {
+                  if (isDisabled) return
+                  setFieldErrors((prev) => ({ ...prev, startTime: '' }))
+                  setForm((prev) => ({ ...prev, startTime: slot.startTime }))
+                }}
+              >
+                <span className="swi-slot-time">{formatTime(slot.startTime)}</span>
+                <span className="swi-slot-end">{formatTime(slot.endTime)}</span>
+                {isFull && <span className="swi-slot-full-label">Full</span>}
+                {isCustomerBooked && <span className="swi-slot-customer-booked-label">Booked</span>}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  const calendarCells = buildCalendar(calendarYear, calendarMonth)
+  const todayStr = todayIso()
+  const activePackages = packageTab === 'MAIN' ? mainPackages : comboPackages
+
   return (
     <main className="swi-page">
+      {/* ── Hero ── */}
       <section className="swi-hero">
-        <div>
-          <p className="swi-kicker">Staff</p>
-          <h1>New Walk-in</h1>
+        <div className="swi-hero-text">
+          <p className="swi-kicker">Staff Portal</p>
+          <h1>New Walk-in Booking</h1>
           <span>Create a walk-in booking for a customer at the counter.</span>
         </div>
         <button type="button" className="swi-back-btn" onClick={scrollToForm}>
@@ -524,8 +616,11 @@ export default function StaffWalkInBookingPage() {
 
       <div className="swi-layout">
         <form id="staff-walk-in-form" className="swi-form" onSubmit={handleSubmit} noValidate>
+
+          {/* ── Customer ── */}
           <section className="swi-section">
-            <h2 className="swi-section-title">Customer info</h2>
+            <h2 className="swi-section-title">Customer</h2>
+
             <div className="swi-row">
               <div className="swi-field">
                 <label>Customer name <span className="swi-required">*</span></label>
@@ -554,7 +649,7 @@ export default function StaffWalkInBookingPage() {
 
             <div className="swi-field">
               <label>
-                Email <span className="swi-optional">(not used for account lookup)</span>
+                Email <span className="swi-optional">(optional — not used for account lookup)</span>
               </label>
               <input
                 name="guestEmail"
@@ -569,18 +664,22 @@ export default function StaffWalkInBookingPage() {
 
             {customerLookup?.found && (
               <div className="swi-match-card">
-                <div>
-                  <span>Customer account found</span>
-                  <strong>{customerLookup.fullName}</strong>
-                  <small>#{customerLookup.customerId} · {customerLookup.phone}</small>
+                <div className="swi-match-info">
+                  <span className="swi-match-badge">Customer found</span>
+                  <strong className="swi-match-name">{customerLookup.fullName}</strong>
+                  <small className="swi-match-meta">#{customerLookup.customerId} &middot; {customerLookup.phone}</small>
                 </div>
-                <button type="button" onClick={useMatchedCustomer}>Use this info</button>
+                <button type="button" className="swi-match-btn" onClick={useMatchedCustomer}>
+                  Use this info
+                </button>
               </div>
             )}
           </section>
 
+          {/* ── Vehicle ── */}
           <section className="swi-section">
             <h2 className="swi-section-title">Vehicle</h2>
+
             <div className="swi-row">
               <div className="swi-field">
                 <label>License plate <span className="swi-required">*</span></label>
@@ -601,16 +700,24 @@ export default function StaffWalkInBookingPage() {
 
               <div className="swi-field">
                 <label>Vehicle type <span className="swi-required">*</span></label>
-                <select
-                  name="vehicleType"
-                  value={form.vehicleType}
-                  onChange={handleChange}
-                  disabled={!!customerLookup?.vehicleId}
-                  className={fieldErrors.vehicleType ? 'swi-input-error' : ''}
-                >
-                  <option value="CAR">Car</option>
-                  <option value="MOTORBIKE">Motorbike</option>
-                </select>
+                <div className="swi-vtype-toggle">
+                  <button
+                    type="button"
+                    disabled={!!customerLookup?.vehicleId}
+                    className={`swi-vtype-btn${form.vehicleType === 'CAR' ? ' swi-vtype-btn--active' : ''}`}
+                    onClick={() => handleChange({ target: { name: 'vehicleType', value: 'CAR' } })}
+                  >
+                    Car
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!!customerLookup?.vehicleId}
+                    className={`swi-vtype-btn${form.vehicleType === 'MOTORBIKE' ? ' swi-vtype-btn--active' : ''}`}
+                    onClick={() => handleChange({ target: { name: 'vehicleType', value: 'MOTORBIKE' } })}
+                  >
+                    Motorbike
+                  </button>
+                </div>
                 {customerLookup?.vehicleId && (
                   <span className="swi-help">Vehicle type determined by system.</span>
                 )}
@@ -674,16 +781,35 @@ export default function StaffWalkInBookingPage() {
             )}
           </section>
 
+          {/* ── Service ── */}
           <section className="swi-section">
             <h2 className="swi-section-title">Service</h2>
-            <div className="swi-row">
+
+            {/* Garage — read-only display when locked, select when not */}
+            {garageLocked ? (
+              <div className="swi-garage-display">
+                <div className="swi-garage-display-icon">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                    <polyline points="9,22 9,12 15,12 15,22"/>
+                  </svg>
+                </div>
+                <div className="swi-garage-display-info">
+                  <span className="swi-garage-display-label">Garage</span>
+                  <span className="swi-garage-display-name">
+                    {loadingInitial ? 'Loading...' : (selectedGarage ? getGarageName(selectedGarage) : 'Not assigned')}
+                  </span>
+                </div>
+                <span className="swi-garage-lock-badge">Locked to profile</span>
+              </div>
+            ) : (
               <div className="swi-field">
                 <label>Garage <span className="swi-required">*</span></label>
                 <select
                   name="garageId"
                   value={form.garageId}
                   onChange={handleChange}
-                  disabled={loadingInitial || garageLocked}
+                  disabled={loadingInitial}
                   className={fieldErrors.garageId ? 'swi-input-error' : ''}
                 >
                   <option value="">{loadingInitial ? 'Loading...' : 'Select garage'}</option>
@@ -693,75 +819,102 @@ export default function StaffWalkInBookingPage() {
                     </option>
                   ))}
                 </select>
-                {garageLocked && <span className="swi-help">Garage locked to your staff profile.</span>}
                 {fieldErrors.garageId && <p className="swi-field-error">{fieldErrors.garageId}</p>}
-              </div>
-
-              <div className="swi-field">
-                <label>Service package <span className="swi-required">*</span></label>
-                <select
-                  name="servicePackageId"
-                  value={form.servicePackageId}
-                  onChange={handleChange}
-                  disabled={loadingInitial}
-                  className={fieldErrors.servicePackageId ? 'swi-input-error' : ''}
-                >
-                  <option value="">{loadingInitial ? 'Loading...' : 'Select service package'}</option>
-                  {mainPackages.map((pkg) => (
-                    <option key={getPackageId(pkg)} value={getPackageId(pkg)}>
-                      {getPackageName(pkg)} - {formatMoney(getPackagePrice(pkg))}
-                    </option>
-                  ))}
-                </select>
-                {fieldErrors.servicePackageId && <p className="swi-field-error">{fieldErrors.servicePackageId}</p>}
-              </div>
-            </div>
-
-            {comboPackages.length > 0 && (
-              <div className="swi-field">
-                <label>Combo package</label>
-                <div className="swi-addon-grid">
-                  {comboPackages.map((pkg) => {
-                    const id = String(getPackageId(pkg))
-                    const active = String(form.servicePackageId) === id
-                    const includedNames = getIncludedPackageNames(pkg)
-                    return (
-                      <button
-                        type="button"
-                        key={id}
-                        className={`swi-addon-card${active ? ' swi-addon-card--active' : ''}`}
-                        onClick={() => selectServicePackage(id)}
-                      >
-                        <strong>{getPackageName(pkg)}</strong>
-                        {includedNames && <small className="swi-combo-includes">{includedNames}</small>}
-                        <small>{formatMoney(getPackagePrice(pkg))}</small>
-                      </button>
-                    )
-                  })}
-                </div>
               </div>
             )}
 
-            {addOnPackages.length > 0 && (
-              <div className="swi-field">
-                <label>Add-ons (select multiple)</label>
-                {isComboSelected && (
-                  <span className="swi-help">Combo package already includes services; no add-ons available.</span>
+            {/* Package tabs */}
+            <div>
+              <p className="swi-field-heading">
+                Service package <span className="swi-required">*</span>
+              </p>
+              <div className="swi-pkg-tabs">
+                <button
+                  type="button"
+                  className={`swi-pkg-tab${packageTab === 'MAIN' ? ' swi-pkg-tab--active' : ''}`}
+                  onClick={() => setPackageTab('MAIN')}
+                >
+                  Main{mainPackages.length > 0 ? ` (${mainPackages.length})` : ''}
+                </button>
+                {comboPackages.length > 0 && (
+                  <button
+                    type="button"
+                    className={`swi-pkg-tab${packageTab === 'COMBO' ? ' swi-pkg-tab--active' : ''}`}
+                    onClick={() => setPackageTab('COMBO')}
+                  >
+                    Combo ({comboPackages.length})
+                  </button>
                 )}
-                <div className="swi-addon-grid">
+              </div>
+            </div>
+
+            {/* Package cards grid */}
+            {loadingInitial ? (
+              <p className="swi-pkg-loading">Loading packages...</p>
+            ) : activePackages.length === 0 ? (
+              <p className="swi-pkg-empty">No packages available for this vehicle type.</p>
+            ) : (
+              <div className="swi-pkg-grid">
+                {activePackages.map((pkg) => {
+                  const id = String(getPackageId(pkg))
+                  const isSelected = String(form.servicePackageId) === id
+                  const pkgType = normalizePackageType(pkg)
+                  const dur = getPackageDuration(pkg)
+                  return (
+                    <button
+                      type="button"
+                      key={id}
+                      className={`swi-pkg-card${isSelected ? ' swi-pkg-card--selected' : ''}`}
+                      onClick={() => selectServicePackage(id)}
+                    >
+                      <div className="swi-pkg-card-top">
+                        <span className={`swi-pkg-badge swi-pkg-badge--${pkgType.toLowerCase()}`}>
+                          {pkgType === 'ADD_ON' ? 'Add-on' : pkgType.charAt(0) + pkgType.slice(1).toLowerCase()}
+                        </span>
+                        {isSelected && (
+                          <span className="swi-pkg-check" aria-label="Selected">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          </span>
+                        )}
+                      </div>
+                      <p className="swi-pkg-name">{getPackageName(pkg)}</p>
+                      <p className="swi-pkg-price">{formatMoney(getPackagePrice(pkg))}</p>
+                      {dur > 0 && <p className="swi-pkg-duration">{dur} min</p>}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            {fieldErrors.servicePackageId && <p className="swi-field-error">{fieldErrors.servicePackageId}</p>}
+
+            {/* Add-ons chip grid */}
+            {addOnPackages.length > 0 && (
+              <div className="swi-addons-section">
+                <p className="swi-addons-label">
+                  Add-ons
+                  {isComboSelected && <span className="swi-help"> — not available with combo</span>}
+                </p>
+                <div className="swi-addon-chips">
                   {addOnPackages.map((pkg) => {
                     const id = String(getPackageId(pkg))
-                    const active = selectedAddOnIds.includes(id)
+                    const isActive = selectedAddOnIds.includes(id)
                     return (
                       <button
                         type="button"
                         key={id}
                         disabled={isComboSelected}
-                        className={`swi-addon-card${active ? ' swi-addon-card--active' : ''}`}
+                        className={[
+                          'swi-addon-chip',
+                          isActive ? 'swi-addon-chip--active' : '',
+                          isComboSelected ? 'swi-addon-chip--disabled' : '',
+                        ].filter(Boolean).join(' ')}
                         onClick={() => toggleAddOn(id)}
                       >
-                        <strong>{getPackageName(pkg)}</strong>
-                        <small>{formatMoney(getPackagePrice(pkg))}</small>
+                        <span className="swi-addon-chip-name">{getPackageName(pkg)}</span>
+                        <span className="swi-addon-chip-price">{formatMoney(getPackagePrice(pkg))}</span>
+                        {isComboSelected && <span className="swi-addon-chip-included">Included</span>}
                       </button>
                     )
                   })}
@@ -770,75 +923,94 @@ export default function StaffWalkInBookingPage() {
             )}
           </section>
 
+          {/* ── Date & Time ── */}
           <section className="swi-section">
-            <h2 className="swi-section-title">Date & Time</h2>
-            <div className="swi-field swi-field--date">
-              <label>Date <span className="swi-required">*</span></label>
-              <input
-                name="date"
-                type="date"
-                value={form.date}
-                min={todayIso()}
-                onChange={handleChange}
-                className={fieldErrors.date ? 'swi-input-error' : ''}
-              />
-              {fieldErrors.date && <p className="swi-field-error">{fieldErrors.date}</p>}
-            </div>
+            <h2 className="swi-section-title">Date &amp; Time</h2>
 
-            {form.garageId && form.servicePackageId ? (
-              loadingSlots ? (
-                <p className="swi-slots-loading">Loading time slots...</p>
-              ) : slots.length === 0 ? (
-                <p className="swi-slots-empty">No available slots for this date.</p>
-              ) : (
-                <>
-                  <div className="swi-slots-grid">
-                    {slots.map((slot) => {
-                      const isFull = !slot.available
-                      const isCustomerBooked = customerConflictSlots.has(slot.startTime)
-                      const isDisabled = isFull || isCustomerBooked
+            <div className="swi-datetime-grid">
+              {/* Left: Calendar */}
+              <div className="swi-datetime-cal">
+                <div className="swi-calendar">
+                  <div className="swi-cal-header">
+                    <button type="button" className="swi-cal-nav" onClick={prevMonth} aria-label="Previous month">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="15 18 9 12 15 6"/>
+                      </svg>
+                    </button>
+                    <span className="swi-cal-title">{MONTHS[calendarMonth]} {calendarYear}</span>
+                    <button type="button" className="swi-cal-nav" onClick={nextMonth} aria-label="Next month">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="9 18 15 12 9 6"/>
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="swi-cal-grid">
+                    {WEEKDAYS.map((d) => (
+                      <div key={d} className="swi-cal-weekday">{d}</div>
+                    ))}
+                    {calendarCells.map((day, i) => {
+                      if (day === null) {
+                        return <div key={`blank-${i}`} className="swi-cal-day swi-cal-day--blank" />
+                      }
+                      const dayIso = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                      const isToday = dayIso === todayStr
+                      const isPast = dayIso < todayStr
+                      const isSelected = dayIso === form.date
                       return (
                         <button
-                          key={slot.startTime}
                           type="button"
-                          disabled={isDisabled}
+                          key={day}
+                          disabled={isPast}
                           className={[
-                            'swi-slot',
-                            form.startTime === slot.startTime ? 'swi-slot--selected' : '',
-                            isFull ? 'swi-slot--full' : '',
-                            isCustomerBooked ? 'swi-slot--customer-booked' : '',
+                            'swi-cal-day',
+                            isPast ? 'swi-cal-day--disabled' : '',
+                            isToday && !isSelected ? 'swi-cal-day--today' : '',
+                            isSelected ? 'swi-cal-day--selected' : '',
                           ].filter(Boolean).join(' ')}
-                          onClick={() => {
-                            if (isDisabled) return
-                            setFieldErrors((prev) => ({ ...prev, startTime: '' }))
-                            setForm((prev) => ({ ...prev, startTime: slot.startTime }))
-                          }}
+                          onClick={() => handleChange({ target: { name: 'date', value: dayIso } })}
                         >
-                          {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
-                          {isFull && <span className="swi-slot-full-label">Full</span>}
-                          {isCustomerBooked && <span className="swi-slot-customer-booked-label">Booked</span>}
+                          {day}
                         </button>
                       )
                     })}
                   </div>
-                  {fieldErrors.startTime && <p className="swi-field-error">{fieldErrors.startTime}</p>}
-                </>
-              )
-            ) : (
-              <p className="swi-slots-hint">Select a garage and package to see available slots.</p>
-            )}
+                </div>
+                {fieldErrors.date && <p className="swi-field-error">{fieldErrors.date}</p>}
+              </div>
+
+              {/* Right: Time slots */}
+              <div className="swi-datetime-slots">
+                {form.garageId && form.servicePackageId ? (
+                  loadingSlots ? (
+                    <p className="swi-slots-loading">Loading time slots...</p>
+                  ) : slots.length === 0 ? (
+                    <p className="swi-slots-empty">No available slots for this date.</p>
+                  ) : (
+                    <div className="swi-slot-groups">
+                      {renderSlotGroup(morningSlots, 'Morning')}
+                      {renderSlotGroup(afternoonSlots, 'Afternoon')}
+                      {renderSlotGroup(eveningSlots, 'Evening')}
+                      {fieldErrors.startTime && <p className="swi-field-error">{fieldErrors.startTime}</p>}
+                    </div>
+                  )
+                ) : (
+                  <p className="swi-slots-hint">Select a garage and package to see available time slots.</p>
+                )}
+              </div>
+            </div>
           </section>
 
+          {/* ── Payment ── */}
           <section className="swi-section">
-            <h2 className="swi-section-title">Payment</h2>
+            <h2 className="swi-section-title">Payment method</h2>
             <div className="swi-payment-options">
               <button
                 type="button"
                 className={`swi-payment-option${form.paymentMethod === 'CASH' ? ' swi-payment-option--active' : ''}`}
                 onClick={() => setForm((prev) => ({ ...prev, paymentMethod: 'CASH' }))}
               >
-                <span>Cash</span>
-                <small>Customer pays cash after service is complete.</small>
+                <span className="swi-pay-label">Cash</span>
+                <small className="swi-pay-desc">Customer pays cash after service is complete.</small>
               </button>
 
               <button
@@ -846,12 +1018,13 @@ export default function StaffWalkInBookingPage() {
                 className={`swi-payment-option${form.paymentMethod === 'PAYOS' ? ' swi-payment-option--active' : ''}`}
                 onClick={() => setForm((prev) => ({ ...prev, paymentMethod: 'PAYOS' }))}
               >
-                <span>PayOS</span>
-                <small>Staff creates a PayOS QR code after service is complete.</small>
+                <span className="swi-pay-label">PayOS</span>
+                <small className="swi-pay-desc">Staff creates a PayOS QR code after service is complete.</small>
               </button>
             </div>
           </section>
 
+          {/* ── Notes ── */}
           <section className="swi-section">
             <h2 className="swi-section-title">
               Notes <span className="swi-optional">(optional)</span>
@@ -864,70 +1037,69 @@ export default function StaffWalkInBookingPage() {
               rows={3}
             />
           </section>
-
-          <button type="submit" className="swi-submit-btn" disabled={submitting || loadingInitial}>
-            {submitting ? 'Creating booking...' : 'Create booking'}
-          </button>
         </form>
 
+        {/* ── Summary sidebar ── */}
         <aside className="swi-summary">
-          <h2 className="swi-summary-title">Booking summary</h2>
+          <h2 className="swi-summary-title">Booking Summary</h2>
 
-          <div className="swi-summary-row">
-            <span>Customer</span>
-            <strong>{form.guestName || <em>Not entered</em>}</strong>
-          </div>
-          <div className="swi-summary-row">
-            <span>Phone</span>
-            <strong>{form.guestPhone || <em>Not entered</em>}</strong>
-          </div>
-          <div className="swi-summary-row">
-            <span>Account</span>
-            <strong>
-              {customerLookup?.found
-                ? `${customerLookup.fullName} #${customerLookup.customerId}`
-                : <em>Walk-in guest</em>}
-            </strong>
-          </div>
-          <div className="swi-summary-row">
-            <span>Vehicle</span>
-            <strong>
-              {form.licensePlate
-                ? `${form.licensePlate.toUpperCase()} (${selectedVehicleType === 'CAR' ? 'Car' : 'Motorbike'})`
-                : <em>Not entered</em>}
-            </strong>
-          </div>
-          <div className="swi-summary-row">
-            <span>Garage</span>
-            <strong>{selectedGarage ? getGarageName(selectedGarage) : <em>Not selected</em>}</strong>
-          </div>
-          <div className="swi-summary-row">
-            <span>Package</span>
-            <strong>{selectedPackage ? getPackageName(selectedPackage) : <em>Not selected</em>}</strong>
-          </div>
-          {isComboSelected && getIncludedPackageNames(selectedPackage) && (
+          <div className="swi-summary-rows">
             <div className="swi-summary-row">
-              <span>Includes</span>
-              <strong>{getIncludedPackageNames(selectedPackage)}</strong>
+              <span>Customer</span>
+              <strong>{form.guestName || <em>Not entered</em>}</strong>
             </div>
-          )}
-          {selectedAddOns.length > 0 && (
             <div className="swi-summary-row">
-              <span>Add-ons</span>
-              <strong>{selectedAddOns.map((pkg) => getPackageName(pkg)).join(', ')}</strong>
+              <span>Phone</span>
+              <strong>{form.guestPhone || <em>Not entered</em>}</strong>
             </div>
-          )}
-          <div className="swi-summary-row">
-            <span>Time</span>
-            <strong>
-              {selectedSlot
-                ? `${formatTime(selectedSlot.startTime)} - ${formatTime(selectedSlot.endTime)}, ${form.date}`
-                : <em>Not selected</em>}
-            </strong>
-          </div>
-          <div className="swi-summary-row">
-            <span>Payment</span>
-            <strong>{getPaymentMethodLabel(form.paymentMethod)}</strong>
+            <div className="swi-summary-row">
+              <span>Account</span>
+              <strong>
+                {customerLookup?.found
+                  ? `${customerLookup.fullName} #${customerLookup.customerId}`
+                  : <em>Walk-in guest</em>}
+              </strong>
+            </div>
+            <div className="swi-summary-row">
+              <span>Vehicle</span>
+              <strong>
+                {form.licensePlate
+                  ? `${form.licensePlate.toUpperCase()} (${selectedVehicleType === 'CAR' ? 'Car' : 'Motorbike'})`
+                  : <em>Not entered</em>}
+              </strong>
+            </div>
+            <div className="swi-summary-row">
+              <span>Garage</span>
+              <strong>{selectedGarage ? getGarageName(selectedGarage) : <em>Not selected</em>}</strong>
+            </div>
+            <div className="swi-summary-row">
+              <span>Package</span>
+              <strong>{selectedPackage ? getPackageName(selectedPackage) : <em>Not selected</em>}</strong>
+            </div>
+            {isComboSelected && getIncludedPackageNames(selectedPackage) && (
+              <div className="swi-summary-row">
+                <span>Includes</span>
+                <strong>{getIncludedPackageNames(selectedPackage)}</strong>
+              </div>
+            )}
+            {selectedAddOns.length > 0 && (
+              <div className="swi-summary-row">
+                <span>Add-ons</span>
+                <strong>{selectedAddOns.map((pkg) => getPackageName(pkg)).join(', ')}</strong>
+              </div>
+            )}
+            <div className="swi-summary-row">
+              <span>Date &amp; Time</span>
+              <strong>
+                {selectedSlot
+                  ? `${form.date} · ${formatTime(selectedSlot.startTime)}`
+                  : <em>Not selected</em>}
+              </strong>
+            </div>
+            <div className="swi-summary-row">
+              <span>Payment</span>
+              <strong>{getPaymentMethodLabel(form.paymentMethod)}</strong>
+            </div>
           </div>
 
           {selectedPackage && (
@@ -939,12 +1111,23 @@ export default function StaffWalkInBookingPage() {
               </div>
               {totalDuration > 0 && (
                 <div className="swi-summary-row">
-                  <span>Duration</span>
+                  <span>Est. duration</span>
                   <strong>{totalDuration} min</strong>
                 </div>
               )}
             </>
           )}
+
+          <div className="swi-summary-submit">
+            <button
+              type="submit"
+              form="staff-walk-in-form"
+              className="swi-submit-btn"
+              disabled={submitting || loadingInitial}
+            >
+              {submitting ? 'Creating booking...' : 'Create booking'}
+            </button>
+          </div>
         </aside>
       </div>
     </main>

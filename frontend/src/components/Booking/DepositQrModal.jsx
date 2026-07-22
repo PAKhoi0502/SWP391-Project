@@ -36,6 +36,7 @@ export default function DepositQrModal({
   open,
   onClose,
   booking,
+  bookingDisplayNumber,
   transaction,
   checkoutUrl,
   error,
@@ -50,6 +51,7 @@ export default function DepositQrModal({
   const qrContent = transaction?.qrCode || ''
   const orderCode = transaction?.orderCode
   const amount = transaction?.amount ?? booking?.depositAmount
+  const displayNo = bookingDisplayNumber ?? booking?.customerBookingNumber ?? booking?.id
   const status = String(transaction?.status || '').toUpperCase()
   const anyLoading = refreshLoading || cancelLoading
   const effectiveCheckoutUrl = checkoutUrl || transaction?.checkoutUrl
@@ -71,7 +73,7 @@ export default function DepositQrModal({
               </svg>
             </div>
             <h2 className="dqm-success-title">Deposit paid!</h2>
-            {booking?.id && <p className="dqm-success-sub">Booking #{booking.id}'s deposit has been received.</p>}
+            {displayNo != null && <p className="dqm-success-sub">Booking #{displayNo}'s deposit has been received.</p>}
             <button type="button" className="dqm-btn dqm-btn--close-success" onClick={onClose}>
               Close
             </button>
@@ -92,7 +94,7 @@ export default function DepositQrModal({
         <div className="dqm-header">
           <div className="dqm-icon">QR</div>
           <h2 className="dqm-title">Deposit Payment</h2>
-          {booking?.id && <p className="dqm-subtitle">Booking #{booking.id}</p>}
+          {displayNo != null && <p className="dqm-subtitle">Booking #{displayNo}</p>}
         </div>
 
         <div className="dqm-qr-section">
