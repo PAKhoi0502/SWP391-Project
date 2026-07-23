@@ -41,7 +41,7 @@ export default function GarageListPage() {
     return (
         <div className="garage-page">
             <div className="garage-header">
-                <p className="garage-eyebrow">AutoWash Pro</p>
+                <p className="garage-eyebrow">Audela Washing</p>
                 <h1>Garage List</h1>
                 <p>Choose the right garage to view its address, opening hours, and service capabilities.</p>
             </div>

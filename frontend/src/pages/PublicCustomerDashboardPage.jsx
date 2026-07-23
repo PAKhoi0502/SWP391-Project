@@ -172,7 +172,7 @@ export default function PublicCustomerDashboardPage() {
 
   const displayTiers = tierRules.length > 0
     ? [...tierRules]
-        .sort((a, b) => (a.priorityLevel ?? 0) - (b.priorityLevel ?? 0))
+        .sort((a, b) => (b.priorityLevel ?? 0) - (a.priorityLevel ?? 0))
         .map((rule) => ({ name: rule.tier, desc: describeTierRule(rule), color: rule.color || getTierColor(rule.tier) }))
     : FALLBACK_TIERS
 
@@ -360,9 +360,9 @@ export default function PublicCustomerDashboardPage() {
               <path d="M4 15 Q14 9 24 15 Q34 21 44 15" stroke="#2EC2F7" strokeWidth="2.8" strokeLinecap="round"/>
               <path d="M5 22 Q15 16 25 22 Q35 28 43 22" stroke="#82cde8" strokeWidth="2.2" strokeLinecap="round"/>
             </svg>
-            <span>AutoWash Pro</span>
+            <span>Audela Washing</span>
           </div>
-          <p className="pcd-footer-copy">© {new Date().getFullYear()} AutoWash Pro. All rights reserved.</p>
+          <p className="pcd-footer-copy">© {new Date().getFullYear()} Audela Washing. All rights reserved.</p>
         </div>
       </footer>
     </div>

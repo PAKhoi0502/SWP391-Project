@@ -287,7 +287,7 @@ export default function AdminTierRulesPage() {
   }
 
   const isCreate = modalMode === 'create'
-  const sorted = [...rules].sort((a, b) => (a.priorityLevel ?? 0) - (b.priorityLevel ?? 0))
+  const sorted = [...rules].sort((a, b) => (b.priorityLevel ?? 0) - (a.priorityLevel ?? 0))
 
   return (
     <div className="tier-rules-page">

@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { StaffBookingCountProvider, useStaffBookingCount } from '../contexts/StaffBookingCountContext'
+import { StaffProfileProvider, useStaffProfile } from '../contexts/StaffProfileContext'
 import './StaffLayout.css'
 
 function NavIcon({ name }) {
@@ -31,11 +33,26 @@ const NAV_ITEMS = [
   { to: '/staff/profile',          label: 'Profile',     icon: 'user' },
 ]
 
+// Vehicle Care Staff only need their dashboard + profile — everything else (walk-in,
+// bookings, waitlist) belongs to front-desk/check-in staff types.
+const VEHICLE_CARE_ALLOWED_PATHS = new Set(['/staff', '/staff/profile'])
+
 function StaffLayoutInner() {
   const navigate = useNavigate()
   const location = useLocation()
   const { logout, user } = useAuth()
   const bookingCount = useStaffBookingCount()
+  const { profile } = useStaffProfile()
+  const isVehicleCareStaff = profile?.staffType === 'VEHICLE_CARE_STAFF'
+  const navItems = isVehicleCareStaff
+    ? NAV_ITEMS.filter((item) => VEHICLE_CARE_ALLOWED_PATHS.has(item.to))
+    : NAV_ITEMS
+
+  useEffect(() => {
+    if (isVehicleCareStaff && !VEHICLE_CARE_ALLOWED_PATHS.has(location.pathname)) {
+      navigate('/staff', { replace: true })
+    }
+  }, [isVehicleCareStaff, location.pathname, navigate])
 
   const handleLogout = async () => {
     await logout()
@@ -72,7 +89,7 @@ function StaffLayoutInner() {
         </div>
 
         <nav className="sl-nav" aria-label="Staff navigation">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -117,8 +134,10 @@ function StaffLayoutInner() {
 
 export default function StaffLayout() {
   return (
-    <StaffBookingCountProvider>
-      <StaffLayoutInner />
-    </StaffBookingCountProvider>
+    <StaffProfileProvider>
+      <StaffBookingCountProvider>
+        <StaffLayoutInner />
+      </StaffBookingCountProvider>
+    </StaffProfileProvider>
   )
 }

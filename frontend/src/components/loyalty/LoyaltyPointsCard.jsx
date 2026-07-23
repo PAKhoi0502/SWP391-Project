@@ -49,7 +49,7 @@ export default function LoyaltyPointsCard() {
   if (!loyalty) return null
 
   const currentTierKey = String(loyalty.currentTier || '').toUpperCase()
-  const sortedRules = [...tierRules].sort((a, b) => (a.priorityLevel ?? 0) - (b.priorityLevel ?? 0))
+  const sortedRules = [...tierRules].sort((a, b) => (b.priorityLevel ?? 0) - (a.priorityLevel ?? 0))
   const currentTierColor = sortedRules.find((r) => String(r.tier || '').toUpperCase() === currentTierKey)?.color
 
   return (

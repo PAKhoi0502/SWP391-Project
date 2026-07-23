@@ -368,13 +368,6 @@ export default function AnimatedAuthShell() {
   const [entered,    setEntered]    = useState(false)
 
   useEffect(() => {
-    // Lock body scroll on auth pages
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prev }
-  }, [])
-
-  useEffect(() => {
     const raf = requestAnimationFrame(() => {
       setAnimReady(true)
       setTimeout(() => setEntered(true), 40)

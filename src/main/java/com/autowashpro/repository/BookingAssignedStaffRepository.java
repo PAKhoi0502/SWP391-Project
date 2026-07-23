@@ -67,4 +67,6 @@ public interface BookingAssignedStaffRepository extends JpaRepository<BookingAss
     );
 
     List<BookingAssignedStaff> findByBookingId(Long bookingId);
+
+    List<BookingAssignedStaff> findByStaffProfileIdAndStatus(Long staffProfileId, String status);
 }

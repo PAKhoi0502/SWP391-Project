@@ -937,7 +937,7 @@ export default function CustomerCreateBookingPage() {
 
         {/* Hero */}
         <div className="bk-hero">
-          <p className="bk-eyebrow">AutoWash Pro</p>
+          <p className="bk-eyebrow">Audela Washing</p>
           <h1 className="bk-title">New Booking</h1>
           <p className="bk-subtitle">
             Choose your vehicle, garage, package, and time — confirm in just a few steps.
@@ -1050,7 +1050,7 @@ export default function CustomerCreateBookingPage() {
                             >
                               <div className="bk-opt-body">
                                 <span className="bk-opt-name">{getName(garage, 'Garage')}</span>
-                                <span className="bk-opt-sub">{garage?.address || garage?.location || 'AutoWash Pro'}</span>
+                                <span className="bk-opt-sub">{garage?.address || garage?.location || 'Audela Washing'}</span>
                               </div>
                               {sel && <span className="bk-check">✓</span>}
                             </button>

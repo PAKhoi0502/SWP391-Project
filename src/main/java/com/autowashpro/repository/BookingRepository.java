@@ -154,5 +154,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                         """)
         List<Booking> findRefundPendingBookings();
         Optional<Booking> findByTrackingToken(String trackingToken);
-        
+
+        List<Booking> findByGarageIdAndStatusInOrderByStartTimeAsc(Long garageId, List<String> statuses);
+
 }

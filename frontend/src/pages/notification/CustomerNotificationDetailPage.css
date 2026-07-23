@@ -224,3 +224,25 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+@media (max-width: 640px) {
+  .cn-detail-content {
+    padding: 28px 14px 48px;
+  }
+
+  .cn-detail-card {
+    padding: 22px 18px;
+  }
+
+  .cn-detail-title {
+    font-size: 19px;
+  }
+
+  .cn-detail-actions {
+    justify-content: stretch;
+  }
+
+  .cn-detail-delete-btn {
+    width: 100%;
+  }
+}

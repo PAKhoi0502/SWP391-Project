@@ -50,7 +50,7 @@ function DashboardLayout({ role }) {
       <aside className="dashboard-sidebar">
         <div className="app-brand-row">
           <Link className="app-brand" to="/">
-            AutoWash Pro
+            Audela Washing
           </Link>
         </div>
 

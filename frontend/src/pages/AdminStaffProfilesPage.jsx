@@ -7,7 +7,10 @@ import { userService } from '../services/userService'
 import '../layouts/admin-light.css'
 import './AdminStaffProfilesPage.css'
 
-const emptyForm = { userId: '', garageId: '', staffCode: '', staffType: STAFF_TYPES[0] }
+const emptyForm = { userId: '', garageId: '', staffCode: '', staffType: STAFF_TYPES[0], salary: '' }
+
+const formatMoney = (value) =>
+  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(Number(value || 0))
 
 export default function AdminStaffProfilesPage() {
   const [profiles, setProfiles] = useState([])
@@ -70,6 +73,7 @@ export default function AdminStaffProfilesPage() {
       garageId: profile.garageId || '',
       staffCode: profile.staffCode || '',
       staffType: profile.staffType || STAFF_TYPES[0],
+      salary: profile.salary ?? '',
     })
     setFormOpen(true)
   }
@@ -80,13 +84,18 @@ export default function AdminStaffProfilesPage() {
     setError('')
     try {
       if (editing) {
-        await staffProfileService.update(editing.id, { garageId: Number(form.garageId), staffType: form.staffType })
+        await staffProfileService.update(editing.id, {
+          garageId: Number(form.garageId),
+          staffType: form.staffType,
+          salary: form.salary === '' ? 0 : Number(form.salary),
+        })
       } else {
         await staffProfileService.create({
           userId: Number(form.userId),
           garageId: Number(form.garageId),
           staffCode: form.staffCode.trim(),
           staffType: form.staffType,
+          salary: form.salary === '' ? 0 : Number(form.salary),
         })
       }
       setFormOpen(false)
@@ -117,6 +126,7 @@ export default function AdminStaffProfilesPage() {
     { title: 'Staff', key: 'userFullName', render: (p) => <StaffCell profile={p} /> },
     { title: 'Garage', key: 'garageId', render: (p) => garageNameById[String(p.garageId)] || `#${p.garageId}` },
     { title: 'Type', key: 'staffType', render: (p) => formatStaffType(p.staffType) },
+    { title: 'Salary', key: 'salary', render: (p) => formatMoney(p.salary) },
     { title: 'Status', key: 'isActive', render: (p) => <StatusBadge status={p.isActive === false ? 'Inactive' : 'Active'} /> },
     { title: 'Actions', key: 'actions', render: (p) => <Actions profile={p} onEdit={openEdit} onStatus={setConfirmAction} /> },
   ]
@@ -192,6 +202,15 @@ export default function AdminStaffProfilesPage() {
               value={form.staffType}
               onChange={(e) => setForm({ ...form, staffType: e.target.value })}
               options={STAFF_TYPES.map((t) => ({ value: t, label: formatStaffType(t) }))}
+            />
+            <Input
+              type="number"
+              min={0}
+              step={1000}
+              label="Salary (VND)"
+              value={form.salary}
+              onChange={(e) => setForm({ ...form, salary: e.target.value })}
+              placeholder="0"
             />
             <div className="aspp-form-actions">
               <Button variant="ghost" onClick={() => setFormOpen(false)} disabled={saving}>Cancel</Button>

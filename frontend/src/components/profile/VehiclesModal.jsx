@@ -241,10 +241,10 @@ export default function VehiclesModal({ open, onClose }) {
                             <div className="vm-item-top">
                               <div className="vm-plate-wrap">
                                 <span className="vm-plate">{v.rawLicensePlate}</span>
-                                {v.isDefault && <span className="vm-default-chip">Default</span>}
-                                {!active   && <span className="vm-inactive-chip">Inactive</span>}
+                                <span className="vm-type-chip">{formatType(v.vehicleType)}</span>
+                                {!active && <span className="vm-inactive-chip">Inactive</span>}
                               </div>
-                              <span className="vm-type-chip">{formatType(v.vehicleType)}</span>
+                              {v.isDefault && <span className="vm-default-chip">Default</span>}
                             </div>
 
                             <dl className="vm-details">

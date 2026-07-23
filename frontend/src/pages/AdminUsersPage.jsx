@@ -159,16 +159,11 @@ function UserCell({ user }) {
 
 function Actions({ user, onView, onAction }) {
   const active = user.isActive !== false
-  const currentRole = normalizeRole(user.role)
-  const nextRole = currentRole === 'ADMIN' ? 'CUSTOMER' : 'ADMIN'
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
       <Button size="sm" variant="ghost" onClick={() => onView(user)}>Detail</Button>
       <Button size="sm" variant={active ? 'danger' : 'secondary'} onClick={() => onAction(statusAction(user, !active))}>
         {active ? 'Deactivate' : 'Activate'}
-      </Button>
-      <Button size="sm" variant="secondary" onClick={() => onAction(roleAction(user, nextRole))}>
-        Make {nextRole}
       </Button>
     </div>
   )
@@ -177,7 +172,8 @@ function Actions({ user, onView, onAction }) {
 function UserDetailModal({ user, onClose, onAction }) {
   if (!user) return null
   const active = user.isActive !== false
-  const nextRole = normalizeRole(user.role) === 'ADMIN' ? 'CUSTOMER' : 'ADMIN'
+  const currentRole = normalizeRole(user.role)
+  const otherRoles = ALL_ROLES.filter((r) => r !== currentRole)
   return (
     <Modal open={Boolean(user)} title="User detail" onClose={onClose}>
       <div style={{ display: 'grid', gap: 14 }}>
@@ -186,15 +182,17 @@ function UserDetailModal({ user, onClose, onAction }) {
         <DetailRow label="Full name" value={user.fullName || '-'} />
         <DetailRow label="Email" value={user.email || '-'} />
         <DetailRow label="Phone" value={user.phone || '-'} />
-        <DetailRow label="Role" value={<RoleBadge role={normalizeRole(user.role)} />} />
+        <DetailRow label="Role" value={<RoleBadge role={currentRole} />} />
         <DetailRow label="Status" value={<StatusBadge status={active ? 'Active' : 'Inactive'} />} />
         <div className="aup-modal-actions">
           <Button variant={active ? 'danger' : 'secondary'} onClick={() => onAction(statusAction(user, !active))}>
             {active ? 'Deactivate' : 'Activate'}
           </Button>
-          <Button variant="secondary" onClick={() => onAction(roleAction(user, nextRole))}>
-            Make {nextRole}
-          </Button>
+          {otherRoles.map((role) => (
+            <Button key={role} variant="secondary" onClick={() => onAction(roleAction(user, role))}>
+              Make {role}
+            </Button>
+          ))}
         </div>
       </div>
     </Modal>

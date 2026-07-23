@@ -159,15 +159,15 @@ export default function AdminLayout() {
 
         {/* Brand + collapse toggle */}
         <div className="al-brand-row">
-          <Link className="al-brand" to="/admin" title={collapsed ? 'AutoWash Pro' : undefined}>
+          <Link className="al-brand" to="/admin" title={collapsed ? 'Audela Washing' : undefined}>
             <svg width="30" height="21" viewBox="0 0 48 32" fill="none" aria-hidden="true">
               <path d="M5 8 Q14 2 24 8 Q34 14 43 8"  stroke="#0855b3" strokeWidth="3.8" strokeLinecap="round"/>
               <path d="M4 15 Q14 9 24 15 Q34 21 44 15" stroke="#2EC2F7" strokeWidth="2.8" strokeLinecap="round"/>
               <path d="M5 22 Q15 16 25 22 Q35 28 43 22" stroke="#82cde8" strokeWidth="2.2" strokeLinecap="round"/>
             </svg>
             <span className="al-brand-text" aria-hidden={collapsed}>
-              <span className="al-brand-main">AutoWash</span>
-              <span className="al-brand-sub">Pro</span>
+              <span className="al-brand-main">Audela</span>
+              <span className="al-brand-sub">Washing</span>
             </span>
           </Link>
 
@@ -293,7 +293,7 @@ export default function AdminLayout() {
               <path d="M4 15 Q14 9 24 15 Q34 21 44 15" stroke="#2EC2F7" strokeWidth="2.8" strokeLinecap="round"/>
               <path d="M5 22 Q15 16 25 22 Q35 28 43 22" stroke="#82cde8" strokeWidth="2.2" strokeLinecap="round"/>
             </svg>
-            <span>AutoWash Pro</span>
+            <span>Audela Washing</span>
           </Link>
         </div>
 

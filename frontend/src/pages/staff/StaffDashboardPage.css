@@ -124,3 +124,274 @@
   font-size: 13px;
   line-height: 1.55;
 }
+
+/* Care Board (Upcoming / Waiting for Care / In Care) */
+.ctc-board {
+  margin-bottom: 32px;
+}
+
+.ctc-lanes {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(260px, 1fr));
+}
+
+@media (max-width: 960px) {
+  .ctc-lanes { grid-template-columns: 1fr; }
+}
+
+.ctc-lane {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.ctc-lane-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.ctc-lane-title {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ctc-lane-count {
+  background: #e2e8f0;
+  border-radius: 999px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 22px;
+  padding: 2px 8px;
+  text-align: center;
+}
+
+.ctc-lane-hint {
+  color: #94a3b8;
+  font-size: 11.5px;
+  margin: 2px 0 12px;
+}
+
+.ctc-lane-empty {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.ctc-lane-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ctc-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.ctc-card-top {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.ctc-booking-id {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ctc-plate {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  color: #2563eb;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 1px 8px;
+}
+
+.ctc-package {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ctc-addons {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.ctc-tasks {
+  color: #475569;
+  font-size: 12.5px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.ctc-tasks li {
+  margin-bottom: 2px;
+}
+
+.ctc-meta-row {
+  color: #64748b;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  gap: 10px;
+}
+
+.ctc-btn {
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 8px 12px;
+  transition: opacity 0.14s;
+}
+
+.ctc-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ctc-btn--start {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.ctc-btn--start:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.ctc-btn--complete {
+  background: #15803d;
+  color: #ffffff;
+}
+
+.ctc-btn--complete:hover:not(:disabled) {
+  background: #166534;
+}
+
+/* Vehicle Care Staff dashboard */
+.vcs-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  color: #dc2626;
+  font-size: 13.5px;
+  margin-bottom: 20px;
+  padding: 10px 14px;
+}
+
+.vcs-loading {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.vcs-stats-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  margin-bottom: 32px;
+  max-width: 740px;
+}
+
+.vcs-stat-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 20px;
+}
+
+.vcs-stat-label {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.vcs-stat-value {
+  color: #0f172a;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.vcs-stat-card--salary .vcs-stat-value {
+  color: #15803d;
+}
+
+.vcs-history-title {
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.vcs-history-empty {
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.vcs-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 740px;
+}
+
+.vcs-history-item {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.vcs-history-item-main {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.vcs-history-package {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.vcs-history-date {
+  color: #64748b;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.vcs-history-addons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.vcs-history-addon-chip {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  color: #2563eb;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 10px;
+}

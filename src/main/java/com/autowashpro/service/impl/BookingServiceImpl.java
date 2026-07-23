@@ -848,34 +848,45 @@ public class BookingServiceImpl implements BookingService {
 
                 BigDecimal originalPrice = sumBasePrice(selectedPackages);
 
+                // Walk-in customers are physically at the counter, so a slot starting soon
+                // (within the next hour) is treated as an immediate wash — no deposit needed.
+                // A slot booked further ahead behaves like a regular advance booking and
+                // needs a deposit to hold it against no-shows.
+                boolean depositRequired = startTime.isAfter(LocalDateTime.now().plusHours(1));
+
                 BigDecimal depositAmount = BigDecimal.ZERO;
 
                 String bookingStatus = "CONFIRMED";
 
-                String depositStatus = "PAID";
+                String depositStatus = "UNPAID";
 
                 LocalDateTime paymentExpiredAt = null;
 
-                if ("CASH".equals(depositPaymentMethod)) {
+                if (depositRequired) {
 
                         depositAmount = originalPrice
                                         .multiply(DEPOSIT_PERCENT)
                                         .setScale(2, RoundingMode.HALF_UP);
 
-                } else if ("PAYOS".equals(depositPaymentMethod)) {
+                        if ("PAYOS".equals(depositPaymentMethod)) {
 
-                        depositAmount = originalPrice
-                                        .multiply(DEPOSIT_PERCENT)
-                                        .setScale(2, RoundingMode.HALF_UP);
+                                // Must pay the deposit via PayOS before the slot is held.
+                                bookingStatus = "PENDING_DEPOSIT";
 
-                        bookingStatus = "PENDING_DEPOSIT";
+                                depositStatus = "UNPAID";
 
-                        depositStatus = "UNPAID";
+                                paymentExpiredAt = LocalDateTime.now()
+                                                .plusMinutes(
+                                                                PAYMENT_TIMEOUT_MINUTES);
 
-                        paymentExpiredAt = LocalDateTime.now()
-                                        .plusMinutes(
-                                                        PAYMENT_TIMEOUT_MINUTES);
+                        } else {
 
+                                // Staff collects the deposit in cash right at the counter.
+                                bookingStatus = "CONFIRMED";
+
+                                depositStatus = "PAID";
+
+                        }
                 }
 
                 Booking booking = new Booking();
@@ -888,15 +899,16 @@ public class BookingServiceImpl implements BookingService {
                 booking.setBookingDate(startTime.toLocalDate());
                 booking.setStartTime(startTime);
                 booking.setEndTime(endTime);
-                booking.setStatus("CONFIRMED");
+                booking.setStatus(bookingStatus);
                 booking.setPaymentStatus("UNPAID");
                 booking.setPaymentMethod(depositPaymentMethod);
                 booking.setOriginalPrice(originalPrice);
                 booking.setSurchargeAmount(BigDecimal.ZERO);
                 booking.setDiscountAmount(BigDecimal.ZERO);
                 booking.setFinalPrice(originalPrice);
-                booking.setDepositAmount(BigDecimal.ZERO);
-                booking.setDepositStatus("UNPAID");
+                booking.setDepositAmount(depositAmount);
+                booking.setDepositStatus(depositStatus);
+                booking.setPaymentExpiredAt(paymentExpiredAt);
                 booking.setRefundAmount(BigDecimal.ZERO);
                 booking.setIsWalkIn(true);
                 booking.setGuestName(matchedCustomer != null ? matchedCustomer.getFullName() : request.getGuestName());
@@ -908,13 +920,15 @@ public class BookingServiceImpl implements BookingService {
                 booking.setNote(request.getNote());
 
                 Booking saved = bookingRepository.save(booking);
-                if ("PAYOS".equalsIgnoreCase(depositPaymentMethod)) {
+                if ("PENDING_DEPOSIT".equals(bookingStatus)) {
 
                         PaymentTransaction transaction = new PaymentTransaction();
 
                         transaction.setBookingId(saved.getId());
 
                         transaction.setPaymentMethod("PAYOS");
+
+                        transaction.setPurpose("DEPOSIT");
 
                         transaction.setAmount(saved.getDepositAmount());
 

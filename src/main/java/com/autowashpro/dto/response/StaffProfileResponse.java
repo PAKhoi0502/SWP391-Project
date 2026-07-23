@@ -4,6 +4,7 @@ import com.autowashpro.entity.enums.StaffType;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -16,6 +17,7 @@ public class StaffProfileResponse {
     private String staffCode;
     private StaffType staffType;
     private Boolean isActive;
+    private BigDecimal salary;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -884,7 +884,7 @@ export default function BookingHistoryPage() {
         {/* Page header */}
         <div className="bhp-header">
           <div>
-            <p className="bhp-header-eyebrow">AutoWash Pro</p>
+            <p className="bhp-header-eyebrow">Audela Washing</p>
             <h1 className="bhp-header-title">Booking History</h1>
             <p className="bhp-header-sub">Track your appointments, service status, and payments.</p>
           </div>

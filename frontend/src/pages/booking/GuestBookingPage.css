@@ -102,3 +102,17 @@
   flex-direction: column;
   gap: 12px;
 }
+
+@media (max-width: 640px) {
+  .gbk-content {
+    padding: 92px 14px 56px;
+  }
+
+  .gbk-modal-card {
+    padding: 24px 20px;
+  }
+
+  .gbk-modal-title {
+    font-size: 19px;
+  }
+}
