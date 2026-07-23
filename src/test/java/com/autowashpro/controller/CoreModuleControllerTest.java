@@ -99,7 +99,7 @@ class CoreModuleControllerTest {
                 .totalItems(0L)
                 .totalPages(0)
                 .build());
-        when(servicePackageService.getAvailable("CAR")).thenReturn(List.of());
+        when(servicePackageService.getAvailable("CAR", null)).thenReturn(List.of());
     }
 
     @Test
@@ -441,7 +441,7 @@ class CoreModuleControllerTest {
         mockMvc.perform(get("/service-packages/available").param("vehicleType", "CAR"))
                 .andExpect(status().isOk());
 
-        verify(servicePackageService).getAvailable("CAR");
+        verify(servicePackageService).getAvailable("CAR", null);
     }
 
     @Test

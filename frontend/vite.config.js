@@ -4,6 +4,9 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: 'node',
+  },
   server: {
     port: 5173,
     // Proxy mọi request API về backend Spring Boot (localhost:8080)

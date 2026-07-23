@@ -60,6 +60,11 @@ export const bookingApi = {
     return unwrap(response)
   },
 
+  async checkGuestPhoneEligibility(phone) {
+    const response = await api.post('/bookings/guest/phone-eligibility', { phone })
+    return unwrap(response)
+  },
+
   async lookupWalkInCustomer({ phone, licensePlate, vehicleType } = {}) {
     const response = await api.get('/bookings/walk-in/customer-lookup', {
       params: {

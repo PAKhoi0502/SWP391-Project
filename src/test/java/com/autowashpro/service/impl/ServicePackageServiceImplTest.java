@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
@@ -55,6 +56,12 @@ class ServicePackageServiceImplTest {
 
     @Mock
     private ComboStepResolver comboStepResolver;
+
+    @Mock
+    private com.autowashpro.repository.GarageRepository garageRepository;
+
+    @Mock
+    private com.autowashpro.repository.GarageServicePackageRepository garageServicePackageRepository;
 
     @InjectMocks
     private ServicePackageServiceImpl servicePackageService;
@@ -123,7 +130,7 @@ class ServicePackageServiceImplTest {
         RuntimeException error = assertThrows(RuntimeException.class,
                 () -> servicePackageService.create(request));
 
-        assertEquals("Code already exists", error.getMessage());
+        assertTrue(error.getMessage().contains("Code already exists"));
         verify(servicePackageRepository, never()).save(any());
     }
 
@@ -158,7 +165,7 @@ class ServicePackageServiceImplTest {
         RuntimeException error = assertThrows(RuntimeException.class,
                 () -> servicePackageService.create(request));
 
-        assertEquals("Included package not found", error.getMessage());
+        assertTrue(error.getMessage().contains("Included package not found"));
     }
 
     @Test
@@ -186,16 +193,13 @@ class ServicePackageServiceImplTest {
     @Test
     void getAvailableReturnsOnlyActiveMatchingVehicleType() {
         ServicePackage activeCar = TestFixtures.carWashPackage();
-        ServicePackage inactiveCar = TestFixtures.carWashPackage();
-        inactiveCar.setId(2L);
-        inactiveCar.setIsActive(false);
         ServicePackage activeBike = TestFixtures.carWashPackage();
         activeBike.setId(3L);
         activeBike.setVehicleType("BIKE");
-        when(servicePackageRepository.findAll()).thenReturn(List.of(activeCar, inactiveCar, activeBike));
+        when(servicePackageRepository.findByIsActiveTrue()).thenReturn(List.of(activeCar, activeBike));
         when(servicePackageRepository.findById(activeCar.getId())).thenReturn(Optional.of(activeCar));
 
-        List<ServicePackageResponse> responses = servicePackageService.getAvailable("CAR");
+        List<ServicePackageResponse> responses = servicePackageService.getAvailable("CAR", null);
 
         assertEquals(1, responses.size());
         assertEquals("CAR", responses.get(0).getVehicleType());

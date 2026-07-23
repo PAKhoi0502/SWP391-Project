@@ -120,7 +120,7 @@ public class WaitlistServiceImpl implements WaitlistService {
         if ("NO_BAY".equals(reason)) {
             long availableBays = washBayRepository.countAvailableByGarageAndVehicleType(garage.getId(), bayType);
             long occupiedBays = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
-                    garage.getId(), bayType, start, end);
+                    garage.getId(), bayType, start, end, LocalDateTime.now());
             return occupiedBays >= availableBays;
         }
 
@@ -254,7 +254,7 @@ public class WaitlistServiceImpl implements WaitlistService {
                 waitlist.getGarageId(), bayType);
         long occupiedBays = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
                 waitlist.getGarageId(), bayType,
-                waitlist.getDesiredStartTime(), waitlist.getDesiredEndTime());
+                waitlist.getDesiredStartTime(), waitlist.getDesiredEndTime(), LocalDateTime.now());
 
         if (occupiedBays >= availableBays) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,

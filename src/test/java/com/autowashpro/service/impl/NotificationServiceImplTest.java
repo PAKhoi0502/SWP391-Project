@@ -7,6 +7,7 @@ import com.autowashpro.entity.PointTransaction;
 import com.autowashpro.entity.ServicePackage;
 import com.autowashpro.entity.User;
 import com.autowashpro.entity.Vehicle;
+import com.autowashpro.entity.Waitlist;
 import com.autowashpro.repository.BookingRepository;
 import com.autowashpro.repository.NotificationRepository;
 import com.autowashpro.repository.PointTransactionRepository;
@@ -29,7 +30,9 @@ import java.util.Optional;
 import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -60,6 +63,10 @@ class NotificationServiceImplTest {
     void notifyBookingConfirmedCreatesCustomerNotification() {
         Booking booking = confirmedBooking();
         when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
+        when(bookingRepository.findByIdAndCustomerId(booking.getId(), booking.getCustomerId()))
+                .thenReturn(Optional.of(booking));
+        when(bookingRepository.countByCustomerIdAndIdLessThanEqual(
+                booking.getCustomerId(), booking.getId())).thenReturn(4L);
         ArgumentCaptor<Notification> notificationCaptor = ArgumentCaptor.forClass(Notification.class);
 
         notificationService.notifyBookingConfirmed(booking.getId());
@@ -70,6 +77,7 @@ class NotificationServiceImplTest {
         assertEquals(booking.getId(), notification.getBookingId());
         assertEquals("APP", notification.getChannel());
         assertEquals("BOOKING_CONFIRMED", notification.getEventType());
+        assertTrue(notification.getMessage().contains("#4"));
         assertEquals(false, notification.getIsRead());
         assertNotNull(notification.getSentAt());
     }
@@ -78,6 +86,10 @@ class NotificationServiceImplTest {
     void notifyPaymentConfirmedCreatesCustomerNotification() {
         Booking booking = confirmedBooking();
         when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
+        when(bookingRepository.findByIdAndCustomerId(booking.getId(), booking.getCustomerId()))
+                .thenReturn(Optional.of(booking));
+        when(bookingRepository.countByCustomerIdAndIdLessThanEqual(
+                booking.getCustomerId(), booking.getId())).thenReturn(4L);
         ArgumentCaptor<Notification> notificationCaptor = ArgumentCaptor.forClass(Notification.class);
 
         notificationService.notifyPaymentConfirmed(booking.getId());
@@ -86,11 +98,15 @@ class NotificationServiceImplTest {
         Notification notification = notificationCaptor.getValue();
         assertEquals("PAYMENT_CONFIRMED", notification.getEventType());
         assertEquals("Payment Confirmed", notification.getTitle());
-        assertTrue(notification.getMessage().contains("#" + booking.getId()));
+        assertTrue(notification.getMessage().contains("#4"));
     }
 
     @Test
     void notifyDepositRefundCompletedCreatesCustomerNotification() {
+        Booking booking = confirmedBooking();
+        booking.setCustomerId(7L);
+        when(bookingRepository.findByIdAndCustomerId(20L, 7L)).thenReturn(Optional.of(booking));
+        when(bookingRepository.countByCustomerIdAndIdLessThanEqual(7L, 20L)).thenReturn(4L);
         ArgumentCaptor<Notification> notificationCaptor = ArgumentCaptor.forClass(Notification.class);
 
         notificationService.notifyDepositRefundCompleted(7L, 20L, new BigDecimal("45000.00"));
@@ -101,7 +117,8 @@ class NotificationServiceImplTest {
         assertEquals(20L, notification.getBookingId());
         assertEquals("DEPOSIT_REFUND_COMPLETED", notification.getEventType());
         assertEquals("Deposit Refunded", notification.getTitle());
-        assertTrue(notification.getMessage().contains("45000.00"));
+        assertTrue(notification.getMessage().contains("45.000 ₫"));
+        assertTrue(notification.getMessage().contains("#4"));
         assertEquals(false, notification.getIsRead());
         assertNotNull(notification.getSentAt());
     }
@@ -140,7 +157,11 @@ class NotificationServiceImplTest {
     @Test
     void getMyNotificationsFiltersReadState() {
         Notification notification = notification(7L, 20L, "BOOKING_CONFIRMED");
+        Booking booking = confirmedBooking();
+        booking.setCustomerId(7L);
         PageRequest pageable = PageRequest.of(0, 10);
+        when(bookingRepository.findByCustomerIdOrderByStartTimeDesc(7L))
+                .thenReturn(List.of(booking));
         when(notificationRepository.findByUserIdAndIsReadOrderByCreatedAtDesc(7L, false, pageable))
                 .thenReturn(new PageImpl<>(List.of(notification), pageable, 1));
 
@@ -148,6 +169,7 @@ class NotificationServiceImplTest {
 
         assertEquals(1, page.getTotalElements());
         assertEquals("BOOKING_CONFIRMED", page.getContent().get(0).getEventType());
+        assertEquals(1, page.getContent().get(0).getCustomerBookingNumber());
     }
 
     @Test
@@ -194,6 +216,42 @@ class NotificationServiceImplTest {
 
         assertEquals(3, count);
         verify(notificationRepository).markAllAsRead(7L);
+    }
+
+    // ── WAITLIST_OFFER (Section D / issue-172) ───────────────────────────────
+
+    @Test
+    void notifyWaitlistOfferedCreatesExactlyOneWaitlistOfferNotification() {
+        Waitlist waitlist = new Waitlist();
+        waitlist.setId(5L);
+        waitlist.setCustomerId(99L);
+        waitlist.setGarageId(1L);
+        waitlist.setDesiredStartTime(java.time.LocalDateTime.of(2026, 8, 1, 9, 0));
+        waitlist.setOfferExpiresAt(java.time.LocalDateTime.of(2026, 8, 1, 10, 0));
+        when(waitlistRepository.findById(5L)).thenReturn(Optional.of(waitlist));
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+
+        notificationService.notifyWaitlistOffered(5L);
+
+        verify(notificationRepository).save(captor.capture());
+        Notification saved = captor.getValue();
+        assertEquals(99L, saved.getUserId());
+        assertNull(saved.getBookingId());
+        assertEquals("WAITLIST_OFFER", saved.getEventType());
+        assertEquals("APP", saved.getChannel());
+        assertFalse(saved.getIsRead());
+    }
+
+    @Test
+    void notifyWaitlistOfferedSkipsWhenCustomerIdIsNull() {
+        Waitlist waitlist = new Waitlist();
+        waitlist.setId(6L);
+        waitlist.setCustomerId(null);
+        when(waitlistRepository.findById(6L)).thenReturn(Optional.of(waitlist));
+
+        notificationService.notifyWaitlistOffered(6L);
+
+        verify(notificationRepository, never()).save(any());
     }
 
     private Booking confirmedBooking() {

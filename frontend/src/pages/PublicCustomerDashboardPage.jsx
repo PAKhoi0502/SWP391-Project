@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useBookingEntry } from '../hooks/useBookingEntry'
 import { loyaltyApi } from '../api/loyaltyApi'
 import { TierGemIcon, getTierColor } from '../components/common/TierGem'
 import PublicReviewShowcase from '../components/reviews/PublicReviewShowcase'
@@ -158,7 +159,9 @@ const STATS = [
 
 export default function PublicCustomerDashboardPage() {
   const navigate = useNavigate()
-  const { isAuthenticated, loading } = useAuth()
+  const location = useLocation()
+  const { loading, isAuthenticated } = useAuth()
+  const handleBookingEntry = useBookingEntry()
   const [tierRules, setTierRules] = useState([])
 
   useEffect(() => {
@@ -194,11 +197,16 @@ export default function PublicCustomerDashboardPage() {
     return () => observer.disconnect()
   }, [])
 
+  useEffect(() => {
+    if (location.hash === '#services') {
+      const el = document.getElementById('services')
+      if (el) el.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [location.hash])
+
   const handleBookingClick = () => {
-    if (!loading && isAuthenticated) {
-      navigate('/booking')
-    } else {
-      navigate('/login')
+    if (!loading) {
+      handleBookingEntry()
     }
   }
 
@@ -340,11 +348,13 @@ export default function PublicCustomerDashboardPage() {
               </div>
             ))}
           </div>
-          <div className="pcd-tiers-cta">
-            <button className="pcd-btn pcd-btn-primary" type="button" onClick={() => navigate('/register')}>
-              Join for free
-            </button>
-          </div>
+          {!isAuthenticated && (
+            <div className="pcd-tiers-cta">
+              <button className="pcd-btn pcd-btn-primary" type="button" onClick={() => navigate('/register')}>
+                Join for free
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -365,13 +375,13 @@ export default function PublicCustomerDashboardPage() {
                 <span>Audela Washing</span>
               </Link>
               <p>Premium car care, made simple.</p>
-              <Link className="pcd-footer-book" to="/booking">Book a wash <span aria-hidden="true">→</span></Link>
+              <button type="button" className="pcd-footer-book" onClick={() => handleBookingEntry()}>Book a wash <span aria-hidden="true">→</span></button>
             </div>
 
             <nav className="pcd-footer-column" aria-label="Explore Audela Washing">
               <h3>Explore</h3>
               <Link to="/customer/service-packages">Services</Link>
-              <Link to="/customer/garages">Garages</Link>
+              <Link to="/#services">Garages</Link>
               <Link to="/customer/leaderboard">Leaderboard</Link>
             </nav>
 

@@ -25,5 +25,6 @@ public interface ServicePackageService {
             UpdateServicePackageStatusRequest request);
 
     List<ServicePackageResponse> getAvailable(
-        String vehicleType);
+        String vehicleType,
+        Long garageId);
 }

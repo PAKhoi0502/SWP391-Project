@@ -172,7 +172,7 @@ class WaitlistAuthorizationTest {
             when(washBayRepository.countAvailableByGarageAndVehicleType(eq(GARAGE_ID), any()))
                     .thenReturn(2L);
             when(bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
-                    eq(GARAGE_ID), any(), any(), any())).thenReturn(1L);
+                    eq(GARAGE_ID), any(), any(), any(), any())).thenReturn(1L);
             when(waitlistRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             assertDoesNotThrow(() ->
@@ -185,7 +185,7 @@ class WaitlistAuthorizationTest {
             when(washBayRepository.countAvailableByGarageAndVehicleType(eq(GARAGE_ID), any()))
                     .thenReturn(2L);
             when(bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
-                    eq(GARAGE_ID), any(), any(), any())).thenReturn(1L);
+                    eq(GARAGE_ID), any(), any(), any(), any())).thenReturn(1L);
             when(waitlistRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             assertDoesNotThrow(() ->

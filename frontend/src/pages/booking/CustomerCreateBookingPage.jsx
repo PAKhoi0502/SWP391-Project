@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTransientMessage } from '../../hooks/useTransientMessage'
 import {
   bookingFlowUtils,
@@ -23,12 +23,7 @@ const toLocalDateIso = (date = new Date()) => {
 
 const todayIso = () => toLocalDateIso()
 
-const minBookingDateIso = () => {
-  const minDate = new Date()
-  minDate.setDate(minDate.getDate() + 1)
-
-  return toLocalDateIso(minDate)
-}
+const minBookingDateIso = () => toLocalDateIso()
 
 const maxBookingDateIso = (bookingWindowDays = 7) => {
   const maxDate = new Date()
@@ -221,7 +216,13 @@ const getSlotEnd = (slot) => {
 export default function CustomerCreateBookingPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const promoDropdownRef = useRef(null)
+
+  const garageIdParam        = searchParams.get('garageId') || ''
+  const servicePackageIdParam = searchParams.get('servicePackageId') || ''
+  // Consumed once after packages first load to avoid clearing on re-load
+  const pendingPackageIdRef  = useRef(servicePackageIdParam)
   // Task 1: success messages (e.g., booking created) auto-clear after 7 s
   const [successMessage, setSuccessMessage] = useTransientMessage(7000)
 
@@ -231,6 +232,8 @@ export default function CustomerCreateBookingPage() {
   const [garages, setGarages] = useState([])
   const [servicePackages, setServicePackages] = useState([])
   const [slots, setSlots] = useState([])
+  // Show vehicles in groups of 2; expands by 2 on demand
+  const [vehiclesVisible, setVehiclesVisible] = useState(2)
 
   const [selectedVehicleId, setSelectedVehicleId] = useState('')
   const [selectedGarageId, setSelectedGarageId] = useState('')
@@ -275,6 +278,17 @@ export default function CustomerCreateBookingPage() {
     () => vehicles.find((item) => String(getId(item)) === String(selectedVehicleId)),
     [vehicles, selectedVehicleId],
   )
+
+  // Vehicles visible in the progressive list (always includes selected vehicle if present)
+  const visibleVehicles = useMemo(() => {
+    if (vehicles.length <= 2) return vehicles
+    const base = vehicles.slice(0, vehiclesVisible)
+    if (selectedVehicleId && !base.some((v) => String(getId(v)) === selectedVehicleId)) {
+      const sel = vehicles.find((v) => String(getId(v)) === selectedVehicleId)
+      if (sel) return [...base, sel]
+    }
+    return base
+  }, [vehicles, vehiclesVisible, selectedVehicleId])
 
   const selectedGarage = useMemo(
     () => garages.find((item) => String(getId(item)) === String(selectedGarageId)),
@@ -368,6 +382,11 @@ export default function CustomerCreateBookingPage() {
         setVehicles(vehicleData)
         setGarages(garageData)
 
+        if (garageIdParam) {
+          const matched = garageData.find((g) => String(getId(g)) === garageIdParam)
+          if (matched) setSelectedGarageId(garageIdParam)
+        }
+
         const currentTier = String(loyaltyResult?.currentTier || 'BRONZE').toUpperCase()
         const currentRule = tierRulesResult.find(
           (rule) => String(rule?.tier || '').toUpperCase() === currentTier,
@@ -420,7 +439,15 @@ export default function CustomerCreateBookingPage() {
           vehicle: selectedVehicle,
         })
 
-        if (mounted) setServicePackages(data)
+        if (mounted) {
+          setServicePackages(data)
+          if (pendingPackageIdRef.current) {
+            const pkgId = pendingPackageIdRef.current
+            const matched = data.find((p) => String(getId(p)) === pkgId)
+            if (matched) setSelectedPackageId(pkgId)
+            pendingPackageIdRef.current = ''
+          }
+        }
       } catch (error) {
         if (mounted) {
           setServicePackages([])
@@ -1021,33 +1048,60 @@ export default function CustomerCreateBookingPage() {
                         <span>Please add a vehicle in My Vehicles first.</span>
                       </div>
                     ) : (
-                      <div className="bk-opt-grid">
-                        {vehicles.map((vehicle) => {
-                          const vid = String(getId(vehicle))
-                          const sel = selectedVehicleId === vid
-                          const plate = vehicle?.rawLicensePlate || vehicle?.normalizedLicensePlate || vehicle?.licensePlate || vehicle?.plateNumber || ''
-                          const modelName = [vehicle?.brand, vehicle?.model].filter(Boolean).join(' ') || ''
-                          const vtype = String(bookingFlowUtils.getVehicleType(vehicle) || '').toUpperCase()
-                          return (
-                            <button
-                              type="button"
-                              key={vid}
-                              className={`bk-opt-card${sel ? ' bk-opt-card--sel' : ''}`}
-                              onClick={() => setSelectedVehicleId(vid)}
-                            >
-                              <div className="bk-opt-icon">
-                                {vtype === 'BIKE' || vtype === 'MOTORBIKE' ? '🛵' : '🚗'}
-                              </div>
-                              <div className="bk-opt-body">
-                                <span className="bk-opt-name">{plate || getName(vehicle, 'Your vehicle')}</span>
-                                {modelName && <span className="bk-opt-sub">{modelName}</span>}
-                                <span className="bk-opt-tag">{vtype === 'BIKE' || vtype === 'MOTORBIKE' ? 'Motorbike' : 'Car'}</span>
-                              </div>
-                              {sel && <span className="bk-check">✓</span>}
-                            </button>
-                          )
-                        })}
-                      </div>
+                      <>
+                        <div className="bk-vehicle-grid">
+                          {visibleVehicles.map((vehicle) => {
+                            const vid = String(getId(vehicle))
+                            const sel = selectedVehicleId === vid
+                            const plate = vehicle?.rawLicensePlate || vehicle?.normalizedLicensePlate || vehicle?.licensePlate || vehicle?.plateNumber || ''
+                            const modelName = [vehicle?.brand, vehicle?.model].filter(Boolean).join(' ') || ''
+                            const vtype = String(bookingFlowUtils.getVehicleType(vehicle) || '').toUpperCase()
+                            const isMotorbike = vtype === 'BIKE' || vtype === 'MOTORBIKE'
+                            return (
+                              <button
+                                type="button"
+                                key={vid}
+                                className={`bk-vehicle-card${sel ? ' bk-vehicle-card--sel' : ''}`}
+                                onClick={() => setSelectedVehicleId(vid)}
+                              >
+                                <div className="bk-vehicle-img-wrap">
+                                  {vehicle.imageUrl
+                                    ? <img src={vehicle.imageUrl} alt={plate || 'Vehicle'} className="bk-vehicle-img" />
+                                    : <div className="bk-vehicle-img-empty" aria-hidden="true" />
+                                  }
+                                  {sel && (
+                                    <span className="bk-vehicle-check" aria-label="Selected">✓</span>
+                                  )}
+                                </div>
+                                <div className="bk-vehicle-body">
+                                  <span className="bk-vehicle-plate">{plate || getName(vehicle, 'Your vehicle')}</span>
+                                  {modelName && <span className="bk-vehicle-model">{modelName}</span>}
+                                  <span className="bk-vehicle-tag">{isMotorbike ? 'Motorbike' : 'Car'}</span>
+                                </div>
+                              </button>
+                            )
+                          })}
+                        </div>
+                        {/* Progressive expand/collapse — only shown when there are more than 2 vehicles */}
+                        {vehicles.length > 2 && vehiclesVisible < vehicles.length && (
+                          <button
+                            type="button"
+                            className="bk-vehicle-expand-btn"
+                            onClick={() => setVehiclesVisible((v) => v + 2)}
+                          >
+                            Show {Math.min(2, vehicles.length - vehiclesVisible)} more vehicles ▼
+                          </button>
+                        )}
+                        {vehicles.length > 2 && vehiclesVisible >= vehicles.length && (
+                          <button
+                            type="button"
+                            className="bk-vehicle-expand-btn"
+                            onClick={() => setVehiclesVisible(2)}
+                          >
+                            Collapse ▲
+                          </button>
+                        )}
+                      </>
                     )}
 
                     <div className="bk-step-nav">
@@ -1318,7 +1372,11 @@ export default function CustomerCreateBookingPage() {
                           selectedPackage && (
                             <div className="bk-empty">
                               <p>No slots available</p>
-                              <span>No available slots for this date, or today's slots have already passed.</span>
+                              <span>
+                                {selectedDate === todayIso()
+                                  ? 'No more available slots for today. Please choose another date.'
+                                  : 'No available slots for this date.'}
+                              </span>
                             </div>
                           )
                         )}

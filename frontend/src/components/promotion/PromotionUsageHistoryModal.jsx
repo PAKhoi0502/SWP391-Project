@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import './PromotionUsageHistoryModal.css'
 
 const formatMoney = (value) => {
@@ -60,7 +61,7 @@ export default function PromotionUsageHistoryModal({
       })
     : usages
 
-  return (
+  return createPortal(
     <div className="puh-overlay" onClick={onClose}>
       <div className="puh-modal" onClick={(e) => e.stopPropagation()}>
         <div className="puh-header">
@@ -152,6 +153,7 @@ export default function PromotionUsageHistoryModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

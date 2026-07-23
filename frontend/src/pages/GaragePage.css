@@ -1,12 +1,26 @@
+/* ── Design tokens: navy / cyan ─────────────────────────────────────────── */
+:root {
+  --g-navy:      #14213D;
+  --g-navy-mid:  #1a2d52;
+  --g-cyan:      #20B8E8;
+  --g-cyan-soft: rgba(32, 184, 232, 0.12);
+  --g-cyan-glow: rgba(32, 184, 232, 0.25);
+  --g-text:      #101828;
+  --g-muted:     #667085;
+  --g-border:    rgba(32, 184, 232, 0.18);
+}
+
+/* ── Page shell ─────────────────────────────────────────────────────────── */
 .garage-page {
   min-height: 100vh;
   padding: 120px 7% 60px;
   background:
-    radial-gradient(circle at top left, rgba(120, 87, 255, 0.16), transparent 36%),
-    linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
-  color: #101828;
+    radial-gradient(circle at top left, rgba(32, 184, 232, 0.10), transparent 38%),
+    linear-gradient(180deg, #f4f8fb 0%, #eaf4fa 100%);
+  color: var(--g-text);
 }
 
+/* ── Header ─────────────────────────────────────────────────────────────── */
 .garage-header {
   max-width: 780px;
   margin-bottom: 28px;
@@ -14,7 +28,7 @@
 
 .garage-eyebrow {
   margin: 0 0 8px;
-  color: #6d5dfc;
+  color: var(--g-cyan);
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -28,15 +42,16 @@
   margin: 0;
   font-size: clamp(32px, 5vw, 52px);
   line-height: 1.05;
-  color: #111827;
+  color: var(--g-navy);
 }
 
 .garage-header p {
-  color: #667085;
+  color: var(--g-muted);
   font-size: 17px;
   line-height: 1.7;
 }
 
+/* ── Search bar ─────────────────────────────────────────────────────────── */
 .garage-search {
   display: flex;
   gap: 12px;
@@ -51,18 +66,31 @@
   padding: 14px 18px;
   font-size: 15px;
   outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+
+.garage-search input:focus {
+  border-color: var(--g-cyan);
+  box-shadow: 0 0 0 4px var(--g-cyan-soft);
 }
 
 .garage-search button {
   border: none;
   border-radius: 999px;
   padding: 0 22px;
-  background: linear-gradient(135deg, #6d5dfc, #9b7bff);
+  background: linear-gradient(135deg, var(--g-navy), var(--g-navy-mid));
   color: white;
   font-weight: 800;
   cursor: pointer;
+  transition: background 0.18s, box-shadow 0.18s;
 }
 
+.garage-search button:hover {
+  background: linear-gradient(135deg, var(--g-navy-mid), var(--g-navy));
+  box-shadow: 0 6px 18px rgba(20, 33, 61, 0.25);
+}
+
+/* ── Card grid ──────────────────────────────────────────────────────────── */
 .garage-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(285px, 1fr));
@@ -74,21 +102,21 @@
 .garage-form-card,
 .capability-card,
 .admin-table-wrap {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(109, 93, 252, 0.14);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--g-border);
   border-radius: 26px;
-  box-shadow: 0 20px 50px rgba(16, 24, 40, 0.08);
+  box-shadow: 0 20px 50px rgba(20, 33, 61, 0.07);
   backdrop-filter: blur(18px);
 }
 
 .garage-card {
   padding: 24px;
-  transition: 0.25s ease;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
 }
 
 .garage-card:hover {
   transform: translateY(-6px);
-  box-shadow: 0 28px 70px rgba(109, 93, 252, 0.18);
+  box-shadow: 0 28px 70px var(--g-cyan-glow);
 }
 
 .garage-card-top {
@@ -101,25 +129,30 @@
 .garage-card h3 {
   margin: 0;
   font-size: 21px;
+  color: var(--g-navy);
 }
 
 .garage-code {
   margin: 8px 0;
-  color: #6d5dfc;
+  color: var(--g-cyan);
   font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.04em;
 }
 
 .garage-address,
 .garage-info,
 .garage-muted {
-  color: #667085;
+  color: var(--g-muted);
   line-height: 1.6;
+  font-size: 14px;
 }
 
+/* ── Status badge ───────────────────────────────────────────────────────── */
 .garage-status {
   display: inline-flex;
   align-items: center;
-  padding: 6px 10px;
+  padding: 5px 10px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 800;
@@ -136,6 +169,59 @@
   background: #fee4e2;
 }
 
+/* ── Card actions ───────────────────────────────────────────────────────── */
+.garage-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* Primary: "View Services" */
+.garage-btn-primary {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--g-navy), var(--g-navy-mid));
+  color: white;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(20, 33, 61, 0.22);
+  transition: background 0.18s, box-shadow 0.18s, transform 0.15s;
+}
+
+.garage-btn-primary:hover {
+  background: linear-gradient(135deg, var(--g-navy-mid), var(--g-navy));
+  box-shadow: 0 12px 30px rgba(20, 33, 61, 0.28);
+  transform: translateY(-1px);
+}
+
+/* Secondary: "Garage Details" */
+.garage-btn-secondary {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px 18px;
+  border: 1.5px solid var(--g-cyan);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--g-navy);
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s, transform 0.15s;
+}
+
+.garage-btn-secondary:hover {
+  background: var(--g-cyan-soft);
+  transform: translateY(-1px);
+}
+
+/* Legacy single-button alias (used by detail/form pages) */
 .garage-btn,
 .garage-submit-btn {
   display: inline-flex;
@@ -145,20 +231,29 @@
   padding: 12px 18px;
   border: none;
   border-radius: 999px;
-  background: linear-gradient(135deg, #6d5dfc, #9b7bff);
+  background: linear-gradient(135deg, var(--g-navy), var(--g-navy-mid));
   color: white;
   font-weight: 800;
   text-decoration: none;
   cursor: pointer;
-  box-shadow: 0 14px 30px rgba(109, 93, 252, 0.28);
+  box-shadow: 0 8px 22px rgba(20, 33, 61, 0.22);
 }
 
+/* ── Detail page ────────────────────────────────────────────────────────── */
 .garage-back {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 22px;
-  color: #6d5dfc;
-  font-weight: 800;
+  color: var(--g-navy);
+  font-weight: 700;
   text-decoration: none;
+  opacity: 0.75;
+  transition: opacity 0.15s;
+}
+
+.garage-back:hover {
+  opacity: 1;
 }
 
 .garage-detail-card,
@@ -181,16 +276,51 @@
   margin-top: 28px;
 }
 
+.garage-section h2 {
+  color: var(--g-navy);
+}
+
+.garage-view-services-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+  padding: 14px 28px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--g-navy), var(--g-navy-mid));
+  color: white;
+  font-weight: 800;
+  font-size: 15px;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 10px 28px rgba(20, 33, 61, 0.25);
+  transition: box-shadow 0.18s, transform 0.15s;
+}
+
+.garage-view-services-btn:hover {
+  box-shadow: 0 14px 36px rgba(20, 33, 61, 0.32);
+  transform: translateY(-2px);
+}
+
+/* ── Capability cards ───────────────────────────────────────────────────── */
 .capability-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 18px;
+  margin-top: 16px;
 }
 
 .capability-card {
   padding: 22px;
 }
 
+.capability-card h3 {
+  color: var(--g-navy);
+  margin: 0 0 6px;
+}
+
+/* ── Admin table (unchanged appearance) ─────────────────────────────────── */
 .admin-garage-header {
   display: flex;
   justify-content: space-between;
@@ -242,6 +372,7 @@
   font-size: 14px;
 }
 
+/* ── Form card ──────────────────────────────────────────────────────────── */
 .garage-form-card {
   max-width: 760px;
   margin: 0 auto;
@@ -272,12 +403,13 @@
   padding: 14px 16px;
   font-size: 15px;
   outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
 }
 
 .garage-form input:focus,
 .garage-search input:focus {
-  border-color: #7f56d9;
-  box-shadow: 0 0 0 4px rgba(127, 86, 217, 0.12);
+  border-color: var(--g-cyan);
+  box-shadow: 0 0 0 4px var(--g-cyan-soft);
 }
 
 .garage-submit-btn {
@@ -285,6 +417,7 @@
   font-size: 16px;
 }
 
+/* ── Error banner ───────────────────────────────────────────────────────── */
 .garage-error {
   margin-bottom: 16px;
   padding: 14px 16px;
@@ -294,6 +427,7 @@
   font-weight: 700;
 }
 
+/* ── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .garage-page {
     padding: 100px 20px 40px;

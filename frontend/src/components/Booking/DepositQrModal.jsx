@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import './DepositQrModal.css'
 
@@ -46,6 +47,8 @@ export default function DepositQrModal({
   cancelLoading,
   paymentSuccess,
 }) {
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
+
   if (!open) return null
 
   const qrContent = transaction?.qrCode || ''
@@ -153,22 +156,48 @@ export default function DepositQrModal({
         )}
 
         <div className="dqm-footer">
-          <button
-            type="button"
-            className="dqm-btn dqm-btn--cancel-tx"
-            onClick={onCancelTransaction}
-            disabled={anyLoading}
-          >
-            {cancelLoading ? 'Canceling...' : 'Cancel transaction'}
-          </button>
-          <button
-            type="button"
-            className="dqm-btn dqm-btn--close"
-            onClick={onClose}
-            disabled={anyLoading}
-          >
-            Close
-          </button>
+          {confirmingCancel ? (
+            <div className="dqm-confirm-cancel">
+              <p className="dqm-confirm-cancel-text">Cancel this payment attempt?</p>
+              <div className="dqm-confirm-cancel-btns">
+                <button
+                  type="button"
+                  className="dqm-btn dqm-btn--cancel-tx"
+                  onClick={() => { setConfirmingCancel(false); onCancelTransaction() }}
+                  disabled={anyLoading}
+                >
+                  {cancelLoading ? 'Canceling...' : 'Yes, cancel it'}
+                </button>
+                <button
+                  type="button"
+                  className="dqm-btn dqm-btn--close"
+                  onClick={() => setConfirmingCancel(false)}
+                  disabled={anyLoading}
+                >
+                  Keep waiting
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="dqm-btn dqm-btn--cancel-tx"
+                onClick={() => setConfirmingCancel(true)}
+                disabled={anyLoading}
+              >
+                Cancel payment attempt
+              </button>
+              <button
+                type="button"
+                className="dqm-btn dqm-btn--close"
+                onClick={onClose}
+                disabled={anyLoading}
+              >
+                Close
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

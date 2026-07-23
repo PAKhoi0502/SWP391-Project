@@ -61,7 +61,9 @@ export default function CustomerPromotionDetailPage() {
   if (loading) {
     return (
       <div className="promo-detail-page">
-        <div className="promo-detail-loading">Loading promotion details...</div>
+        <div className="promo-detail-inner">
+          <div className="promo-detail-loading">Loading promotion details...</div>
+        </div>
       </div>
     )
   }
@@ -69,10 +71,12 @@ export default function CustomerPromotionDetailPage() {
   if (error || !promo) {
     return (
       <div className="promo-detail-page">
-        <div className="promo-detail-error">{error || 'Promotion not found.'}</div>
-        <button className="promo-detail-back-btn" onClick={() => navigate('/customer/promotions')}>
-          ← Back to list
-        </button>
+        <div className="promo-detail-inner">
+          <div className="promo-detail-error">{error || 'Promotion not found.'}</div>
+          <button className="promo-detail-back-btn" onClick={() => navigate('/customer/promotions')}>
+            ← Back to list
+          </button>
+        </div>
       </div>
     )
   }
@@ -82,6 +86,7 @@ export default function CustomerPromotionDetailPage() {
 
   return (
     <div className="promo-detail-page">
+    <div className="promo-detail-inner">
       <div className="promo-detail-hero">
         <div className="promo-detail-hero-text">
           <p className="promo-detail-kicker">Promotion</p>
@@ -187,6 +192,7 @@ export default function CustomerPromotionDetailPage() {
           Book Now →
         </button>
       </div>
+    </div>
     </div>
   )
 }

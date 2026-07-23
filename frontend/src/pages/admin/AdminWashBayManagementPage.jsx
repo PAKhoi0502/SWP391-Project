@@ -459,7 +459,7 @@ export default function AdminWashBayManagementPage() {
                   onChange={handleChangeForm}
                 >
                   <option value="CAR">Car</option>
-                  <option value="BIKE">Motorcycle</option>
+                  <option value="BIKE">Motorbike</option>
                 </select>
               </label>
 
