@@ -4,6 +4,7 @@ import com.autowashpro.dto.request.BookingCreateRequest;
 import com.autowashpro.dto.request.CreateWaitlistRequest;
 import com.autowashpro.dto.response.WaitlistResponse;
 import com.autowashpro.entity.*;
+import com.autowashpro.entity.enums.StaffType;
 import com.autowashpro.repository.*;
 import com.autowashpro.service.BookingService;
 import com.autowashpro.service.WaitlistService;
@@ -197,11 +198,10 @@ public class WaitlistServiceImpl implements WaitlistService {
 
         PageRequest pageable = PageRequest.of(page - 1, limit);
 
-        Long effectiveGarageId = garageId;
+        StaffProfile staff = requireCustomerServiceOrAdmin(staffUserId, role);
 
-        if ("ROLE_STAFF".equals(role)) {
-            StaffProfile staff = staffProfileRepository.findByUser_Id(staffUserId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Staff profile not found"));
+        Long effectiveGarageId = garageId;
+        if (staff != null) {
             effectiveGarageId = staff.getGarageId();
         }
 
@@ -344,17 +344,37 @@ public class WaitlistServiceImpl implements WaitlistService {
 
     // ===================== HELPERS =====================
 
-    private void validateStaffScope(Waitlist waitlist, Long staffUserId, String role) {
-        if ("ROLE_STAFF".equals(role)) {
-            StaffProfile staff = staffProfileRepository.findByUser_Id(staffUserId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Staff profile not found"));
-
-            if (!staff.getGarageId().equals(waitlist.getGarageId())) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                        "Staff can only manage waitlist entries in their assigned garage");
-            }
+    /**
+     * Enforces that the caller is either ROLE_ADMIN or an active CUSTOMER_SERVICE_STAFF.
+     * Returns the StaffProfile for ROLE_STAFF callers (non-null), or null for ROLE_ADMIN.
+     * Throws 403 for any other role, inactive staff, or wrong staffType.
+     */
+    private StaffProfile requireCustomerServiceOrAdmin(Long staffUserId, String role) {
+        if ("ROLE_ADMIN".equals(role)) {
+            return null;
         }
-        // ROLE_ADMIN bypasses garage scope
+        if (!"ROLE_STAFF".equals(role)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
+        }
+        StaffProfile staff = staffProfileRepository.findByUser_Id(staffUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Staff profile not found"));
+        if (!Boolean.TRUE.equals(staff.getIsActive())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Staff profile is inactive");
+        }
+        if (staff.getStaffType() != StaffType.CUSTOMER_SERVICE_STAFF) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Only CUSTOMER_SERVICE_STAFF can manage waitlists");
+        }
+        return staff;
+    }
+
+    private void validateStaffScope(Waitlist waitlist, Long staffUserId, String role) {
+        StaffProfile staff = requireCustomerServiceOrAdmin(staffUserId, role);
+        // staff is null only for ROLE_ADMIN — admin is not restricted by garage
+        if (staff != null && !staff.getGarageId().equals(waitlist.getGarageId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Staff can only manage waitlist entries in their assigned garage");
+        }
     }
 
     private WaitlistResponse toResponse(Waitlist w) {

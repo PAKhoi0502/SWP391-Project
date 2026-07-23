@@ -49,6 +49,9 @@ public class DepositRefund {
     @Column(name = "admin_note", length = 500)
     private String adminNote;
 
+    @Column(name = "transaction_reference", length = 100)
+    private String transactionReference;
+
     @Column(name = "requested_at", nullable = false)
     private LocalDateTime requestedAt;
 

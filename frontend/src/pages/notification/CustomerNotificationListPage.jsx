@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import notificationApi from '../../api/notificationApi'
 import { customerBookingFlowApi } from '../../api/customerBookingFlowApi'
@@ -12,10 +12,13 @@ const replaceBookingId = (message, bookingId, seqMap) => {
   return message.replace(new RegExp(`#${bookingId}\\b`, 'g'), `#${seq}`)
 }
 
+// DEPOSIT_REFUND_APPROVED and DEPOSIT_REFUND_REJECTED are hidden from customers —
+// only DEPOSIT_REFUND_COMPLETED is shown (when the bank transfer is actually done).
 const VISIBLE_TYPES = new Set([
   'TIER_UPGRADED', 'VOUCHER_RECEIVED', 'REWARD_EARNED',
   'BOOKING_CONFIRMED', 'BOOKING_CANCELED', 'PAYMENT_CONFIRMED',
   'POINTS_ADJUSTED', 'REVIEW_REQUEST',
+  'DEPOSIT_REFUND_COMPLETED',
 ])
 const isVisible = (t) => VISIBLE_TYPES.has(String(t || '').toUpperCase())
 
@@ -44,7 +47,8 @@ const buildTitle = (notif) => {
   if (notif.eventType === 'BOOKING_CANCELED')   return 'Booking canceled'
   if (notif.eventType === 'PAYMENT_CONFIRMED')  return 'Payment confirmed'
   if (notif.eventType === 'POINTS_ADJUSTED')    return notif.title || 'Points adjusted'
-  if (notif.eventType === 'REVIEW_REQUEST')     return 'Rate your experience'
+  if (notif.eventType === 'REVIEW_REQUEST')          return 'Rate your experience'
+  if (notif.eventType === 'DEPOSIT_REFUND_COMPLETED') return 'Deposit refunded'
   return notif.title || notif.eventType || ''
 }
 
@@ -56,11 +60,14 @@ const getTypeKey = (eventType) => {
   if (eventType === 'BOOKING_CANCELED')  return 'booking-canceled'
   if (eventType === 'PAYMENT_CONFIRMED') return 'payment'
   if (eventType === 'REVIEW_REQUEST')    return 'review'
+  if (eventType === 'DEPOSIT_REFUND_APPROVED')  return 'refund'
+  if (eventType === 'DEPOSIT_REFUND_REJECTED')  return 'refund'
+  if (eventType === 'DEPOSIT_REFUND_COMPLETED') return 'refund'
   return 'default'
 }
 
-const TYPE_ICON  = { reward: '★', tier: '▲', voucher: '%', booking: '✓', 'booking-canceled': '✕', payment: '$', review: '★', default: '•' }
-const TYPE_LABEL = { reward: 'Reward', tier: 'Membership tier', voucher: 'Voucher', booking: 'Booking', 'booking-canceled': 'Booking', payment: 'Payment', review: 'Review', default: 'Notification' }
+const TYPE_ICON  = { reward: '★', tier: '▲', voucher: '%', booking: '✓', 'booking-canceled': '✕', payment: '$', review: '★', refund: '↺', default: '•' }
+const TYPE_LABEL = { reward: 'Reward', tier: 'Membership tier', voucher: 'Voucher', booking: 'Booking', 'booking-canceled': 'Booking', payment: 'Payment', review: 'Review', refund: 'Deposit refund', default: 'Notification' }
 
 export default function CustomerNotificationListPage() {
   const navigate = useNavigate()
@@ -77,10 +84,12 @@ export default function CustomerNotificationListPage() {
   const [reviewModal, setReviewModal] = useState(null)
 
   const LIMIT = 20
+  // Used to avoid loading flicker during silent background refreshes
+  const silentRef  = useRef(false)
+  const pollTimerRef = useRef(null)
 
-  const fetchPage = useCallback(async (pg, readFilter) => {
-    setLoading(true)
-    setError(null)
+  const fetchPage = useCallback(async (pg, readFilter, silent = false) => {
+    if (!silent) { setLoading(true); setError(null) }
     try {
       const result = await notificationApi.getNotifications({
         page: pg,
@@ -92,26 +101,61 @@ export default function CustomerNotificationListPage() {
       setItems(visible)
       setTotalPages(result.totalPages ?? 1)
 
-      // Build seq map if any notification references a booking
+      // Build seq map using server-computed customerBookingNumber — no local recompute needed
       if (visible.some(n => n.bookingId != null)) {
         try {
           const bookings = await customerBookingFlowApi.getCustomerBookings()
-          const sorted = [...bookings].sort((a, b) => Number(a.id) - Number(b.id))
           const seqMap = new Map()
-          sorted.forEach((b, idx) => seqMap.set(Number(b.id), idx + 1))
+          bookings.forEach((b) => {
+            if (b.customerBookingNumber != null) seqMap.set(Number(b.id), b.customerBookingNumber)
+          })
           setBookingSeqMap(seqMap)
         } catch {}
       }
     } catch {
-      setError('Failed to load notifications.')
+      if (!silent) setError('Failed to load notifications.')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
     fetchPage(page, filterRead)
   }, [page, filterRead, fetchPage])
+
+  // Silent background poll every 5 s; also re-fires on window focus / tab visibility regained
+  useEffect(() => {
+    let cancelled = false
+
+    const poll = () => {
+      if (cancelled) return
+      silentRef.current = true
+      fetchPage(page, filterRead, true).finally(() => {
+        silentRef.current = false
+        if (!cancelled) pollTimerRef.current = setTimeout(poll, 5_000)
+      })
+    }
+
+    const handleFocus = () => {
+      if (cancelled) return
+      clearTimeout(pollTimerRef.current)
+      poll()
+    }
+    const handleVisibility = () => {
+      if (!document.hidden) handleFocus()
+    }
+
+    pollTimerRef.current = setTimeout(poll, 5_000)
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      cancelled = true
+      clearTimeout(pollTimerRef.current)
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, filterRead])
 
   const handleFilterChange = (val) => {
     setFilterRead(val)

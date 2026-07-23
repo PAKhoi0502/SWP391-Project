@@ -252,6 +252,47 @@ class BookingReviewServiceImplTest {
         assertThat(r.getInitials()).isEqualTo("U");
     }
 
+    // ── Reviewed booking IDs (customer polling) ────────────────────────────────
+
+    @Test
+    void getMyReviewedBookingIds_returnsBookingIdsReviewedByCustomer() {
+        long customerId = 42L;
+        BookingReview r1 = reviewWithCustomer(customerId, 100L);
+        BookingReview r2 = reviewWithCustomer(customerId, 200L);
+        when(bookingReviewRepository.findByCustomerId(customerId)).thenReturn(List.of(r1, r2));
+
+        List<Long> ids = service.getMyReviewedBookingIds(customerId);
+
+        assertThat(ids).containsExactlyInAnyOrder(100L, 200L);
+    }
+
+    @Test
+    void getMyReviewedBookingIds_customerWithNoReviews_returnsEmptyList() {
+        long customerId = 99L;
+        when(bookingReviewRepository.findByCustomerId(customerId)).thenReturn(List.of());
+
+        List<Long> ids = service.getMyReviewedBookingIds(customerId);
+
+        assertThat(ids).isEmpty();
+    }
+
+    @Test
+    void getMyReviewedBookingIds_onlyReturnsCurrentCustomersBookings() {
+        long customerA = 10L;
+        long customerB = 20L;
+        // Two reviews by A, one by B
+        BookingReview rA1 = reviewWithCustomer(customerA, 101L);
+        BookingReview rA2 = reviewWithCustomer(customerA, 102L);
+        when(bookingReviewRepository.findByCustomerId(customerA)).thenReturn(List.of(rA1, rA2));
+        when(bookingReviewRepository.findByCustomerId(customerB)).thenReturn(List.of());
+
+        List<Long> idsForA = service.getMyReviewedBookingIds(customerA);
+        List<Long> idsForB = service.getMyReviewedBookingIds(customerB);
+
+        assertThat(idsForA).containsExactlyInAnyOrder(101L, 102L);
+        assertThat(idsForB).isEmpty();
+    }
+
     // ── Public endpoint accessible without authentication ─────────────────────
     // (SecurityConfig is not tested here; this just confirms the service method is public)
 

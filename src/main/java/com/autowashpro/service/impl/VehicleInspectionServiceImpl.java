@@ -5,6 +5,7 @@ import com.autowashpro.dto.request.VehicleInspectionUpdateRequest;
 import com.autowashpro.dto.response.VehicleInspectionImageResponse;
 import com.autowashpro.dto.response.VehicleInspectionResponse;
 import com.autowashpro.entity.Booking;
+import com.autowashpro.entity.BookingServiceStep;
 import com.autowashpro.entity.Garage;
 import com.autowashpro.entity.Upload;
 import com.autowashpro.entity.User;
@@ -12,6 +13,7 @@ import com.autowashpro.entity.Vehicle;
 import com.autowashpro.entity.VehicleInspection;
 import com.autowashpro.entity.VehicleInspectionImage;
 import com.autowashpro.repository.BookingRepository;
+import com.autowashpro.repository.BookingServiceStepRepository;
 import com.autowashpro.repository.GarageRepository;
 import com.autowashpro.repository.UserRepository;
 import com.autowashpro.repository.VehicleInspectionImageRepository;
@@ -26,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -40,6 +43,7 @@ public class VehicleInspectionServiceImpl implements VehicleInspectionService {
     private final VehicleInspectionRepository inspectionRepository;
     private final VehicleInspectionImageRepository imageRepository;
     private final BookingRepository bookingRepository;
+    private final BookingServiceStepRepository bookingServiceStepRepository;
     private final VehicleRepository vehicleRepository;
     private final GarageRepository garageRepository;
     private final UserRepository userRepository;
@@ -93,6 +97,12 @@ public class VehicleInspectionServiceImpl implements VehicleInspectionService {
             savedImages.add(imageRepository.save(image));
         }
 
+        // BEFORE_WASH inspection is the source of truth for intake.
+        // Auto-complete any pending INTAKE_INSPECTION booking steps (idempotent).
+        if ("BEFORE_WASH".equals(request.getInspectionType())) {
+            autoCompleteIntakeSteps(bookingId, currentUserId);
+        }
+
         return toResponse(saved, savedImages);
     }
 
@@ -107,11 +117,7 @@ public class VehicleInspectionServiceImpl implements VehicleInspectionService {
                         HttpStatus.NOT_FOUND,
                         "Booking not found: " + bookingId));
 
-        if ("ROLE_CUSTOMER".equals(role) && !currentUserId.equals(booking.getCustomerId())) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "You can only view inspections of your own bookings");
-        }
+        inspectionAccessPolicy.requireCanRead(booking, currentUserId, role);
 
         return inspectionRepository.findByBookingIdOrderByCreatedAtAsc(bookingId)
                 .stream()
@@ -128,15 +134,10 @@ public class VehicleInspectionServiceImpl implements VehicleInspectionService {
                         HttpStatus.NOT_FOUND,
                         "Inspection not found: " + id));
 
-        if ("ROLE_CUSTOMER".equals(role)) {
-            Booking booking = bookingRepository.findById(inspection.getBookingId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
-            if (!currentUserId.equals(booking.getCustomerId())) {
-                throw new ResponseStatusException(
-                        HttpStatus.FORBIDDEN,
-                        "You can only view inspections of your own bookings");
-            }
-        }
+        Booking booking = bookingRepository.findById(inspection.getBookingId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+
+        inspectionAccessPolicy.requireCanRead(booking, currentUserId, role);
 
         return toResponse(inspection, imageRepository.findByVehicleInspectionId(id));
     }
@@ -192,7 +193,35 @@ public class VehicleInspectionServiceImpl implements VehicleInspectionService {
             images = imageRepository.findByVehicleInspectionId(id);
         }
 
+        // Force updatedAt to refresh even when no content fields changed.
+        // This is required for AFTER_WASH stale detection (updatedAt vs careCompletedAt).
+        inspectionRepository.touchUpdatedAt(id, LocalDateTime.now());
+
+        // BEFORE_WASH update: re-complete INTAKE_INSPECTION steps in case they exist (idempotent).
+        if ("BEFORE_WASH".equals(updated.getType())) {
+            autoCompleteIntakeSteps(updated.getBookingId(), currentUserId);
+        }
+
         return toResponse(updated, images);
+    }
+
+    /**
+     * Idempotently completes all pending INTAKE_INSPECTION booking service steps.
+     * Called when a BEFORE_WASH inspection is created or updated, since BEFORE_WASH
+     * is the authoritative intake record — no separate step tick is needed.
+     * Safe to call multiple times; already-completed steps are left unchanged.
+     */
+    private void autoCompleteIntakeSteps(Long bookingId, Long staffUserId) {
+        LocalDateTime now = LocalDateTime.now();
+        bookingServiceStepRepository.findByBookingIdOrderByStepOrder(bookingId).stream()
+                .filter(s -> "INTAKE_INSPECTION".equalsIgnoreCase(s.getExecutionPhase()))
+                .filter(s -> !"COMPLETED".equals(s.getStatus()))
+                .forEach(s -> {
+                    s.setStatus("COMPLETED");
+                    s.setCompletedAt(now);
+                    s.setCompletedByStaffId(staffUserId);
+                    bookingServiceStepRepository.save(s);
+                });
     }
 
     private VehicleInspectionResponse toResponse(

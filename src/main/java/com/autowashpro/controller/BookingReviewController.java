@@ -14,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -49,6 +50,19 @@ public class BookingReviewController {
                 .success(true)
                 .message("Review submitted successfully")
                 .data(bookingReviewService.createReview(bookingId, customerId, request))
+                .build();
+    }
+
+    @GetMapping("/customer/reviews/reviewed-booking-ids")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ApiResponse<List<Long>> getMyReviewedBookingIds(
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        Long customerId = Long.valueOf(userDetails.getUsername());
+        return ApiResponse.<List<Long>>builder()
+                .success(true)
+                .message("Reviewed booking IDs retrieved")
+                .data(bookingReviewService.getMyReviewedBookingIds(customerId))
                 .build();
     }
 

@@ -38,11 +38,11 @@ public ApiResponse<CreatePayOSPaymentResponse> createPayOSPayment(
         Authentication authentication) {
 
     Long callerId = Long.valueOf(userDetails.getUsername());
-    String role = authentication.getAuthorities().stream()
-            .findFirst().orElseThrow().getAuthority().replace("ROLE_", "");
+    String fullRole = authentication.getAuthorities().stream().findFirst().orElseThrow().getAuthority();
+    String role = fullRole.replace("ROLE_", "");
     CreatePayOSPaymentResponse response = "CUSTOMER".equalsIgnoreCase(role)
             ? paymentService.createPayOSPaymentForCustomer(request, callerId)
-            : paymentService.createPayOSPayment(request, callerId);
+            : paymentService.createPayOSPaymentForStaff(request, callerId, fullRole);
     auditLogService.createAuditLog(
             callerId,
             AuditAction.PAYMENT_LINK_CREATED,
@@ -72,11 +72,12 @@ public ApiResponse<Void> handleWebhook(@RequestBody Map<String, Object> webhookD
             @AuthenticationPrincipal UserDetails userDetails,
             Authentication authentication) {
 
-        String role = authentication.getAuthorities().stream()
-                .findFirst().orElseThrow().getAuthority().replace("ROLE_", "");
+        Long callerId = Long.valueOf(userDetails.getUsername());
+        String fullRole = authentication.getAuthorities().stream().findFirst().orElseThrow().getAuthority();
+        String role = fullRole.replace("ROLE_", "");
         PaymentTransactionResponse data = "CUSTOMER".equalsIgnoreCase(role)
-                ? paymentService.getTransactionByIdForCustomer(id, Long.valueOf(userDetails.getUsername()))
-                : paymentService.getTransactionById(id);
+                ? paymentService.getTransactionByIdForCustomer(id, callerId)
+                : paymentService.getTransactionById(id, callerId, fullRole);
 
         return ApiResponse.<PaymentTransactionResponse>builder()
                 .success(true)
@@ -93,11 +94,12 @@ public ApiResponse<Void> handleWebhook(@RequestBody Map<String, Object> webhookD
             @AuthenticationPrincipal UserDetails userDetails,
             Authentication authentication) {
 
-        String role = authentication.getAuthorities().stream()
-                .findFirst().orElseThrow().getAuthority().replace("ROLE_", "");
+        Long callerId = Long.valueOf(userDetails.getUsername());
+        String fullRole = authentication.getAuthorities().stream().findFirst().orElseThrow().getAuthority();
+        String role = fullRole.replace("ROLE_", "");
         List<PaymentTransactionResponse> data = "CUSTOMER".equalsIgnoreCase(role)
-                ? paymentService.getTransactionsByBookingForCustomer(bookingId, Long.valueOf(userDetails.getUsername()), purpose)
-                : paymentService.getTransactionsByBooking(bookingId);
+                ? paymentService.getTransactionsByBookingForCustomer(bookingId, callerId, purpose)
+                : paymentService.getTransactionsByBooking(bookingId, callerId, fullRole);
 
         return ApiResponse.<List<PaymentTransactionResponse>>builder()
                 .success(true)
@@ -114,11 +116,11 @@ public ApiResponse<Void> handleWebhook(@RequestBody Map<String, Object> webhookD
             Authentication authentication) {
 
         Long callerId = Long.valueOf(userDetails.getUsername());
-        String role = authentication.getAuthorities().stream()
-                .findFirst().orElseThrow().getAuthority().replace("ROLE_", "");
+        String fullRole = authentication.getAuthorities().stream().findFirst().orElseThrow().getAuthority();
+        String role = fullRole.replace("ROLE_", "");
         PaymentTransactionResponse response = "CUSTOMER".equalsIgnoreCase(role)
                 ? paymentService.cancelTransactionForCustomer(id, callerId)
-                : paymentService.cancelTransaction(id, callerId);
+                : paymentService.cancelTransaction(id, callerId, fullRole);
         auditLogService.createAuditLog(
                 callerId,
                 AuditAction.PAYMENT_TRANSACTION_CANCELLED,

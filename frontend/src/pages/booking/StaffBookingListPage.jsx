@@ -89,6 +89,7 @@ const toArray = (payload) => {
 const getStatusText = (status) => {
   const value = String(status || '').toUpperCase()
   if (value === 'CONFIRMED') return 'Confirmed'
+  if (value === 'PENDING_DEPOSIT') return 'Pending Deposit'
   if (value === 'CHECKED_IN') return 'Checked in'
   if (value === 'IN_PROGRESS') return 'In progress'
   if (value === 'COMPLETED') return 'Completed'
@@ -174,10 +175,21 @@ const enrichBookingsWithPayment = async (items) => {
       const cached = readCachedBooking(booking.id)
       const transactions = await bookingApi.getPaymentTransactions(booking.id)
       const transactionList = toArray(transactions)
-      const paidTransaction = transactionList.find((t) => String(t?.status || '').toUpperCase() === 'PAID')
+      // Only a FINAL-purpose PAID transaction confirms full payment.
+      // A DEPOSIT-purpose PAID transaction must NOT set paymentStatus=PAID.
+      const finalPaidTx = transactionList.find(
+        (t) =>
+          String(t?.status || '').toUpperCase() === 'PAID' &&
+          String(t?.purpose || '').toUpperCase() === 'FINAL',
+      )
+      const depositPaidTx = transactionList.find(
+        (t) =>
+          String(t?.status || '').toUpperCase() === 'PAID' &&
+          String(t?.purpose || '').toUpperCase() === 'DEPOSIT',
+      )
+      const anyPaidTx = finalPaidTx || depositPaidTx
       const latestTransaction = transactionList[0]
-      const paymentTransaction = paidTransaction || latestTransaction
-      const cachedPayOSPaidAt = readCachedPayOSPaidAt(booking.id)
+      const paymentTransaction = anyPaidTx || latestTransaction
 
       const cachedValues = Object.fromEntries(
         Object.entries(cached).filter(([, item]) => item !== undefined && item !== null && item !== ''),
@@ -199,8 +211,9 @@ const enrichBookingsWithPayment = async (items) => {
           readCachedPaymentMethod(booking.id) ||
           paymentTransaction?.paymentMethod ||
           inferPaymentMethod({ ...cached, ...booking }),
-        paymentStatus: paidTransaction || cachedPayOSPaidAt ? 'PAID' : booking.paymentStatus,
-        paidAt: booking.paidAt || paidTransaction?.paidAt || cachedPayOSPaidAt,
+        paymentStatus: finalPaidTx ? 'PAID' : booking.paymentStatus,
+        paidAt: booking.paidAt || finalPaidTx?.paidAt,
+        depositStatus: depositPaidTx ? 'PAID' : booking.depositStatus,
         note: booking.note || cached.note,
         vehicleName: booking.vehicleName || cached.vehicleName || null,
         addOnServicePackageNames: addOnNames,
@@ -236,6 +249,7 @@ function StaffBookingListPage() {
   const [loading, setLoading] = useState(true)
   const [creatingPayOSId, setCreatingPayOSId] = useState(null)
   const [error, setError] = useState('')
+  const [stats, setStats] = useState(null)
 
   const loadBookings = async (silent = false) => {
     try {
@@ -256,10 +270,30 @@ function StaffBookingListPage() {
     }
   }
 
+  // Fetch aggregate stats once on mount (independent of filters/pagination)
   useEffect(() => {
-    loadBookings()
-    const timer = setInterval(() => loadBookings(true), 15_000)
-    return () => clearInterval(timer)
+    let cancelled = false
+    bookingApi.getStaffBookingSummary()
+      .then((data) => { if (!cancelled) setStats(data) })
+      .catch(() => { /* stats fail silently — counts show '—' */ })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    let mounted = true
+    let timer
+
+    const scheduleNext = () => {
+      timer = setTimeout(async () => {
+        if (mounted) {
+          await loadBookings(true)
+          if (mounted) scheduleNext()
+        }
+      }, 15_000)
+    }
+
+    loadBookings().then(() => { if (mounted) scheduleNext() })
+    return () => { mounted = false; clearTimeout(timer) }
   }, [status, date])
 
   const title = useMemo(
@@ -290,7 +324,8 @@ function StaffBookingListPage() {
     try {
       setCreatingPayOSId(booking.id)
       setError('')
-      const result = await bookingApi.createPayOSPayment(booking.id)
+      // This button only appears for COMPLETED bookings, so this is always a FINAL payment.
+      const result = await bookingApi.createFinalPayOSPayment(booking.id)
       writeCachedPaymentMethod(booking.id, booking.paymentMethod || 'PAYOS')
       if (result?.checkoutUrl) {
         persistPayOSReturnPath(`/staff/bookings/${booking.id}`, result)
@@ -312,6 +347,22 @@ function StaffBookingListPage() {
         <h1>{title}</h1>
         <p>Track bookings assigned to your garage.</p>
       </section>
+
+      <div className="sbl-stat-cards">
+        {[
+          { key: 'total',      label: 'Total Bookings',     value: stats?.total,            mod: 'total'      },
+          { key: 'confirmed',  label: 'Confirmed',          value: stats?.confirmed,         mod: 'confirmed'  },
+          { key: 'inprogress', label: 'In Progress',        value: stats?.inProgress,        mod: 'inprogress' },
+          { key: 'cancelled',  label: 'Cancelled / No-show',value: stats?.canceledAndNoShow, mod: 'cancelled'  },
+        ].map(({ key, label, value, mod }) => (
+          <div key={key} className={`sbl-stat-card sbl-stat-card--${mod}`}>
+            <span className="sbl-stat-number">
+              {stats === null ? <span className="sbl-stat-skeleton" /> : (value ?? '—')}
+            </span>
+            <span className="sbl-stat-label">{label}</span>
+          </div>
+        ))}
+      </div>
 
       <div className="sbl-filters">
         <div className="sbl-search">
@@ -364,7 +415,30 @@ function StaffBookingListPage() {
       {error && <div className="sbl-error">{error}</div>}
 
       {loading ? (
-        <div className="sbl-empty">Loading bookings...</div>
+        <div className="sbl-list">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="sbl-card sbl-card--skeleton">
+              <div className="sbl-skeleton-head">
+                <div className="sbl-skeleton-bar sbl-skeleton-bar--id" />
+                <div className="sbl-skeleton-badges">
+                  <div className="sbl-skeleton-bar sbl-skeleton-bar--badge" />
+                  <div className="sbl-skeleton-bar sbl-skeleton-bar--badge" />
+                </div>
+              </div>
+              <div className="sbl-skeleton-grid">
+                {[1, 2, 3, 4].map((j) => (
+                  <div key={j} className="sbl-skeleton-cell">
+                    <div className="sbl-skeleton-bar sbl-skeleton-bar--label" />
+                    <div className="sbl-skeleton-bar sbl-skeleton-bar--value" />
+                  </div>
+                ))}
+              </div>
+              <div className="sbl-skeleton-foot">
+                <div className="sbl-skeleton-bar sbl-skeleton-bar--btn" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : visibleBookings.length === 0 ? (
         <div className="sbl-empty">No bookings found.</div>
       ) : (

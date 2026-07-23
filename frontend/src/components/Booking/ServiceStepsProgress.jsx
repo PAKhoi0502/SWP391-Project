@@ -32,6 +32,7 @@ const normalizeStep = (step, index) => ({
   completedAt: step.completedAt || null,
   completedByStaffId: step.completedByStaffId || step.completedBy || step.staffId || null,
   note: step.note || step.staffNote || '',
+  executionPhase: String(step.executionPhase || step.phase || '').toUpperCase(),
 })
 
 export default function ServiceStepsProgress({
@@ -101,7 +102,8 @@ export default function ServiceStepsProgress({
           const isExpanded = expandedStepId === step.id
           const hasId = Boolean(step.id)
           const anyLoading = actionLoadingStepId !== null
-          const blocked = !isCompleted && Boolean(isStepBlocked && isStepBlocked(step))
+          const blockedMsg = !isCompleted && isStepBlocked ? isStepBlocked(step) : null
+          const blocked = Boolean(blockedMsg)
 
           return (
             <li
@@ -146,7 +148,7 @@ export default function ServiceStepsProgress({
                       >
                         {isCompleted ? TEXT.reopenStep : TEXT.completeStep}
                       </button>
-                      {blocked && <p className="ssp-blocked-hint">{TEXT.blockedHint}</p>}
+                      {blocked && <p className="ssp-blocked-hint">{typeof blockedMsg === 'string' ? blockedMsg : TEXT.blockedHint}</p>}
                     </>
                   ) : (
                     <div className="ssp-confirm-panel">

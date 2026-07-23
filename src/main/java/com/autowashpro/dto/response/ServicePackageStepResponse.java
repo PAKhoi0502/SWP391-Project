@@ -22,4 +22,10 @@ public class ServicePackageStepResponse {
     private Boolean isRequired;
 
     private List<ServicePackageInstructionResponse> instructions;
+
+    /** Which execution phase: AUTOMATED_WASH, VEHICLE_CARE, FINAL_INSPECTION */
+    private String executionPhase;
+
+    /** Estimated duration in minutes */
+    private Integer durationMinutes;
 }

@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface BookingReviewRepository extends JpaRepository<BookingReview, Long> {
@@ -12,6 +13,8 @@ public interface BookingReviewRepository extends JpaRepository<BookingReview, Lo
     Optional<BookingReview> findByBookingId(Long bookingId);
 
     boolean existsByBookingId(Long bookingId);
+
+    List<BookingReview> findByCustomerId(Long customerId);
 
     Page<BookingReview> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }

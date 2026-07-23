@@ -169,4 +169,29 @@ public class Booking {
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 
+    // ===================== ISSUE #169 Operation Phase =====================
+
+    /** Current operation phase: WAITING_FOR_INTAKE, AUTOMATED_WASH, WAITING_FOR_CARE,
+     *  VEHICLE_CARE, FINAL_INSPECTION, READY_FOR_HANDOVER, DONE */
+    @Column(name = "operation_phase", length = 30)
+    private String operationPhase;
+
+    @Column(name = "planned_wash_start_at")
+    private LocalDateTime plannedWashStartAt;
+
+    @Column(name = "planned_wash_end_at")
+    private LocalDateTime plannedWashEndAt;
+
+    @Column(name = "planned_care_start_at")
+    private LocalDateTime plannedCareStartAt;
+
+    @Column(name = "planned_care_end_at")
+    private LocalDateTime plannedCareEndAt;
+
+    @Column(name = "care_started_at")
+    private LocalDateTime careStartedAt;
+
+    @Column(name = "care_completed_at")
+    private LocalDateTime careCompletedAt;
+
 }

@@ -81,6 +81,7 @@ const getPaymentMethodText = (booking) => {
 const getStatusText = (status) => {
   const value = String(status || '').toUpperCase()
   if (value === 'CONFIRMED') return 'Confirmed'
+  if (value === 'PENDING_DEPOSIT') return 'Pending Deposit'
   if (value === 'CHECKED_IN') return 'Checked in'
   if (value === 'IN_PROGRESS') return 'In progress'
   if (value === 'COMPLETED') return 'Completed'
@@ -128,10 +129,21 @@ const enrichBookingsWithPaymentTransactions = async (items, users = []) => {
       const user = usersById[String(booking.customerId)]
       const transactions = await bookingApi.getPaymentTransactions(booking.id)
       const transactionList = Array.isArray(transactions) ? transactions : []
-      const paidTransaction = transactionList.find((t) => String(t?.status || '').toUpperCase() === 'PAID')
+      // Only a FINAL-purpose PAID transaction confirms full payment.
+      // A DEPOSIT-purpose PAID transaction must NOT set paymentStatus=PAID.
+      const finalPaidTransaction = transactionList.find(
+        (t) =>
+          String(t?.status || '').toUpperCase() === 'PAID' &&
+          String(t?.purpose || '').toUpperCase() === 'FINAL',
+      )
+      const depositPaidTransaction = transactionList.find(
+        (t) =>
+          String(t?.status || '').toUpperCase() === 'PAID' &&
+          String(t?.purpose || '').toUpperCase() === 'DEPOSIT',
+      )
+      const anyPaidTransaction = finalPaidTransaction || depositPaidTransaction
       const latestTransaction = transactionList[0]
-      const paymentTransaction = paidTransaction || latestTransaction
-      const cachedPayOSPaidAt = readCachedPayOSPaidAt(booking.id)
+      const paymentTransaction = anyPaidTransaction || latestTransaction
 
       const enrichedBooking = {
         ...cached,
@@ -147,8 +159,9 @@ const enrichBookingsWithPaymentTransactions = async (items, users = []) => {
           readCachedPaymentMethod(booking.id) ||
           paymentTransaction?.paymentMethod ||
           inferPaymentMethod({ ...cached, ...booking }),
-        paymentStatus: paidTransaction || cachedPayOSPaidAt ? 'PAID' : booking.paymentStatus,
-        paidAt: booking.paidAt || paidTransaction?.paidAt || cachedPayOSPaidAt,
+        paymentStatus: finalPaidTransaction ? 'PAID' : booking.paymentStatus,
+        paidAt: booking.paidAt || finalPaidTransaction?.paidAt,
+        depositStatus: depositPaidTransaction ? 'PAID' : booking.depositStatus,
         note: booking.note || cached.note,
         vehicleName: booking.vehicleName || booking.licensePlate || cached.vehicleName || cached.licensePlate,
       }
@@ -240,7 +253,8 @@ function AdminBookingListPage() {
     try {
       setCreatingPayOSId(booking.id)
       setError('')
-      const result = await bookingApi.createPayOSPayment(booking.id)
+      // This button only appears for COMPLETED bookings, so this is always a FINAL payment.
+      const result = await bookingApi.createFinalPayOSPayment(booking.id)
       writeCachedPaymentMethod(booking.id, booking.paymentMethod || 'PAYOS')
       if (result?.checkoutUrl) {
         persistPayOSReturnPath(`/admin/bookings/${booking.id}`, result)

@@ -28,9 +28,10 @@ public class CustomUserDetailsService
 
         String role = user.getRole();
         String authority = (role != null && role.startsWith("ROLE_")) ? role : "ROLE_" + role;
+        String passwordHash = user.getPasswordHash() != null ? user.getPasswordHash() : "";
         return new org.springframework.security.core.userdetails.User(
                 user.getId().toString(),
-                user.getPasswordHash(),
+                passwordHash,
                 List.of(new SimpleGrantedAuthority(authority))
         );
     }

@@ -12,10 +12,10 @@ import java.util.List;
 
 public interface WashBayService {
     WashBayResponse create(WashBayCreateRequest request);
-    WashBayResponse getById(Long id);
+    WashBayResponse getById(Long id, Long callerId, String role);
     WashBayResponse update(Long id, WashBayUpdateRequest request);
-    WashBayResponse updateStatus(Long id, WashBayStatusUpdateRequest request);
-    PageResponse<WashBayResponse> list(int page, int limit, Long garageId, String vehicleType, WashBayStatus status);
+    WashBayResponse updateStatus(Long id, WashBayStatusUpdateRequest request, Long callerId, String role);
+    PageResponse<WashBayResponse> list(int page, int limit, Long garageId, String vehicleType, WashBayStatus status, Long callerId, String role);
     List<String> getSupportedVehicleTypes(Long garageId);
-    WashBayCapacityResponse getCapacity(Long garageId, String vehicleType);
+    WashBayCapacityResponse getCapacity(Long garageId, String vehicleType, Long callerId, String role);
 }

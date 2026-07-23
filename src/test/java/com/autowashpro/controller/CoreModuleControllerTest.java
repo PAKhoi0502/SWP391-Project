@@ -37,6 +37,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
@@ -341,11 +343,13 @@ class CoreModuleControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "1", roles = "ADMIN")
     void washBayCapacityBindsVehicleTypeFilter() throws Exception {
-        when(washBayService.getCapacity(1L, "CAR")).thenReturn(WashBayCapacityResponse.builder()
-                .garageId(1L)
-                .availableCountByVehicleType(Map.of("CAR", 3L))
-                .build());
+        when(washBayService.getCapacity(eq(1L), eq("CAR"), anyLong(), anyString()))
+                .thenReturn(WashBayCapacityResponse.builder()
+                        .garageId(1L)
+                        .availableCountByVehicleType(Map.of("CAR", 3L))
+                        .build());
 
         mockMvc.perform(get("/api/wash-bays/garages/1/capacity")
                         .param("vehicleType", "CAR"))

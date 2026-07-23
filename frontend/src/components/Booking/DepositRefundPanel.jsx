@@ -20,11 +20,14 @@ const STATUS_TEXT = {
   CANCELED: 'Canceled',
 }
 
+const RETRYABLE_STATUSES = ['REJECTED', 'FAILED', 'CANCELED']
+
 export default function DepositRefundPanel({ bookingId, refundAmount, onRefunded }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [eligibility, setEligibility] = useState(null)
   const [existingRefund, setExistingRefund] = useState(null)
+  const [previousRefund, setPreviousRefund] = useState(null)
   const [bankAccounts, setBankAccounts] = useState([])
   const [selectedBankAccountId, setSelectedBankAccountId] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -35,21 +38,29 @@ export default function DepositRefundPanel({ bookingId, refundAmount, onRefunded
     const load = async () => {
       setLoading(true)
       setError('')
+      setExistingRefund(null)
+      setPreviousRefund(null)
       try {
-        const eligibilityResult = await depositRefundApi.getRefundEligibility(bookingId)
+        const [eligibilityResult, myRefunds] = await Promise.all([
+          depositRefundApi.getRefundEligibility(bookingId),
+          depositRefundApi.getMyDepositRefunds(),
+        ])
         if (cancelled) return
+
         setEligibility(eligibilityResult)
+        const latest = (Array.isArray(myRefunds) ? myRefunds : [])
+          .find((refund) => String(refund.bookingId) === String(bookingId))
+        const latestStatus = String(latest?.status || '').toUpperCase()
 
         if (eligibilityResult?.eligible) {
+          if (latest && RETRYABLE_STATUSES.includes(latestStatus)) {
+            setPreviousRefund(latest)
+          }
           const accounts = await bankAccountService.listOwn()
           if (cancelled) return
-          setBankAccounts((Array.isArray(accounts) ? accounts : []).filter((a) => a.isActive))
-        } else if (eligibilityResult?.reasonCode === 'ALREADY_REQUESTED') {
-          const myRefunds = await depositRefundApi.getMyDepositRefunds()
-          if (cancelled) return
-          const mine = (Array.isArray(myRefunds) ? myRefunds : [])
-            .find((r) => String(r.bookingId) === String(bookingId))
-          setExistingRefund(mine || null)
+          setBankAccounts((Array.isArray(accounts) ? accounts : []).filter((account) => account.isActive))
+        } else {
+          setExistingRefund(latest || null)
         }
       } catch (err) {
         if (!cancelled) setError(err?.response?.data?.message || err?.message || 'Failed to load refund status')
@@ -72,6 +83,7 @@ export default function DepositRefundPanel({ bookingId, refundAmount, onRefunded
     try {
       const created = await depositRefundApi.createDepositRefund(bookingId, Number(selectedBankAccountId))
       setExistingRefund(created)
+      setPreviousRefund(null)
       setEligibility({ eligible: false, reasonCode: 'ALREADY_REQUESTED' })
       onRefunded?.(created)
     } catch (err) {
@@ -96,6 +108,9 @@ export default function DepositRefundPanel({ bookingId, refundAmount, onRefunded
         <p className="drp-detail">
           {formatMoney(existingRefund.requestedAmount)} to {existingRefund.bankName} · {existingRefund.accountNumber}
         </p>
+        {existingRefund.transactionReference && (
+          <p className="drp-detail">Transfer reference: {existingRefund.transactionReference}</p>
+        )}
         {status === 'REJECTED' && existingRefund.rejectReason && (
           <p className="drp-reject-reason">Reason: {existingRefund.rejectReason}</p>
         )}
@@ -104,13 +119,19 @@ export default function DepositRefundPanel({ bookingId, refundAmount, onRefunded
   }
 
   if (!eligibility?.eligible) {
-    return null
+    return error ? <div className="drp-panel"><p className="drp-error">{error}</p></div> : null
   }
 
   return (
     <div className="drp-panel">
       <h3 className="drp-title">Request deposit refund</h3>
       <p className="drp-detail">You are eligible for a refund of <strong>{formatMoney(refundAmount)}</strong>.</p>
+      {previousRefund && (
+        <p className="drp-detail">
+          Previous request: <strong>{STATUS_TEXT[String(previousRefund.status).toUpperCase()] || previousRefund.status}</strong>
+          {previousRefund.rejectReason ? ` — ${previousRefund.rejectReason}` : ''}
+        </p>
+      )}
 
       {bankAccounts.length === 0 ? (
         <p className="drp-empty">Add a bank account in your profile to request this refund.</p>
@@ -124,7 +145,7 @@ export default function DepositRefundPanel({ bookingId, refundAmount, onRefunded
                   name="drp-bank-account"
                   value={account.id}
                   checked={String(selectedBankAccountId) === String(account.id)}
-                  onChange={(e) => setSelectedBankAccountId(e.target.value)}
+                  onChange={(event) => setSelectedBankAccountId(event.target.value)}
                 />
                 <span>{account.bankName} · {account.accountNumber} · {account.accountHolderName}</span>
               </label>
