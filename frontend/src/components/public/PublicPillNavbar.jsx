@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { getRedirectPathByRole, useAuth } from '../../contexts/AuthContext'
+import { useBookingEntry } from '../../hooks/useBookingEntry'
 import NotificationDropdown from '../notification/NotificationDropdown'
 import './PublicPillNavbar.css'
 
@@ -46,7 +47,7 @@ const NAV_LINKS = [
   { label: 'Home',     to: '/',                          icon: <IconHome /> },
   { label: 'Services', to: '/customer/service-packages', icon: <IconServices /> },
   { label: 'About Us', to: '/about',                     icon: <IconAboutUs /> },
-  { label: 'Booking',  to: '/booking',                   icon: <IconBookingNav /> },
+  // 'Booking' is handled separately via handleBookingEntry (not a static route)
 ]
 
 function IconBooking() {
@@ -123,6 +124,7 @@ export default function PublicPillNavbar() {
   const { user, role, isAuthenticated, loading, logout } = useAuth()
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const handleBookingEntry = useBookingEntry()
   const [visible, setVisible] = useState(true)
   const [scrolled, setScrolled] = useState(false)
   const lastScrollY = useRef(0)
@@ -275,6 +277,17 @@ export default function PublicPillNavbar() {
               )}
             </li>
           ))}
+          <li>
+            <button
+              type="button"
+              className="ppn-link ppn-link-btn"
+              aria-label="Booking"
+              onClick={() => { setMenuOpen(false); handleBookingEntry() }}
+            >
+              <IconBookingNav />
+              <span className="ppn-link-label">Booking</span>
+            </button>
+          </li>
         </ul>
 
         {/* Auth actions */}
@@ -417,6 +430,13 @@ export default function PublicPillNavbar() {
               </Link>
             )
           ))}
+          <button
+            type="button"
+            className="ppn-mobile-link ppn-link-btn"
+            onClick={() => { setMenuOpen(false); handleBookingEntry() }}
+          >
+            Booking
+          </button>
           <div className="ppn-mobile-auth">
             {!loading && isAuthenticated ? (
               <>

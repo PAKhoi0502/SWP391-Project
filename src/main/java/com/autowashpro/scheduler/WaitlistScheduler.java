@@ -100,7 +100,7 @@ public class WaitlistScheduler {
                 long occupiedBays = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
                         waitlist.getGarageId(), bayType,
                         waitlist.getDesiredStartTime(),
-                        waitlist.getDesiredEndTime());
+                        waitlist.getDesiredEndTime(), LocalDateTime.now());
 
                 boolean slotAvailable = occupiedBays < availableBays;
 

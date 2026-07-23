@@ -49,4 +49,6 @@ public class ServicePackageResponse {
     private List<Long> includedServiceIds;
 
     private List<ServicePackageStepResponse> steps;
+
+    private List<Long> garageIds;
 }

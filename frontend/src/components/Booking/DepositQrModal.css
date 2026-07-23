@@ -251,6 +251,24 @@
   flex: 1;
 }
 
+.dqm-confirm-cancel {
+  width: 100%;
+}
+.dqm-confirm-cancel-text {
+  font-size: 13px;
+  color: #dc2626;
+  font-weight: 600;
+  margin: 0 0 8px;
+  text-align: center;
+}
+.dqm-confirm-cancel-btns {
+  display: flex;
+  gap: 8px;
+}
+.dqm-confirm-cancel-btns .dqm-btn {
+  flex: 1;
+}
+
 .dqm-btn--cancel-tx {
   background: #fef2f2;
   border: 1px solid #fecaca;

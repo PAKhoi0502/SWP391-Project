@@ -46,6 +46,7 @@ import com.autowashpro.repository.StaffProfileRepository;
 import com.autowashpro.repository.UserRepository;
 import com.autowashpro.repository.VehicleRepository;
 import com.autowashpro.repository.VehicleInspectionRepository;
+import com.autowashpro.repository.GarageServicePackageRepository;
 import com.autowashpro.repository.WashBayRepository;
 import com.autowashpro.service.EmailService;
 import com.autowashpro.service.LoyaltyPointExpiryService;
@@ -177,6 +178,9 @@ class BookingServiceImplTest {
     @Mock
     private PackageResourceResolver packageResourceResolver;
 
+    @Mock
+    private GarageServicePackageRepository garageServicePackageRepository;
+
     @InjectMocks
     private BookingServiceImpl bookingService;
 
@@ -243,6 +247,151 @@ class BookingServiceImplTest {
     }
 
     @Test
+    void createBookingRejectsTimeLessThan15MinutesAhead() {
+        User customer = TestFixtures.customer();
+        Vehicle vehicle = TestFixtures.car(customer);
+        Garage garage = TestFixtures.garage();
+        ServicePackage servicePackage = mainPackage();
+        BookingCreateRequest request = bookingRequest(garage, vehicle, servicePackage);
+        // 14 min 59 s from now — one second under the required lead time
+        request.setStartTime(LocalDateTime.now().plusMinutes(14).plusSeconds(59));
+        stubSuccessfulBookingCreate(customer, vehicle, garage, servicePackage);
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> bookingService.createBooking(request, customer.getId()));
+
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
+        assertTrue(error.getReason().contains("15 minutes"));
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    void createBookingAllowsExactly15MinutesAhead() {
+        User customer = TestFixtures.customer();
+        Vehicle vehicle = TestFixtures.car(customer);
+        Garage garage = TestFixtures.garage();
+        ServicePackage servicePackage = mainPackage();
+        BookingCreateRequest request = bookingRequest(garage, vehicle, servicePackage);
+        // now + 15 min + 2 s: stays above the lead-time boundary even after service execution
+        request.setStartTime(LocalDateTime.now().plusMinutes(15).plusSeconds(2));
+        stubSuccessfulBookingCreate(customer, vehicle, garage, servicePackage);
+
+        BookingResponse response = bookingService.createBooking(request, customer.getId());
+
+        assertEquals("PENDING_DEPOSIT", response.getStatus());
+    }
+
+    @Test
+    void createGuestBookingRejectsPastTime() {
+        Garage garage = TestFixtures.garage();
+        ServicePackage servicePackage = mainPackage();
+        WalkInBookingCreateRequest request = guestRequest(garage, servicePackage);
+        request.setStartTime(LocalDateTime.now().minusMinutes(5));
+        when(garageRepository.findById(garage.getId())).thenReturn(Optional.of(garage));
+        when(servicePackageRepository.findById(servicePackage.getId())).thenReturn(Optional.of(servicePackage));
+        when(garageServicePackageRepository
+                .existsByGarageIdAndServicePackageIdAndIsActiveTrue(anyLong(), anyLong())).thenReturn(true);
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> bookingService.createGuestBooking(request));
+
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
+        assertTrue(error.getReason().contains("15 minutes"));
+    }
+
+    @Test
+    void createGuestBookingRejectsTimeLessThan15MinutesAhead() {
+        Garage garage = TestFixtures.garage();
+        ServicePackage servicePackage = mainPackage();
+        WalkInBookingCreateRequest request = guestRequest(garage, servicePackage);
+        // 14 min 59 s from now — one second under the required lead time
+        request.setStartTime(LocalDateTime.now().plusMinutes(14).plusSeconds(59));
+        when(garageRepository.findById(garage.getId())).thenReturn(Optional.of(garage));
+        when(servicePackageRepository.findById(servicePackage.getId())).thenReturn(Optional.of(servicePackage));
+        when(garageServicePackageRepository
+                .existsByGarageIdAndServicePackageIdAndIsActiveTrue(anyLong(), anyLong())).thenReturn(true);
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> bookingService.createGuestBooking(request));
+
+        assertEquals(HttpStatus.BAD_REQUEST, error.getStatusCode());
+        assertTrue(error.getReason().contains("15 minutes"));
+    }
+
+    // ── Guest booking phone check (Section A2 / issue-172) ──────────────────
+
+    @Test
+    void createGuestBookingSucceedsWhenPhoneIsUnregistered() {
+        Garage garage = TestFixtures.garage();
+        ServicePackage servicePackage = mainPackage();
+        WalkInBookingCreateRequest request = guestRequest(garage, servicePackage);
+        stubGuestBookingPrePhoneCheck(garage, servicePackage);
+        // Unregistered phone: userRepository returns empty
+        when(userRepository.findByPhone("+84912000002")).thenReturn(Optional.empty());
+        stubGuestBookingPostPhoneCheck(garage);
+
+        BookingResponse response = bookingService.createGuestBooking(request);
+
+        assertEquals("PENDING_DEPOSIT", response.getStatus());
+        assertNull(response.getCustomerId());
+    }
+
+    @Test
+    void createGuestBookingRejects409WhenPhoneMatchesRegisteredActiveAccount() {
+        Garage garage = TestFixtures.garage();
+        ServicePackage servicePackage = mainPackage();
+        WalkInBookingCreateRequest request = guestRequest(garage, servicePackage);
+        stubGuestBookingPrePhoneCheck(garage, servicePackage);
+        // Registered active customer with the same phone
+        User registeredCustomer = TestFixtures.customer();
+        registeredCustomer.setPhone("+84912000002");
+        when(userRepository.findByPhone("+84912000002")).thenReturn(Optional.of(registeredCustomer));
+
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> bookingService.createGuestBooking(request));
+
+        assertEquals(HttpStatus.CONFLICT, error.getStatusCode());
+        assertTrue(error.getReason().contains("ACCOUNT_EXISTS_SIGN_IN_REQUIRED"));
+    }
+
+    @Test
+    void createGuestBookingSucceedsWhenPhoneMatchesInactiveAccount() {
+        Garage garage = TestFixtures.garage();
+        ServicePackage servicePackage = mainPackage();
+        WalkInBookingCreateRequest request = guestRequest(garage, servicePackage);
+        stubGuestBookingPrePhoneCheck(garage, servicePackage);
+        // Phone belongs to a DEACTIVATED account — not treated as a registered account
+        User inactiveCustomer = TestFixtures.customer();
+        inactiveCustomer.setPhone("+84912000002");
+        inactiveCustomer.setIsActive(false);
+        when(userRepository.findByPhone("+84912000002")).thenReturn(Optional.of(inactiveCustomer));
+        stubGuestBookingPostPhoneCheck(garage);
+
+        BookingResponse response = bookingService.createGuestBooking(request);
+
+        assertEquals("PENDING_DEPOSIT", response.getStatus());
+    }
+
+    private void stubGuestBookingPrePhoneCheck(Garage garage, ServicePackage servicePackage) {
+        when(garageRepository.findById(garage.getId())).thenReturn(Optional.of(garage));
+        when(servicePackageRepository.findById(servicePackage.getId())).thenReturn(Optional.of(servicePackage));
+        when(washBayRepository.findDistinctVehicleTypesByGarageId(garage.getId())).thenReturn(List.of("CAR"));
+        when(garageServicePackageRepository
+                .existsByGarageIdAndServicePackageIdAndIsActiveTrue(anyLong(), anyLong())).thenReturn(true);
+    }
+
+    private void stubGuestBookingPostPhoneCheck(Garage garage) {
+        when(bookingRepository.countActiveBookingsByLicensePlate(any(), any(), any())).thenReturn(0L);
+        when(bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(
+                any(), any(), any(), any(), any())).thenReturn(0L);
+        when(washBayRepository.countActiveByGarageAndVehicleType(garage.getId(), "CAR")).thenReturn(2L);
+        when(bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
+                eq(garage.getId()), eq("CAR"), any(), any(), any())).thenReturn(0L);
+        when(garageServicePackageRepository
+                .existsByGarageIdAndServicePackageIdAndIsActiveTrue(anyLong(), anyLong())).thenReturn(true);
+    }
+
+    @Test
     void createBookingRejectsMissingGarage() {
         User customer = TestFixtures.customer();
         Vehicle vehicle = TestFixtures.car(customer);
@@ -302,7 +451,7 @@ class BookingServiceImplTest {
         ServicePackage servicePackage = mainPackage();
         BookingCreateRequest request = bookingRequest(garage, vehicle, servicePackage);
         stubSuccessfulBookingCreate(customer, vehicle, garage, servicePackage);
-        when(bookingRepository.countOverlappingBookingsByVehicle(eq(vehicle.getId()), any(), any())).thenReturn(1L);
+        when(bookingRepository.countOverlappingBookingsByVehicle(eq(vehicle.getId()), any(), any(), any())).thenReturn(1L);
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
                 () -> bookingService.createBooking(request, customer.getId()));
@@ -319,7 +468,7 @@ class BookingServiceImplTest {
         BookingCreateRequest request = bookingRequest(garage, vehicle, servicePackage);
         stubSuccessfulBookingCreate(customer, vehicle, garage, servicePackage);
         when(bookingRepository.countOverlappingBookingsByCustomerAndGarage(
-                eq(customer.getId()), eq(garage.getId()), any(), any())).thenReturn(1L);
+                eq(customer.getId()), eq(garage.getId()), any(), any(), any())).thenReturn(1L);
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
                 () -> bookingService.createBooking(request, customer.getId()));
@@ -337,7 +486,7 @@ class BookingServiceImplTest {
         stubSuccessfulBookingCreate(customer, vehicle, garage, servicePackage);
         when(washBayRepository.countActiveByGarageAndVehicleType(garage.getId(), "CAR")).thenReturn(1L);
         when(bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
-                eq(garage.getId()), eq("CAR"), any(), any())).thenReturn(1L);
+                eq(garage.getId()), eq("CAR"), any(), any(), any())).thenReturn(1L);
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class,
                 () -> bookingService.createBooking(request, customer.getId()));
@@ -1040,17 +1189,19 @@ class BookingServiceImplTest {
         tierRule.setBookingWindowDays(30);
         tierRule.setMaxUpcomingBookings(5);
         when(loyaltyTierRuleRepository.findByTierAndIsActiveTrue("BRONZE")).thenReturn(Optional.of(tierRule));
-        when(bookingRepository.countUpcomingBookings(eq(customer.getId()), any())).thenReturn(0L);
-        when(bookingRepository.countOverlappingBookingsByVehicle(eq(vehicle.getId()), any(), any())).thenReturn(0L);
+        when(bookingRepository.countActiveHolds(eq(customer.getId()), any())).thenReturn(0L);
+        when(bookingRepository.countOverlappingBookingsByVehicle(eq(vehicle.getId()), any(), any(), any())).thenReturn(0L);
         when(bookingRepository.countOverlappingBookingsByCustomerAndGarage(
-                eq(customer.getId()), eq(garage.getId()), any(), any())).thenReturn(0L);
+                eq(customer.getId()), eq(garage.getId()), any(), any(), any())).thenReturn(0L);
         when(washBayRepository.countActiveByGarageAndVehicleType(garage.getId(), "CAR")).thenReturn(2L);
         when(bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
-                eq(garage.getId()), eq("CAR"), any(), any())).thenReturn(0L);
+                eq(garage.getId()), eq("CAR"), any(), any(), any())).thenReturn(0L);
         when(staffProfileRepository.countByGarageIdAndStaffTypeAndIsActiveTrue(
                 garage.getId(), StaffType.VEHICLE_CARE_STAFF)).thenReturn(2L);
         when(bookingAssignedStaffRepository.countAssignedStaffByGarageAndTypeAndTime(
                 eq(garage.getId()), eq(StaffType.VEHICLE_CARE_STAFF), any(), any())).thenReturn(0L);
+        when(garageServicePackageRepository
+                .existsByGarageIdAndServicePackageIdAndIsActiveTrue(anyLong(), anyLong())).thenReturn(true);
     }
 
     private void stubWalkInCreate(
@@ -1063,11 +1214,13 @@ class BookingServiceImplTest {
         when(servicePackageRepository.findById(servicePackage.getId())).thenReturn(Optional.of(servicePackage));
         when(washBayRepository.findDistinctVehicleTypesByGarageId(garage.getId())).thenReturn(List.of("CAR"));
         when(bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(
-                eq("51H12345"), eq("CAR"), any(), any())).thenReturn(0L);
+                eq("51H12345"), eq("CAR"), any(), any(), any())).thenReturn(0L);
         when(washBayRepository.countActiveByGarageAndVehicleType(garage.getId(), "CAR")).thenReturn(2L);
         when(bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
-                eq(garage.getId()), eq("CAR"), any(), any())).thenReturn(0L);
+                eq(garage.getId()), eq("CAR"), any(), any(), any())).thenReturn(0L);
         when(userRepository.findByPhone("+84903000001")).thenReturn(Optional.empty());
+        when(garageServicePackageRepository
+                .existsByGarageIdAndServicePackageIdAndIsActiveTrue(anyLong(), anyLong())).thenReturn(true);
     }
 
     private BookingCreateRequest bookingRequest(Garage garage, Vehicle vehicle, ServicePackage servicePackage) {
@@ -1089,6 +1242,22 @@ class BookingServiceImplTest {
         request.setServicePackageId(servicePackage.getId());
         request.setStartTime(slotStart());
         request.setPaymentMethod("CASH");
+        return request;
+    }
+
+    private WalkInBookingCreateRequest guestRequest(Garage garage, ServicePackage servicePackage) {
+        WalkInBookingCreateRequest request = new WalkInBookingCreateRequest();
+        request.setGarageId(garage.getId());
+        request.setGuestName("Tran Thi Guest");
+        request.setGuestPhone("0912000002");
+        request.setLicensePlate("51H-123.45");
+        request.setVehicleType("CAR");
+        request.setSeatCount(5);
+        request.setVehicleBrand("Honda");
+        request.setVehicleModel("City");
+        request.setServicePackageId(servicePackage.getId());
+        request.setStartTime(slotStart());
+        request.setPaymentMethod("ONLINE");
         return request;
     }
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import { useBookingEntry } from '../hooks/useBookingEntry'
 import {
   getErrorMessage,
   getPackageDuration,
@@ -77,7 +77,7 @@ function SkeletonDetail() {
 export default function ServicePackageDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { isAuthenticated } = useAuth()
+  const handleBookingEntry = useBookingEntry()
 
   const [pkg,     setPkg]     = useState(null)
   const [loading, setLoading] = useState(true)
@@ -146,13 +146,12 @@ export default function ServicePackageDetailPage() {
                   </p>
 
                   <div className="spp-detail-cta">
-                    <Link
-                      to={isAuthenticated ? '/booking' : '/guest-booking'}
-                      state={isAuthenticated ? undefined : { servicePackageId: pkg?.id }}
+                    <button
                       className="spp-detail-book-btn"
+                      onClick={() => handleBookingEntry({ servicePackageId: pkg?.id })}
                     >
                       <IconCalendar /> Book Now
-                    </Link>
+                    </button>
                   </div>
                 </div>
 

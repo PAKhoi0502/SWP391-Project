@@ -699,13 +699,14 @@ function BookingDetailPage() {
   const [careAssignError, setCareAssignError] = useState('')
   const [assignedCareStaff, setAssignedCareStaff] = useState([])
   const [editingAfterWash, setEditingAfterWash] = useState(false)
+  const [cancelTxToast, setCancelTxToast] = useState('')
 
   const role = location.pathname.startsWith('/admin')
     ? 'admin'
     : location.pathname.startsWith('/staff')
       ? 'staff'
       : 'customer'
-  const backUrl = role === 'admin' ? '/admin/bookings' : role === 'staff' ? '/staff/bookings' : '/customer/bookings'
+  const backUrl = role === 'admin' ? '/admin/bookings' : role === 'staff' ? '/staff/bookings' : '/customer/booking-history'
   // VEHICLE_CARE_STAFF must not perform booking mutations; only CUSTOMER_SERVICE_STAFF and ADMIN may.
   // staffType is null for admin/customer routes (no StaffLayout outlet context) — treat null as allowed
   // for admin (role guard covers it) and as loading for staff.
@@ -1710,9 +1711,12 @@ function BookingDetailPage() {
       setPayosQrOpen(false)
       setPayosTransaction(null)
       setPayosCheckoutUrl('')
-      setPaymentCollectionOpen(true)
+      await loadDetail()
+      setCancelTxToast('Payment attempt canceled.')
+      setTimeout(() => setCancelTxToast(''), 4000)
     } catch (err) {
-      setPayosQrError(err?.response?.data?.message || err?.message || 'Failed to cancel transaction.')
+      // keep modal open so user can retry or close manually
+      setPayosQrError(err?.response?.data?.message || err?.message || 'Failed to cancel. Please try again.')
     } finally {
       setPayosCancelLoading(false)
     }
@@ -1812,8 +1816,12 @@ function BookingDetailPage() {
       setDepositQrOpen(false)
       setDepositTransaction(null)
       setDepositCheckoutUrl('')
+      await loadDetail()
+      setCancelTxToast('Deposit payment attempt canceled.')
+      setTimeout(() => setCancelTxToast(''), 4000)
     } catch (err) {
-      setDepositQrError(err?.response?.data?.message || err?.message || 'Failed to cancel transaction.')
+      // keep modal open so user can retry or close manually
+      setDepositQrError(err?.response?.data?.message || err?.message || 'Failed to cancel. Please try again.')
     } finally {
       setDepositCancelLoading(false)
     }
@@ -2190,6 +2198,9 @@ function BookingDetailPage() {
   const paymentKey = String(booking?.paymentStatus || '').toLowerCase()
   return (
     <div className="bd-page">
+      {cancelTxToast && (
+        <div className="bd-cancel-tx-toast">{cancelTxToast}</div>
+      )}
       <section className="bd-hero">
         <div className="bd-hero-left">
           <p className="bd-eyebrow">Booking detail</p>

@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import notificationApi from '../../api/notificationApi'
+import {
+  getNotificationBookingNumber,
+  presentNotificationMessage,
+} from '../../utils/notificationPresentation'
 import './CustomerNotificationDetailPage.css'
 
 const LABEL = {
@@ -105,7 +109,7 @@ export default function CustomerNotificationDetailPage() {
             </div>
 
             <h2 className="cn-detail-title">{notif.title}</h2>
-            <p className="cn-detail-msg">{notif.message}</p>
+            <p className="cn-detail-msg">{presentNotificationMessage(notif)}</p>
 
             <div className="cn-detail-meta">
               <div className="cn-detail-meta-row">
@@ -121,7 +125,7 @@ export default function CustomerNotificationDetailPage() {
                     className="cn-detail-booking-link"
                     onClick={() => navigate(`/customer/booking-history?open=${notif.bookingId}`)}
                   >
-                    View booking #{notif.bookingId} →
+                    View booking #{getNotificationBookingNumber(notif) ?? notif.bookingId} →
                   </button>
                 </div>
               )}

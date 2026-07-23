@@ -5,10 +5,13 @@ import { useAuth } from '../../contexts/AuthContext'
 import { ROLES } from '../../constants/roles'
 import notificationApi from '../../api/notificationApi'
 import promotionApi from '../../api/promotionApi'
-import { customerBookingFlowApi } from '../../api/customerBookingFlowApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
 import { bookingApi } from '../../api/bookingApi'
 import ReviewModal from '../reviews/ReviewModal'
+import {
+  getNotificationBookingNumber,
+  presentNotificationMessage,
+} from '../../utils/notificationPresentation'
 import './NotificationDropdown.css'
 
 // Only show these event types in the dropdown (case-insensitive).
@@ -19,6 +22,7 @@ const VISIBLE_TYPES = new Set([
   'BOOKING_CONFIRMED', 'BOOKING_CANCELED', 'PAYMENT_CONFIRMED',
   'POINTS_ADJUSTED', 'REVIEW_REQUEST',
   'DEPOSIT_REFUND_COMPLETED',
+  'WAITLIST_OFFER',
 ])
 const isVisible = (eventType) => VISIBLE_TYPES.has(String(eventType || '').toUpperCase())
 
@@ -109,21 +113,15 @@ const buildTitle = (notif) => {
   if (notif.eventType === 'POINTS_ADJUSTED') return notif.title || 'Points adjusted'
   if (notif.eventType === 'REVIEW_REQUEST') return 'Rate your experience'
   if (notif.eventType === 'DEPOSIT_REFUND_COMPLETED') return 'Deposit refunded'
+  if (notif.eventType === 'WAITLIST_OFFER') return 'Waitlist slot available'
   return notif.title || ''
-}
-
-const replaceBookingId = (message, bookingId, seqMap) => {
-  if (!message || bookingId == null) return message
-  const seq = seqMap.get(Number(bookingId))
-  if (seq == null) return message
-  return message.replace(new RegExp(`#${bookingId}\\b`, 'g'), `#${seq}`)
 }
 
 const buildMessage = (notif, bookingSeqMap) => {
   if (notif.eventType === 'REWARD_EARNED') {
     const match = notif.message?.match(/(\d[\d,.]*)[\s\xa0]*loyalty\s+points/i)
     const points = match ? match[1] : '?'
-    const seq = notif.bookingId != null ? bookingSeqMap.get(Number(notif.bookingId)) : null
+    const seq = getNotificationBookingNumber(notif, bookingSeqMap)
     const label = seq != null
       ? `booking #${seq}`
       : notif.bookingId != null
@@ -143,7 +141,7 @@ const buildMessage = (notif, bookingSeqMap) => {
   }
   // For booking-related types, replace raw DB id with customer's sequential number
   if (notif.bookingId != null) {
-    return replaceBookingId(notif.message || '', notif.bookingId, bookingSeqMap)
+    return presentNotificationMessage(notif, bookingSeqMap)
   }
   return notif.message || ''
 }
@@ -249,7 +247,7 @@ export default function NotificationDropdown() {
   const [items, setItems] = useState([])
   const [expiryItems, setExpiryItems] = useState([])
   const [dismissedExpiry, setDismissedExpiry] = useState(getDismissedExpiryIds)
-  const [bookingSeqMap, setBookingSeqMap] = useState(new Map())
+  const bookingSeqMap = new Map()
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -346,19 +344,6 @@ export default function NotificationDropdown() {
 
       // 2. Build booking sequence map (CUSTOMER only, for any notification with bookingId).
       //    Use server-computed customerBookingNumber from the response — no local recompute.
-      let seqMap = new Map()
-      if (user?.role === ROLES.CUSTOMER) {
-        const needsSeq = visible.some(n => n.bookingId != null)
-        if (needsSeq) {
-          try {
-            const bookings = await customerBookingFlowApi.getCustomerBookings()
-            bookings.forEach((b) => {
-              if (b.customerBookingNumber != null) seqMap.set(Number(b.id), b.customerBookingNumber)
-            })
-          } catch {}
-        }
-      }
-      setBookingSeqMap(seqMap)
       setItems(visible)
 
       // 3. Synthetic voucher-expiry / expired items (CUSTOMER only)
@@ -403,6 +388,12 @@ export default function NotificationDropdown() {
         setUnreadCount(prev => Math.max(0, prev - 1))
       } catch {}
     }
+    // WAITLIST_OFFER: navigate to profile waitlist tab (no bookingId)
+    if (notif.eventType === 'WAITLIST_OFFER') {
+      setOpen(false)
+      navigate('/customer/profile?open=waitlist')
+      return
+    }
     // REVIEW_REQUEST: open review modal instead of navigating
     if (notif.eventType === 'REVIEW_REQUEST') {
       const bookingId = notif.bookingId
@@ -417,7 +408,7 @@ export default function NotificationDropdown() {
     if (notif.bookingId) {
       // CUSTOMER: show inline mini modal instead of navigating away
       if (user?.role === ROLES.CUSTOMER) {
-        const seqNum = bookingSeqMap.get(Number(notif.bookingId)) ?? null
+        const seqNum = getNotificationBookingNumber(notif, bookingSeqMap)
         setOpen(false)
         setDetailModal({ bookingId: notif.bookingId, seqNum })
       } else {

@@ -1,42 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import {
-  PACKAGE_TYPES,
-  extractList,
-  getAvailableServicePackages,
-  getErrorMessage,
-  getPackageActive,
-  getPackageDuration,
-  getPackageId,
-  getPackageName,
-  getPackagePrice,
-  getPackageType,
-  getServicePackages,
-} from '../services/servicePackageApi'
+import { getGarages, getGarageById } from '../api/GarageApi'
+import GarageServiceResults from './GarageServiceResults'
 import './PublicServicePackagePage.css'
-
-const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
-
-function formatVehicleType(value) {
-  const v = String(value || '').toUpperCase()
-  if (v === 'CAR') return 'Car'
-  if (v === 'BIKE' || v === 'MOTORBIKE') return 'Motorbike'
-  return 'All vehicle types'
-}
-
-function formatPackageType(value) {
-  if (value === 'MAIN')   return 'Main'
-  if (value === 'ADD_ON') return 'Add-on'
-  if (value === 'COMBO')  return 'Combo'
-  return value || '—'
-}
-
-function badgeClass(type) {
-  if (type === 'ADD_ON') return 'spp-badge spp-badge--add_on'
-  if (type === 'COMBO')  return 'spp-badge spp-badge--combo'
-  return 'spp-badge spp-badge--main'
-}
+import './GaragePickerStep.css'
 
 function IconSearch() {
   return (
@@ -48,297 +16,149 @@ function IconSearch() {
   )
 }
 
-function IconClock() {
+function IconMapPin() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9"/>
-      <polyline points="12 7 12 12 15 14"/>
+      <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/>
+      <circle cx="12" cy="10" r="3"/>
     </svg>
   )
 }
 
-function IconCar() {
-  return (
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 11l1.7-4.3A2 2 0 0 1 8.6 5.5h6.8a2 2 0 0 1 1.9 1.2L19 11"/>
-      <path d="M3 11h18v5.2a.8.8 0 0 1-.8.8H18"/>
-      <path d="M6 17H3.8a.8.8 0 0 1-.8-.8V11"/>
-      <circle cx="7.5" cy="17" r="1.7"/>
-      <circle cx="16.5" cy="17" r="1.7"/>
-    </svg>
-  )
-}
+/* ── Step 1: Garage picker ────────────────────────────────────────────────── */
 
-const VEHICLE_ALL     = ''
-const PAGE_SIZE       = 9
-const VEHICLE_OPTIONS = [
-  { value: '',     label: 'All' },
-  { value: 'CAR',  label: 'Car' },
-  { value: 'BIKE', label: 'Motorbike' },
-]
+function GaragePickerStep({ onSelectGarage }) {
+  const [garages, setGarages] = useState([])
+  const [keyword, setKeyword] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-function SkeletonGrid() {
-  return (
-    <div className="spp-grid">
-      {Array.from({ length: PAGE_SIZE }).map((_, i) => (
-        <div key={i} className="spp-skeleton-card">
-          <div className="spp-skel spp-skel--h10 spp-skel--w40" />
-          <div className="spp-skel spp-skel--h20 spp-skel--w80" />
-          <div className="spp-skel spp-skel--h10 spp-skel--w60" style={{ marginTop: 4 }} />
-          <div className="spp-skel spp-skel--h10 spp-skel--w80" />
-          <div className="spp-skel spp-skel--h10 spp-skel--w60" style={{ marginTop: 8 }} />
-          <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-            <div className="spp-skel spp-skel--h14" style={{ flex: 1 }} />
-            <div className="spp-skel spp-skel--h14" style={{ flex: 1 }} />
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-export default function ServicePackageListPage() {
-  const { isAuthenticated } = useAuth()
-
-  const [packages, setPackages] = useState([])
-  const [loading,  setLoading]  = useState(true)
-  const [error,    setError]    = useState('')
-
-  const [keyword,     setKeyword]     = useState('')
-  const [vehicleType, setVehicleType] = useState('CAR')
-  const [packageType, setPackageType] = useState('')
-
-  const debounceRef = useRef(null)
-
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(loadPackages, 280)
-    return () => clearTimeout(debounceRef.current)
-  }, [vehicleType])
-
-  async function loadPackages() {
+  async function fetchGarages(kw = '') {
     setLoading(true)
     setError('')
     try {
-      if (!vehicleType) {
-        // "All" selected — /available requires vehicleType, so fall back to base endpoint
-        const data = await getServicePackages({})
-        setPackages(extractList(data).filter((item) => getPackageActive(item)))
-      } else {
-        try {
-          const data = await getAvailableServicePackages({ vehicleType })
-          setPackages(extractList(data))
-        } catch (e) {
-          if (e?.response?.status !== 404) throw e
-          const data = await getServicePackages({ vehicleType })
-          setPackages(extractList(data).filter((item) => getPackageActive(item)))
-        }
-      }
+      const result = await getGarages({ page: 1, limit: 20, isActive: true, keyword: kw })
+      setGarages(result.data || [])
     } catch (err) {
-      setError(getErrorMessage(err, 'Could not load service packages.'))
+      setError(err.message || 'Could not load garages')
     } finally {
       setLoading(false)
     }
   }
 
-  const filteredPackages = useMemo(() => {
-    const kw = keyword.trim().toLowerCase()
-    return packages.filter((item) => {
-      if (!getPackageActive(item)) return false
-      if (kw && !getPackageName(item).toLowerCase().includes(kw)) return false
-      if (packageType && getPackageType(item) !== packageType) return false
-      return true
-    })
-  }, [packages, keyword, packageType])
+  useEffect(() => { fetchGarages() }, [])
 
-  function clearFilters() {
-    setKeyword('')
-    setVehicleType('CAR')
-    setPackageType('')
+  function handleSearch(e) {
+    e.preventDefault()
+    fetchGarages(keyword)
   }
-
-  const hasFilters = keyword !== '' || vehicleType !== 'CAR' || packageType !== ''
-
-  const countByType = (type) => packages.filter((p) => getPackageActive(p) && getPackageType(p) === type).length
 
   return (
     <div className="spp-page">
       <div className="spp-content">
-
-        {/* ── Hero ── */}
         <div className="spp-hero">
           <div className="spp-hero-text">
             <p className="spp-hero-eyebrow">Service Packages</p>
-            <h1 className="spp-hero-title">Professional Car&nbsp;Care</h1>
+            <h1 className="spp-hero-title">Choose a Garage</h1>
             <p className="spp-hero-desc">
-              Choose the perfect package for your vehicle. Filter by vehicle type,
-              package category, or search by name — then book in seconds.
+              Select the garage you want to visit. We&apos;ll show you the services available at that location.
             </p>
-            <Link
-              to={isAuthenticated ? '/booking' : '/guest-booking'}
-              className="spp-book-btn spp-hero-book-btn"
-            >
-              Book Now
-            </Link>
-          </div>
-
-          <div className="spp-stats">
-            <div className="spp-stat">
-              <strong>{packages.filter(getPackageActive).length}</strong>
-              <span>Total</span>
-            </div>
-            <div className="spp-stat">
-              <strong>{countByType('MAIN')}</strong>
-              <span>Main</span>
-            </div>
-            <div className="spp-stat">
-              <strong>{countByType('COMBO')}</strong>
-              <span>Combo</span>
-            </div>
-            <div className="spp-stat">
-              <strong>{countByType('ADD_ON')}</strong>
-              <span>Add-on</span>
-            </div>
           </div>
         </div>
 
-        {/* ── Filters ── */}
-        <div className="spp-filter-section">
-          <div className="spp-search-wrap">
-            <span className="spp-search-icon"><IconSearch /></span>
-            <input
-              className="spp-search"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="Search packages by name…"
-            />
-          </div>
+        <form className="gps-search" onSubmit={handleSearch}>
+          <span className="gps-search-icon"><IconSearch /></span>
+          <input
+            className="gps-search-input"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            placeholder="Search by name, city…"
+          />
+          <button className="gps-search-btn" type="submit">Search</button>
+        </form>
 
-          <div className="spp-filter-rows">
-            <div className="spp-filter-group">
-              <span className="spp-filter-label">Vehicle</span>
-              {VEHICLE_OPTIONS.map(({ value, label }) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={`spp-pill${vehicleType === value ? ' spp-pill--active' : ''}`}
-                  onClick={() => setVehicleType(value)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            <div className="spp-filter-sep" />
-
-            <div className="spp-filter-group">
-              <span className="spp-filter-label">Type</span>
-              <button
-                type="button"
-                className={`spp-pill${packageType === '' ? ' spp-pill--active' : ''}`}
-                onClick={() => setPackageType('')}
-              >
-                All
-              </button>
-              {PACKAGE_TYPES.map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  className={`spp-pill${packageType === type ? ' spp-pill--active' : ''}`}
-                  onClick={() => setPackageType(type)}
-                >
-                  {formatPackageType(type)}
-                </button>
-              ))}
-            </div>
-
-            {hasFilters && (
-              <button type="button" className="spp-clear-btn" onClick={clearFilters}>
-                Clear filters
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* ── Results count ── */}
-        {!loading && !error && (
-          <div className="spp-results-head">
-            <span className="spp-results-count">
-              {filteredPackages.length} package{filteredPackages.length !== 1 ? 's' : ''} found
-            </span>
-          </div>
-        )}
-
-        {/* ── Error ── */}
         {error && <div className="spp-error">{error}</div>}
 
-        {/* ── Grid / States ── */}
         {loading ? (
-          <SkeletonGrid />
-        ) : !error && filteredPackages.length === 0 ? (
-          <div className="spp-grid">
-            <div className="spp-empty">
-              <div className="spp-empty-icon"><IconCar /></div>
-              <p>No packages found</p>
-              <span>Try adjusting your filters or search term.</span>
-            </div>
-          </div>
-        ) : !error ? (
-          <div className="spp-grid">
-            {filteredPackages.map((item, idx) => (
-              <PackageCard
-                key={getPackageId(item)}
-                item={item}
-                delay={idx * 0.045}
-              />
+          <div className="gps-grid">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="gps-card gps-card--skeleton">
+                <div className="gps-skel" style={{ width: '40%', height: 12 }} />
+                <div className="gps-skel" style={{ width: '75%', height: 22, marginTop: 6 }} />
+                <div className="gps-skel" style={{ width: '60%', height: 12, marginTop: 10 }} />
+                <div className="gps-skel" style={{ width: '50%', height: 12, marginTop: 6 }} />
+                <div className="gps-skel" style={{ borderRadius: 999, height: 40, marginTop: 16 }} />
+              </div>
             ))}
           </div>
-        ) : null}
-
+        ) : garages.length === 0 ? (
+          <p style={{ color: '#667085' }}>No garages found. Try a different search.</p>
+        ) : (
+          <div className="gps-grid">
+            {garages.map((garage) => (
+              <button
+                key={garage.id}
+                type="button"
+                className="gps-card"
+                onClick={() => onSelectGarage(garage)}
+              >
+                <span className="gps-code">{garage.garageCode}</span>
+                <span className="gps-name">{garage.name}</span>
+                <span className="gps-info">
+                  <IconMapPin /> {garage.address}, {garage.city}
+                </span>
+                <span className="gps-info">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="9"/>
+                    <polyline points="12 7 12 12 15 14"/>
+                  </svg>
+                  {garage.openingTime} – {garage.closingTime}
+                </span>
+                <span className="gps-cta">View Services →</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-function PackageCard({ item, delay }) {
-  const id       = getPackageId(item)
-  const price    = getPackagePrice(item)
-  const duration = getPackageDuration(item)
-  const type     = getPackageType(item)
-  const name     = getPackageName(item)
+/* ── Main page ───────────────────────────────────────────────────────────── */
+
+export default function ServicePackageListPage() {
+  const { isAuthenticated } = useAuth()
+  const [searchParams] = useSearchParams()
+
+  const [selectedGarage, setSelectedGarage] = useState(null)
+
+  // One-time init from URL ?garageId= (e.g. when landing via direct link)
+  useEffect(() => {
+    const garageIdParam = searchParams.get('garageId')
+    if (!garageIdParam) return
+
+    let active = true
+    getGarageById(garageIdParam)
+      .then((data) => { if (active) setSelectedGarage(data) })
+      .catch(() => { /* silently fail — user sees picker to choose again */ })
+    return () => { active = false }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!selectedGarage) {
+    return <GaragePickerStep onSelectGarage={setSelectedGarage} />
+  }
 
   return (
-    <div className="spp-card" style={{ animationDelay: `${delay}s` }}>
-      <div className="spp-card-head">
-        <div className="spp-card-badges">
-          <span className={badgeClass(type)}>{formatPackageType(type)}</span>
-          {item.vehicleType && (
-            <span className="spp-badge spp-badge--vehicle">{formatVehicleType(item.vehicleType)}</span>
-          )}
-        </div>
-        {duration > 0 && (
-          <span className="spp-card-duration">
-            <IconClock /> {duration} min
-          </span>
-        )}
-      </div>
-
-      <h3 className="spp-card-name">{name}</h3>
-      <p className="spp-card-desc">
-        {item.description || item.shortDescription || 'Professional vehicle care package.'}
-      </p>
-
-      <div className="spp-card-price">
-        <span className="spp-price-label">Starting from</span>
-        <strong className="spp-price-value">{money.format(Number(price) || 0)}</strong>
-      </div>
-
-      <div className="spp-card-actions">
-        <Link to={`/customer/service-packages/${id}`} className="spp-detail-btn">
-          View Details
-        </Link>
+    <div className="spp-page">
+      <div className="spp-content">
+        <GarageServiceResults
+          key={selectedGarage.id}
+          garage={selectedGarage}
+          onBack={() => setSelectedGarage(null)}
+          isAuthenticated={isAuthenticated}
+        />
       </div>
     </div>
   )

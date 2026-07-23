@@ -7,6 +7,7 @@ import com.autowashpro.common.AuditTargetType;
 import com.autowashpro.dto.request.BookingCreateRequest;
 import com.autowashpro.dto.request.CareAssignmentRequest;
 import com.autowashpro.dto.request.OperationPhaseRequest;
+import com.autowashpro.dto.request.GuestPhoneEligibilityRequest;
 import com.autowashpro.dto.request.WalkInBookingCreateRequest;
 import com.autowashpro.dto.response.AssignedCareStaffResponse;
 import com.autowashpro.dto.response.AvailableCareStaffResponse;
@@ -135,6 +136,18 @@ public class BookingController {
                                 .success(true)
                                 .message("Guest booking created successfully")
                                 .data(response)
+                                .build();
+        }
+
+        @PostMapping("/guest/phone-eligibility")
+        public ApiResponse<java.util.Map<String, Boolean>> checkGuestPhoneEligibility(
+                        @Valid @RequestBody GuestPhoneEligibilityRequest request) {
+
+                bookingService.checkGuestPhoneEligibility(request.getPhone());
+                return ApiResponse.<java.util.Map<String, Boolean>>builder()
+                                .success(true)
+                                .message("Phone is eligible for guest booking")
+                                .data(java.util.Map.of("eligible", true))
                                 .build();
         }
 

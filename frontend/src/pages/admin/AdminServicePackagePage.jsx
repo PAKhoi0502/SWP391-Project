@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { computeWashStepTotal } from '../../utils/guestBookingUtils'
+import { getGarages } from '../../api/GarageApi'
 import {
   PACKAGE_TYPES,
   VEHICLE_TYPES,
@@ -46,12 +48,14 @@ const initialForm = {
   executionMode: 'AUTOMATED_WASH',
   careStaffDurationMinutes: '0',
   careStaffRequiredCount: '1',
+  garageIds: [],
 }
 
 const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
 
 export default function AdminServicePackagePage() {
   const [packages, setPackages] = useState([])
+  const [garages, setGarages] = useState([])
   const [form, setForm] = useState(initialForm)
   const [editingId, setEditingId] = useState(null)
   const [keyword, setKeyword] = useState('')
@@ -75,7 +79,21 @@ export default function AdminServicePackagePage() {
     })
   }, [packages, keyword, typeFilter, vehicleFilter])
 
-  useEffect(() => { loadPackages() }, [])
+  useEffect(() => { loadPackages(); loadGarages() }, [])
+
+  async function loadGarages() {
+    try {
+      const result = await getGarages({ page: 1, limit: 100, isActive: true })
+      const list = Array.isArray(result) ? result
+        : Array.isArray(result?.content) ? result.content
+        : Array.isArray(result?.data?.content) ? result.data.content
+        : Array.isArray(result?.data) ? result.data
+        : []
+      setGarages(list)
+    } catch {
+      // non-blocking
+    }
+  }
 
   async function loadPackages() {
     try {
@@ -102,6 +120,16 @@ export default function AdminServicePackagePage() {
       comboAddOnIds: prev.comboAddOnIds.includes(key)
         ? prev.comboAddOnIds.filter((item) => item !== key)
         : [...prev.comboAddOnIds, key],
+    }))
+  }
+
+  function toggleGarage(id) {
+    const key = String(id)
+    setForm((prev) => ({
+      ...prev,
+      garageIds: prev.garageIds.includes(key)
+        ? prev.garageIds.filter((g) => g !== key)
+        : [...prev.garageIds, key],
     }))
   }
 
@@ -165,7 +193,7 @@ export default function AdminServicePackagePage() {
     const mode = isCombo ? 'AUTOMATED_WASH' : (form.executionMode || 'AUTOMATED_WASH')
     const requiresWashBay = !isCombo && mode !== 'VEHICLE_CARE'
     const requiresCareStaff = !isCombo && mode !== 'AUTOMATED_WASH'
-    const washBayDurationMinutes = requiresWashBay ? Number(form.durationMinutes) : 0
+    const washBayDurationMinutes = requiresWashBay ? computeWashStepTotal(steps) : 0
     const careStaffDurationMinutes = requiresCareStaff ? (Number(form.careStaffDurationMinutes) || 0) : 0
     const careStaffRequiredCount = requiresCareStaff ? Math.max(1, Number(form.careStaffRequiredCount) || 1) : 0
     const careStaffType = requiresCareStaff ? 'VEHICLE_CARE_STAFF' : 'NONE'
@@ -194,6 +222,7 @@ export default function AdminServicePackagePage() {
       serviceIds,
       stepsTemplate: steps,
       steps,
+      garageIds: form.garageIds.map(Number),
       isActive: true,
       active: true,
     }
@@ -221,6 +250,18 @@ export default function AdminServicePackagePage() {
       if (badSteps.length > 0) {
         setAlertMsg(`Configuration error: ${badSteps.length} step(s) have no execution phase assigned. Each step must have a phase (Intake Inspection, Automated Wash, Vehicle Care, or Final Inspection).`)
         return
+      }
+
+      const modeNow = form.executionMode || 'AUTOMATED_WASH'
+      if (modeNow === 'AUTOMATED_WASH' || modeNow === 'MIXED') {
+        const washTotal = computeWashStepTotal(form.steps)
+        if (washTotal > 30) {
+          setAlertMsg(
+            `Automated Wash steps total ${washTotal} minutes, but the wash bay window is limited to 30 minutes. ` +
+            `Reduce step durations or move some steps to Vehicle Care.`
+          )
+          return
+        }
       }
     }
 
@@ -290,6 +331,7 @@ export default function AdminServicePackagePage() {
       executionMode: derivedMode,
       careStaffDurationMinutes: String(item.careStaffDurationMinutes ?? '0'),
       careStaffRequiredCount: String(item.careStaffRequiredCount > 0 ? item.careStaffRequiredCount : '1'),
+      garageIds: Array.isArray(item.garageIds) ? item.garageIds.map(String) : [],
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -405,8 +447,11 @@ export default function AdminServicePackagePage() {
                 <span className="asp-steps-label">Service steps</span>
                 <button type="button" className="asp-ghost-btn" onClick={handleAddStep}>+ Add step</button>
               </div>
-              <p style={{ color: '#64748b', fontSize: 13, marginBottom: 10 }}>
+              <p style={{ color: '#64748b', fontSize: 13, marginBottom: 4 }}>
                 Enter each step name, its execution phase, and estimated duration. Inspection and handover steps are added automatically — only list the actual service steps here.
+              </p>
+              <p style={{ color: '#94a3b8', fontSize: 12, marginBottom: 10 }}>
+                Resource window: the total duration of <strong>Automated Wash</strong> steps determines the wash bay slot length (max 30 min). <strong>Vehicle Care</strong> steps run in a separate care staff window with no 30-min limit.
               </p>
               {form.steps.map((step, index) => (
                 <div key={index} className="asp-step-row">
@@ -429,8 +474,8 @@ export default function AdminServicePackagePage() {
                   <input
                     className="asp-input asp-step-duration"
                     type="number"
-                    min="0"
-                    placeholder="Min"
+                    min="1"
+                    placeholder="Step duration (minutes)"
                     value={step.durationMinutes}
                     onChange={(e) => handleStepChange(index, 'durationMinutes', e.target.value)}
                     title="Duration in minutes"
@@ -446,6 +491,15 @@ export default function AdminServicePackagePage() {
                   </button>
                 </div>
               ))}
+              {(() => {
+                const washTotal = computeWashStepTotal(form.steps)
+                const overLimit = washTotal > 30
+                return (
+                  <p style={{ fontSize: 13, marginTop: 8, color: overLimit ? '#dc2626' : '#475569', fontWeight: overLimit ? 600 : 400 }}>
+                    Wash bay: {washTotal} / 30 min{overLimit ? ' — exceeds limit' : ''}
+                  </p>
+                )
+              })()}
             </div>
           )}
 
@@ -490,6 +544,36 @@ export default function AdminServicePackagePage() {
               )}
             </div>
           )}
+
+          <div className="asp-steps-editor" style={{ marginTop: 16 }}>
+            <div className="asp-steps-header">
+              <span className="asp-steps-label">Served garages</span>
+            </div>
+            <p style={{ color: '#64748b', fontSize: 13, marginBottom: 8 }}>
+              Select which garages offer this package. At least one garage is required for active packages.
+            </p>
+            {garages.length === 0 ? (
+              <p style={{ color: '#94a3b8', fontSize: 13 }}>No garages loaded.</p>
+            ) : (
+              <div className="asp-combo-addons">
+                {garages.map((g) => {
+                  const gid = String(g?.id ?? g?.garageId)
+                  const gname = g?.name || g?.garageName || `Garage #${gid}`
+                  const selected = form.garageIds.includes(gid)
+                  return (
+                    <button
+                      type="button"
+                      key={gid}
+                      className={`asp-pill${selected ? ' active' : ''}`}
+                      onClick={() => toggleGarage(gid)}
+                    >
+                      {gname}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
 
           <div className="asp-form-actions">
             <button className="asp-primary-btn" disabled={saving || toggling}>
