@@ -95,12 +95,14 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         @Query("""
                         SELECT COUNT(b) FROM Booking b
                         WHERE b.licensePlate = :licensePlate
+                        AND b.vehicleType = :vehicleType
                         AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
                         AND b.startTime < :endTime
                         AND b.endTime > :startTime
                         """)
-        long countOverlappingBookingsByLicensePlate(
+        long countOverlappingBookingsByLicensePlateAndVehicleType(
                         @Param("licensePlate") String licensePlate,
+                        @Param("vehicleType") String vehicleType,
                         @Param("startTime") LocalDateTime startTime,
                         @Param("endTime") LocalDateTime endTime);
 

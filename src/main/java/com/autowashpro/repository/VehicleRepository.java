@@ -15,12 +15,12 @@ public interface VehicleRepository
 
     List<Vehicle> findByCustomer_IdAndIsActiveTrue(Long customerId);
 
-    boolean existsByNormalizedLicensePlateAndIsActiveTrue(String normalizedLicensePlate);
+    boolean existsByNormalizedLicensePlateAndVehicleType(String normalizedLicensePlate, String vehicleType);
 
     Optional<Vehicle> findByIdAndCustomer_Id(Long id, Long customerId);
 
-    Optional<Vehicle> findByCustomer_IdAndNormalizedLicensePlateAndIsActiveTrue(Long customerId,
-            String normalizedLicensePlate);
+    Optional<Vehicle> findByCustomer_IdAndNormalizedLicensePlateAndVehicleTypeAndIsActiveTrue(
+            Long customerId, String normalizedLicensePlate, String vehicleType);
 
     // Reset tất cả xe của customer về is_default=false trước khi set default mới
     @Modifying

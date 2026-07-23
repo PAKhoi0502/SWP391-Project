@@ -388,7 +388,7 @@ class BookingOperationPhaseTest {
         when(garageRepository.findById(garage.getId())).thenReturn(Optional.of(garage));
         when(servicePackageRepository.findById(pkg.getId())).thenReturn(Optional.of(pkg));
         when(washBayRepository.findDistinctVehicleTypesByGarageId(garage.getId())).thenReturn(List.of("CAR"));
-        when(bookingRepository.countOverlappingBookingsByLicensePlate(any(), any(), any())).thenReturn(0L);
+        when(bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(any(), any(), any(), any())).thenReturn(0L);
         when(washBayRepository.countActiveByGarageAndVehicleType(garage.getId(), "CAR")).thenReturn(2L);
         when(bookingRepository.countOverlappingBookingsByGarageAndVehicleType(any(), any(), any(), any())).thenReturn(0L);
         when(staffProfileRepository.countByGarageIdAndStaffTypeAndIsActiveTrue(
@@ -425,7 +425,7 @@ class BookingOperationPhaseTest {
         when(garageRepository.findById(garage.getId())).thenReturn(Optional.of(garage));
         when(servicePackageRepository.findById(pkg.getId())).thenReturn(Optional.of(pkg));
         when(washBayRepository.findDistinctVehicleTypesByGarageId(garage.getId())).thenReturn(List.of("CAR"));
-        when(bookingRepository.countOverlappingBookingsByLicensePlate(any(), any(), any())).thenReturn(0L);
+        when(bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(any(), any(), any(), any())).thenReturn(0L);
         when(washBayRepository.countActiveByGarageAndVehicleType(garage.getId(), "CAR")).thenReturn(2L);
         when(bookingRepository.countOverlappingBookingsByGarageAndVehicleType(any(), any(), any(), any())).thenReturn(0L);
         when(userRepository.findByPhone(any())).thenReturn(Optional.empty());
@@ -498,7 +498,7 @@ class BookingOperationPhaseTest {
         when(garageRepository.findById(garage.getId())).thenReturn(Optional.of(garage));
         when(servicePackageRepository.findById(pkg.getId())).thenReturn(Optional.of(pkg));
         when(washBayRepository.findDistinctVehicleTypesByGarageId(garage.getId())).thenReturn(List.of("CAR"));
-        when(bookingRepository.countOverlappingBookingsByLicensePlate(any(), any(), any())).thenReturn(0L);
+        when(bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(any(), any(), any(), any())).thenReturn(0L);
         when(washBayRepository.countActiveByGarageAndVehicleType(garage.getId(), "CAR")).thenReturn(2L);
         when(bookingRepository.countOverlappingBookingsByGarageAndVehicleType(any(), any(), any(), any())).thenReturn(0L);
         when(userRepository.findByPhone(any())).thenReturn(Optional.empty());

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ENGINE_TYPES, MOTORBIKE_GROUPS, VEHICLE_TYPES } from '../../constants/vehicleTypes'
 import { vehicleService } from '../../services/vehicleService'
 import ImageUpload from '../upload/ImageUpload'
+import { getLicensePlateError } from '../../utils/identityValidation'
 import './VehiclesModal.css'
 
 function VehiclePhotoFallback() {
@@ -118,8 +119,17 @@ export default function VehiclesModal({ open, onClose }) {
 
   const handleSave = async (e) => {
     e.preventDefault()
-    setSaving(true)
     setFormError('')
+
+    if (!editingVehicle) {
+      const plateError = getLicensePlateError(form.rawLicensePlate, form.vehicleType)
+      if (plateError) {
+        setFormError(plateError)
+        return
+      }
+    }
+
+    setSaving(true)
     try {
       const payload = cleanPayload(form)
       if (editingVehicle) {

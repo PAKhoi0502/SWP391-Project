@@ -354,7 +354,7 @@ class BookingOperationAuthorizationTest {
             when(staffOperationAccessPolicy.requireCustomerServiceOrAdmin(STAFF_ID, "ROLE_ADMIN")).thenReturn(null);
 
             // phone=null → normalizePhone returns null → customer not found → returns found=false
-            assertDoesNotThrow(() -> bookingService.lookupWalkInCustomerByPhone(null, null, STAFF_ID, "ROLE_ADMIN"));
+            assertDoesNotThrow(() -> bookingService.lookupWalkInCustomerByPhone(null, null, null, STAFF_ID, "ROLE_ADMIN"));
             verify(staffOperationAccessPolicy).requireCustomerServiceOrAdmin(STAFF_ID, "ROLE_ADMIN");
         }
 
@@ -363,7 +363,7 @@ class BookingOperationAuthorizationTest {
             when(staffOperationAccessPolicy.requireCustomerServiceOrAdmin(STAFF_ID, "ROLE_STAFF"))
                     .thenReturn(new StaffProfile());
 
-            assertDoesNotThrow(() -> bookingService.lookupWalkInCustomerByPhone(null, null, STAFF_ID, "ROLE_STAFF"));
+            assertDoesNotThrow(() -> bookingService.lookupWalkInCustomerByPhone(null, null, null, STAFF_ID, "ROLE_STAFF"));
             verify(staffOperationAccessPolicy).requireCustomerServiceOrAdmin(STAFF_ID, "ROLE_STAFF");
         }
 
@@ -373,7 +373,7 @@ class BookingOperationAuthorizationTest {
                     .when(staffOperationAccessPolicy).requireCustomerServiceOrAdmin(STAFF_ID, "ROLE_STAFF");
 
             var ex = assertThrows(ResponseStatusException.class,
-                    () -> bookingService.lookupWalkInCustomerByPhone("0123456789", null, STAFF_ID, "ROLE_STAFF"));
+                    () -> bookingService.lookupWalkInCustomerByPhone("0123456789", null, null, STAFF_ID, "ROLE_STAFF"));
             assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
         }
     }

@@ -32,15 +32,15 @@ public final class TestFixtures {
     }
 
     public static User customer() {
-        return user(1L, "Customer Test", "customer@test.local", "0901000001", "CUSTOMER");
+        return user(1L, "Customer Test", "customer@test.local", "+84901000001", "CUSTOMER");
     }
 
     public static User staff() {
-        return user(2L, "Staff Test", "staff@test.local", "0901000002", "STAFF");
+        return user(2L, "Staff Test", "staff@test.local", "+84901000002", "STAFF");
     }
 
     public static User admin() {
-        return user(3L, "Admin Test", "admin@test.local", "0901000003", "ADMIN");
+        return user(3L, "Admin Test", "admin@test.local", "+84901000003", "ADMIN");
     }
 
     public static User user(Long id, String fullName, String email, String phone, String role) {

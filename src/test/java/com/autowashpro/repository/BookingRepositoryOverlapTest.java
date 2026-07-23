@@ -63,8 +63,8 @@ class BookingRepositoryOverlapTest {
         persistBooking(null, null, 3L, "IN_PROGRESS", start, start.plusHours(1), "51H99999");
         persistBooking(null, null, 3L, "NO_SHOW", start, start.plusHours(1), "51H99999");
 
-        long overlaps = bookingRepository.countOverlappingBookingsByLicensePlate(
-                "51H99999", start.plusMinutes(10), start.plusMinutes(20));
+        long overlaps = bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(
+                "51H99999", "CAR", start.plusMinutes(10), start.plusMinutes(20));
 
         assertEquals(1, overlaps);
     }

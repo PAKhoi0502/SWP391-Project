@@ -78,6 +78,9 @@ class VehicleServiceImplTest {
         User customer = TestFixtures.customer();
         VehicleCreateRequest request = TestFixtures.vehicleCreateRequest();
         request.setRawLicensePlate("59X3-246.80");
+        request.setVehicleType("BIKE");
+        request.setSeatCount(null);
+        request.setMotorbikeGroup("STANDARD");
         request.setIsDefault(false);
         when(userRepository.findById(customer.getId())).thenReturn(Optional.of(customer));
         when(vehicleRepository.findByCustomer_IdAndIsActiveTrue(customer.getId()))
@@ -95,7 +98,7 @@ class VehicleServiceImplTest {
         User customer = TestFixtures.customer();
         VehicleCreateRequest request = TestFixtures.vehicleCreateRequest();
         when(userRepository.findById(customer.getId())).thenReturn(Optional.of(customer));
-        when(vehicleRepository.existsByNormalizedLicensePlateAndIsActiveTrue("51H12345"))
+        when(vehicleRepository.existsByNormalizedLicensePlateAndVehicleType("51H12345", "CAR"))
                 .thenReturn(true);
 
         ResponseStatusException error = assertThrows(ResponseStatusException.class,

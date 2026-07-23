@@ -143,6 +143,7 @@ public class BookingController {
         public ApiResponse<WalkInCustomerLookupResponse> lookupWalkInCustomer(
                         @RequestParam String phone,
                         @RequestParam(required = false) String licensePlate,
+                        @RequestParam(required = false) String vehicleType,
                         @AuthenticationPrincipal UserDetails userDetails,
                         Authentication authentication) {
 
@@ -151,7 +152,7 @@ public class BookingController {
                 return ApiResponse.<WalkInCustomerLookupResponse>builder()
                                 .success(true)
                                 .message("Walk-in customer lookup completed")
-                                .data(bookingService.lookupWalkInCustomerByPhone(phone, licensePlate, callerId, role))
+                                .data(bookingService.lookupWalkInCustomerByPhone(phone, licensePlate, vehicleType, callerId, role))
                                 .build();
         }
 

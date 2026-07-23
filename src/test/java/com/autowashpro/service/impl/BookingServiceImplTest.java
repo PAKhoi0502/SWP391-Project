@@ -1062,11 +1062,12 @@ class BookingServiceImplTest {
         when(garageRepository.findById(garage.getId())).thenReturn(Optional.of(garage));
         when(servicePackageRepository.findById(servicePackage.getId())).thenReturn(Optional.of(servicePackage));
         when(washBayRepository.findDistinctVehicleTypesByGarageId(garage.getId())).thenReturn(List.of("CAR"));
-        when(bookingRepository.countOverlappingBookingsByLicensePlate(eq("51H12345"), any(), any())).thenReturn(0L);
+        when(bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(
+                eq("51H12345"), eq("CAR"), any(), any())).thenReturn(0L);
         when(washBayRepository.countActiveByGarageAndVehicleType(garage.getId(), "CAR")).thenReturn(2L);
         when(bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
                 eq(garage.getId()), eq("CAR"), any(), any())).thenReturn(0L);
-        when(userRepository.findByPhone("0903000001")).thenReturn(Optional.empty());
+        when(userRepository.findByPhone("+84903000001")).thenReturn(Optional.empty());
     }
 
     private BookingCreateRequest bookingRequest(Garage garage, Vehicle vehicle, ServicePackage servicePackage) {

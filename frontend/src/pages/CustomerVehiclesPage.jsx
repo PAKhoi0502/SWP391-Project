@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button, ConfirmDialog, Input, Modal, Select, StatusBadge, Table } from '../components/common/ui'
 import { ENGINE_TYPES, MOTORBIKE_GROUPS, VEHICLE_TYPES } from '../constants/vehicleTypes'
 import { vehicleService } from '../services/vehicleService'
+import { getLicensePlateError } from '../utils/identityValidation'
 
 const emptyForm = {
   rawLicensePlate: '',
@@ -66,8 +67,17 @@ export default function CustomerVehiclesPage() {
 
   const handleSave = async (event) => {
     event.preventDefault()
-    setSaving(true)
     setError('')
+
+    if (!editing) {
+      const plateError = getLicensePlateError(form.rawLicensePlate, form.vehicleType)
+      if (plateError) {
+        setError(plateError)
+        return
+      }
+    }
+
+    setSaving(true)
 
     try {
       const payload = cleanPayload(form)

@@ -42,7 +42,12 @@ public interface BookingService {
 
         BookingResponse createGuestBooking(WalkInBookingCreateRequest request);
 
-        WalkInCustomerLookupResponse lookupWalkInCustomerByPhone(String phone, String licensePlate, Long callerId, String role);
+        WalkInCustomerLookupResponse lookupWalkInCustomerByPhone(
+                        String phone,
+                        String licensePlate,
+                        String vehicleType,
+                        Long callerId,
+                        String role);
 
         // ===================== ISSUE #13 =====================
 
