@@ -60,6 +60,7 @@ function getPackageVehicleType(pkg) {
   return pkg?.vehicleType || pkg?.vehicle_type || pkg?.supportedVehicleType || ''
 }
 function getPackageSeatCount(pkg) { return pkg?.seatCount ?? pkg?.seat_count ?? null }
+function getPackageSeatCountAndAbove(pkg) { return Boolean(pkg?.seatCountAndAbove ?? pkg?.seat_count_and_above) }
 function getPackageMotorbikeGroup(pkg) { return pkg?.motorbikeGroup ?? pkg?.motorbike_group ?? '' }
 
 function normalizeVehicleType(type) {
@@ -71,18 +72,21 @@ function normalizeVehicleType(type) {
 function toBackendVehicleType(type) {
   return normalizeVehicleType(type) === 'MOTORBIKE' ? 'BIKE' : 'CAR'
 }
-// Mirrors BookingServiceImpl#isSeatCountCompatible: a package's seatCount is its
-// base tier and also covers vehicles with one extra seat (e.g. seatCount=4 fits 5-seaters).
-function seatCountMatches(pkgSeatCount, vehicleSeatCount) {
+// Mirrors BookingServiceImpl#isSeatCountCompatible: a package's seatCount is normally
+// its base tier and also covers vehicles with one extra seat (e.g. seatCount=4 fits
+// 5-seaters). When seatCountAndAbove is set, seatCount is instead a floor with no
+// upper bound (e.g. a "7 seats and above" package fits any vehicle with 7+ seats).
+function seatCountMatches(pkgSeatCount, seatCountAndAbove, vehicleSeatCount) {
   if (pkgSeatCount == null) return true
   if (!vehicleSeatCount) return false
+  if (seatCountAndAbove) return Number(vehicleSeatCount) >= Number(pkgSeatCount)
   return Number(vehicleSeatCount) <= Number(pkgSeatCount) + 1
 }
 function packageMatchesVehicle(pkg, vehicleType, seatCount, motorbikeGroup) {
   const pt = getPackageVehicleType(pkg)
   if (pt && normalizeVehicleType(pt) !== normalizeVehicleType(vehicleType)) return false
   if (normalizeVehicleType(vehicleType) === 'CAR') {
-    return seatCountMatches(getPackageSeatCount(pkg), seatCount)
+    return seatCountMatches(getPackageSeatCount(pkg), getPackageSeatCountAndAbove(pkg), seatCount)
   }
   if (normalizeVehicleType(vehicleType) === 'MOTORBIKE') {
     const pkgGroup = getPackageMotorbikeGroup(pkg)

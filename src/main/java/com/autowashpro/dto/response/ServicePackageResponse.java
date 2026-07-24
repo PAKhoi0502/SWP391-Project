@@ -24,6 +24,8 @@ public class ServicePackageResponse {
 
     private Integer seatCount;
 
+    private Boolean seatCountAndAbove;
+
     private String motorbikeGroup;
 
     private BigDecimal basePrice;

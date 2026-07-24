@@ -326,6 +326,7 @@ public class ServicePackageServiceImpl
                 .vehicleType(servicePackage.getVehicleType())
                 .serviceType(servicePackage.getServiceType())
                 .seatCount(servicePackage.getSeatCount())
+                .seatCountAndAbove(servicePackage.getSeatCountAndAbove())
                 .motorbikeGroup(servicePackage.getMotorbikeGroup())
                 .basePrice(servicePackage.getBasePrice())
                 .durationMinutes(servicePackage.getDurationMinutes())

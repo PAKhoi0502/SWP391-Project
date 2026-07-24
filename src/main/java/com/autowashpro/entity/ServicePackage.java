@@ -70,6 +70,11 @@ public class ServicePackage {
     @Column(name = "seat_count")
     private Integer seatCount;
 
+    // When true, seatCount is a floor with no upper bound (e.g. "7 seats and above")
+    // instead of a base tier that only also covers one extra seat.
+    @Column(name = "seat_count_and_above")
+    private Boolean seatCountAndAbove;
+
     @Column(name = "motorbike_group")
     private String motorbikeGroup;
 }
