@@ -79,6 +79,7 @@ public class ServicePackageServiceImpl
                 .careStaffRequiredCount(request.getCareStaffRequiredCount())
                 .careStaffDurationMinutes(request.getCareStaffDurationMinutes())
                 .isActive(true)
+                .seatCountAndAbove(false)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
