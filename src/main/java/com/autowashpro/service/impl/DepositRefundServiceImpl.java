@@ -178,7 +178,7 @@ public class DepositRefundServiceImpl implements DepositRefundService {
 
         auditLogService.createAuditLog(adminId, AuditAction.DEPOSIT_REFUND_REJECTED, AuditTargetType.DEPOSIT_REFUND,
                 saved.getId(), AuditMetadata.of("bookingId", saved.getBookingId(), "reason", request.getReason()));
-        // Task 7: No customer notification on reject — only notify when refund is actually transferred (execute)
+        notificationService.notifyDepositRefundRejected(saved.getCustomerId(), saved.getBookingId(), request.getReason());
 
         return toResponse(saved);
     }
