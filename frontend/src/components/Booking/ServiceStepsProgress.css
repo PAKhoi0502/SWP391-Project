@@ -244,7 +244,7 @@
   line-height: 1.5;
   padding: 9px 12px;
   resize: vertical;
-  width: 100%;
+  width: 50%;
   box-sizing: border-box;
   min-height: 54px;
   transition: border-color 0.15s;
