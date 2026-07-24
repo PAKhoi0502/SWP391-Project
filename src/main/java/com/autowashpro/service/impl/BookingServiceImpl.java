@@ -3056,7 +3056,8 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 if ("CAR".equals(vehicleType)) {
-                        return isSeatCountCompatible(vehicle.getSeatCount(), servicePackage.getSeatCount());
+                        return isSeatCountCompatible(vehicle.getSeatCount(), servicePackage.getSeatCount(),
+                                        servicePackage.getSeatCountAndAbove());
                 }
 
                 if ("BIKE".equals(vehicleType)) {
@@ -3073,12 +3074,21 @@ public class BookingServiceImpl implements BookingService {
          * A package's seatCount is treated as its base tier: it also covers vehicles
          * with one extra seat (e.g. a package for seatCount=4 also fits 5-seat cars).
          * A null package seatCount means "any seat count" (wildcard).
+         * When seatCountAndAbove is true, seatCount is instead a floor with no upper
+         * bound (e.g. a "7 seats and above" package fits any vehicle with 7+ seats).
          */
-        private boolean isSeatCountCompatible(Integer vehicleSeatCount, Integer packageSeatCount) {
+        private boolean isSeatCountCompatible(Integer vehicleSeatCount, Integer packageSeatCount,
+                        Boolean seatCountAndAbove) {
                 if (packageSeatCount == null) {
                         return true;
                 }
-                return vehicleSeatCount != null && vehicleSeatCount <= packageSeatCount + 1;
+                if (vehicleSeatCount == null) {
+                        return false;
+                }
+                if (Boolean.TRUE.equals(seatCountAndAbove)) {
+                        return vehicleSeatCount >= packageSeatCount;
+                }
+                return vehicleSeatCount <= packageSeatCount + 1;
         }
 
         private boolean isWalkInVehicleCompatible(
@@ -3097,7 +3107,8 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 if ("CAR".equals(requestVehicleType)) {
-                        return isSeatCountCompatible(request.getSeatCount(), servicePackage.getSeatCount());
+                        return isSeatCountCompatible(request.getSeatCount(), servicePackage.getSeatCount(),
+                                        servicePackage.getSeatCountAndAbove());
                 }
 
                 if ("BIKE".equals(requestVehicleType)) {
