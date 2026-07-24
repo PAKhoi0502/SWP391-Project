@@ -10,6 +10,8 @@ import { loyaltyApi } from '../../api/loyaltyApi'
 import promotionApi from '../../api/promotionApi'
 import { waitlistApi } from '../../api/waitlistApi'
 import DepositQrModal from '../../components/Booking/DepositQrModal'
+import BookingErrorToast, { useBookingErrorToast } from '../../components/Booking/BookingErrorToast'
+import { normalizeBookingError } from '../../utils/bookingErrorMapper'
 import './CustomerCreateBookingPage.css'
 import { getPackageType } from '../../services/servicePackageApi'
 
@@ -225,6 +227,13 @@ export default function CustomerCreateBookingPage() {
   const pendingPackageIdRef  = useRef(servicePackageIdParam)
   // Task 1: success messages (e.g., booking created) auto-clear after 7 s
   const [successMessage, setSuccessMessage] = useTransientMessage(7000)
+  const {
+    toast: errorToast,
+    show: showErrorToast,
+    dismiss: dismissErrorToast,
+    pause: pauseErrorToast,
+    resume: resumeErrorToast,
+  } = useBookingErrorToast()
 
   const [currentStep, setCurrentStep] = useState(1)
 
@@ -859,8 +868,7 @@ export default function CustomerCreateBookingPage() {
         })
       }
     } catch (error) {
-      const msg = error?.response?.data?.message || error.message || ''
-      setMessage(msg || 'Booking failed. Please try again.')
+      showErrorToast(normalizeBookingError(error))
     } finally {
       setSubmitting(false)
     }
@@ -1715,7 +1723,10 @@ export default function CustomerCreateBookingPage() {
                   className="bk-wl-btn bk-wl-btn--ghost"
                   onClick={() => {
                     setDepositConfirm(null)
-                    navigate('/customer/booking-history', { replace: true, state: { bookingCreated: true } })
+                    navigate('/customer/booking-history', {
+                      replace: true,
+                      state: { bookingCreated: true, initialFilter: 'PENDING_DEPOSIT' },
+                    })
                   }}
                 >
                   Pay later
@@ -1746,6 +1757,12 @@ export default function CustomerCreateBookingPage() {
         refreshLoading={depositRefreshLoading}
         cancelLoading={depositCancelLoading}
         paymentSuccess={depositSuccess}
+      />
+      <BookingErrorToast
+        toast={errorToast}
+        onDismiss={dismissErrorToast}
+        onMouseEnter={pauseErrorToast}
+        onMouseLeave={resumeErrorToast}
       />
     </main>
   )

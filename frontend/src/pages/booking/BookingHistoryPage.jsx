@@ -609,11 +609,13 @@ export default function BookingHistoryPage() {
     }
   }
 
-  // Task 1: Show "Booking created" banner from navigation state and immediately clear the state
-  // so that a page refresh does not re-show the banner.
   useEffect(() => {
     if (location.state?.bookingCreated) {
       setSuccessMessage('Booking created successfully!')
+      const initialFilter = location.state?.initialFilter
+      if (initialFilter && STATUS_FILTERS.includes(initialFilter)) {
+        setFilter(initialFilter)
+      }
       navigate(location.pathname, { replace: true, state: {} })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

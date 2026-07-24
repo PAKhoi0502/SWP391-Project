@@ -41,6 +41,10 @@ public class BookingSummaryResponse {
 
     private String guestPhone;
 
+    private String customerName;
+
+    private String customerPhone;
+
     private String licensePlate;
 
     private String vehicleName;
