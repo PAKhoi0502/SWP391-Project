@@ -26,6 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
+import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -86,6 +87,23 @@ class NotificationServiceImplTest {
         assertEquals("PAYMENT_CONFIRMED", notification.getEventType());
         assertEquals("Payment Confirmed", notification.getTitle());
         assertTrue(notification.getMessage().contains("#" + booking.getId()));
+    }
+
+    @Test
+    void notifyDepositRefundCompletedCreatesCustomerNotification() {
+        ArgumentCaptor<Notification> notificationCaptor = ArgumentCaptor.forClass(Notification.class);
+
+        notificationService.notifyDepositRefundCompleted(7L, 20L, new BigDecimal("45000.00"));
+
+        verify(notificationRepository).save(notificationCaptor.capture());
+        Notification notification = notificationCaptor.getValue();
+        assertEquals(7L, notification.getUserId());
+        assertEquals(20L, notification.getBookingId());
+        assertEquals("DEPOSIT_REFUND_COMPLETED", notification.getEventType());
+        assertEquals("Deposit Refunded", notification.getTitle());
+        assertTrue(notification.getMessage().contains("45000.00"));
+        assertEquals(false, notification.getIsRead());
+        assertNotNull(notification.getSentAt());
     }
 
     @Test

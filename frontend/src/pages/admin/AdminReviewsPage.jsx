@@ -2,6 +2,31 @@ import { useEffect, useState } from 'react'
 import reviewApi from '../../api/reviewApi'
 import './AdminReviewsPage.css'
 
+// Plain circle avatar — no PNG frame, no rank badge, no ring
+function PlainAvatar({ name, avatarUrl, size = 40 }) {
+  const [imgError, setImgError] = useState(false)
+  const initials = (name || 'C')
+    .trim().split(/\s+/).filter(Boolean).slice(0, 2)
+    .map(w => w[0].toUpperCase()).join('')
+  return (
+    <div className="ar-plain-avatar" style={{ width: size, height: size }}>
+      {avatarUrl && !imgError ? (
+        <img
+          src={avatarUrl}
+          alt={name || 'Customer'}
+          className="ar-plain-avatar__img"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <span className="ar-plain-avatar__initials"
+          style={{ fontSize: Math.round(size * 0.36) }}>
+          {initials || 'C'}
+        </span>
+      )}
+    </div>
+  )
+}
+
 const formatDate = (value) => {
   if (!value) return '—'
   try {
@@ -152,9 +177,16 @@ export default function AdminReviewsPage() {
               <div key={review.id} className="ar-item">
                 <div className="ar-item-head">
                   <div className="ar-item-meta">
-                    <span className="ar-item-customer">{review.customerName || 'Customer'}</span>
-                    <span className="ar-item-sep">·</span>
-                    <span className="ar-item-booking">Booking #{review.bookingId}</span>
+                    <PlainAvatar
+                      name={review.customerName}
+                      avatarUrl={review.avatarUrl}
+                      size={40}
+                    />
+                    <div className="ar-item-customer-wrap">
+                      <span className="ar-item-customer">{review.customerName || 'Customer'}</span>
+                      <span className="ar-item-sep">·</span>
+                      <span className="ar-item-booking">Booking #{review.bookingId}</span>
+                    </div>
                   </div>
                   <div className="ar-item-rating">
                     <StarDisplay rating={review.rating} />

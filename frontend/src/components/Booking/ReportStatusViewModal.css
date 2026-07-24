@@ -1,0 +1,195 @@
+.rsv-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 16px;
+}
+
+.rsv-modal {
+  background: #ffffff;
+  border: 1px solid rgba(23, 32, 51, 0.08);
+  border-radius: 20px;
+  box-shadow: 0 28px 64px rgba(10, 18, 36, 0.22);
+  color: #172033;
+  width: 100%;
+  max-width: 520px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.rsv-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 22px 24px 16px;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(23, 32, 51, 0.07);
+}
+
+.rsv-title {
+  margin: 0 0 2px;
+  font-size: 17px;
+  font-weight: 900;
+  color: #172033;
+}
+
+.rsv-subtitle {
+  margin: 0;
+  font-size: 12.5px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.rsv-close-btn {
+  background: transparent;
+  border: 1px solid rgba(23, 32, 51, 0.12);
+  border-radius: 8px;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  height: 30px;
+  width: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.rsv-close-btn:hover {
+  background: rgba(23, 32, 51, 0.06);
+  color: #172033;
+}
+
+.rsv-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 24px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rsv-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rsv-category-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.rsv-status-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.rsv-status-pill--pending  { background: #fef9c3; color: #92400e; }
+.rsv-status-pill--reviewed { background: #e0f2fe; color: #0369a1; }
+.rsv-status-pill--resolved { background: #dcfce7; color: #15803d; }
+.rsv-status-pill--rejected { background: #fee2e2; color: #b91c1c; }
+
+.rsv-date {
+  font-size: 11.5px;
+  color: #94a3b8;
+  margin-left: auto;
+}
+
+.rsv-section h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rsv-description {
+  margin: 0;
+  font-size: 14px;
+  color: #334155;
+  line-height: 1.55;
+  background: #f8fafc;
+  border: 1px solid rgba(23, 32, 51, 0.07);
+  border-radius: 8px;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+}
+
+.rsv-photo-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rsv-photo {
+  width: 76px;
+  height: 76px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(23, 32, 51, 0.08);
+}
+
+.rsv-admin-note {
+  margin: 0;
+  font-size: 14px;
+  color: #334155;
+  line-height: 1.55;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+}
+
+.rsv-hint {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.rsv-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 24px 20px;
+  flex-shrink: 0;
+  border-top: 1px solid rgba(23, 32, 51, 0.07);
+}
+
+.rsv-btn {
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 700;
+  padding: 9px 22px;
+  border: 1px solid rgba(23, 32, 51, 0.10);
+  background: rgba(23, 32, 51, 0.06);
+  color: #475569;
+}
+
+.rsv-btn:hover {
+  opacity: 0.88;
+}
+
+@media (max-width: 480px) {
+  .rsv-modal { max-width: 95vw; border-radius: 16px; max-height: 92vh; }
+  .rsv-header { padding: 16px 16px 12px; }
+  .rsv-body   { padding: 14px 16px 4px; }
+  .rsv-footer { padding: 12px 16px 16px; }
+}

@@ -1,12 +1,11 @@
-import { useEffect, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useOutletContext, useParams } from 'react-router-dom'
 import { useRefreshBookingCount } from '../../contexts/StaffBookingCountContext'
 import { bookingApi } from '../../api/bookingApi'
 import { vehicleInspectionApi } from '../../api/vehicleInspectionApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
 import { garageService } from '../../services/garageService'
 import { getServicePackageById, getPackageName } from '../../services/servicePackageApi'
-import { staffProfileService } from '../../services/staffProfileService'
 import { userService } from '../../services/userService'
 import { vehicleService } from '../../services/vehicleService'
 import { getWashBayById } from '../../services/washBayApi'
@@ -25,7 +24,6 @@ import './BookingDetailPage.css'
 
 const BOOKING_CACHE_PREFIX = 'booking-detail-cache-'
 const PAYMENT_METHOD_CACHE_PREFIX = 'booking-payment-method-'
-const PAYOS_PAID_CACHE_PREFIX = 'booking-payos-paid-'
 
 const addOnPackageNameCache = new Map()
 
@@ -133,6 +131,62 @@ const formatDateTime = (value) => {
   return new Date(value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
+const useDepositCountdown = (paymentExpiredAt) => {
+  const calculate = useCallback(() => {
+    if (!paymentExpiredAt) return null
+    const expiresAt = new Date(paymentExpiredAt).getTime()
+    if (!Number.isFinite(expiresAt)) return null
+    return Math.max(0, Math.floor((expiresAt - Date.now()) / 1000))
+  }, [paymentExpiredAt])
+  const [remaining, setRemaining] = useState(calculate)
+
+  useEffect(() => {
+    setRemaining(calculate())
+    if (!paymentExpiredAt) return undefined
+    const timer = window.setInterval(() => setRemaining(calculate()), 1000)
+    return () => window.clearInterval(timer)
+  }, [calculate, paymentExpiredAt])
+
+  return remaining
+}
+
+const DepositDeadlineNotice = ({ paymentExpiredAt, depositAmount, customerView, onPay, loading }) => {
+  const remaining = useDepositCountdown(paymentExpiredAt)
+  const expired = remaining === 0
+  const urgent = remaining !== null && remaining > 0 && remaining <= 60 * 60
+  const hours = remaining === null ? 0 : Math.floor(remaining / 3600)
+  const minutes = remaining === null ? 0 : Math.floor((remaining % 3600) / 60)
+  const seconds = remaining === null ? 0 : remaining % 60
+  const countdown = hours > 0
+    ? `${hours}h ${String(minutes).padStart(2, '0')}m`
+    : `${minutes}:${String(seconds).padStart(2, '0')}`
+
+  return (
+    <section className={`bd-deposit-alert${urgent || expired ? ' bd-deposit-alert--urgent' : ''}`}>
+      <div className="bd-deposit-alert-icon" aria-hidden="true">!</div>
+      <div className="bd-deposit-alert-copy">
+        <div className="bd-deposit-alert-title-row">
+          <strong>Deposit payment required</strong>
+          <span className="bd-deposit-alert-amount">{formatMoney(depositAmount)}</span>
+        </div>
+        <p>
+          {expired
+            ? 'The deposit deadline has passed. This booking is awaiting automatic cancellation confirmation.'
+            : remaining === null
+              ? 'Pay the deposit before the payment deadline to keep this booking.'
+              : `Pay within ${countdown} to keep this booking. Unpaid bookings are cancelled automatically when the deadline expires.`}
+        </p>
+        {paymentExpiredAt && <small>Deadline: {formatDateTime(paymentExpiredAt)}</small>}
+      </div>
+      {customerView && !expired && (
+        <button type="button" className="bd-btn bd-btn--deposit" onClick={onPay} disabled={loading}>
+          {loading ? 'Creating payment...' : 'Pay deposit now'}
+        </button>
+      )}
+    </section>
+  )
+}
+
 const readCachedBooking = (bookingId) => {
   try {
     return JSON.parse(localStorage.getItem(`${BOOKING_CACHE_PREFIX}${bookingId}`) || '{}')
@@ -149,16 +203,6 @@ const readCachedCustomerName = (customerId) => {
 const readCachedPaymentMethod = (bookingId) => {
   if (!bookingId) return ''
   return localStorage.getItem(`${PAYMENT_METHOD_CACHE_PREFIX}${bookingId}`) || ''
-}
-
-const readCachedPayOSPaidAt = (bookingId) => {
-  if (!bookingId) return ''
-  return localStorage.getItem(`${PAYOS_PAID_CACHE_PREFIX}${bookingId}`) || ''
-}
-
-const writeCachedPayOSPaidAt = (bookingId, paidAt = new Date().toISOString()) => {
-  if (!bookingId) return
-  localStorage.setItem(`${PAYOS_PAID_CACHE_PREFIX}${bookingId}`, paidAt)
 }
 
 const writeCachedPaymentMethod = (bookingId, paymentMethod) => {
@@ -252,6 +296,7 @@ const getStatusText = (status) => {
   const value = String(status || '').toUpperCase()
 
   if (value === 'CONFIRMED') return TEXT.notStarted
+  if (value === 'PENDING_DEPOSIT') return 'Pending deposit'
   if (value === 'CHECKED_IN') return TEXT.checkedIn
   if (value === 'IN_PROGRESS') return TEXT.inProgress
   if (value === 'COMPLETED') return TEXT.completed
@@ -259,6 +304,17 @@ const getStatusText = (status) => {
   if (value === 'NO_SHOW') return 'No-show'
 
   return status || 'N/A'
+}
+
+const getOperationPhaseText = (phase) => {
+  const value = String(phase || '').toUpperCase()
+  if (value === 'WAITING_FOR_INTAKE') return 'Awaiting Intake'
+  if (value === 'AUTOMATED_WASH') return 'In Wash'
+  if (value === 'WAITING_FOR_CARE') return 'Awaiting Care'
+  if (value === 'VEHICLE_CARE') return 'In Care'
+  if (value === 'FINAL_INSPECTION') return 'Final Inspection'
+  if (value === 'READY_FOR_HANDOVER') return 'Ready for Handover'
+  return phase || ''
 }
 
 const getPaymentStatusText = (status) => {
@@ -408,19 +464,8 @@ const formatWashBayResource = (payload, id) => {
   }
 }
 
-const formatCareStaffResource = (payload, id) => {
-  const staff = unwrapResourcePayload(payload)
-  const name = staff?.userFullName || staff?.fullName || staff?.name || staff?.staffCode || 'Staff'
-  const code = staff?.staffCode && staff?.staffCode !== name ? ` - ${staff.staffCode}` : ''
-
-  return `${name}${code} #${staff?.id || id}`
-}
-
 const resolveAssignedResources = async (source = {}) => {
   const washBayId = source?.washBayId
-  const assignedCareStaffIds = Array.isArray(source?.assignedCareStaffIds)
-    ? source.assignedCareStaffIds.filter(Boolean)
-    : []
   const resources = {}
 
   if (washBayId) {
@@ -432,17 +477,10 @@ const resolveAssignedResources = async (source = {}) => {
     resources.washBayId = washBayId
   }
 
-  if (assignedCareStaffIds.length > 0) {
-    const staffResults = await Promise.allSettled(
-      assignedCareStaffIds.map((staffId) => staffProfileService.get(staffId)),
-    )
-
-    resources.assignedCareStaffIds = assignedCareStaffIds
-    resources.careStaffLabels = staffResults.map((result, index) =>
-      result.status === 'fulfilled'
-        ? formatCareStaffResource(result.value, assignedCareStaffIds[index])
-        : `Staff #${assignedCareStaffIds[index]}`,
-    )
+  // Care staff labels are no longer loaded here — use the dedicated
+  // GET /bookings/{id}/assigned-care-staff endpoint to avoid a 403.
+  if (Array.isArray(source?.assignedCareStaffIds)) {
+    resources.assignedCareStaffIds = source.assignedCareStaffIds.filter(Boolean)
   }
 
   return resources
@@ -500,14 +538,11 @@ const getPackageStepSource = (servicePackage) =>
   ])
 
 const getInspectionTypes = (booking) => {
-  const packageType = String(booking?.servicePackageType || booking?.serviceType || booking?.packageType || 'MAIN').toUpperCase()
-  const hasAddOnPackages = Array.isArray(booking?.addOnServicePackageIds) && booking.addOnServicePackageIds.length > 0
-
-  if (packageType === 'ADD_ON' || packageType === 'ADDON' || packageType === 'COMBO' || hasAddOnPackages) {
-    return ['BEFORE_WASH', 'AFTER_WASH']
-  }
-
-  return ['BEFORE_WASH']
+  // AFTER_WASH inspection is only required when the booking involves vehicle care staff.
+  // Use the backend-provided requiresCareStaff flag or the plannedCareStartAt timestamp
+  // (set when care staff is reserved during booking creation) as the signal.
+  const needsCare = Boolean(booking?.requiresCareStaff) || Boolean(booking?.plannedCareStartAt)
+  return needsCare ? ['BEFORE_WASH', 'AFTER_WASH'] : ['BEFORE_WASH']
 }
 
 const getInspectionByType = (items, type) => items.find((item) => String(item?.type || '').toUpperCase() === type)
@@ -594,15 +629,11 @@ const persistPayOSReturnPath = (path, result) => {
   }
 }
 
-const getCustomerBookingNumber = (items, bookingId) => {
-  const sorted = [...toArray(items)].sort((left, right) => Number(left?.id || 0) - Number(right?.id || 0))
-  const index = sorted.findIndex((item) => String(item?.id) === String(bookingId))
-  return index >= 0 ? index + 1 : null
-}
-
 function BookingDetailPage() {
   const { id } = useParams()
   const location = useLocation()
+  // staffType is passed from StaffLayout via Outlet context (undefined for admin/customer routes)
+  const { staffType } = useOutletContext() || {}
   const refreshBookingCount = useRefreshBookingCount()
   const [booking, setBooking] = useState(null)
   const [selectedStatus, setSelectedStatus] = useState('CONFIRMED')
@@ -632,6 +663,11 @@ function BookingDetailPage() {
   const [noShowError, setNoShowError] = useState('')
   const [paymentCollectionOpen, setPaymentCollectionOpen] = useState(false)
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false)
+  const [paymentVerifying, setPaymentVerifying] = useState(false)
+  const [paymentPending, setPaymentPending] = useState(false)
+  const [paymentSuccessMessage, setPaymentSuccessMessage] = useState('')
+  const paymentOrderCodeRef = useRef(null)
+  const paymentVerificationStopRef = useRef(null)
   const [cashPayLoading, setCashPayLoading] = useState(false)
   const [cashPayError, setCashPayError] = useState('')
   const [payosLoading, setPayosLoading] = useState(false)
@@ -654,6 +690,15 @@ function BookingDetailPage() {
   const [serviceSteps, setServiceSteps] = useState([])
   const [stepActionLoadingId, setStepActionLoadingId] = useState(null)
   const [stepActionError, setStepActionError] = useState('')
+  const [phaseActionLoading, setPhaseActionLoading] = useState(false)
+  const [phaseActionError, setPhaseActionError] = useState('')
+  const [availableCareStaff, setAvailableCareStaff] = useState([])
+  const [careAssignmentStatus, setCareAssignmentStatus] = useState(null)
+  const [selectedCareStaffProfileId, setSelectedCareStaffProfileId] = useState('')
+  const [careAssignLoading, setCareAssignLoading] = useState(false)
+  const [careAssignError, setCareAssignError] = useState('')
+  const [assignedCareStaff, setAssignedCareStaff] = useState([])
+  const [editingAfterWash, setEditingAfterWash] = useState(false)
 
   const role = location.pathname.startsWith('/admin')
     ? 'admin'
@@ -661,6 +706,10 @@ function BookingDetailPage() {
       ? 'staff'
       : 'customer'
   const backUrl = role === 'admin' ? '/admin/bookings' : role === 'staff' ? '/staff/bookings' : '/customer/bookings'
+  // VEHICLE_CARE_STAFF must not perform booking mutations; only CUSTOMER_SERVICE_STAFF and ADMIN may.
+  // staffType is null for admin/customer routes (no StaffLayout outlet context) — treat null as allowed
+  // for admin (role guard covers it) and as loading for staff.
+  const canManageCareAssignment = role === 'admin' || (role === 'staff' && staffType === 'CUSTOMER_SERVICE_STAFF')
 
   const currentStatus = String(booking?.status || 'CONFIRMED').toUpperCase()
   const isClosedBooking =
@@ -668,7 +717,7 @@ function BookingDetailPage() {
     currentStatus === 'CANCELED' ||
     currentStatus === 'CANCELLED' ||
     currentStatus === 'NO_SHOW'
-  const canEditBooking = role !== 'customer' && !isClosedBooking
+  const canEditBooking = canManageCareAssignment && !isClosedBooking
   const workflowStatus = ['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'].includes(currentStatus)
     ? currentStatus
     : 'CONFIRMED'
@@ -691,8 +740,64 @@ function BookingDetailPage() {
   const canCustomerCancel = role === 'customer' && (currentStatus === 'CONFIRMED' || currentStatus === 'PENDING_DEPOSIT') && !canPayDeposit
   const canMarkNoShow = canEditBooking && currentStatus === 'CONFIRMED'
   const canCheckIn = canEditBooking && currentStatus === 'CONFIRMED'
-  const canStartService = canEditBooking && currentStatus === 'CHECKED_IN'
-  const canCompleteService = canEditBooking && currentStatus === 'IN_PROGRESS'
+  // Operation phase (new granular workflow)
+  const operationPhase = String(booking?.operationPhase || '').toUpperCase()
+  const hasOperationPhase = Boolean(booking?.operationPhase)
+  // Legacy buttons only shown when no operationPhase is active
+  const canStartService = canEditBooking && currentStatus === 'CHECKED_IN' && !hasOperationPhase
+  const canCompleteService = canEditBooking && currentStatus === 'IN_PROGRESS' && !hasOperationPhase
+  // Phase-based action buttons
+  const canStartWash = canEditBooking && currentStatus === 'CHECKED_IN' && operationPhase === 'WAITING_FOR_INTAKE'
+  // Phase-specific step completion derived state
+  const washSteps = serviceSteps.filter((s) => String(s.executionPhase || '').toUpperCase() === 'AUTOMATED_WASH')
+  const careSteps = serviceSteps.filter((s) => String(s.executionPhase || '').toUpperCase() === 'VEHICLE_CARE')
+  // No wash/care steps configured means the package has none — passes the guard (backend will also validate).
+  const allWashStepsDone = washSteps.length === 0 || washSteps.every((s) => String(s.status || '').toUpperCase() === 'COMPLETED')
+  const allCareStepsDone = careSteps.length === 0 || careSteps.every((s) => String(s.status || '').toUpperCase() === 'COMPLETED')
+  const pendingWashStepCount = washSteps.filter((s) => String(s.status || '').toUpperCase() !== 'COMPLETED').length
+  const pendingCareStepCount = careSteps.filter((s) => String(s.status || '').toUpperCase() !== 'COMPLETED').length
+  // Legacy data may already be at FINAL_INSPECTION although a care step is still pending.
+  // It must be returned to VEHICLE_CARE; final inspection must never hide/skip that step.
+  const needsCareWorkflowRecovery = canEditBooking
+    && currentStatus === 'IN_PROGRESS'
+    && operationPhase === 'FINAL_INSPECTION'
+    && pendingCareStepCount > 0
+  const nonIntakeSteps = serviceSteps.filter((s) => String(s.executionPhase || '').toUpperCase() !== 'INTAKE_INSPECTION')
+  const visibleServiceSteps = operationPhase === 'AUTOMATED_WASH' || operationPhase === 'WAITING_FOR_INTAKE'
+    ? washSteps
+    : operationPhase === 'WAITING_FOR_CARE' || operationPhase === 'VEHICLE_CARE'
+      ? careSteps
+      : nonIntakeSteps
+  const serviceStepsReadOnly = role === 'customer'
+    || operationPhase === 'WAITING_FOR_INTAKE'
+    || operationPhase === 'WAITING_FOR_CARE'
+    || operationPhase === 'FINAL_INSPECTION'
+    || operationPhase === 'READY_FOR_HANDOVER'
+  const canCompleteWash = canEditBooking && currentStatus === 'IN_PROGRESS' && operationPhase === 'AUTOMATED_WASH'
+  const careStaffShortage = careAssignmentStatus != null
+    ? Boolean(careAssignmentStatus.shortage)
+    : Boolean(booking?.careStaffShortage)
+  const canStartCare = canEditBooking && currentStatus === 'IN_PROGRESS' && operationPhase === 'WAITING_FOR_CARE' && !careStaffShortage
+  const canCompleteCare = canEditBooking && currentStatus === 'IN_PROGRESS' && operationPhase === 'VEHICLE_CARE'
+  // Stale AFTER_WASH: inspection was recorded before Vehicle Care completed → must be reconfirmed.
+  const afterWashInsp = getInspectionByType(inspections, 'AFTER_WASH')
+  const isAfterWashStale = Boolean(
+    afterWashInsp &&
+    booking?.careCompletedAt &&
+    (afterWashInsp.updatedAt || afterWashInsp.createdAt) < booking.careCompletedAt
+  )
+  const canCompleteFinalInspection = canEditBooking
+    && currentStatus === 'IN_PROGRESS'
+    && operationPhase === 'FINAL_INSPECTION'
+    && !needsCareWorkflowRecovery
+    && !isAfterWashStale
+  const canCompletePhaseService = canEditBooking && currentStatus === 'IN_PROGRESS' && operationPhase === 'READY_FOR_HANDOVER'
+  const canFinishService = canCompleteService || canCompletePhaseService
+  // At FINAL_INSPECTION, block handover until the AFTER_WASH inspection exists
+  const needsCareForHandover = Boolean(booking?.requiresCareStaff) || Boolean(booking?.plannedCareStartAt)
+  const missingAfterWash = operationPhase === 'FINAL_INSPECTION'
+    && needsCareForHandover
+    && !afterWashInsp
   const canOpenPaymentCollection = role !== 'customer' && currentStatus === 'COMPLETED' && !isPaid
   const statusChanged = canEditBooking && selectedStatus !== workflowStatus
   const hasPendingUpdate = canEditBooking && statusChanged
@@ -803,22 +908,30 @@ function BookingDetailPage() {
 
     if (transactionsResult.status === 'fulfilled') {
       const transactions = toArray(transactionsResult.value)
-      const paidTransaction = transactions.find((transaction) => String(transaction?.status || '').toUpperCase() === 'PAID')
+      // Use any PAID transaction (DEPOSIT or FINAL) to infer the payment method.
+      const anyPaidTransaction = transactions.find((tx) => String(tx?.status || '').toUpperCase() === 'PAID')
+      // Only a FINAL-purpose PAID transaction should update paymentStatus.
+      // A DEPOSIT payment being confirmed does NOT mean the full booking is paid.
+      const finalPaidTransaction = transactions.find(
+        (tx) =>
+          String(tx?.status || '').toUpperCase() === 'PAID' &&
+          String(tx?.purpose || '').toUpperCase() === 'FINAL',
+      )
       const latestTransaction = transactions[0]
-      const paymentTransaction = paidTransaction || latestTransaction
-      const cachedPayOSPaidAt = readCachedPayOSPaidAt(enriched.id)
+      const paymentTransaction = anyPaidTransaction || latestTransaction
 
       enriched.paymentMethod =
         enriched.paymentMethod ||
         readCachedPaymentMethod(enriched.id) ||
         paymentTransaction?.paymentMethod ||
         inferPaymentMethod(enriched)
-      if (paidTransaction) {
+
+      // Only override paymentStatus when the server confirms a full (FINAL) payment.
+      // The cachedPayOSPaidAt localStorage cache is intentionally NOT used here because
+      // it incorrectly promoted deposit payments to full-payment status.
+      if (finalPaidTransaction) {
         enriched.paymentStatus = 'PAID'
-        enriched.paidAt = enriched.paidAt || paidTransaction.paidAt
-      } else if (cachedPayOSPaidAt) {
-        enriched.paymentStatus = 'PAID'
-        enriched.paidAt = enriched.paidAt || cachedPayOSPaidAt
+        enriched.paidAt = enriched.paidAt || finalPaidTransaction.paidAt
       }
     }
 
@@ -833,6 +946,27 @@ function BookingDetailPage() {
       if (bookingDetail.pointsEarned !== undefined && bookingDetail.pointsEarned !== null) {
         enriched.pointsEarned = bookingDetail.pointsEarned
       }
+      // Workflow fields: server always wins, even when null (clears stale cached phase)
+      ;[
+        'operationPhase',
+        'plannedWashStartAt',
+        'plannedWashEndAt',
+        'plannedCareStartAt',
+        'plannedCareEndAt',
+        'careStartedAt',
+        'careCompletedAt',
+        'requiresCareStaff',
+        'careStaffShortage',
+        'washBayId',
+      ].forEach((key) => {
+        enriched[key] = bookingDetail[key] !== undefined ? bookingDetail[key] : null
+      })
+    }
+
+    // plannedCareStartAt is the canonical care signal — never let a COMBO parent's
+    // requiresCareStaff=false downgrade a booking that has a care window scheduled.
+    if (enriched.plannedCareStartAt && !enriched.requiresCareStaff) {
+      enriched.requiresCareStaff = true
     }
 
     const inferredPaymentMethod = inferPaymentMethod(enriched)
@@ -851,7 +985,7 @@ function BookingDetailPage() {
   }
 
   const loadInspections = async (detail) => {
-    if (!detail?.id || role !== 'staff') return
+    if (!detail?.id || (role !== 'staff' && role !== 'admin')) return
 
     try {
       setInspectionError('')
@@ -896,9 +1030,10 @@ function BookingDetailPage() {
           : null,
       )
 
+      // Use the server-computed customerBookingNumber from the booking detail response
+      // (avoids a separate getCustomerBookings() call just to compute the sequence)
       if (role === 'customer') {
-        const customerBookings = await bookingApi.getCustomerBookings().catch(() => [])
-        setCustomerBookingNo(getCustomerBookingNumber(customerBookings, id))
+        setCustomerBookingNo(enrichedDetail?.customerBookingNumber ?? null)
       } else {
         setCustomerBookingNo(null)
       }
@@ -933,7 +1068,166 @@ function BookingDetailPage() {
     }
   }
 
+  // Extracted polling loop so it can be called from both the ?payment=success useEffect
+  // and the "Check again" button without duplicating the logic.
+  // Returns a stop() function that cancels the polling interval.
+  const startPaymentVerification = useCallback(
+    (orderCode) => {
+      // Cancel any existing polling loop before starting a new one
+      if (paymentVerificationStopRef.current) {
+        paymentVerificationStopRef.current()
+        paymentVerificationStopRef.current = null
+      }
+
+      paymentOrderCodeRef.current = orderCode
+      setCashPayError('')
+      setPaymentVerifying(true)
+      setPaymentPending(false)
+      setShowPaymentSuccess(false)
+      setPaymentCollectionOpen(true)
+
+      let cancelled = false
+      let retryCount = 0
+
+      const verifyAndShow = async () => {
+        if (cancelled) return
+        retryCount += 1
+        loadDetail()
+
+        try {
+          const txs = await bookingApi.getPaymentTransactions(id)
+          if (cancelled) return
+          const txList = Array.isArray(txs) ? txs : []
+
+          // Find the paid transaction that matches this return — prefer the exact
+          // orderCode match; fall back to any PAID transaction if orderCode is absent.
+          const matchingTx = orderCode
+            ? txList.find(
+                (tx) =>
+                  String(tx.orderCode) === orderCode &&
+                  String(tx.status || '').toUpperCase() === 'PAID',
+              )
+            : txList.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
+
+          if (matchingTx) {
+            const purpose = String(matchingTx.purpose || '').toUpperCase()
+            const msg =
+              purpose === 'DEPOSIT'
+                ? 'Deposit paid successfully! Your booking is confirmed.'
+                : purpose === 'FINAL'
+                  ? 'Payment received. Booking fully paid.'
+                  : 'Payment complete.'
+            setPaymentSuccessMessage(msg)
+            setPaymentVerifying(false)
+            setShowPaymentSuccess(true)
+            return true
+          }
+        } catch {
+          // polling error — ignore and retry
+        }
+
+        if (retryCount >= 6) {
+          // Timed out — webhook not confirmed yet. Show PENDING state with
+          // a "Check again" button instead of the success screen.
+          setPaymentVerifying(false)
+          setPaymentPending(true)
+          return true
+        }
+        return false
+      }
+
+      const timer = window.setInterval(async () => {
+        const done = await verifyAndShow()
+        if (done) window.clearInterval(timer)
+      }, 1600)
+
+      // Run once immediately so the first poll starts right away.
+      verifyAndShow()
+
+      const stop = () => {
+        cancelled = true
+        window.clearInterval(timer)
+      }
+      paymentVerificationStopRef.current = stop
+      return stop
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [id],
+  )
+
+  const loadAssignedCareStaff = useCallback(async () => {
+    // Skip for customer (no permission) and VEHICLE_CARE_STAFF (backend blocks with 403)
+    if (!id || role === 'customer') return
+    if (role === 'staff' && staffType !== null && staffType !== 'CUSTOMER_SERVICE_STAFF') return
+    try {
+      const data = await bookingApi.getAssignedCareStaff(id)
+      setAssignedCareStaff(Array.isArray(data) ? data : [])
+    } catch {
+      setAssignedCareStaff([])
+    }
+  }, [id, role, staffType])
+
   useEffect(() => {
+    loadAssignedCareStaff()
+  }, [loadAssignedCareStaff])
+
+  const loadCareAssignmentData = useCallback(async () => {
+    // Only CUSTOMER_SERVICE_STAFF and ADMIN may call care assignment endpoints
+    if (!id || !canManageCareAssignment) return
+    const bStatus = String(booking?.status || '').toUpperCase()
+    if (!['CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS'].includes(bStatus)) {
+      setCareAssignmentStatus(null)
+      setAvailableCareStaff([])
+      return
+    }
+    try {
+      const status = await bookingApi.getCareAssignmentStatus(id)
+      setCareAssignmentStatus(status)
+      if (status?.requiresCareStaff && status?.canAssign) {
+        const staff = await bookingApi.getAvailableCareStaff(id)
+        setAvailableCareStaff(Array.isArray(staff) ? staff : [])
+      } else {
+        setAvailableCareStaff([])
+      }
+    } catch {
+      setCareAssignmentStatus(null)
+      setAvailableCareStaff([])
+    }
+  }, [id, canManageCareAssignment, booking?.status])
+
+  useEffect(() => {
+    loadCareAssignmentData()
+  }, [loadCareAssignmentData])
+
+  const handleAssignCareStaff = async () => {
+    if (!selectedCareStaffProfileId) return
+    setCareAssignLoading(true)
+    setCareAssignError('')
+    try {
+      await bookingApi.assignCareStaff(id, Number(selectedCareStaffProfileId))
+      setSelectedCareStaffProfileId('')
+      await loadDetail()
+      await loadCareAssignmentData()
+      await loadAssignedCareStaff()
+    } catch (err) {
+      const status = err?.response?.status
+      const msg = err?.response?.data?.message || err?.message || 'Failed to assign care staff.'
+      setCareAssignError(status === 409 ? `Conflict: ${msg}` : msg)
+      if (status === 409) {
+        await loadCareAssignmentData()
+        await loadAssignedCareStaff()
+      }
+    } finally {
+      setCareAssignLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    // Clean up legacy localStorage keys written by the old PAYOS_PAID_CACHE_PREFIX logic.
+    // These keys are no longer read but could occupy storage indefinitely.
+    if (id) {
+      localStorage.removeItem(`booking-payos-paid-${id}`)
+    }
     loadDetail()
   }, [id, role])
 
@@ -941,40 +1235,25 @@ function BookingDetailPage() {
     const params = new URLSearchParams(location.search)
     if (params.get('payment') !== 'success') return undefined
 
-    const paidAt = new Date().toISOString()
-    writeCachedPayOSPaidAt(id, paidAt)
+    // Do NOT immediately override paymentStatus from a URL parameter.
+    // This return URL fires for both deposit payments and final payments;
+    // only the backend knows which one it was. Update payment method only.
     writeCachedPaymentMethod(id, 'PAYOS')
     setBooking((prev) =>
       prev
-        ? {
-            ...prev,
-            paymentMethod: prev.paymentMethod || 'PAYOS',
-            paymentStatus: 'PAID',
-            paidAt: prev.paidAt || paidAt,
-          }
+        ? { ...prev, paymentMethod: prev.paymentMethod || 'PAYOS' }
         : prev,
     )
 
-    // Show payment success modal when returning from PayOS
-    setCashPayError('')
-    setShowPaymentSuccess(true)
-    setPaymentCollectionOpen(true)
-
-    if (isPaid) {
-      return undefined
+    const urlOrderCode = params.get('orderCode')
+    startPaymentVerification(urlOrderCode)
+    // Always clean up via the ref so that a later "Check again" call (which updates
+    // the ref) is also stopped when the component unmounts or the URL changes.
+    return () => {
+      paymentVerificationStopRef.current?.()
+      paymentVerificationStopRef.current = null
     }
-
-    let retryCount = 0
-    const timer = window.setInterval(() => {
-      retryCount += 1
-      loadDetail()
-      if (retryCount >= 5) {
-        window.clearInterval(timer)
-      }
-    }, 1600)
-
-    return () => window.clearInterval(timer)
-  }, [location.search, isPaid])
+  }, [location.search, startPaymentVerification])
 
   useEffect(() => {
     if (!payosQrOpen || payosSuccess) return undefined
@@ -993,7 +1272,11 @@ function BookingDetailPage() {
           }
         } else {
           const txs = await bookingApi.getPaymentTransactions(id)
-          const paidTx = txs.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
+          const paidTx = txs.find(
+            (tx) =>
+              String(tx.status || '').toUpperCase() === 'PAID' &&
+              String(tx.purpose || '').toUpperCase() === 'FINAL',
+          )
           if (paidTx) {
             setPayosTransaction((prev) => ({ ...prev, ...paidTx }))
             setPayosSuccess(true)
@@ -1027,7 +1310,11 @@ function BookingDetailPage() {
           }
         } else {
           const txs = await bookingApi.getPaymentTransactions(id)
-          const paidTx = txs.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
+          const paidTx = txs.find(
+            (tx) =>
+              String(tx.status || '').toUpperCase() === 'PAID' &&
+              String(tx.purpose || '').toUpperCase() === 'DEPOSIT',
+          )
           if (paidTx) {
             setDepositTransaction((prev) => ({ ...prev, ...paidTx }))
             setDepositSuccess(true)
@@ -1253,7 +1540,7 @@ function BookingDetailPage() {
   }
 
   const handleCompleteService = () => {
-    if (!canCompleteService) return
+    if (!canFinishService) return
     setCompleteServiceError('')
     setCompleteServiceModalOpen(true)
   }
@@ -1284,6 +1571,11 @@ function BookingDetailPage() {
     try {
       const result = await bookingApi.completeService(id, note)
       setCompleteServiceModalOpen(false)
+      // Apply server response immediately as source of truth before reloading
+      if (result) {
+        setBooking((prev) => ({ ...prev, ...result }))
+        writeCachedBooking(result.id, result)
+      }
       await loadDetail()
       await loadServiceSteps()
       const updatedPaymentStatus = String(result?.paymentStatus || '').toUpperCase()
@@ -1291,10 +1583,9 @@ function BookingDetailPage() {
         setActionMessage('Service completed.')
       } else {
         setActionMessage('Service completed. Please process payment.')
+        setCashPayError('')
+        setPaymentCollectionOpen(true)
       }
-      setCashPayError('')
-      setPaymentCollectionOpen(true)
-      setSelectedStatus('COMPLETED')
       refreshBookingCount()
     } catch (err) {
       setCompleteServiceError(getCompleteServiceErrorMessage(err))
@@ -1334,7 +1625,7 @@ function BookingDetailPage() {
     setPayosQrError('')
     setPayosSuccess(false)
     try {
-      const result = await bookingApi.createPayOSPayment(id)
+      const result = await bookingApi.createFinalPayOSPayment(id)
       writeCachedPaymentMethod(id, booking?.paymentMethod || 'PAYOS')
       if (result?.checkoutUrl) {
         persistPayOSReturnPath(location.pathname, result)
@@ -1385,7 +1676,11 @@ function BookingDetailPage() {
         }
       } else {
         const transactions = await bookingApi.getPaymentTransactions(id)
-        const paidTx = transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
+        const paidTx = transactions.find(
+          (tx) =>
+            String(tx.status || '').toUpperCase() === 'PAID' &&
+            String(tx.purpose || '').toUpperCase() === 'FINAL',
+        )
         if (paidTx) {
           setPayosTransaction((prev) => ({ ...prev, ...paidTx }))
           setPayosSuccess(true)
@@ -1435,7 +1730,7 @@ function BookingDetailPage() {
     setDepositQrError('')
     setDepositSuccess(false)
     try {
-      const result = await bookingApi.createPayOSPayment(id)
+      const result = await bookingApi.createDepositPayOSPayment(id)
       persistPayOSReturnPath(location.pathname, result)
 
       let txData = {
@@ -1483,7 +1778,11 @@ function BookingDetailPage() {
         }
       } else {
         const transactions = await bookingApi.getPaymentTransactions(id)
-        const paidTx = transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
+        const paidTx = transactions.find(
+          (tx) =>
+            String(tx.status || '').toUpperCase() === 'PAID' &&
+            String(tx.purpose || '').toUpperCase() === 'DEPOSIT',
+        )
         if (paidTx) {
           setDepositTransaction((prev) => ({ ...prev, ...paidTx }))
           setDepositSuccess(true)
@@ -1623,12 +1922,17 @@ function BookingDetailPage() {
     (resourceWashBayId ? `Bay #${resourceWashBayId}` : '')
   const resourceWashBayTypeLabel = assignedResources?.washBayTypeLabel || booking?.washBayTypeLabel || ''
   const rawCareStaffIds = assignedResources?.assignedCareStaffIds || booking?.assignedCareStaffIds || []
-  const resourceCareStaffLabels =
-    assignedResources?.careStaffLabels?.length > 0
-      ? assignedResources.careStaffLabels
-      : booking?.careStaffLabels?.length > 0
-        ? booking.careStaffLabels
-        : rawCareStaffIds.map((staffId) => `Staff #${staffId}`)
+  // For staff/admin: use the assignedCareStaff data from the dedicated endpoint (no 403).
+  // For customer: fall back to booking IDs with generic labels.
+  const resourceCareStaffLabels = role !== 'customer' && assignedCareStaff.length > 0
+    ? assignedCareStaff.map((s) => {
+        const name = `${s.displayName || 'Staff'}${s.staffCode ? ` (${s.staffCode})` : ''}`
+        const statusLabel = s.assignmentStatus === 'RELEASED' ? ' — Completed'
+          : s.assignmentStatus === 'ACTIVE' ? ' — In progress'
+          : ''
+        return name + statusLabel
+      })
+    : rawCareStaffIds.map((staffId) => `Staff #${staffId}`)
   const hasAssignedResources = Boolean(resourceWashBayLabel || resourceCareStaffLabels.length > 0)
   const resourceCareStaffText = resourceCareStaffLabels.length > 0
     ? resourceCareStaffLabels.join(', ')
@@ -1692,10 +1996,110 @@ function BookingDetailPage() {
 
       setInspectionMessage('')
       await loadInspections(booking)
+      if (type === 'AFTER_WASH') setEditingAfterWash(false)
     } catch (err) {
       setInspectionError(err?.response?.data?.message || err?.message || 'Failed to save inspection.')
     } finally {
       setInspectionSavingType('')
+    }
+  }
+
+  const handleStartWash = async () => {
+    if (!canStartWash) return
+    setPhaseActionLoading(true)
+    setPhaseActionError('')
+    try {
+      await bookingApi.startWash(id, '')
+      setActionMessage('Wash started. Bay assigned.')
+      await loadDetail()
+      await loadServiceSteps()
+    } catch (err) {
+      setPhaseActionError(getActionErrorMessage(err) || 'Failed to start wash.')
+    } finally {
+      setPhaseActionLoading(false)
+    }
+  }
+
+  const handleCompleteWash = async () => {
+    if (!canCompleteWash) return
+    setPhaseActionLoading(true)
+    setPhaseActionError('')
+    try {
+      await bookingApi.completeWash(id, '')
+      setActionMessage('Wash completed. Bay released.')
+      await loadDetail()
+      await loadServiceSteps()
+    } catch (err) {
+      setPhaseActionError(getActionErrorMessage(err) || 'Failed to complete wash.')
+    } finally {
+      setPhaseActionLoading(false)
+    }
+  }
+
+  const handleStartCare = async () => {
+    if (!canStartCare) return
+    setPhaseActionLoading(true)
+    setPhaseActionError('')
+    try {
+      await bookingApi.startCare(id, '')
+      setActionMessage('Care session started.')
+      await loadDetail()
+    } catch (err) {
+      setPhaseActionError(getActionErrorMessage(err) || 'Failed to start care.')
+    } finally {
+      setPhaseActionLoading(false)
+    }
+  }
+
+  const handleCompleteCare = async () => {
+    if (!canCompleteCare) return
+    setPhaseActionLoading(true)
+    setPhaseActionError('')
+    try {
+      await bookingApi.completeCare(id, '')
+      setActionMessage('Care completed. Proceeding to final inspection.')
+      await loadDetail()
+      await loadServiceSteps()
+    } catch (err) {
+      setPhaseActionError(getActionErrorMessage(err) || 'Failed to complete care.')
+    } finally {
+      setPhaseActionLoading(false)
+    }
+  }
+
+  const handleCompleteFinalInspection = async () => {
+    if (!canCompleteFinalInspection) return
+    setPhaseActionLoading(true)
+    setPhaseActionError('')
+    try {
+      const result = await bookingApi.completeFinalInspection(id)
+      if (result) {
+        setBooking((prev) => ({ ...prev, ...result }))
+        writeCachedBooking?.(result.id, result)
+      }
+      setActionMessage('Final inspection confirmed. Booking is ready for handover.')
+      await loadDetail()
+    } catch (err) {
+      setPhaseActionError(getActionErrorMessage(err) || 'Failed to complete final inspection.')
+    } finally {
+      setPhaseActionLoading(false)
+    }
+  }
+
+  const handleRecoverCareWorkflow = async () => {
+    if (!needsCareWorkflowRecovery) return
+    setPhaseActionLoading(true)
+    setPhaseActionError('')
+    try {
+      await bookingApi.recoverCareWorkflow(id)
+      setActionMessage('Booking returned to Vehicle Care. Assign/start care and complete the pending care steps.')
+      await loadDetail()
+      await loadServiceSteps()
+      await loadCareAssignmentData()
+    } catch (err) {
+      setPhaseActionError(getActionErrorMessage(err) || 'Failed to restore the Vehicle Care workflow.')
+    } finally {
+      setPhaseActionLoading(false)
     }
   }
 
@@ -1714,7 +2118,7 @@ function BookingDetailPage() {
               {typeLabel}
             </span>
             <span className={`bd-inspection-status ${existingInspection ? 'bd-inspection-status--created' : 'bd-inspection-status--missing'}`}>
-              {existingInspection ? '✓ Created' : 'Not yet created'}
+              {existingInspection ? 'Created' : 'Not yet created'}
             </span>
           </div>
           {existingInspection && (
@@ -1815,10 +2219,23 @@ function BookingDetailPage() {
               {booking.isWalkIn && <span className="bd-badge bd-badge--walkin">Walk-in</span>}
               <span className={`bd-badge bd-badge--${statusKey}`}>{getStatusText(booking.status)}</span>
               <span className={`bd-badge bd-badge--${paymentKey}`}>{getPaymentStatusText(booking.paymentStatus)}</span>
+              {booking.operationPhase && (
+                <span className="bd-badge bd-badge--phase">{getOperationPhaseText(booking.operationPhase)}</span>
+              )}
             </div>
           </div>
 
           {/* ── Info grid ── */}
+          {currentStatus === 'PENDING_DEPOSIT' && depositStatus !== 'PAID' && (
+            <DepositDeadlineNotice
+              paymentExpiredAt={booking.paymentExpiredAt}
+              depositAmount={booking.depositAmount}
+              customerView={role === 'customer'}
+              onPay={handlePayDeposit}
+              loading={depositLoading}
+            />
+          )}
+
           <div className="bd-info">
             <div className="bd-info-cell">
               <span className="bd-info-label">{TEXT.customer}</span>
@@ -1868,6 +2285,22 @@ function BookingDetailPage() {
               <span className="bd-info-label">Check-in</span>
               <span className="bd-info-value"><strong>{getCheckInDisplay(booking)}</strong></span>
             </div>
+            {booking.plannedWashStartAt && (
+              <div className="bd-info-cell">
+                <span className="bd-info-label">Wash window</span>
+                <span className="bd-info-value">
+                  <strong>{formatDateTime(booking.plannedWashStartAt)} – {formatDateTime(booking.plannedWashEndAt)}</strong>
+                </span>
+              </div>
+            )}
+            {booking.plannedCareStartAt && (
+              <div className="bd-info-cell">
+                <span className="bd-info-label">Care window</span>
+                <span className="bd-info-value">
+                  <strong>{formatDateTime(booking.plannedCareStartAt)} – {formatDateTime(booking.plannedCareEndAt)}</strong>
+                </span>
+              </div>
+            )}
             <div className="bd-info-cell">
               <span className="bd-info-label">{TEXT.paidAt}</span>
               <span className="bd-info-value"><strong>{formatDateTime(booking.paidAt)}</strong></span>
@@ -1926,11 +2359,6 @@ function BookingDetailPage() {
                   {TEXT.createQr}
                 </button>
               )}
-              {canPayDeposit && (
-                <button type="button" className="bd-btn--payos" onClick={handlePayDeposit} disabled={depositLoading}>
-                  {depositLoading ? 'Creating...' : 'Pay deposit'}
-                </button>
-              )}
             </div>
           </div>
 
@@ -1961,6 +2389,64 @@ function BookingDetailPage() {
                 <span className="bd-info-label">{TEXT.careStaff}</span>
                 <span className="bd-info-value"><strong>{resourceCareStaffText}</strong></span>
               </div>
+            </div>
+          )}
+
+          {/* ── Care staff assignment ── */}
+          {canManageCareAssignment && careAssignmentStatus?.requiresCareStaff && (
+            <div className={`bd-action-msg ${careAssignmentStatus.shortage ? 'bd-action-msg--warn' : 'bd-action-msg--info'}`}>
+              {(careAssignmentStatus.operationPhase === 'FINAL_INSPECTION'
+                || careAssignmentStatus.operationPhase === 'READY_FOR_HANDOVER'
+                || careAssignmentStatus.operationPhase === 'DONE') ? (
+                <p className="bd-care-assign-summary">
+                  Care staff:{' '}
+                  <strong>{careAssignmentStatus.assignedCount ?? 0}</strong> / {careAssignmentStatus.requiredCount ?? 0} completed
+                </p>
+              ) : (
+                <p className="bd-care-assign-summary">
+                  Care staff:{' '}
+                  <strong>{careAssignmentStatus.assignedCount ?? 0}</strong> / {careAssignmentStatus.requiredCount ?? 0} assigned
+                  {careAssignmentStatus.plannedCareStartAt && (
+                    <span className="bd-care-assign-window">
+                      {' '}&middot; Window: {new Date(careAssignmentStatus.plannedCareStartAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {' – '}{new Date(careAssignmentStatus.plannedCareEndAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </p>
+              )}
+              {careAssignmentStatus.shortage && careAssignmentStatus.canAssign && (
+                <>
+                  <p className="bd-care-assign-prompt">
+                    Assign a vehicle care staff member to meet the required count.
+                  </p>
+                  <div className="bd-care-assign-row">
+                    <select
+                      className="bd-care-assign-select"
+                      value={selectedCareStaffProfileId}
+                      onChange={(e) => setSelectedCareStaffProfileId(e.target.value)}
+                      disabled={careAssignLoading}
+                    >
+                      <option value="">— Select care staff —</option>
+                      {availableCareStaff.map((s) => (
+                        <option key={s.staffProfileId} value={s.staffProfileId}>
+                          {s.displayName || `Staff #${s.staffProfileId}`} ({s.staffCode})
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="bd-btn bd-btn--start bd-care-assign-btn"
+                      disabled={!selectedCareStaffProfileId || careAssignLoading}
+                      onClick={handleAssignCareStaff}
+                    >
+                      {careAssignLoading ? 'Assigning…' : 'Assign'}
+                    </button>
+                  </div>
+                </>
+              )}
+              {careAssignError && (
+                <p className="bd-care-assign-error">{careAssignError}</p>
+              )}
             </div>
           )}
 
@@ -2005,37 +2491,34 @@ function BookingDetailPage() {
               </div>
               <span className="bd-section-meta">{booking.servicePackageName || TEXT.servicePackage}</span>
             </div>
-            {serviceSteps.length > 0 ? (
+            {visibleServiceSteps.length > 0 ? (
               <ServiceStepsProgress
-                steps={serviceSteps}
+                steps={visibleServiceSteps}
                 bookingStatus={currentStatus}
-                onCompleteStep={role !== 'customer' ? handleCompleteServiceStep : undefined}
-                onReopenStep={role !== 'customer' ? handleReopenServiceStep : undefined}
+                onCompleteStep={!serviceStepsReadOnly && role !== 'customer' ? handleCompleteServiceStep : undefined}
+                onReopenStep={!serviceStepsReadOnly && role !== 'customer' ? handleReopenServiceStep : undefined}
                 actionLoadingStepId={stepActionLoadingId}
                 error={stepActionError}
-                renderStepExtra={role === 'staff' && ['IN_PROGRESS', 'COMPLETED'].includes(currentStatus)
+                isStepBlocked={(role === 'staff' || role === 'admin')
                   ? (step) => {
-                      if (step.order === 1) return renderInspectionCard('BEFORE_WASH')
-                      const isLastStep = !serviceSteps.some((s, i) =>
-                        Number(s.stepOrder || s.order || s.sequence || i + 1) > step.order,
-                      )
-                      if (isLastStep && getInspectionTypes(booking).includes('AFTER_WASH')) {
-                        return renderInspectionCard('AFTER_WASH')
+                      const stepPhase = String(step.executionPhase || '').toUpperCase()
+                      if (!stepPhase) {
+                        return 'This step has no execution phase. Fix the service package configuration first.'
                       }
-                      return null
-                    }
-                  : undefined}
-                isStepBlocked={role === 'staff'
-                  ? (step) => {
-                      if (step.order === 1 && !getInspectionByType(inspections, 'BEFORE_WASH')) return true
-                      const isLastStep = !serviceSteps.some((s, i) =>
-                        Number(s.stepOrder || s.order || s.sequence || i + 1) > step.order,
-                      )
-                      if (isLastStep && getInspectionTypes(booking).includes('AFTER_WASH') && !getInspectionByType(inspections, 'AFTER_WASH')) return true
+                      if (stepPhase === 'AUTOMATED_WASH' && operationPhase !== 'AUTOMATED_WASH') {
+                        return 'This step can only be completed during the Automated Wash phase.'
+                      }
+                      if (stepPhase === 'VEHICLE_CARE' && operationPhase !== 'VEHICLE_CARE') {
+                        return 'This step can only be completed during the Vehicle Care phase.'
+                      }
                       return false
                     }
                   : undefined}
               />
+            ) : serviceSteps.length > 0 ? (
+              <div className="bd-phase-config-error">
+                No service steps are configured for the current phase. Update the package step execution phases before continuing.
+              </div>
             ) : booking.servicePackageSteps?.length > 0 ? (
               <ol className="bd-step-list">
                 {booking.servicePackageSteps.map((step, index) => (
@@ -2053,12 +2536,174 @@ function BookingDetailPage() {
             )}
           </section>
 
+          {/* ── Before-Wash Inspection gate (WAITING_FOR_INTAKE phase) ── */}
+          {canStartWash && (role === 'staff' || role === 'admin') && (
+            <section className="bd-section bd-section--intake">
+              <div className="bd-section-head">
+                <div className="bd-section-head-left">
+                  <span className="bd-section-eyebrow">Required before wash</span>
+                  <h3 className="bd-section-title">Before-Wash Inspection</h3>
+                </div>
+                {getInspectionByType(inspections, 'BEFORE_WASH') && (
+                  <span className="bd-badge bd-badge--confirmed bd-badge--intake-done">Inspection completed</span>
+                )}
+              </div>
+
+              {!getInspectionByType(inspections, 'BEFORE_WASH') ? (
+                <div>
+                  <p className="bd-intake-hint">
+                    Complete the intake inspection before starting the automated wash.
+                  </p>
+                  {renderInspectionCard('BEFORE_WASH')}
+                </div>
+              ) : (
+                <div className="bd-inspection-done-summary">
+                  {(() => {
+                    const insp = getInspectionByType(inspections, 'BEFORE_WASH')
+                    return (
+                      <>
+                        {insp.exteriorCondition && (
+                          <p className="bd-intake-field"><strong>Exterior:</strong> {insp.exteriorCondition}</p>
+                        )}
+                        {insp.interiorCondition && (
+                          <p className="bd-intake-field"><strong>Interior:</strong> {insp.interiorCondition}</p>
+                        )}
+                        {insp.notes && (
+                          <p className="bd-intake-field"><strong>Notes:</strong> {insp.notes}</p>
+                        )}
+                        <p className="bd-intake-done-ts">
+                          Inspected {formatDateTime(insp.updatedAt || insp.createdAt)}
+                          {insp.inspectedByStaffName ? ` by ${insp.inspectedByStaffName}` : ''}
+                        </p>
+                      </>
+                    )
+                  })()}
+                </div>
+              )}
+
+              <div className="bd-intake-action-row">
+                <button
+                  type="button"
+                  className="bd-btn bd-btn--start"
+                  disabled={phaseActionLoading || actionLoading || !getInspectionByType(inspections, 'BEFORE_WASH')}
+                  onClick={handleStartWash}
+                  title={
+                    !getInspectionByType(inspections, 'BEFORE_WASH')
+                      ? 'Complete the before-wash inspection first'
+                      : 'Start the automated wash'
+                  }
+                >
+                  {phaseActionLoading ? 'Starting...' : 'Start Automated Wash'}
+                </button>
+              </div>
+            </section>
+          )}
+
+          {/* ── After-Service Inspection (FINAL_INSPECTION phase, care bookings) ── */}
+          {needsCareWorkflowRecovery && (
+            <section className="bd-workflow-recovery" role="alert">
+              <div>
+                <strong>Vehicle Care is not finished</strong>
+                <p>
+                  {pendingCareStepCount} care step(s), including “{careSteps.find((step) => String(step.status || '').toUpperCase() !== 'COMPLETED')?.name || 'Vehicle Care'}”,
+                  are still pending. Return this booking to Vehicle Care before final inspection.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="bd-btn bd-btn--start"
+                disabled={phaseActionLoading || actionLoading}
+                onClick={handleRecoverCareWorkflow}
+              >
+                {phaseActionLoading ? 'Restoring...' : 'Return to Vehicle Care'}
+              </button>
+            </section>
+          )}
+
+          {operationPhase === 'FINAL_INSPECTION' && !needsCareWorkflowRecovery && needsCareForHandover && (role === 'staff' || role === 'admin') && (
+            <section className="bd-section bd-section--intake" id="after-service-inspection">
+              <div className="bd-section-head">
+                <div className="bd-section-head-left">
+                  <span className="bd-section-eyebrow">Required before handover</span>
+                  <h3 className="bd-section-title">After-Service Inspection</h3>
+                </div>
+                {afterWashInsp ? (
+                  isAfterWashStale ? (
+                    <span className="bd-badge bd-badge--warn">Needs reconfirmation</span>
+                  ) : (
+                    <span className="bd-badge bd-badge--confirmed bd-badge--intake-done">Inspection completed</span>
+                  )
+                ) : (
+                  <span className="bd-badge bd-badge--warn">Missing</span>
+                )}
+              </div>
+
+              {!afterWashInsp ? (
+                <div>
+                  <p className="bd-intake-hint">
+                    Document the vehicle condition after care before handing over to the customer.
+                  </p>
+                  {renderInspectionCard('AFTER_WASH')}
+                </div>
+              ) : editingAfterWash ? (
+                <div>
+                  {isAfterWashStale && (
+                    <p className="bd-intake-stale-warning">
+                      This inspection was recorded before Vehicle Care was completed. Review the vehicle's current condition and save to reconfirm.
+                    </p>
+                  )}
+                  {renderInspectionCard('AFTER_WASH')}
+                  {currentStatus !== 'COMPLETED' && (
+                    <div className="bd-intake-action-row">
+                      <button type="button" className="bd-btn bd-btn--secondary" onClick={() => setEditingAfterWash(false)}>
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bd-inspection-done-summary">
+                  {isAfterWashStale && (
+                    <p className="bd-intake-stale-warning">
+                      Inspection was recorded before Vehicle Care completed. Reconfirm the vehicle's current condition before completing final inspection.
+                    </p>
+                  )}
+                  {afterWashInsp.exteriorCondition && (
+                    <p className="bd-intake-field"><strong>Exterior:</strong> {afterWashInsp.exteriorCondition}</p>
+                  )}
+                  {afterWashInsp.interiorCondition && (
+                    <p className="bd-intake-field"><strong>Interior:</strong> {afterWashInsp.interiorCondition}</p>
+                  )}
+                  {afterWashInsp.notes && (
+                    <p className="bd-intake-field"><strong>Notes:</strong> {afterWashInsp.notes}</p>
+                  )}
+                  <p className="bd-intake-done-ts">
+                    Inspected {formatDateTime(afterWashInsp.updatedAt || afterWashInsp.createdAt)}
+                    {afterWashInsp.inspectedByStaffName ? ` by ${afterWashInsp.inspectedByStaffName}` : ''}
+                  </p>
+                  {currentStatus !== 'COMPLETED' && (
+                    <div className="bd-intake-action-row">
+                      <button type="button" className="bd-btn bd-btn--secondary" onClick={() => setEditingAfterWash(true)}>
+                        Edit inspection
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+
           {/* ── Inspection messages ── */}
-          {role === 'staff' && (inspectionMessage || inspectionError) && (
+          {(role === 'staff' || role === 'admin') && (inspectionMessage || inspectionError) && (
             <div className="bd-inspection-messages">
               {inspectionMessage && <p className="bd-inspect-msg bd-inspect-msg--ok">{inspectionMessage}</p>}
               {inspectionError && <p className="bd-inspect-msg bd-inspect-msg--err">{inspectionError}</p>}
             </div>
+          )}
+
+          {/* ── Phase action error ── */}
+          {phaseActionError && (
+            <div className="bd-action-msg bd-action-msg--error">{phaseActionError}</div>
           )}
 
           {/* ── Action message ── */}
@@ -2090,7 +2735,7 @@ function BookingDetailPage() {
           )}
 
           {/* ── Staff/admin action footer ── */}
-          {role !== 'customer' && !isClosedBooking && (
+          {canManageCareAssignment && !isClosedBooking && (
             <div className="bd-footer">
               <div className="bd-danger-group">
                 {canMarkNoShow && (
@@ -2107,6 +2752,7 @@ function BookingDetailPage() {
                   {TEXT.checkInBooking}
                 </button>
               )}
+              {/* ── Legacy (no operation phase) ── */}
               {canStartService && (
                 <button type="button" className="bd-btn bd-btn--start" disabled={actionLoading} onClick={handleStartService}>
                   {TEXT.startService}
@@ -2115,6 +2761,89 @@ function BookingDetailPage() {
               {canCompleteService && (
                 <button type="button" className="bd-btn bd-btn--complete" disabled={actionLoading} onClick={handleCompleteService}>
                   {actionLoading ? 'Completing...' : TEXT.completeService}
+                </button>
+              )}
+              {/* ── Operation phase buttons ── */}
+              {/* NOTE: canStartWash — "Start Automated Wash" button is now rendered in the
+                  Before-Wash Inspection gate section above, where it is gated on the
+                  BEFORE_WASH inspection existing. No standalone button here. */}
+              {canCompleteWash && (
+                <>
+                  {!allWashStepsDone && (
+                    <p className="bd-care-assign-error">
+                      {washSteps.length === 0
+                        ? 'No Automated Wash steps are configured. Fix the service package before releasing the bay.'
+                        : `${pendingWashStepCount} wash step(s) must be completed before releasing the bay.`}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="bd-btn bd-btn--complete"
+                    disabled={phaseActionLoading || actionLoading || !allWashStepsDone}
+                    title={!allWashStepsDone
+                      ? washSteps.length === 0
+                        ? 'No Automated Wash steps are configured'
+                        : `${pendingWashStepCount} wash step(s) still incomplete`
+                      : undefined}
+                    onClick={handleCompleteWash}
+                  >
+                    {phaseActionLoading ? 'Completing...' : 'Complete Wash & Release Bay'}
+                  </button>
+                </>
+              )}
+              {canStartCare && (
+                <button type="button" className="bd-btn bd-btn--start" disabled={phaseActionLoading || actionLoading} onClick={handleStartCare}>
+                  {phaseActionLoading ? 'Starting...' : 'Confirm Care Started'}
+                </button>
+              )}
+              {canCompleteCare && (
+                <>
+                  {!allCareStepsDone && (
+                    <p className="bd-care-assign-error">
+                      {careSteps.length === 0
+                        ? 'No Vehicle Care steps are configured. Fix the service package before releasing care staff.'
+                        : `${pendingCareStepCount} care step(s) must be completed before finishing vehicle care.`}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="bd-btn bd-btn--complete"
+                    disabled={phaseActionLoading || actionLoading || !allCareStepsDone}
+                    title={!allCareStepsDone
+                      ? careSteps.length === 0
+                        ? 'No Vehicle Care steps are configured'
+                        : `${pendingCareStepCount} care step(s) still incomplete`
+                      : undefined}
+                    onClick={handleCompleteCare}
+                  >
+                    {phaseActionLoading ? 'Completing...' : 'Verify & Complete Care'}
+                  </button>
+                </>
+              )}
+              {canCompleteFinalInspection && missingAfterWash && (
+                <p className="bd-care-assign-error">
+                  Create the After-Service Inspection before confirming final inspection.
+                </p>
+              )}
+              {canCompleteFinalInspection && (
+                <button
+                  type="button"
+                  className="bd-btn bd-btn--complete"
+                  disabled={phaseActionLoading || actionLoading || missingAfterWash}
+                  title={missingAfterWash ? 'Create the After-Service Inspection first' : undefined}
+                  onClick={handleCompleteFinalInspection}
+                >
+                  {phaseActionLoading ? 'Confirming...' : 'Confirm Final Inspection Done'}
+                </button>
+              )}
+              {canCompletePhaseService && (
+                <button
+                  type="button"
+                  className="bd-btn bd-btn--complete"
+                  disabled={actionLoading || phaseActionLoading}
+                  onClick={handleCompleteService}
+                >
+                  {actionLoading ? 'Completing...' : 'Complete & Hand Over'}
                 </button>
               )}
               {hasPendingUpdate && (
@@ -2130,6 +2859,7 @@ function BookingDetailPage() {
       <CancelBookingModal
         open={cancelModalOpen}
         bookingId={displayBookingNo}
+        rawBookingId={id}
         loading={cancelLoading}
         onClose={() => { if (!cancelLoading) setCancelModalOpen(false) }}
         onConfirm={handleCancelConfirm}
@@ -2185,10 +2915,19 @@ function BookingDetailPage() {
         cashError={cashPayError}
         payosLoading={payosLoading}
         showSuccess={showPaymentSuccess}
+        verifying={paymentVerifying}
+        pending={paymentPending}
+        successMessage={paymentSuccessMessage}
+        onCheckAgain={() => startPaymentVerification(paymentOrderCodeRef.current)}
         onClose={() => {
           if (!cashPayLoading && !payosLoading) {
+            paymentVerificationStopRef.current?.()
+            paymentVerificationStopRef.current = null
             setPaymentCollectionOpen(false)
             setShowPaymentSuccess(false)
+            setPaymentVerifying(false)
+            setPaymentPending(false)
+            setPaymentSuccessMessage('')
             setCashPayError('')
           }
         }}
@@ -2221,6 +2960,7 @@ function BookingDetailPage() {
         open={depositQrOpen}
         onClose={handleDepositQrClose}
         booking={booking}
+        bookingDisplayNumber={displayBookingNo}
         transaction={depositTransaction}
         checkoutUrl={depositCheckoutUrl}
         error={depositQrError}

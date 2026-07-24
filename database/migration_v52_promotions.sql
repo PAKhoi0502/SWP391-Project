@@ -9,3 +9,5 @@ ADD description NVARCHAR(500) NULL;
 ALTER TABLE promotion_usages
 ADD CONSTRAINT UQ_promotion_usage_booking
 UNIQUE (booking_id);
+
+SELECT * FROM users

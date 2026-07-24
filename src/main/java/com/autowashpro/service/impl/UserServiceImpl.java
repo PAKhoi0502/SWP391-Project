@@ -10,6 +10,7 @@ import com.autowashpro.repository.RefreshTokenRepository;
 import com.autowashpro.repository.UploadRepository;
 import com.autowashpro.repository.UserRepository;
 import com.autowashpro.service.UserService;
+import com.autowashpro.service.support.VietnamesePhoneNumber;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -40,6 +41,7 @@ public class UserServiceImpl implements UserService {
                 .phone(user.getPhone())
                 .role(user.getRole())
                 .isActive(user.getIsActive())
+                .hasPassword(user.getPasswordHash() != null)
                 .build();
     }
 
@@ -79,22 +81,26 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() ->
                         new RuntimeException("User not found"));
 
+        String normalizedPhone = request.getPhone() == null
+                ? user.getPhone()
+                : VietnamesePhoneNumber.normalizeMobile(request.getPhone());
+
         if (!Objects.equals(user.getEmail(), request.getEmail())
                 && userRepository.existsByEmail(request.getEmail())) {
 
             throw new RuntimeException("Email already exists");
         }
 
-        if (!Objects.equals(user.getPhone(), request.getPhone())
-                && request.getPhone() != null
-                && userRepository.existsByPhone(request.getPhone())) {
+        if (!Objects.equals(user.getPhone(), normalizedPhone)
+                && normalizedPhone != null
+                && userRepository.existsByPhone(normalizedPhone)) {
 
             throw new RuntimeException("Phone already exists");
         }
 
         user.setFullName(request.getFullName());
         user.setEmail(request.getEmail());
-        user.setPhone(request.getPhone());
+        user.setPhone(normalizedPhone);
         user.setUpdatedAt(LocalDateTime.now());
 
         userRepository.save(user);
@@ -108,6 +114,11 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() ->
                         new RuntimeException("User not found"));
+
+        if (user.getPasswordHash() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "This account signed in with Google and has no password to change");
+        }
 
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect");

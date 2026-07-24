@@ -2,6 +2,7 @@ package com.autowashpro.controller;
 
 import com.autowashpro.common.ApiResponse;
 import com.autowashpro.dto.review.AdminReviewStatsResponse;
+import com.autowashpro.dto.review.PublicReviewResponse;
 import com.autowashpro.dto.review.ReviewCreateRequest;
 import com.autowashpro.dto.review.ReviewEligibilityResponse;
 import com.autowashpro.dto.review.ReviewResponse;
@@ -13,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -51,6 +53,19 @@ public class BookingReviewController {
                 .build();
     }
 
+    @GetMapping("/customer/reviews/reviewed-booking-ids")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ApiResponse<List<Long>> getMyReviewedBookingIds(
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        Long customerId = Long.valueOf(userDetails.getUsername());
+        return ApiResponse.<List<Long>>builder()
+                .success(true)
+                .message("Reviewed booking IDs retrieved")
+                .data(bookingReviewService.getMyReviewedBookingIds(customerId))
+                .build();
+    }
+
     @GetMapping("/bookings/{bookingId}/reviews")
     @PreAuthorize("hasRole('CUSTOMER')")
     public ApiResponse<ReviewResponse> getMyReview(
@@ -68,11 +83,11 @@ public class BookingReviewController {
     // ── Public endpoints (no auth) ────────────────────────────────────────────
 
     @GetMapping("/public/reviews")
-    public ApiResponse<Page<ReviewResponse>> getPublicReviews(
+    public ApiResponse<Page<PublicReviewResponse>> getPublicReviews(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int limit) {
 
-        return ApiResponse.<Page<ReviewResponse>>builder()
+        return ApiResponse.<Page<PublicReviewResponse>>builder()
                 .success(true)
                 .message("Reviews retrieved")
                 .data(bookingReviewService.getPublicReviews(page, limit))

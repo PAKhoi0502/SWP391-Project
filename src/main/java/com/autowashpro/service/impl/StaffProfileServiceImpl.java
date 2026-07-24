@@ -139,8 +139,8 @@ public class StaffProfileServiceImpl implements StaffProfileService {
 
     @Override
     public PageResponse<StaffProfileResponse> list(int page, int limit, Long garageId, StaffType staffType, Boolean isActive) {
-        Specification<StaffProfile> spec = Specification
-                .where(StaffProfileSpecifications.garageIdEquals(garageId))
+        Specification<StaffProfile> spec = ((Specification<StaffProfile>) (root, query, cb) -> null)
+                .and(StaffProfileSpecifications.garageIdEquals(garageId))
                 .and(StaffProfileSpecifications.staffTypeEquals(staffType))
                 .and(StaffProfileSpecifications.isActiveEquals(isActive));
 

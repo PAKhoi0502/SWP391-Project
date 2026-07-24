@@ -17,6 +17,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -49,9 +51,12 @@ public class WashBayController {
             @RequestParam(defaultValue = "10") int limit,
             @RequestParam(required = false) Long garageId,
             @RequestParam(required = false) String vehicleType,
-            @RequestParam(required = false) WashBayStatus status
+            @RequestParam(required = false) WashBayStatus status,
+            @AuthenticationPrincipal UserDetails userDetails
     ) {
-        return ResponseEntity.ok(washBayService.list(page, limit, garageId, vehicleType, status));
+        Long callerId = Long.valueOf(userDetails.getUsername());
+        String role = userDetails.getAuthorities().stream().findFirst().orElseThrow().getAuthority();
+        return ResponseEntity.ok(washBayService.list(page, limit, garageId, vehicleType, status, callerId, role));
     }
 
     // QUAN TRỌNG: 2 endpoint /garages/:id/... phải đặt TRƯỚC /{id}
@@ -65,15 +70,23 @@ public class WashBayController {
     @PreAuthorize("hasRole('ADMIN') or hasRole('STAFF')")
     public ResponseEntity<WashBayCapacityResponse> getCapacity(
             @PathVariable Long garageId,
-            @RequestParam(required = false) String vehicleType
+            @RequestParam(required = false) String vehicleType,
+            @AuthenticationPrincipal UserDetails userDetails
     ) {
-        return ResponseEntity.ok(washBayService.getCapacity(garageId, vehicleType));
+        Long callerId = Long.valueOf(userDetails.getUsername());
+        String role = userDetails.getAuthorities().stream().findFirst().orElseThrow().getAuthority();
+        return ResponseEntity.ok(washBayService.getCapacity(garageId, vehicleType, callerId, role));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('STAFF')")
-    public ResponseEntity<WashBayResponse> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(washBayService.getById(id));
+    public ResponseEntity<WashBayResponse> getById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        Long callerId = Long.valueOf(userDetails.getUsername());
+        String role = userDetails.getAuthorities().stream().findFirst().orElseThrow().getAuthority();
+        return ResponseEntity.ok(washBayService.getById(id, callerId, role));
     }
 
     @PatchMapping("/{id}")
@@ -92,9 +105,13 @@ public class WashBayController {
 
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN') or hasRole('STAFF')")
-    public ResponseEntity<WashBayResponse> updateStatus(@PathVariable Long id,
-                                                          @Valid @RequestBody WashBayStatusUpdateRequest request) {
-        WashBayResponse response = washBayService.updateStatus(id, request);
+    public ResponseEntity<WashBayResponse> updateStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody WashBayStatusUpdateRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long callerId = Long.valueOf(userDetails.getUsername());
+        String role = userDetails.getAuthorities().stream().findFirst().orElseThrow().getAuthority();
+        WashBayResponse response = washBayService.updateStatus(id, request, callerId, role);
         auditLogService.createAuditLog(
                 AuditActorContext.currentActorId(),
                 AuditAction.WASH_BAY_STATUS_UPDATED,

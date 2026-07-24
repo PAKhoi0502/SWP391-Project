@@ -20,6 +20,7 @@ public class DepositRefundResponse {
     private String status;
     private String rejectReason;
     private String adminNote;
+    private String transactionReference;
     private LocalDateTime requestedAt;
     private Long reviewedBy;
     private LocalDateTime reviewedAt;

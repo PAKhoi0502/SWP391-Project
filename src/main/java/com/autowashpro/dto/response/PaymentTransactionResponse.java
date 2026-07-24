@@ -14,6 +14,7 @@ public class PaymentTransactionResponse {
     private String paymentMethod;
     private BigDecimal amount;
     private String status;
+    private String purpose;
     private Long orderCode;
     private String checkoutUrl;
     private String qrCode;

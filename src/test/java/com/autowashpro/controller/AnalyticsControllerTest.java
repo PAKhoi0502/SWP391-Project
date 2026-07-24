@@ -44,13 +44,13 @@ class AnalyticsControllerTest {
     private AnalyticsService analyticsService;
 
     @MockitoBean
+    private AdminDashboardBookingService adminDashboardBookingService;
+
+    @MockitoBean
     private JwtService jwtService;
 
     @MockitoBean
     private CustomUserDetailsService customUserDetailsService;
-
-    @MockitoBean
-    private AdminDashboardBookingService adminDashboardBookingService;
 
     @Test
     void rejectsCustomerAnalyticsAccess() throws Exception {

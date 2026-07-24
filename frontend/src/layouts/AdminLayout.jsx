@@ -23,6 +23,7 @@ function NavIcon({ name, size = 16 }) {
     download:  <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
     shield:    <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></>,
     message:   <><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></>,
+    alert:     <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
     'chevron-down':  <polyline points="6 9 12 15 18 9"/>,
     'chevron-left':  <polyline points="15 18 9 12 15 6"/>,
     'chevron-right': <polyline points="9 18 15 12 9 6"/>,
@@ -79,7 +80,7 @@ const NAV_GROUPS = [
     icon: 'star',
     items: [
       { to: '/admin/loyalty/tier-rules',    label: 'Loyalty Tiers', icon: 'star'    },
-      { to: '/admin/loyalty/adjust-points', label: 'Adjust Points', icon: 'dollar'  },
+      { to: '/admin/loyalty/adjust-points', label: 'Loyalty Management', icon: 'dollar'  },
       { to: '/admin/promotions',            label: 'Promotions',    icon: 'tag'     },
       { to: '/admin/reviews',               label: 'Reviews',       icon: 'message' },
     ],
@@ -93,6 +94,7 @@ const NAV_GROUPS = [
       { to: '/admin/deposit-refunds',          label: 'Deposit Refunds', icon: 'dollar'   },
       { to: '/admin/research/export',          label: 'Research Export', icon: 'download' },
       { to: '/admin/notifications/test-email', label: 'Test Email',      icon: 'mail'     },
+      { to: '/admin/exception-reports',        label: 'Exception Reports', icon: 'alert'  },
     ],
   },
 ]

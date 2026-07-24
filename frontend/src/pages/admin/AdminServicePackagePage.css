@@ -85,11 +85,31 @@
   color: #15803d;
 }
 
+.asp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
 .asp-panel {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 20px 24px;
+}
+
+.asp-panel--packages {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.asp-packages-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .asp-panel-header {
@@ -117,12 +137,17 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-width: 720px;
 }
 
 .asp-form-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
+}
+
+.asp-select-wide {
+  grid-column: span 2;
 }
 
 .asp-input,
@@ -253,15 +278,18 @@
   gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 16px;
+  max-width: 640px;
 }
 
 .asp-filters .asp-input {
   flex: 1;
   min-width: 160px;
+  max-width: 280px;
 }
 
 .asp-filters .asp-select {
   min-width: 140px;
+  max-width: 200px;
 }
 
 .asp-empty {
@@ -277,8 +305,8 @@
 
 .asp-table {
   border-collapse: collapse;
-  min-width: 860px;
   width: 100%;
+  table-layout: fixed;
 }
 
 .asp-table th {
@@ -299,7 +327,16 @@
   font-size: 13.5px;
   padding: 13px 14px;
   vertical-align: middle;
+  word-break: break-word;
 }
+
+.asp-table th:nth-child(1) { width: 24%; }
+.asp-table th:nth-child(2) { width: 10%; }
+.asp-table th:nth-child(3) { width: 10%; }
+.asp-table th:nth-child(4) { width: 14%; }
+.asp-table th:nth-child(5) { width: 9%; }
+.asp-table th:nth-child(6) { width: 13%; }
+.asp-table th:nth-child(7) { width: 20%; }
 
 .asp-table tbody tr:hover td {
   background: #f8fafc;
@@ -329,6 +366,8 @@
   font-size: 12px;
   font-weight: 600;
   padding: 3px 10px;
+  white-space: nowrap;
+  display: inline-block;
 }
 
 .asp-status-pill {
@@ -336,6 +375,8 @@
   font-size: 12px;
   font-weight: 600;
   padding: 4px 10px;
+  white-space: nowrap;
+  display: inline-block;
 }
 
 .asp-status-pill.active {
@@ -350,6 +391,7 @@
 
 .asp-row-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -462,6 +504,101 @@
 
 .asp-dialog-ok.danger:hover {
   background: #b91c1c;
+}
+
+/* ── Steps editor ── */
+.asp-steps-editor {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.asp-steps-header {
+  align-items: center;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px;
+}
+
+.asp-steps-label {
+  color: #374151;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.asp-steps-editor > p {
+  padding: 0 14px;
+  margin-top: 10px;
+}
+
+.asp-step-row {
+  align-items: center;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  gap: 8px;
+  padding: 8px 14px;
+}
+
+.asp-step-row:last-of-type {
+  border-bottom: none;
+}
+
+.asp-step-num {
+  background: #e0e7ff;
+  border-radius: 50%;
+  color: #3730a3;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  height: 22px;
+  line-height: 22px;
+  text-align: center;
+  width: 22px;
+}
+
+.asp-step-name {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.asp-step-phase {
+  flex: 0 0 160px;
+}
+
+.asp-step-duration {
+  flex: 0 0 80px;
+}
+
+.asp-step-remove {
+  background: none;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  color: #dc2626;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 16px;
+  height: 30px;
+  line-height: 1;
+  padding: 0 8px;
+  transition: background 0.15s;
+}
+
+.asp-step-remove:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
+.asp-step-remove:disabled {
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1200px) {
+  .asp-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 900px) {

@@ -1,7 +1,9 @@
 package com.autowashpro.repository;
 
 import com.autowashpro.entity.Booking;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -11,6 +13,10 @@ import java.util.List;
 import java.util.Optional;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
+
+        @Lock(LockModeType.PESSIMISTIC_WRITE)
+        @Query("SELECT b FROM Booking b WHERE b.id = :id")
+        Optional<Booking> findByIdWithLock(@Param("id") Long id);
 
         // Giữ nguyên từ phong-bk (issue #10)
         List<Booking> findByGarageId(Long garageId);
@@ -89,12 +95,14 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         @Query("""
                         SELECT COUNT(b) FROM Booking b
                         WHERE b.licensePlate = :licensePlate
+                        AND b.vehicleType = :vehicleType
                         AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
                         AND b.startTime < :endTime
                         AND b.endTime > :startTime
                         """)
-        long countOverlappingBookingsByLicensePlate(
+        long countOverlappingBookingsByLicensePlateAndVehicleType(
                         @Param("licensePlate") String licensePlate,
+                        @Param("vehicleType") String vehicleType,
                         @Param("startTime") LocalDateTime startTime,
                         @Param("endTime") LocalDateTime endTime);
 
@@ -133,15 +141,12 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         @Query("""
                         SELECT b
                         FROM Booking b
-                        WHERE b.status = :status
-                        AND b.depositStatus = :depositStatus
+                        WHERE b.status = 'PENDING_DEPOSIT'
+                        AND b.depositStatus NOT IN ('PAID', 'REFUND_PENDING', 'REFUNDED')
                         AND b.paymentExpiredAt IS NOT NULL
                         AND b.paymentExpiredAt <= :now
                         """)
-        List<Booking> findExpiredPendingDeposits(
-                        @Param("status") String status,
-                        @Param("depositStatus") String depositStatus,
-                        @Param("now") LocalDateTime now);
+        List<Booking> findExpiredPendingDeposits(@Param("now") LocalDateTime now);
 
         List<Booking> findByDepositStatusOrderByCreatedAtDesc(
                         String depositStatus);
@@ -156,5 +161,40 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         Optional<Booking> findByTrackingToken(String trackingToken);
 
         List<Booking> findByGarageIdAndStatusInOrderByStartTimeAsc(Long garageId, List<String> statuses);
+
+        /**
+         * Task 3: Count bookings for a customer with id <= bookingId (inclusive).
+         * This gives the 1-based sequential position of bookingId in this customer's history.
+         */
+        @Query("SELECT COUNT(b) FROM Booking b WHERE b.customerId = :customerId AND b.id <= :bookingId")
+        long countByCustomerIdAndIdLessThanEqual(
+                @Param("customerId") Long customerId,
+                @Param("bookingId") Long bookingId);
+
+        // ===================== Staff Booking Summary =====================
+
+        @Query("SELECT COUNT(b) FROM Booking b WHERE b.garageId = :garageId AND b.status <> 'PENDING_DEPOSIT'")
+        long countByGarageIdExcludingPendingDeposit(@Param("garageId") Long garageId);
+
+        @Query("SELECT COUNT(b) FROM Booking b WHERE b.garageId = :garageId AND b.status = :status")
+        long countByGarageIdAndStatus(@Param("garageId") Long garageId, @Param("status") String status);
+
+        @Query("SELECT COUNT(b) FROM Booking b WHERE b.garageId = :garageId AND b.status IN :statuses")
+        long countByGarageIdAndStatusIn(@Param("garageId") Long garageId, @Param("statuses") List<String> statuses);
+
+        // ===================== Staff Calendar =====================
+
+        @Query("""
+                        SELECT b.startTime, b.status
+                        FROM Booking b
+                        WHERE b.garageId = :garageId
+                        AND b.startTime >= :start
+                        AND b.startTime < :end
+                        AND b.status IN ('CONFIRMED', 'CANCELED', 'CANCELLED')
+                        """)
+        List<Object[]> findDateAndStatusForCalendar(
+                        @Param("garageId") Long garageId,
+                        @Param("start") LocalDateTime start,
+                        @Param("end") LocalDateTime end);
 
 }

@@ -13,6 +13,7 @@ import com.autowashpro.repository.UserRepository;
 import com.autowashpro.repository.VehicleRepository;
 import com.autowashpro.repository.spec.VehicleSpecifications;
 import com.autowashpro.service.VehicleService;
+import com.autowashpro.service.support.VietnameseLicensePlate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -33,13 +34,6 @@ public class VehicleServiceImpl implements VehicleService {
     private final UserRepository userRepository;
     private final UploadRepository uploadRepository;
 
-    // Chuẩn hóa biển số: uppercase, xóa dấu chấm/gạch/khoảng trắng
-    private String normalizePlate(String raw) {
-        return raw.toUpperCase()
-                .replaceAll("[\\s.\\-]", "")
-                .replaceAll("[^A-Z0-9]", "");
-    }
-
     @Override
     @Transactional
     public VehicleResponse create(VehicleCreateRequest request, Long customerId) {
@@ -47,18 +41,20 @@ public class VehicleServiceImpl implements VehicleService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Customer not found: " + customerId));
 
-        String normalized = normalizePlate(request.getRawLicensePlate());
+        String vehicleType = VietnameseLicensePlate.normalizeVehicleType(request.getVehicleType());
+        String normalized = VietnameseLicensePlate.normalizeAndValidate(
+                request.getRawLicensePlate(), vehicleType);
 
-        if (vehicleRepository.existsByNormalizedLicensePlateAndIsActiveTrue(normalized)) {
+        if (vehicleRepository.existsByNormalizedLicensePlateAndVehicleType(normalized, vehicleType)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "License plate already exists: " + normalized);
         }
 
         Vehicle vehicle = new Vehicle();
         vehicle.setCustomer(customer);
-        vehicle.setRawLicensePlate(request.getRawLicensePlate());
+        vehicle.setRawLicensePlate(request.getRawLicensePlate().trim());
         vehicle.setNormalizedLicensePlate(normalized);
-        vehicle.setVehicleType(request.getVehicleType());
+        vehicle.setVehicleType(vehicleType);
         vehicle.setEngineType(request.getEngineType());
         vehicle.setBrand(request.getBrand());
         vehicle.setModel(request.getModel());
@@ -153,8 +149,8 @@ public class VehicleServiceImpl implements VehicleService {
     @Override
     public PageResponse<VehicleResponse> adminList(int page, int limit,
                                                     String vehicleType, String keyword) {
-        Specification<Vehicle> spec = Specification
-                .where(VehicleSpecifications.vehicleTypeEquals(vehicleType))
+        Specification<Vehicle> spec = ((Specification<Vehicle>) (root, query, cb) -> null)
+                .and(VehicleSpecifications.vehicleTypeEquals(vehicleType))
                 .and(VehicleSpecifications.keywordContains(keyword));
 
         Page<Vehicle> result = vehicleRepository.findAll(spec,

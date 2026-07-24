@@ -346,6 +346,7 @@
   align-items: flex-start;
   justify-content: center;
   gap: 0;
+  margin-top: -20px;
 }
 
 .pcd-process-step {
@@ -662,33 +663,135 @@
    FOOTER
    ════════════════════════════════════════════ */
 .pcd-footer {
-  background: var(--pcd-bg-alt);
-  border-top: 1px solid var(--pcd-border);
-  padding: 32px 24px;
+  position: relative;
+  overflow: hidden;
+  padding: 44px 24px 26px;
+  background:
+    linear-gradient(135deg, rgba(5, 28, 58, 0.96), rgba(10, 74, 111, 0.88)),
+    url('/images/Hero1.jpg') center 70% / cover no-repeat;
+  border-top: 1px solid rgba(137, 220, 255, 0.28);
+}
+
+.pcd-footer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(46, 194, 247, 0.22), transparent 32%),
+    radial-gradient(circle at 88% 90%, rgba(80, 142, 255, 0.18), transparent 34%);
 }
 
 .pcd-footer-inner {
+  position: relative;
+  z-index: 1;
   max-width: 1100px;
   margin: 0 auto;
-  display: flex;
+  padding: 30px 32px 20px;
+  color: #f4fbff;
+  background: linear-gradient(135deg, rgba(89, 169, 214, 0.16), rgba(255, 255, 255, 0.07));
+  border: 1px solid rgba(191, 232, 255, 0.24);
+  border-radius: 24px;
+  box-shadow: 0 18px 48px rgba(0, 12, 32, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+}
+
+.pcd-footer-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.6fr) repeat(3, minmax(125px, 1fr));
+  gap: 34px;
+  padding-bottom: 28px;
+}
+
+.pcd-footer-intro p {
+  margin: 11px 0 18px;
+  color: rgba(225, 243, 255, 0.72);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.pcd-footer-book {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 16px;
+  color: #07203b;
+  background: linear-gradient(135deg, #8be6ff, #2ec2f7);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 999px;
+  box-shadow: 0 8px 22px rgba(25, 181, 235, 0.22);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.pcd-footer-book:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 11px 26px rgba(25, 181, 235, 0.34);
 }
 
 .pcd-footer-brand {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 800;
-  color: var(--pcd-text);
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.pcd-footer-column {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.pcd-footer-column h3 {
+  margin: 1px 0 5px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pcd-footer-column a {
+  color: rgba(225, 243, 255, 0.72);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.pcd-footer-column a:hover {
+  color: #7fe1ff;
+  transform: translateX(2px);
+}
+
+.pcd-footer-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 19px;
+  border-top: 1px solid rgba(191, 232, 255, 0.18);
+}
+
+.pcd-footer-bottom > a {
+  color: rgba(225, 243, 255, 0.64);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
 }
 
 .pcd-footer-copy {
   font-size: 13px;
-  color: var(--pcd-text-sub);
+  color: rgba(225, 243, 255, 0.64);
   margin: 0;
 }
 
@@ -704,6 +807,14 @@
 
   .pcd-stats-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .pcd-footer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pcd-footer-intro {
+    grid-column: 1 / -1;
   }
 }
 
@@ -749,8 +860,31 @@
     grid-template-columns: repeat(2, 1fr);
   }
 
+  .pcd-footer {
+    padding: 28px 14px 18px;
+  }
+
   .pcd-footer-inner {
+    padding: 25px 22px 18px;
+    border-radius: 20px;
+  }
+
+  .pcd-footer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px 22px;
+  }
+
+  .pcd-footer-intro {
+    grid-column: 1 / -1;
+  }
+
+  .pcd-footer-contact {
+    grid-column: 1 / -1;
+  }
+
+  .pcd-footer-bottom {
+    align-items: flex-start;
     flex-direction: column;
-    text-align: center;
+    gap: 7px;
   }
 }

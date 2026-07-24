@@ -83,6 +83,22 @@
   margin-top: 2px;
 }
 
+.pcm-deposit-amount {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.pcm-info-row--remaining {
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.pcm-remaining-amount {
+  color: #0f172a;
+  font-weight: 700;
+}
+
 .pcm-info-label {
   color: #64748b;
   min-width: 80px;

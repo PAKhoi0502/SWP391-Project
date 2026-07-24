@@ -58,6 +58,7 @@ function normalizeUser(user, token) {
     role: String(role).toUpperCase(),
     avatarUrl: user?.avatarUrl || null,
     avatarPublicId: user?.avatarPublicId || null,
+    hasPassword: user?.hasPassword ?? null,
   };
 }
 
@@ -193,8 +194,8 @@ export function AuthProvider({ children }) {
   return applyAuthData(authData);
 };
 
- const loginWithGoogle = async (idToken) => {
-  const authData = await authService.googleAuth(idToken);
+ const loginWithGoogle = async (idToken, phone) => {
+  const authData = await authService.googleAuth(idToken, phone);
   return applyAuthData(authData);
 };
 

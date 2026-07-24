@@ -21,6 +21,8 @@ public class UserDetailResponse {
 
     private Boolean isActive;
 
+    private Boolean hasPassword;
+
     private String avatarUrl;
 
     private String avatarPublicId;

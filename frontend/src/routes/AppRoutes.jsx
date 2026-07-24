@@ -7,6 +7,7 @@ import StaffLayout from '../layouts/StaffLayout'
 import AdminUsersPage from '../pages/AdminUsersPage'
 import AdminStaffProfilesPage from '../pages/AdminStaffProfilesPage'
 import ProtectedRoute from './ProtectedRoute'
+import StaffTypeGuard from './StaffTypeGuard'
 import DashboardPlaceholderPage from '../pages/DashboardPlaceholderPage'
 import StaffDashboardPage from '../pages/staff/StaffDashboardPage'
 import ForbiddenPage from '../pages/ForbiddenPage'
@@ -60,6 +61,8 @@ import AdminResearchExportPage from '../pages/admin/AdminResearchExportPage'
 import AdminAuditLogPage from '../pages/admin/AdminAuditLogPage'
 import AdminDepositRefundsPage from '../pages/admin/AdminDepositRefundsPage'
 import AdminReviewsPage from '../pages/admin/AdminReviewsPage'
+import AdminExceptionReportPage from '../pages/admin/AdminExceptionReportPage'
+import CustomerLeaderboardPage from '../pages/leaderboard/CustomerLeaderboardPage'
 
 
 function AppRoutes() {
@@ -88,6 +91,7 @@ function AppRoutes() {
           <Route path="/customer/notifications" element={<CustomerNotificationListPage />} />
           <Route path="/customer/notifications/:id" element={<CustomerNotificationDetailPage />} />
           <Route path="/customer/waitlist" element={<WaitlistPage />} />
+          <Route path="/customer/leaderboard" element={<CustomerLeaderboardPage />} />
         </Route>
       </Route>
 
@@ -115,13 +119,17 @@ function AppRoutes() {
 
       <Route element={<ProtectedRoute allowedRoles={[ROLES.STAFF]} />}>
         <Route element={<StaffLayout />}>
+          {/* Accessible by all staff types */}
           <Route path="staff" element={<StaffDashboardPage />} />
-          <Route path="staff/bookings" element={<StaffBookingListPage />} />
-          <Route path="staff/bookings/walk-in" element={<StaffWalkInBookingPage />} />
-          <Route path="staff/bookings/:id" element={<BookingDetailPage />} />
-          <Route path="staff/inspections" element={<Navigate to="/staff/bookings" replace />} />
           <Route path="staff/profile" element={<StaffProfilePage />} />
-          <Route path="staff/waitlist" element={<StaffWaitlistPage />} />
+          {/* CUSTOMER_SERVICE_STAFF only — VEHICLE_CARE_STAFF is redirected to /staff */}
+          <Route element={<StaffTypeGuard />}>
+            <Route path="staff/bookings" element={<StaffBookingListPage />} />
+            <Route path="staff/bookings/walk-in" element={<StaffWalkInBookingPage />} />
+            <Route path="staff/bookings/:id" element={<BookingDetailPage />} />
+            <Route path="staff/waitlist" element={<StaffWaitlistPage />} />
+          </Route>
+          <Route path="staff/inspections" element={<Navigate to="/staff/bookings" replace />} />
         </Route>
       </Route>
 
@@ -150,6 +158,7 @@ function AppRoutes() {
           <Route path="admin/audit-logs" element={<AdminAuditLogPage />} />
           <Route path="admin/deposit-refunds" element={<AdminDepositRefundsPage />} />
           <Route path="admin/reviews" element={<AdminReviewsPage />} />
+          <Route path="admin/exception-reports" element={<AdminExceptionReportPage />} />
         </Route>
       </Route>
 

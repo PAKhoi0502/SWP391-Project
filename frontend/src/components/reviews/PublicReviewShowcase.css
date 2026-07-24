@@ -75,16 +75,14 @@
   flex-shrink: 0;
 }
 
-/* ── Avatar ── */
-.prs-avatar {
-  border-radius: 50%;
+/* ── Avatar wrapper ── */
+/* LeaderboardAvatar handles its own styling via LeaderboardAvatar.css.
+   This wrapper provides consistent vertical alignment within the card row. */
+.prs-avatar-wrap {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
-  color: #fff;
-  flex-shrink: 0;
-  letter-spacing: 0.03em;
 }
 
 /* ════════════════════════════════════════════
@@ -161,14 +159,68 @@
   min-width: 0;
 }
 
+.prs-card-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
 .prs-card-name {
-  display: block;
+  display: inline-block;
   font-size: 14.5px;
   font-weight: 700;
   color: #172033;
+  min-width: 0;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.prs-rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 7px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  flex-shrink: 0;
+  line-height: 1;
+  box-shadow: 0 2px 7px rgba(15, 23, 42, 0.12);
+}
+
+.prs-rank-badge__number {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.prs-rank-badge--gold {
+  color: #854d0e;
+  background: linear-gradient(135deg, #fef3c7, #fbbf24);
+  border-color: #f59e0b;
+  box-shadow: 0 3px 12px rgba(245, 158, 11, 0.28);
+}
+
+.prs-rank-badge--silver {
+  color: #334155;
+  background: linear-gradient(135deg, #f8fafc, #cbd5e1);
+  border-color: #94a3b8;
+}
+
+.prs-rank-badge--bronze {
+  color: #7c2d12;
+  background: linear-gradient(135deg, #ffedd5, #fb923c);
+  border-color: #ea580c;
+}
+
+.prs-rank-badge--top10 {
+  color: #fff;
+  background: linear-gradient(135deg, #2563eb, #06b6d4);
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 3px 12px rgba(37, 99, 235, 0.24);
 }
 
 .prs-card-service {
@@ -191,6 +243,17 @@
   color: #374151;
   margin: 0 0 14px;
   font-style: italic;
+  min-height: calc(1.68em * 2);
+  max-height: calc(1.68em * 2);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.prs-card-quote--empty {
+  visibility: hidden;
 }
 
 .prs-qmark {
@@ -297,4 +360,12 @@
 
 @media (max-width: 480px) {
   .prs-avg-num { font-size: 1.15rem; }
+
+  .prs-card-name-row { gap: 5px; }
+
+  .prs-rank-badge {
+    padding: 1px 6px;
+  }
+
+  .prs-rank-badge__number { font-size: 10px; }
 }

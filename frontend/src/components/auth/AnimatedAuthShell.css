@@ -78,6 +78,7 @@
 
 /* ── Form panels ── */
 .aas-panel {
+  position: relative;
   flex: 0 0 50%;
   padding: 52px 44px;
   display: flex;
@@ -499,8 +500,11 @@
    SUCCESS OVERLAY
 ══════════════════════════════════════════════════ */
 .aas-success-overlay {
-  position: fixed;
-  inset: 0;
+  position: absolute;
+  /* Bleed past the panel's edges (clipped by .aas-card's overflow: hidden)
+     so backdrop-filter has margin to sample from — otherwise the blur reads as
+     weaker right at the edge and looks like an unblurred sliver. */
+  inset: -30px;
   z-index: 200;
   display: flex;
   align-items: center;
@@ -559,6 +563,67 @@
 .aas-success-sub {
   font-size: 13.5px;
   color: #667085;
+}
+
+/* ══════════════════════════════════════════════════
+   GOOGLE PHONE PROMPT MODAL
+══════════════════════════════════════════════════ */
+.aas-phone-modal {
+  position: relative;
+  background: #FFFFFF;
+  border: 1px solid rgba(23, 32, 51, 0.10);
+  border-radius: 20px;
+  padding: 32px 34px;
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+  box-shadow: 0 24px 64px rgba(23, 32, 51, 0.14);
+  animation: aasScaleIn 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.aas-phone-modal-title {
+  margin: 0 0 6px;
+  font-size: 19px;
+  font-weight: 800;
+  color: #172033;
+}
+
+.aas-phone-modal-sub {
+  margin: 0 0 20px;
+  font-size: 13.5px;
+  color: #667085;
+}
+
+.aas-phone-modal .aas-field { text-align: left; }
+
+.aas-phone-modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.aas-phone-modal-actions .aas-submit-btn { flex: 1; }
+
+.aas-phone-modal-cancel {
+  flex: 1;
+  border: 1px solid rgba(23, 32, 51, 0.14);
+  border-radius: 999px;
+  background: #FFFFFF;
+  color: #667085;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.aas-phone-modal-cancel:hover:not(:disabled) {
+  background: #F8F6F0;
+  border-color: rgba(23, 32, 51, 0.24);
+}
+
+.aas-phone-modal-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ══════════════════════════════════════════════════

@@ -78,6 +78,7 @@ class UserServiceImplTest {
 
         assertEquals("Updated Customer", response.getFullName());
         assertEquals("updated@test.local", customer.getEmail());
+        assertEquals("+84901888888", customer.getPhone());
         verify(userRepository).save(customer);
     }
 
@@ -106,7 +107,7 @@ class UserServiceImplTest {
         request.setEmail(customer.getEmail());
         request.setPhone("0901777777");
         when(userRepository.findById(customer.getId())).thenReturn(Optional.of(customer));
-        when(userRepository.existsByPhone(request.getPhone())).thenReturn(true);
+        when(userRepository.existsByPhone("+84901777777")).thenReturn(true);
 
         RuntimeException error = assertThrows(RuntimeException.class,
                 () -> userService.updateCurrentUser(customer.getId(), request));

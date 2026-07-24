@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { depositRefundApi } from '../../api/depositRefundApi'
 import './AdminDepositRefundsPage.css'
 
@@ -15,10 +15,13 @@ export default function AdminDepositRefundsPage() {
   const [actionRefund, setActionRefund] = useState(null)
   const [actionType, setActionType] = useState('')
 
-  const reload = () => {
+  // Used to avoid loading flicker during silent background refreshes
+  const silentRef    = useRef(false)
+  const pollTimerRef = useRef(null)
+
+  const reload = (silent = false) => {
     let ignore = false
-    setLoading(true)
-    setError('')
+    if (!silent) { setLoading(true); setError('') }
 
     depositRefundApi.getAdminDepositRefunds({ page, limit: PAGE_SIZE, status })
       .then((result) => {
@@ -27,16 +30,57 @@ export default function AdminDepositRefundsPage() {
         setTotalPages(result?.totalPages || 1)
       })
       .catch((err) => {
-        if (ignore) return
+        if (ignore || silent) return
         setRefunds([])
         setError(getErrorMessage(err, 'Unable to load deposit refunds.'))
       })
-      .finally(() => { if (!ignore) setLoading(false) })
+      .finally(() => { if (!ignore && !silent) setLoading(false) })
 
     return () => { ignore = true }
   }
 
-  useEffect(reload, [page, status])
+  // Initial / filter-triggered load
+  useEffect(() => reload(), [page, status]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Silent background poll every 5 s; also re-fires on window focus / tab visibility regained
+  useEffect(() => {
+    let cancelled = false
+
+    const poll = () => {
+      if (cancelled) return
+      silentRef.current = true
+      depositRefundApi.getAdminDepositRefunds({ page, limit: PAGE_SIZE, status })
+        .then((result) => {
+          if (cancelled) return
+          setRefunds(Array.isArray(result?.data) ? result.data : [])
+          setTotalPages(result?.totalPages || 1)
+        })
+        .catch(() => { /* silently ignore poll errors */ })
+        .finally(() => {
+          silentRef.current = false
+          if (!cancelled) pollTimerRef.current = setTimeout(poll, 5_000)
+        })
+    }
+
+    const handleFocus = () => {
+      if (cancelled) return
+      clearTimeout(pollTimerRef.current)
+      poll()
+    }
+    const handleVisibility = () => {
+      if (!document.hidden) handleFocus()
+    }
+
+    pollTimerRef.current = setTimeout(poll, 5_000)
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      cancelled = true
+      clearTimeout(pollTimerRef.current)
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [page, status]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleApprove = async (refund) => {
     setActionRefund(refund)
@@ -44,7 +88,7 @@ export default function AdminDepositRefundsPage() {
     try {
       await depositRefundApi.approveDepositRefund(refund.id)
       setActionRefund(null)
-      reload()
+      reload(false)
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to approve refund.'))
       setActionRefund(null)
@@ -143,7 +187,7 @@ export default function AdminDepositRefundsPage() {
         <RejectDialog
           refund={actionRefund}
           onClose={() => { setActionRefund(null); setActionType('') }}
-          onDone={() => { setActionRefund(null); setActionType(''); reload() }}
+          onDone={() => { setActionRefund(null); setActionType(''); reload(false) }}
         />
       )}
 
@@ -151,7 +195,7 @@ export default function AdminDepositRefundsPage() {
         <ExecuteDialog
           refund={actionRefund}
           onClose={() => { setActionRefund(null); setActionType('') }}
-          onDone={() => { setActionRefund(null); setActionType(''); reload() }}
+          onDone={() => { setActionRefund(null); setActionType(''); reload(false) }}
         />
       )}
     </div>
@@ -213,6 +257,10 @@ function ExecuteDialog({ refund, onClose, onDone }) {
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async () => {
+    if (success && !transactionReference.trim()) {
+      setError('Transaction reference is required after a successful transfer')
+      return
+    }
     setLoading(true)
     setError('')
     try {

@@ -32,15 +32,15 @@ public final class TestFixtures {
     }
 
     public static User customer() {
-        return user(1L, "Customer Test", "customer@test.local", "0901000001", "CUSTOMER");
+        return user(1L, "Customer Test", "customer@test.local", "+84901000001", "CUSTOMER");
     }
 
     public static User staff() {
-        return user(2L, "Staff Test", "staff@test.local", "0901000002", "STAFF");
+        return user(2L, "Staff Test", "staff@test.local", "+84901000002", "STAFF");
     }
 
     public static User admin() {
-        return user(3L, "Admin Test", "admin@test.local", "0901000003", "ADMIN");
+        return user(3L, "Admin Test", "admin@test.local", "+84901000003", "ADMIN");
     }
 
     public static User user(Long id, String fullName, String email, String phone, String role) {
@@ -157,7 +157,9 @@ public final class TestFixtures {
                 "Foam wash",
                 "Apply foam and clean exterior",
                 true,
-                List.of("Apply foam", "Rinse vehicle")
+                List.of("Apply foam", "Rinse vehicle"),
+                "AUTOMATED_WASH",
+                30
         );
 
         CreateServicePackageRequest request = new CreateServicePackageRequest();
@@ -207,6 +209,19 @@ public final class TestFixtures {
         profile.setGarageId(garage.getId());
         profile.setStaffCode("CARE-001");
         profile.setStaffType(StaffType.VEHICLE_CARE_STAFF);
+        profile.setIsActive(true);
+        profile.setCreatedAt(BASE_TIME.minusDays(30));
+        profile.setUpdatedAt(BASE_TIME.minusDays(30));
+        return profile;
+    }
+
+    public static StaffProfile customerServiceStaff(User staff, Garage garage) {
+        StaffProfile profile = new StaffProfile();
+        profile.setId(2L);
+        profile.setUser(staff);
+        profile.setGarageId(garage.getId());
+        profile.setStaffCode("CSS-001");
+        profile.setStaffType(StaffType.CUSTOMER_SERVICE_STAFF);
         profile.setIsActive(true);
         profile.setCreatedAt(BASE_TIME.minusDays(30));
         profile.setUpdatedAt(BASE_TIME.minusDays(30));

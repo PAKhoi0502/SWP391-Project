@@ -26,14 +26,13 @@ public class CustomUserDetailsService
                         new UsernameNotFoundException(
                                 "User not found"));
 
+        String role = user.getRole();
+        String authority = (role != null && role.startsWith("ROLE_")) ? role : "ROLE_" + role;
+        String passwordHash = user.getPasswordHash() != null ? user.getPasswordHash() : "";
         return new org.springframework.security.core.userdetails.User(
                 user.getId().toString(),
-                user.getPasswordHash(),
-                List.of(
-                        new SimpleGrantedAuthority(
-                                "ROLE_" + user.getRole()
-                        )
-                )
+                passwordHash,
+                List.of(new SimpleGrantedAuthority(authority))
         );
     }
 }

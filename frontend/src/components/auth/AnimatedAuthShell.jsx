@@ -1,8 +1,122 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { getRedirectPathByRole, useAuth } from '../../contexts/AuthContext'
 import GoogleSignInButton from './GoogleSignInButton'
+import { getVietnameseMobileError, normalizeVietnameseMobile } from '../../utils/identityValidation'
 import './AnimatedAuthShell.css'
+
+// Distinct marker the backend returns when a Google sign-in would create a brand-new
+// account but no phone number was supplied yet — see AuthServiceImpl.googleAuth.
+const GOOGLE_SIGNUP_PHONE_REQUIRED = 'GOOGLE_SIGNUP_PHONE_REQUIRED'
+
+const getRoleFromUser = (u) =>
+  u?.role || u?.roleName || u?.accountRole || u?.authorities?.[0]?.authority || 'CUSTOMER'
+
+/* ── Shared Google sign-in flow (used by both Login and Register panels) ──
+   Google can create a brand-new account on first use from either panel.
+   When the backend reports the new account still needs a phone number, we
+   open a small modal to collect it and retry with the same idToken — Google
+   idToken verification is stateless, so re-verifying it is safe. ── */
+function useGoogleAuth() {
+  const navigate = useNavigate()
+  const { loginWithGoogle } = useAuth()
+  const idTokenRef = useRef(null)
+
+  const [googleLoading, setGoogleLoading] = useState(false)
+  const [googleError, setGoogleError] = useState('')
+  const [phonePrompt, setPhonePrompt] = useState(null) // { loading, error } | null
+
+  const finishLogin = (user) => {
+    navigate(getRedirectPathByRole(getRoleFromUser(user)), { replace: true, state: { loginSuccess: true } })
+  }
+
+  const handleGoogleCredential = async (idToken) => {
+    setGoogleLoading(true)
+    setGoogleError('')
+    try {
+      const user = await loginWithGoogle(idToken)
+      finishLogin(user)
+    } catch (err) {
+      const message = err.response?.data?.message || err.response?.data?.error
+      if (message === GOOGLE_SIGNUP_PHONE_REQUIRED) {
+        idTokenRef.current = idToken
+        setPhonePrompt({ loading: false, error: '' })
+      } else {
+        setGoogleError(message || 'Could not sign in with Google.')
+      }
+    } finally {
+      setGoogleLoading(false)
+    }
+  }
+
+  const submitPhonePrompt = async (phone) => {
+    const phoneError = getVietnameseMobileError(phone)
+    if (phoneError) {
+      setPhonePrompt({ loading: false, error: phoneError })
+      return
+    }
+    setPhonePrompt({ loading: true, error: '' })
+    try {
+      const user = await loginWithGoogle(idTokenRef.current, normalizeVietnameseMobile(phone))
+      setPhonePrompt(null)
+      finishLogin(user)
+    } catch (err) {
+      const message = err.response?.data?.message || err.response?.data?.error || 'Could not complete sign up.'
+      setPhonePrompt({ loading: false, error: message })
+    }
+  }
+
+  const cancelPhonePrompt = () => {
+    idTokenRef.current = null
+    setPhonePrompt(null)
+  }
+
+  return { googleLoading, googleError, handleGoogleCredential, phonePrompt, submitPhonePrompt, cancelPhonePrompt }
+}
+
+/* ── Phone prompt modal — shown when Google sign-in creates a new account ── */
+function GooglePhonePromptModal({ prompt, onSubmit, onCancel }) {
+  const [phone, setPhone] = useState('')
+  if (!prompt) return null
+
+  return (
+    <div className="aas-success-overlay" onClick={onCancel}>
+      <div className="aas-phone-modal" onClick={(e) => e.stopPropagation()}>
+        <h3 className="aas-phone-modal-title">One last step</h3>
+        <p className="aas-phone-modal-sub">Enter your phone number to finish creating your account.</p>
+
+        <div className="aas-field">
+          <label className="aas-label" htmlFor="google-phone">Phone number</label>
+          <input
+            id="google-phone"
+            className={`aas-input${prompt.error ? ' aas-input--err' : ''}`}
+            type="tel"
+            placeholder="0912 345 678"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            autoFocus
+            disabled={prompt.loading}
+          />
+          {prompt.error && <span className="aas-field-err">{prompt.error}</span>}
+        </div>
+
+        <div className="aas-phone-modal-actions">
+          <button type="button" className="aas-phone-modal-cancel" onClick={onCancel} disabled={prompt.loading}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="aas-submit-btn"
+            onClick={() => onSubmit(phone)}
+            disabled={prompt.loading}
+          >
+            {prompt.loading ? 'Creating account…' : 'Continue'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 /* ── Validators ─────────────────────────────────── */
 const V = {
@@ -10,9 +124,7 @@ const V = {
   email:           (v)     => !v.trim()            ? 'Email is required.'
                             : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
                               ? 'Invalid email address.' : '',
-  phone:           (v)     => !v.trim()            ? 'Phone number is required.'
-                            : !/^[0-9]{9,11}$/.test(v.replace(/\s/g,''))
-                              ? 'Invalid phone (9–11 digits).' : '',
+  phone:           (v)     => getVietnameseMobileError(v),
   password:        (v)     => !v                   ? 'Password is required.'
                             : v.length < 6         ? 'Minimum 6 characters.' : '',
   confirmPassword: (v, pw) => !v                   ? 'Please confirm your password.'
@@ -75,16 +187,13 @@ function SuccessOverlay({ show }) {
 /* ── Login form ──────────────────────────────────── */
 function LoginForm({ active, justRegistered }) {
   const navigate  = useNavigate()
-  const { login, loginWithGoogle } = useAuth()
+  const { login } = useAuth()
+  const { googleLoading, googleError, handleGoogleCredential, phonePrompt, submitPhonePrompt, cancelPhonePrompt } = useGoogleAuth()
 
   const [form,     setForm]     = useState({ identifier: '', password: '' })
   const [showPass, setShowPass] = useState(false)
   const [error,    setError]    = useState('')
   const [loading,  setLoading]  = useState(false)
-  const [googleLoading, setGoogleLoading] = useState(false)
-
-  const getRole = (u) =>
-    u?.role || u?.roleName || u?.accountRole || u?.authorities?.[0]?.authority || 'CUSTOMER'
 
   const handleChange = (e) => {
     setForm(p => ({ ...p, [e.target.name]: e.target.value }))
@@ -93,12 +202,13 @@ function LoginForm({ active, justRegistered }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!form.identifier.trim()) { setError('Please enter your phone number.'); return }
+    const phoneError = getVietnameseMobileError(form.identifier)
+    if (phoneError) { setError(phoneError); return }
     if (!form.password.trim())   { setError('Please enter your password.');      return }
     setLoading(true)
     try {
-      const user = await login({ phone: form.identifier.trim(), password: form.password })
-      navigate(getRedirectPathByRole(getRole(user)), { replace: true, state: { loginSuccess: true } })
+      const user = await login({ phone: normalizeVietnameseMobile(form.identifier), password: form.password })
+      navigate(getRedirectPathByRole(getRoleFromUser(user)), { replace: true, state: { loginSuccess: true } })
     } catch (err) {
       setError(err.response?.data?.message || err.response?.data?.error || 'Incorrect phone or password.')
     } finally {
@@ -106,21 +216,9 @@ function LoginForm({ active, justRegistered }) {
     }
   }
 
-  const handleGoogleCredential = async (idToken) => {
-    setGoogleLoading(true)
-    setError('')
-    try {
-      const user = await loginWithGoogle(idToken)
-      navigate(getRedirectPathByRole(getRole(user)), { replace: true, state: { loginSuccess: true } })
-    } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || 'Could not sign in with Google.')
-    } finally {
-      setGoogleLoading(false)
-    }
-  }
-
   return (
     <div className={`aas-form-content${active ? ' aas-visible' : ' aas-hidden'}`}>
+      <GooglePhonePromptModal prompt={phonePrompt} onSubmit={submitPhonePrompt} onCancel={cancelPhonePrompt} />
       <LogoMark />
       <p className="aas-eyebrow">WELCOME BACK</p>
       <h2 className="aas-form-title">Sign in to Audela</h2>
@@ -132,6 +230,7 @@ function LoginForm({ active, justRegistered }) {
         </div>
       )}
       {error && <div className="aas-alert aas-alert--error">{error}</div>}
+      {googleError && <div className="aas-alert aas-alert--error">{googleError}</div>}
 
       <form onSubmit={handleSubmit} className="aas-form">
         <div className="aas-field">
@@ -176,7 +275,8 @@ function LoginForm({ active, justRegistered }) {
 /* ── Register form ───────────────────────────────── */
 function RegisterForm({ active }) {
   const navigate     = useNavigate()
-  const { register, loginWithGoogle } = useAuth()
+  const { register } = useAuth()
+  const { googleLoading, googleError, handleGoogleCredential, phonePrompt, submitPhonePrompt, cancelPhonePrompt } = useGoogleAuth()
 
   const [form,        setForm]        = useState({ fullName: '', email: '', phone: '', password: '', confirmPassword: '' })
   const [errors,      setErrors]      = useState({})
@@ -186,10 +286,6 @@ function RegisterForm({ active }) {
   const [serverError, setServerError] = useState('')
   const [loading,     setLoading]     = useState(false)
   const [success,     setSuccess]     = useState(false)
-  const [googleLoading, setGoogleLoading] = useState(false)
-
-  const getRole = (u) =>
-    u?.role || u?.roleName || u?.accountRole || u?.authorities?.[0]?.authority || 'CUSTOMER'
 
   const validate = (name, value) =>
     name === 'confirmPassword' ? V.confirmPassword(value, form.password) : V[name]?.(value) ?? ''
@@ -227,7 +323,7 @@ function RegisterForm({ active }) {
     }
     setLoading(true); setServerError('')
     try {
-      await register({ fullName: form.fullName.trim(), email: form.email.trim(), phone: form.phone.trim(), password: form.password })
+      await register({ fullName: form.fullName.trim(), email: form.email.trim(), phone: normalizeVietnameseMobile(form.phone), password: form.password })
       setSuccess(true)
       setTimeout(() => navigate('/login', { state: { registered: true } }), 2200)
     } catch (err) {
@@ -240,28 +336,16 @@ function RegisterForm({ active }) {
 
   const showErr = (n) => touched[n] && errors[n]
 
-  const handleGoogleCredential = async (idToken) => {
-    setGoogleLoading(true)
-    setServerError('')
-    try {
-      const user = await loginWithGoogle(idToken)
-      navigate(getRedirectPathByRole(getRole(user)), { replace: true, state: { loginSuccess: true } })
-    } catch (err) {
-      const d = err.response?.data
-      setServerError(d?.message || d?.error || 'Could not sign up with Google.')
-    } finally {
-      setGoogleLoading(false)
-    }
-  }
-
   return (
     <div className={`aas-form-content${active ? ' aas-visible' : ' aas-hidden'}`}>
       <SuccessOverlay show={success} />
+      <GooglePhonePromptModal prompt={phonePrompt} onSubmit={submitPhonePrompt} onCancel={cancelPhonePrompt} />
       <p className="aas-eyebrow">START YOUR JOURNEY</p>
       <h2 className="aas-form-title">Create account</h2>
       <p className="aas-form-sub">Book faster and earn loyalty points.</p>
 
       {serverError && <div className="aas-alert aas-alert--error">{serverError}</div>}
+      {googleError && <div className="aas-alert aas-alert--error">{googleError}</div>}
 
       <form onSubmit={handleSubmit} className="aas-form" noValidate>
         <div className="aas-field">
@@ -366,6 +450,12 @@ export default function AnimatedAuthShell() {
   const [isActive,   setIsActive]   = useState(isRegRoute)
   const [animReady,  setAnimReady]  = useState(false)
   const [entered,    setEntered]    = useState(false)
+
+  useLayoutEffect(() => {
+    // React Router preserves the previous page's scroll position. Reset it
+    // before paint so the fixed public navbar never overlaps the auth form.
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [location.pathname])
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => {

@@ -113,6 +113,11 @@ public class ServicePackageServiceImpl
                                                 stepRequest.getDescription())
                                         .isRequired(
                                                 stepRequest.getIsRequired())
+                                        .executionPhase(
+                                                stepRequest.getExecutionPhase())
+                                        .durationMinutes(
+                                                stepRequest.getDurationMinutes() != null
+                                                        ? stepRequest.getDurationMinutes() : 0)
                                         .createdAt(
                                                 LocalDateTime.now())
                                         .updatedAt(
@@ -211,6 +216,10 @@ public class ServicePackageServiceImpl
                             step.getIsRequired())
                     .instructions(
                             instructions)
+                    .executionPhase(
+                            step.getExecutionPhase())
+                    .durationMinutes(
+                            step.getDurationMinutes())
                     .build());
         }
 
@@ -321,6 +330,11 @@ public class ServicePackageServiceImpl
                                                 stepRequest.getDescription())
                                         .isRequired(
                                                 stepRequest.getIsRequired())
+                                        .executionPhase(
+                                                stepRequest.getExecutionPhase())
+                                        .durationMinutes(
+                                                stepRequest.getDurationMinutes() != null
+                                                        ? stepRequest.getDurationMinutes() : 0)
                                         .createdAt(
                                                 LocalDateTime.now())
                                         .updatedAt(

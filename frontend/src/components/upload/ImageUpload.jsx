@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { uploadService } from '../../services/uploadService'
-import { Button, Modal } from '../common/ui'
 import './ImageUpload.css'
 
 const DEFAULT_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -34,21 +33,26 @@ function ImageUpload({
     }
   }, [previewUrl])
 
-  const handleFileChange = (event) => {
+  const validateFile = (file) => {
+    if (!acceptedTypes.includes(file.type)) {
+      setError('This image format is not supported.')
+      return false
+    }
+    if (file.size > maxSizeMB * 1024 * 1024) {
+      setError(`Image must not exceed ${maxSizeMB} MB.`)
+      return false
+    }
+    return true
+  }
+
+  // Avatar mode keeps the confirm-before-upload modal (unchanged).
+  const handleAvatarFileChange = (event) => {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
 
     setError('')
-
-    if (!acceptedTypes.includes(file.type)) {
-      setError('This image format is not supported.')
-      return
-    }
-    if (file.size > maxSizeMB * 1024 * 1024) {
-      setError(`Image must not exceed ${maxSizeMB} MB.`)
-      return
-    }
+    if (!validateFile(file)) return
 
     if (previewUrl) URL.revokeObjectURL(previewUrl)
     setPendingFile(file)
@@ -78,6 +82,31 @@ function ImageUpload({
     }
   }
 
+  // Grid mode: picking a photo previews and uploads it immediately — no separate confirm step.
+  const handleGridFileChange = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    setError('')
+    if (!validateFile(file)) return
+
+    const localUrl = URL.createObjectURL(file)
+    setPreviewUrl(localUrl)
+    setUploading(true)
+
+    try {
+      const uploaded = await uploadService.uploadImage(file, folder, entityId)
+      onUploaded?.(uploaded)
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || 'Failed to upload image.')
+    } finally {
+      URL.revokeObjectURL(localUrl)
+      setPreviewUrl('')
+      setUploading(false)
+    }
+  }
+
   const handleDelete = async (publicId) => {
     setDeletingPublicId(publicId)
     setError('')
@@ -92,7 +121,7 @@ function ImageUpload({
     }
   }
 
-  const canAddMore = !disabled && !pendingFile && (multiple || images.length === 0)
+  const canAddMore = !disabled && !uploading && (multiple || images.length === 0)
 
   if (avatarMode) {
     const currentImage = images[0] || null
@@ -119,7 +148,7 @@ function ImageUpload({
               ref={inputRef}
               type="file"
               accept={acceptedTypes.join(',')}
-              onChange={handleFileChange}
+              onChange={handleAvatarFileChange}
               style={{ display: 'none' }}
             />
           )}
@@ -181,6 +210,13 @@ function ImageUpload({
           </div>
         ))}
 
+        {uploading && previewUrl && (
+          <div className="image-upload-thumb image-upload-thumb--pending">
+            <img src={previewUrl} alt="Uploading" />
+            <div className="image-upload-thumb-spinner" aria-label="Uploading…" />
+          </div>
+        )}
+
         {canAddMore && (
           <label className="image-upload-add">
             <span>+ Add photo</span>
@@ -188,31 +224,13 @@ function ImageUpload({
               ref={inputRef}
               type="file"
               accept={acceptedTypes.join(',')}
-              onChange={handleFileChange}
+              onChange={handleGridFileChange}
             />
           </label>
         )}
       </div>
 
       {error && <p className="image-upload-error">{error}</p>}
-
-      <Modal
-        open={Boolean(pendingFile)}
-        title="Image preview"
-        onClose={uploading ? undefined : handleCancelPreview}
-        footer={
-          <>
-            <Button variant="ghost" disabled={uploading} onClick={handleCancelPreview}>
-              Cancel
-            </Button>
-            <Button variant="primary" loading={uploading} onClick={handleConfirmUpload}>
-              Upload
-            </Button>
-          </>
-        }
-      >
-        {previewUrl && <img src={previewUrl} alt="Preview" className="image-upload-preview-img" />}
-      </Modal>
     </div>
   )
 }

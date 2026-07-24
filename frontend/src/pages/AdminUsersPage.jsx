@@ -173,7 +173,7 @@ function UserDetailModal({ user, onClose, onAction }) {
   if (!user) return null
   const active = user.isActive !== false
   const currentRole = normalizeRole(user.role)
-  const otherRoles = ALL_ROLES.filter((r) => r !== currentRole)
+  const otherRoles = currentRole === 'ADMIN' ? [] : ALL_ROLES.filter((r) => r !== currentRole)
   return (
     <Modal open={Boolean(user)} title="User detail" onClose={onClose}>
       <div style={{ display: 'grid', gap: 14 }}>

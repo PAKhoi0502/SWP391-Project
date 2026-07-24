@@ -31,6 +31,17 @@ export default function PaymentCollectionModal({
   cashError,
   payosLoading,
   showSuccess,
+  // Optional: show a "verifying payment..." state while the backend webhook is being
+  // processed. When true, the modal stays open but shows a loading indicator instead
+  // of the form or the success screen.
+  verifying,
+  // Optional: purpose-aware success message shown on the success screen.
+  // Defaults to the generic "Payment complete" text.
+  successMessage,
+  // Optional: show a "pending" state after polling timeout — webhook not yet confirmed.
+  // Shows a "Check again" button instead of the success screen.
+  pending,
+  onCheckAgain,
 }) {
   const [changingMethod, setChangingMethod] = useState(false)
   const [methodLoading, setMethodLoading] = useState(false)
@@ -50,6 +61,12 @@ export default function PaymentCollectionModal({
       ? '#Motorbike'
       : '#Car'
     : null
+
+  // Compute deposit breakdown — only shown when a deposit was already paid
+  const depositPaid = String(booking?.depositStatus || '').toUpperCase() === 'PAID'
+  const finalPrice = Number(booking?.finalPrice || 0)
+  const depositAmount = depositPaid ? Math.min(Number(booking?.depositAmount || 0), finalPrice) : 0
+  const remainingAmount = Math.max(0, finalPrice - depositAmount)
 
   const handleClose = () => {
     if (anyLoading) return
@@ -77,6 +94,63 @@ export default function PaymentCollectionModal({
     }
   }
 
+  // Polling timed out — webhook not yet confirmed. Show PENDING state with retry button.
+  if (pending) {
+    return (
+      <div className="pcm-overlay" onClick={handleClose}>
+        <div
+          className="pcm-dialog pcm-dialog--success"
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="pcm-success-screen">
+            <p className="pcm-success-title" style={{ fontSize: '1rem', color: '#b45309' }}>
+              Payment pending
+            </p>
+            <p className="pcm-success-sub">
+              We couldn&apos;t confirm your payment yet. The transaction may still be processing.
+            </p>
+            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+              <button
+                type="button"
+                className="pcm-btn pcm-btn--primary"
+                onClick={onCheckAgain}
+              >
+                Check again
+              </button>
+              <button type="button" className="pcm-btn pcm-btn--ghost" onClick={handleClose}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show a "verifying payment..." indicator while the backend webhook is still being
+  // processed. This prevents falsely confirming a payment that hasn't been recorded yet.
+  if (verifying) {
+    return (
+      <div className="pcm-overlay" onClick={handleClose}>
+        <div
+          className="pcm-dialog pcm-dialog--success"
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="pcm-success-screen">
+            <p className="pcm-success-title" style={{ fontSize: '1rem', color: 'inherit' }}>
+              Verifying payment...
+            </p>
+            <p className="pcm-success-sub">Please wait while we confirm your payment.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (showSuccess) {
     return (
       <div className="pcm-overlay" onClick={handleClose}>
@@ -94,7 +168,11 @@ export default function PaymentCollectionModal({
               </svg>
             </div>
             <h2 className="pcm-success-title">Payment complete</h2>
-            {bookingId && <p className="pcm-success-sub">Booking #{bookingId} has been marked as paid.</p>}
+            {successMessage ? (
+              <p className="pcm-success-sub">{successMessage}</p>
+            ) : (
+              bookingId && <p className="pcm-success-sub">Booking #{bookingId} has been marked as paid.</p>
+            )}
             <button type="button" className="pcm-btn pcm-btn--close-success" onClick={handleClose}>
               Close
             </button>
@@ -145,8 +223,20 @@ export default function PaymentCollectionModal({
           )}
           <div className="pcm-info-row pcm-info-row--total">
             <span className="pcm-info-label">Total</span>
-            <span className="pcm-info-value pcm-total-amount">{formatMoney(booking?.finalPrice)}</span>
+            <span className="pcm-info-value pcm-total-amount">{formatMoney(finalPrice)}</span>
           </div>
+          {depositPaid && (
+            <>
+              <div className="pcm-info-row pcm-info-row--deposit">
+                <span className="pcm-info-label">Deposit paid</span>
+                <span className="pcm-info-value pcm-deposit-amount">− {formatMoney(depositAmount)}</span>
+              </div>
+              <div className="pcm-info-row pcm-info-row--remaining">
+                <span className="pcm-info-label">Remaining</span>
+                <span className="pcm-info-value pcm-remaining-amount">{formatMoney(remainingAmount)}</span>
+              </div>
+            </>
+          )}
           <div className="pcm-info-row pcm-info-row--method">
             <span className="pcm-info-label">Method</span>
             <span className="pcm-method-row">

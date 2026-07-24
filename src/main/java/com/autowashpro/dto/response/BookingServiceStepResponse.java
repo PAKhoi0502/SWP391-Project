@@ -25,6 +25,10 @@ public class BookingServiceStepResponse {
 
     private String status;
 
+    private String executionPhase;
+
+    private Integer durationMinutes;
+
     private LocalDateTime startedAt;
 
     private LocalDateTime completedAt;

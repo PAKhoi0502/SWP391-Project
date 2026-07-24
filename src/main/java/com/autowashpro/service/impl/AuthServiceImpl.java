@@ -13,6 +13,7 @@ import com.autowashpro.repository.UserRepository;
 import com.autowashpro.security.JwtService;
 import com.autowashpro.service.AuthService;
 import com.autowashpro.service.EmailService;
+import com.autowashpro.service.support.VietnamesePhoneNumber;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
+    /** Distinct marker (not free text) so the frontend can reliably detect this case. */
+    public static final String GOOGLE_SIGNUP_PHONE_REQUIRED = "GOOGLE_SIGNUP_PHONE_REQUIRED";
+
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordResetRepository passwordResetRepository;
@@ -49,14 +53,16 @@ public class AuthServiceImpl implements AuthService {
             throw new RuntimeException("Email already exists");
         }
 
-        if (userRepository.existsByPhone(request.getPhone())) {
+        String normalizedPhone = VietnamesePhoneNumber.normalizeMobile(request.getPhone());
+
+        if (userRepository.existsByPhone(normalizedPhone)) {
             throw new RuntimeException("Phone already exists");
         }
 
         User user = User.builder()
                 .fullName(request.getFullName())
                 .email(request.getEmail())
-                .phone(request.getPhone())
+                .phone(normalizedPhone)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .role("CUSTOMER")
                 .authProvider(AuthProvider.LOCAL)
@@ -88,7 +94,8 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse login(LoginRequest request) {
 
-        User user = userRepository.findByPhone(request.getPhone())
+        String normalizedPhone = VietnamesePhoneNumber.normalizeMobile(request.getPhone());
+        User user = userRepository.findByPhone(normalizedPhone)
                 .orElseThrow(() -> new RuntimeException("Invalid credentials"));
 
         if (!user.getIsActive()) {
@@ -130,7 +137,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public AuthResponse googleAuth(String idToken) {
+    public AuthResponse googleAuth(String idToken, String phone) {
 
         if (!googleAuthProperties.isConfigured()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Google sign-in is not configured");
@@ -150,9 +157,26 @@ public class AuthServiceImpl implements AuthService {
                 user.setGoogleId(googleId);
                 userRepository.save(user);
             } else {
+                // Brand-new account via Google — a phone number is mandatory so the
+                // customer can still be reached/identified the same way as local signups.
+                // The frontend calls this endpoint once with no phone to check whether the
+                // Google account is new; on this exact marker it shows a "enter phone" modal
+                // and retries with the phone filled in. Verifying the same Google idToken
+                // twice is safe — verification is stateless (JWT signature/expiry check).
+                if (phone == null || phone.isBlank()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, GOOGLE_SIGNUP_PHONE_REQUIRED);
+                }
+
+                String normalizedPhone = VietnamesePhoneNumber.normalizeMobile(phone);
+
+                if (userRepository.existsByPhone(normalizedPhone)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Phone already exists");
+                }
+
                 user = User.builder()
                         .fullName(fullName)
                         .email(email)
+                        .phone(normalizedPhone)
                         .googleId(googleId)
                         .role("CUSTOMER")
                         .authProvider(AuthProvider.GOOGLE)

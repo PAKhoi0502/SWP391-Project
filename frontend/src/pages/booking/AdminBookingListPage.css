@@ -368,7 +368,8 @@
 .abl-badge--completed    { background: #f0fdf4; border: 1px solid #bbf7d0; color: #14532d; }
 .abl-badge--canceled,
 .abl-badge--cancelled    { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
-.abl-badge--no_show      { background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; }
+.abl-badge--no_show         { background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; }
+.abl-badge--pending_deposit { background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; }
 .abl-badge--paid         { background: #f0fdf4; border: 1px solid #bbf7d0; color: #14532d; }
 .abl-badge--unpaid       { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
 .abl-badge--pending      { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; }

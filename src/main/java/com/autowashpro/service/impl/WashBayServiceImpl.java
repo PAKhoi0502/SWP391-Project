@@ -12,6 +12,7 @@ import com.autowashpro.repository.GarageRepository;
 import com.autowashpro.repository.WashBayRepository;
 import com.autowashpro.repository.spec.WashBaySpecifications;
 import com.autowashpro.service.WashBayService;
+import com.autowashpro.service.support.StaffOperationAccessPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -21,9 +22,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.autowashpro.entity.StaffProfile;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,6 +36,7 @@ public class WashBayServiceImpl implements WashBayService {
 
     private final WashBayRepository washBayRepository;
     private final GarageRepository garageRepository;
+    private final StaffOperationAccessPolicy staffOperationAccessPolicy;
 
     @Override
     @Transactional
@@ -57,8 +62,14 @@ public class WashBayServiceImpl implements WashBayService {
     }
 
     @Override
-    public WashBayResponse getById(Long id) {
-        return toResponse(findOrThrow(id));
+    public WashBayResponse getById(Long id, Long callerId, String role) {
+        WashBay bay = findOrThrow(id);
+        StaffProfile profile = staffOperationAccessPolicy.requireCustomerServiceOrAdmin(callerId, role);
+        if (profile != null && !Objects.equals(profile.getGarageId(), bay.getGarageId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You can only view wash bays for your own garage");
+        }
+        return toResponse(bay);
     }
 
     @Override
@@ -74,8 +85,11 @@ public class WashBayServiceImpl implements WashBayService {
 
     @Override
     @Transactional
-    public WashBayResponse updateStatus(Long id, WashBayStatusUpdateRequest request) {
+    public WashBayResponse updateStatus(Long id, WashBayStatusUpdateRequest request, Long callerId, String role) {
         WashBay bay = findOrThrow(id);
+        // Authorization: only CSS (same garage) or Admin may mutate wash bay status
+        staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(callerId, role, bay.getGarageId());
+
         bay.setStatus(request.getStatus());
 
         // Nếu set INACTIVE thì đồng thời deactivate
@@ -88,9 +102,21 @@ public class WashBayServiceImpl implements WashBayService {
 
     @Override
     public PageResponse<WashBayResponse> list(int page, int limit, Long garageId,
-                                               String vehicleType, WashBayStatus status) {
-        Specification<WashBay> spec = Specification
-                .where(WashBaySpecifications.garageIdEquals(garageId))
+                                               String vehicleType, WashBayStatus status,
+                                               Long callerId, String role) {
+        StaffProfile profile = staffOperationAccessPolicy.requireCustomerServiceOrAdmin(callerId, role);
+        Long effectiveGarageId = garageId;
+        if (profile != null) {
+            if (effectiveGarageId == null) {
+                effectiveGarageId = profile.getGarageId();
+            } else if (!Objects.equals(effectiveGarageId, profile.getGarageId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "You can only view wash bays for your own garage");
+            }
+        }
+
+        Specification<WashBay> spec = ((Specification<WashBay>) (root, query, cb) -> null)
+                .and(WashBaySpecifications.garageIdEquals(effectiveGarageId))
                 .and(WashBaySpecifications.vehicleTypeEquals(vehicleType))
                 .and(WashBaySpecifications.statusEquals(status));
 
@@ -115,7 +141,13 @@ public class WashBayServiceImpl implements WashBayService {
     }
 
     @Override
-    public WashBayCapacityResponse getCapacity(Long garageId, String vehicleType) {
+    public WashBayCapacityResponse getCapacity(Long garageId, String vehicleType, Long callerId, String role) {
+        StaffProfile profile = staffOperationAccessPolicy.requireCustomerServiceOrAdmin(callerId, role);
+        if (profile != null && !Objects.equals(profile.getGarageId(), garageId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You can only view capacity for your own garage");
+        }
+
         if (!garageRepository.existsById(garageId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND,
                     "Garage not found: " + garageId);

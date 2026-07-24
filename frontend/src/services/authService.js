@@ -82,8 +82,8 @@ export const authService = {
     return normalizeAuthResponse(res.data);
   },
 
-  async googleAuth(idToken) {
-    const res = await api.post("/auth/google", { idToken });
+  async googleAuth(idToken, phone) {
+    const res = await api.post("/auth/google", { idToken, phone: phone || undefined });
     return normalizeAuthResponse(res.data);
   },
 

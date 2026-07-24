@@ -1,10 +1,12 @@
 package com.autowashpro.service;
 
 import com.autowashpro.dto.review.AdminReviewStatsResponse;
+import com.autowashpro.dto.review.PublicReviewResponse;
 import com.autowashpro.dto.review.ReviewCreateRequest;
 import com.autowashpro.dto.review.ReviewEligibilityResponse;
 import com.autowashpro.dto.review.ReviewResponse;
 import org.springframework.data.domain.Page;
+import java.util.List;
 
 public interface BookingReviewService {
 
@@ -20,7 +22,10 @@ public interface BookingReviewService {
 
     void maybeCreateReviewRequestNotification(Long bookingId);
 
-    Page<ReviewResponse> getPublicReviews(int page, int limit);
+    /** Returns booking IDs that the given customer has already reviewed. */
+    List<Long> getMyReviewedBookingIds(Long customerId);
+
+    Page<PublicReviewResponse> getPublicReviews(int page, int limit);
 
     AdminReviewStatsResponse getPublicStats();
 }

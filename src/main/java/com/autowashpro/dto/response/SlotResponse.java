@@ -17,5 +17,11 @@ public class SlotResponse {
 
     private Boolean available;
 
-    private String fullReason; // NO_BAY | NO_CARE_STAFF — populated when available=false
+    private String fullReason; // NO_WASH_BAY | NO_CARE_STAFF | GARAGE_CLOSED — populated when available=false
+
+    // ===================== ISSUE #169 wash/care windows =====================
+    private LocalDateTime washStartAt;
+    private LocalDateTime washEndAt;
+    private LocalDateTime careStartAt;
+    private LocalDateTime careEndAt;
 }
