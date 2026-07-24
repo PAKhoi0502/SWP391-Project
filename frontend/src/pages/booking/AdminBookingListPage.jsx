@@ -201,8 +201,11 @@ function AdminBookingListPage() {
     try {
       setLoading(true)
       setError('')
+      // "WALKIN" is a client-side-only filter (see visibleBookings) — the backend
+      // has no such status, so fetch the unfiltered list in that case.
+      const apiStatus = status === 'WALKIN' ? 'ALL' : status
       const [data, users] = await Promise.all([
-        bookingApi.getAdminBookings({ garageId, status, paymentStatus }),
+        bookingApi.getAdminBookings({ garageId, status: apiStatus, paymentStatus }),
         userService.getUsers().catch(() => []),
       ])
       setBookings(await enrichBookingsWithPaymentTransactions(data, users))
@@ -221,6 +224,7 @@ function AdminBookingListPage() {
   const visibleBookings = bookings
     .filter((booking) => {
       const bookingStatus = String(booking?.status || '').toUpperCase()
+      if (status === 'WALKIN') return Boolean(booking.isWalkIn)
       if (status === 'ALL') return !closedStatuses.has(bookingStatus)
       if (status === 'CANCELED') return bookingStatus === 'CANCELED' || bookingStatus === 'CANCELLED'
       return bookingStatus === status
@@ -298,25 +302,13 @@ function AdminBookingListPage() {
               {item === 'ALL' ? 'Active' : getStatusText(item)}
             </button>
           ))}
-        </div>
-
-        <div className="abl-field">
-          <label>Payment</label>
-          <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}>
-            {paymentStatuses.map((item) => (
-              <option key={item} value={item}>{item === 'ALL' ? 'All payments' : getPaymentStatusText(item)}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="abl-field">
-          <label>Garage ID</label>
-          <input
-            placeholder="e.g. 1"
-            value={garageId}
-            onChange={(e) => setGarageId(e.target.value)}
-            style={{ width: 90 }}
-          />
+          <button
+            type="button"
+            className={`abl-pill${status === 'WALKIN' ? ' abl-pill--active' : ''}`}
+            onClick={() => setStatus('WALKIN')}
+          >
+            Walk-in
+          </button>
         </div>
 
         <div className={`abl-date-wrap${dateOpen ? ' open' : ''}`}>
@@ -331,6 +323,25 @@ function AdminBookingListPage() {
               {date && <button type="button" onClick={() => { setDate(''); setDateOpen(false) }}>Clear</button>}
             </div>
           </div>
+        </div>
+
+        <div className="abl-field">
+          <label>Garage ID</label>
+          <input
+            placeholder="e.g. 1"
+            value={garageId}
+            onChange={(e) => setGarageId(e.target.value)}
+            style={{ width: 90 }}
+          />
+        </div>
+
+        <div className="abl-field">
+          <label>Payment</label>
+          <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}>
+            {paymentStatuses.map((item) => (
+              <option key={item} value={item}>{item === 'ALL' ? 'All payments' : getPaymentStatusText(item)}</option>
+            ))}
+          </select>
         </div>
 
         <button type="button" className="abl-refresh" onClick={loadBookings}>

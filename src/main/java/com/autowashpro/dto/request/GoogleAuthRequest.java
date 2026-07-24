@@ -10,4 +10,7 @@ public class GoogleAuthRequest {
 
     @NotBlank
     private String idToken;
+
+    /** Required only when the Google sign-in creates a brand-new account. */
+    private String phone;
 }

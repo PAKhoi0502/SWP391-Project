@@ -1,24 +1,25 @@
 .puh-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.72);
+  z-index: 1200;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1200;
   padding: 20px;
 }
 
 .puh-modal {
-  background: #111116;
-  border: 1px solid rgba(250, 204, 21, 0.2);
-  border-radius: 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
   width: 100%;
   max-width: 820px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.15);
 }
 
 /* ── Header ── */
@@ -27,32 +28,36 @@
   justify-content: space-between;
   align-items: center;
   padding: 22px 28px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid #e2e8f0;
   flex-shrink: 0;
 }
 
 .puh-header h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 800;
-  color: #f1f5f9;
+  color: #0f172a;
 }
 
 .puh-close {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 17px;
-  cursor: pointer;
-  padding: 4px 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
   border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   line-height: 1;
-  transition: color 0.15s, background 0.15s;
 }
 
 .puh-close:hover {
-  color: #f1f5f9;
-  background: rgba(255, 255, 255, 0.08);
+  background: #f1f5f9;
 }
 
 /* ── Body ── */
@@ -73,34 +78,35 @@
 .puh-filter-input {
   flex: 1;
   min-width: 180px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
-  color: #e2e8f0;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #1e293b;
   font-size: 13px;
-  transition: border-color 0.15s;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .puh-filter-input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: #cbd5e1;
 }
 
 .puh-filter-input:focus {
-  outline: none;
-  border-color: rgba(250, 204, 21, 0.4);
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
 }
 
 /* ── States ── */
 .puh-state {
   padding: 48px 0;
   text-align: center;
-  color: rgba(255, 255, 255, 0.38);
+  color: #94a3b8;
   font-size: 14px;
 }
 
 .puh-state--error {
-  color: #fca5a5;
+  color: #dc2626;
 }
 
 /* ── Table ── */
@@ -119,17 +125,17 @@
   padding: 10px 14px;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.38);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: #64748b;
+  border-bottom: 1px solid #e2e8f0;
   white-space: nowrap;
 }
 
 .puh-table td {
   padding: 12px 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  color: #e2e8f0;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
   vertical-align: middle;
 }
 
@@ -138,11 +144,11 @@
 }
 
 .puh-table tbody tr:hover td {
-  background: rgba(255, 255, 255, 0.03);
+  background: #f8fafc;
 }
 
 .puh-id {
-  color: rgba(255, 255, 255, 0.55);
+  color: #64748b;
   font-family: monospace;
   font-size: 13px;
 }
@@ -153,13 +159,13 @@
 }
 
 .puh-promo-id {
-  color: rgba(255, 255, 255, 0.55);
+  color: #64748b;
   font-family: monospace;
   font-size: 13px;
 }
 
 .puh-promo-code {
-  color: #facc15;
+  color: #2563eb;
   font-weight: 700;
   font-family: monospace;
   font-size: 13px;
@@ -173,32 +179,33 @@
 .puh-customer-main {
   font-family: monospace;
   font-size: 13px;
-  color: #e2e8f0;
+  color: #1e293b;
   white-space: nowrap;
 }
 
 .puh-customer-sub {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
+  color: #94a3b8;
   margin-top: 3px;
 }
 
 .puh-amount {
-  color: #facc15;
+  color: #15803d;
   font-weight: 700;
   white-space: nowrap;
 }
 
 .puh-date {
   white-space: nowrap;
-  color: #cbd5e1;
+  color: #475569;
   font-size: 13px;
 }
 
 @media (max-width: 600px) {
+  .puh-overlay { padding: 0; align-items: flex-end; }
   .puh-modal {
     max-height: 90vh;
-    border-radius: 16px;
+    border-radius: 16px 16px 0 0;
   }
   .puh-header {
     padding: 16px 18px 14px;

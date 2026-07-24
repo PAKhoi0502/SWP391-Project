@@ -41,6 +41,7 @@ public class UserServiceImpl implements UserService {
                 .phone(user.getPhone())
                 .role(user.getRole())
                 .isActive(user.getIsActive())
+                .hasPassword(user.getPasswordHash() != null)
                 .build();
     }
 
@@ -113,6 +114,11 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() ->
                         new RuntimeException("User not found"));
+
+        if (user.getPasswordHash() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "This account signed in with Google and has no password to change");
+        }
 
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect");

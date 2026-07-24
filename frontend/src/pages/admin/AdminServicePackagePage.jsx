@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { computeWashStepTotal } from '../../utils/guestBookingUtils'
 import { getGarages } from '../../api/GarageApi'
 import {
@@ -68,6 +68,21 @@ export default function AdminServicePackagePage() {
   const [alertMsg, setAlertMsg] = useState('')
   const [confirmDialog, setConfirmDialog] = useState(null)
   const [toggling, setToggling] = useState(false)
+
+  // Match the "Service packages" panel's height to "Create new package" so its
+  // own list can scroll internally instead of growing the page.
+  const createPanelRef = useRef(null)
+  const [matchedPanelHeight, setMatchedPanelHeight] = useState(null)
+
+  useLayoutEffect(() => {
+    const el = createPanelRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(([entry]) => {
+      setMatchedPanelHeight(entry.contentRect.height)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   const filteredPackages = useMemo(() => {
     return packages.filter((item) => {
@@ -384,7 +399,8 @@ export default function AdminServicePackagePage() {
       {error && <div className="asp-alert error">{error}</div>}
       {success && <div className="asp-alert success">{success}</div>}
 
-      <div className="asp-panel">
+      <div className="asp-grid">
+      <div className="asp-panel" ref={createPanelRef}>
         <div className="asp-panel-header">
           <div>
             <h2>{editingId ? 'Update package' : 'Create new package'}</h2>
@@ -510,7 +526,7 @@ export default function AdminServicePackagePage() {
               </div>
               <div className="asp-form-grid" style={{ marginTop: 8 }}>
                 <select
-                  className="asp-select"
+                  className="asp-select asp-select-wide"
                   name="executionMode"
                   value={form.executionMode}
                   onChange={handleChange}
@@ -586,7 +602,10 @@ export default function AdminServicePackagePage() {
         </form>
       </div>
 
-      <div className="asp-panel">
+      <div
+        className="asp-panel asp-panel--packages"
+        style={matchedPanelHeight ? { height: matchedPanelHeight } : undefined}
+      >
         <div className="asp-panel-header">
           <div>
             <h2>Service packages</h2>
@@ -609,6 +628,7 @@ export default function AdminServicePackagePage() {
           </button>
         </div>
 
+        <div className="asp-packages-scroll">
         {loading ? (
           <div className="asp-empty">Loading service packages...</div>
         ) : filteredPackages.length === 0 ? (
@@ -666,6 +686,8 @@ export default function AdminServicePackagePage() {
             </table>
           </div>
         )}
+        </div>
+      </div>
       </div>
 
       {alertMsg && (

@@ -13,12 +13,27 @@ import {
   getServicePackages,
 } from '../../services/servicePackageApi'
 import { staffProfileService } from '../../services/staffProfileService'
+import DepositQrModal from '../../components/Booking/DepositQrModal'
 import {
   getLicensePlateError,
   getVietnameseMobileError,
   normalizeVietnameseMobile,
 } from '../../utils/identityValidation'
 import './StaffWalkInBookingPage.css'
+
+const DEPOSIT_PERCENT = 0.30
+
+function persistPayOSReturnPath(path, result) {
+  const orderCode = result?.orderCode || result?.order_code
+  ;[localStorage, sessionStorage].forEach((storage) => {
+    storage.setItem('payosReturnPath', path)
+    storage.setItem('payosLastReturnPath', path)
+  })
+  if (orderCode) {
+    localStorage.setItem(`payosReturnPath-${orderCode}`, path)
+    sessionStorage.setItem(`payosReturnPath-${orderCode}`, path)
+  }
+}
 
 function todayIso() {
   const d = new Date()
@@ -151,6 +166,16 @@ export default function StaffWalkInBookingPage() {
   const [fieldErrors, setFieldErrors] = useState({})
   const [customerConflictSlots, setCustomerConflictSlots] = useState(new Set())
 
+  const [depositConfirm, setDepositConfirm] = useState(null)
+  const [depositQrOpen, setDepositQrOpen] = useState(false)
+  const [depositTransaction, setDepositTransaction] = useState(null)
+  const [depositCheckoutUrl, setDepositCheckoutUrl] = useState('')
+  const [depositQrError, setDepositQrError] = useState('')
+  const [depositLoading, setDepositLoading] = useState(false)
+  const [depositRefreshLoading, setDepositRefreshLoading] = useState(false)
+  const [depositCancelLoading, setDepositCancelLoading] = useState(false)
+  const [depositSuccess, setDepositSuccess] = useState(false)
+
   // UI-only state
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth())
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear())
@@ -274,6 +299,19 @@ export default function StaffWalkInBookingPage() {
   const selectedSlot = useMemo(
     () => slots.find((slot) => slot.startTime === form.startTime) || null,
     [slots, form.startTime],
+  )
+
+  // Walk-in customers are already at the counter, so a slot starting within the next
+  // hour is treated as an immediate wash — no deposit needed. A slot further out behaves
+  // like a regular advance booking and needs a deposit to hold it against no-shows.
+  const isDepositRequired = useMemo(() => {
+    if (!form.startTime) return false
+    return new Date(form.startTime).getTime() > Date.now() + 60 * 60 * 1000
+  }, [form.startTime])
+
+  const estimatedDeposit = useMemo(
+    () => (isDepositRequired ? Math.round(totalPrice * DEPOSIT_PERCENT) : 0),
+    [isDepositRequired, totalPrice],
   )
 
   // Slot groups (UI-only derived from existing `slots`)
@@ -525,6 +563,11 @@ export default function StaffWalkInBookingPage() {
       if (id && form.paymentMethod) {
         localStorage.setItem(`booking-payment-method-${id}`, form.paymentMethod)
       }
+      if (String(result?.status || '').toUpperCase() === 'PENDING_DEPOSIT') {
+        setDepositConfirm({ id, depositAmount: result.depositAmount })
+        await handlePayDeposit(id, result.depositAmount)
+        return
+      }
       navigate(id ? `/staff/bookings/${id}` : '/staff/bookings', { replace: true })
     } catch (err) {
       const msg = getErrorMessage(err, '')
@@ -540,6 +583,137 @@ export default function StaffWalkInBookingPage() {
       setSubmitting(false)
     }
   }
+
+  const handlePayDeposit = async (bookingId, depositAmount) => {
+    if (!bookingId) return
+    setDepositLoading(true)
+    setDepositQrError('')
+    setDepositSuccess(false)
+    try {
+      const result = await bookingApi.createPayOSPayment(bookingId)
+      persistPayOSReturnPath(`/staff/bookings/${bookingId}`, result)
+
+      let txData = {
+        orderCode: result.orderCode,
+        qrCode: result.qrCode,
+        checkoutUrl: result.checkoutUrl,
+        amount: depositAmount,
+        status: 'PENDING',
+      }
+
+      try {
+        const transactions = await bookingApi.getPaymentTransactions(bookingId)
+        const matchingTx =
+          transactions.find((tx) => String(tx.orderCode) === String(result.orderCode)) ||
+          transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PENDING')
+        if (matchingTx) {
+          txData = { ...matchingTx, qrCode: matchingTx.qrCode || result.qrCode }
+        }
+      } catch {
+        // silently ignore — use data from createPayOSPayment response
+      }
+
+      setDepositTransaction(txData)
+      setDepositCheckoutUrl(result.checkoutUrl || '')
+      setDepositQrOpen(true)
+    } catch (err) {
+      setDepositQrError(err?.response?.data?.message || err?.message || 'Failed to create deposit payment.')
+      setDepositQrOpen(true)
+    } finally {
+      setDepositLoading(false)
+    }
+  }
+
+  const handleDepositRefresh = async () => {
+    const bookingId = depositConfirm?.id
+    setDepositRefreshLoading(true)
+    setDepositQrError('')
+    try {
+      if (depositTransaction?.id) {
+        const tx = await bookingApi.getPaymentTransaction(depositTransaction.id)
+        setDepositTransaction((prev) => ({ ...prev, ...tx }))
+        if (String(tx?.status || '').toUpperCase() === 'PAID') {
+          setDepositSuccess(true)
+        }
+      } else if (bookingId) {
+        const transactions = await bookingApi.getPaymentTransactions(bookingId)
+        const paidTx = transactions.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
+        if (paidTx) {
+          setDepositTransaction((prev) => ({ ...prev, ...paidTx }))
+          setDepositSuccess(true)
+        } else {
+          const pendingTx = transactions.find(
+            (tx) => String(tx.orderCode) === String(depositTransaction?.orderCode),
+          )
+          if (pendingTx) setDepositTransaction((prev) => ({ ...prev, ...pendingTx }))
+        }
+      }
+    } catch {
+      setDepositQrError('Refresh failed. Please try again.')
+    } finally {
+      setDepositRefreshLoading(false)
+    }
+  }
+
+  const handleDepositCancelTransaction = async () => {
+    setDepositCancelLoading(true)
+    setDepositQrError('')
+    try {
+      if (depositTransaction?.id) {
+        await bookingApi.cancelPaymentTransaction(depositTransaction.id)
+      }
+      setDepositQrOpen(false)
+      setDepositTransaction(null)
+      setDepositCheckoutUrl('')
+    } catch (err) {
+      setDepositQrError(err?.response?.data?.message || err?.message || 'Failed to cancel transaction.')
+    } finally {
+      setDepositCancelLoading(false)
+    }
+  }
+
+  const handleDepositQrClose = () => {
+    if (depositRefreshLoading || depositCancelLoading) return
+    setDepositQrOpen(false)
+    setDepositQrError('')
+    if (depositSuccess) {
+      const bookingId = depositConfirm?.id
+      setDepositSuccess(false)
+      setDepositConfirm(null)
+      navigate(bookingId ? `/staff/bookings/${bookingId}` : '/staff/bookings', { replace: true })
+    }
+  }
+
+  useEffect(() => {
+    if (!depositQrOpen || depositSuccess) return undefined
+
+    const bookingId = depositConfirm?.id
+    const txId = depositTransaction?.id
+
+    const poll = async () => {
+      try {
+        if (txId) {
+          const tx = await bookingApi.getPaymentTransaction(txId)
+          if (String(tx?.status || '').toUpperCase() === 'PAID') {
+            setDepositTransaction((prev) => ({ ...prev, ...tx }))
+            setDepositSuccess(true)
+          }
+        } else if (bookingId) {
+          const txs = await bookingApi.getPaymentTransactions(bookingId)
+          const paidTx = txs.find((tx) => String(tx.status || '').toUpperCase() === 'PAID')
+          if (paidTx) {
+            setDepositTransaction((prev) => ({ ...prev, ...paidTx }))
+            setDepositSuccess(true)
+          }
+        }
+      } catch {
+        // silently ignore
+      }
+    }
+
+    const timer = setInterval(poll, 4000)
+    return () => clearInterval(timer)
+  }, [depositQrOpen, depositSuccess, depositTransaction?.id, depositConfirm?.id])
 
   const scrollToForm = () => {
     document.getElementById('staff-walk-in-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -1005,6 +1179,18 @@ export default function StaffWalkInBookingPage() {
                 )}
               </div>
             </div>
+
+            {form.startTime && (
+              isDepositRequired ? (
+                <p className="swi-deposit-notice swi-deposit-notice--required">
+                  This slot is more than 1 hour from now — a {formatMoney(estimatedDeposit)} deposit (30%) is required to hold it.
+                </p>
+              ) : (
+                <p className="swi-deposit-notice">
+                  This slot is within the next hour — no deposit needed.
+                </p>
+              )
+            )}
           </section>
 
           {/* ── Payment ── */}
@@ -1017,7 +1203,11 @@ export default function StaffWalkInBookingPage() {
                 onClick={() => setForm((prev) => ({ ...prev, paymentMethod: 'CASH' }))}
               >
                 <span className="swi-pay-label">Cash</span>
-                <small className="swi-pay-desc">Customer pays cash after service is complete.</small>
+                <small className="swi-pay-desc">
+                  {isDepositRequired
+                    ? 'Staff collects the deposit in cash now; remainder paid after service.'
+                    : 'Customer pays cash after service is complete.'}
+                </small>
               </button>
 
               <button
@@ -1026,7 +1216,11 @@ export default function StaffWalkInBookingPage() {
                 onClick={() => setForm((prev) => ({ ...prev, paymentMethod: 'PAYOS' }))}
               >
                 <span className="swi-pay-label">PayOS</span>
-                <small className="swi-pay-desc">Staff creates a PayOS QR code after service is complete.</small>
+                <small className="swi-pay-desc">
+                  {isDepositRequired
+                    ? 'Customer pays the deposit via PayOS QR now; remainder after service.'
+                    : 'Staff creates a PayOS QR code after service is complete.'}
+                </small>
               </button>
             </div>
           </section>
@@ -1122,6 +1316,12 @@ export default function StaffWalkInBookingPage() {
                   <strong>{totalDuration} min</strong>
                 </div>
               )}
+              {isDepositRequired && (
+                <div className="swi-summary-row">
+                  <span>Deposit required (30%)</span>
+                  <strong>{formatMoney(estimatedDeposit)}</strong>
+                </div>
+              )}
             </>
           )}
 
@@ -1130,13 +1330,31 @@ export default function StaffWalkInBookingPage() {
               type="submit"
               form="staff-walk-in-form"
               className="swi-submit-btn"
-              disabled={submitting || loadingInitial}
+              disabled={submitting || depositLoading || loadingInitial}
             >
-              {submitting ? 'Creating booking...' : 'Create booking'}
+              {submitting || depositLoading
+                ? 'Processing...'
+                : isDepositRequired
+                  ? (form.paymentMethod === 'PAYOS' ? 'Create & pay deposit' : 'Confirm & collect deposit')
+                  : 'Create booking'}
             </button>
           </div>
         </aside>
       </div>
+
+      <DepositQrModal
+        open={depositQrOpen}
+        onClose={handleDepositQrClose}
+        booking={depositConfirm}
+        transaction={depositTransaction}
+        checkoutUrl={depositCheckoutUrl}
+        error={depositQrError}
+        onRefresh={handleDepositRefresh}
+        onCancelTransaction={handleDepositCancelTransaction}
+        refreshLoading={depositRefreshLoading}
+        cancelLoading={depositCancelLoading}
+        paymentSuccess={depositSuccess}
+      />
     </main>
   )
 }

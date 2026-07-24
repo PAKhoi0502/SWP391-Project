@@ -89,6 +89,8 @@ public interface BookingAssignedStaffRepository extends JpaRepository<BookingAss
 
     List<BookingAssignedStaff> findByBookingId(Long bookingId);
 
+    List<BookingAssignedStaff> findByStaffProfileIdAndStatus(Long staffProfileId, String status);
+
     List<BookingAssignedStaff> findByStaffProfileId(Long staffProfileId);
 
     /** Count overlapping assignments for a staff member, excluding RELEASED and CANCELED statuses. */

@@ -44,7 +44,7 @@ function UiKitDemo() {
 
     return (
         <div style={{ padding: "40px", minHeight: "100vh" }}>
-            <h1>AutoWash Pro UI Kit</h1>
+            <h1>Audela Washing UI Kit</h1>
             <p>Demo reusable frontend components for issue #2.</p>
 
             <section style={{ marginTop: 30 }}>

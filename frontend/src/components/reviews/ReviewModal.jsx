@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import reviewApi from '../../api/reviewApi'
-import api from '../../services/api'
+import { uploadService } from '../../services/uploadService'
 import { emitReviewCreated } from '../../utils/reviewEvents'
 import StarRatingInput from './StarRatingInput'
 import ReviewImageUploader from './ReviewImageUploader'
@@ -73,13 +73,7 @@ export default function ReviewModal({ bookingId, open, onClose, onSubmitted, onA
     const urls = []
     for (const img of images) {
       try {
-        const formData = new FormData()
-        formData.append('file', img.file)
-        formData.append('folder', 'reviews')
-        const res = await api.post('/uploads/images', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
-        const uploaded = res?.data?.data ?? res?.data ?? res
+        const uploaded = await uploadService.uploadImage(img.file, 'reviews', bookingId)
         if (uploaded?.imageUrl) urls.push(uploaded.imageUrl)
       } catch {
         // Skip failed uploads silently — review still submits without that image

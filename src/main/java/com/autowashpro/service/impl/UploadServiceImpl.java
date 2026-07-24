@@ -172,6 +172,15 @@ public class UploadServiceImpl implements UploadService {
             return requestedEntityId;
         }
 
+        if (folder == UploadFolder.REPORTS || folder == UploadFolder.REVIEWS) {
+            Booking booking = bookingRepository.findById(requestedEntityId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+            if (!currentUserId.equals(booking.getCustomerId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only attach photos to your own booking");
+            }
+            return requestedEntityId;
+        }
+
         Booking booking = bookingRepository.findById(requestedEntityId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
         inspectionAccessPolicy.requireCanManage(booking, currentUserId, role);

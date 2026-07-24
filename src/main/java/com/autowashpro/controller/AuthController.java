@@ -39,7 +39,7 @@ public class AuthController {
     public AuthResponse googleAuth(
             @Valid @RequestBody GoogleAuthRequest request) {
 
-        return authService.googleAuth(request.getIdToken());
+        return authService.googleAuth(request.getIdToken(), request.getPhone());
     }
     @GetMapping("/me")
 public UserResponse me(

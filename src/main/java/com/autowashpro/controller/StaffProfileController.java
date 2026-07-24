@@ -7,7 +7,11 @@ import com.autowashpro.common.AuditTargetType;
 import com.autowashpro.dto.request.StaffProfileCreateRequest;
 import com.autowashpro.dto.request.StaffProfileStatusUpdateRequest;
 import com.autowashpro.dto.request.StaffProfileUpdateRequest;
+import com.autowashpro.dto.response.CareBoardResponse;
+import com.autowashpro.dto.response.CareTaskResponse;
 import com.autowashpro.dto.response.PageResponse;
+import com.autowashpro.dto.response.StaffCompletedServiceResponse;
+import com.autowashpro.dto.response.StaffDashboardStatsResponse;
 import com.autowashpro.dto.response.StaffProfileResponse;
 import com.autowashpro.entity.enums.StaffType;
 import com.autowashpro.service.StaffProfileService;
@@ -18,6 +22,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/staff-profiles")
@@ -57,6 +63,43 @@ public class StaffProfileController {
     public ResponseEntity<StaffProfileResponse> getMyProfile(Authentication authentication) {
         Long currentUserId = Long.valueOf(authentication.getName());
         return ResponseEntity.ok(staffProfileService.getByUserId(currentUserId));
+    }
+
+    @GetMapping("/me/dashboard-stats")
+    @PreAuthorize("hasRole('STAFF')")
+    public ResponseEntity<StaffDashboardStatsResponse> getMyDashboardStats(Authentication authentication) {
+        Long currentUserId = Long.valueOf(authentication.getName());
+        return ResponseEntity.ok(staffProfileService.getMyDashboardStats(currentUserId));
+    }
+
+    @GetMapping("/me/completed-services")
+    @PreAuthorize("hasRole('STAFF')")
+    public ResponseEntity<List<StaffCompletedServiceResponse>> getMyCompletedServices(
+            Authentication authentication,
+            @RequestParam(defaultValue = "20") int limit) {
+        Long currentUserId = Long.valueOf(authentication.getName());
+        return ResponseEntity.ok(staffProfileService.getMyCompletedServices(currentUserId, limit));
+    }
+
+    @GetMapping("/me/care-board")
+    @PreAuthorize("hasRole('STAFF')")
+    public ResponseEntity<CareBoardResponse> getMyCareBoard(Authentication authentication) {
+        Long currentUserId = Long.valueOf(authentication.getName());
+        return ResponseEntity.ok(staffProfileService.getMyCareBoard(currentUserId));
+    }
+
+    @PatchMapping("/me/care-tasks/{assignmentId}/start")
+    @PreAuthorize("hasRole('STAFF')")
+    public ResponseEntity<CareTaskResponse> startCareTask(Authentication authentication, @PathVariable Long assignmentId) {
+        Long currentUserId = Long.valueOf(authentication.getName());
+        return ResponseEntity.ok(staffProfileService.startCareTask(currentUserId, assignmentId));
+    }
+
+    @PatchMapping("/me/care-tasks/{assignmentId}/complete")
+    @PreAuthorize("hasRole('STAFF')")
+    public ResponseEntity<CareTaskResponse> completeCareTask(Authentication authentication, @PathVariable Long assignmentId) {
+        Long currentUserId = Long.valueOf(authentication.getName());
+        return ResponseEntity.ok(staffProfileService.completeCareTask(currentUserId, assignmentId));
     }
 
     @GetMapping("/{id}")

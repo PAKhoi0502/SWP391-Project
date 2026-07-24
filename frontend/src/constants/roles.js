@@ -1,4 +1,4 @@
-// User roles in the AutoWash Pro system.
+// User roles in the Audela Washing system.
 // Uses constants instead of typing strings directly to avoid typos.
 export const ROLES = {
   CUSTOMER: 'CUSTOMER',

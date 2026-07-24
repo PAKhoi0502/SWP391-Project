@@ -8,7 +8,9 @@ import java.util.Arrays;
 public enum UploadFolder {
     AVATARS("avatars", "AVATAR", "autowashpro/avatars"),
     INSPECTIONS("inspections", "INSPECTION", "autowashpro/inspections"),
-    VEHICLES("vehicles", "VEHICLE", "autowashpro/vehicles");
+    VEHICLES("vehicles", "VEHICLE", "autowashpro/vehicles"),
+    REPORTS("reports", "REPORT", "autowashpro/reports"),
+    REVIEWS("reviews", "REVIEW", "autowashpro/reviews");
 
     private final String value;
     private final String entityType;
@@ -42,6 +44,6 @@ public enum UploadFolder {
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
-                        "folder must be avatars, inspections, or vehicles"));
+                        "folder must be avatars, inspections, vehicles, reports, or reviews"));
     }
 }

@@ -25,6 +25,7 @@ import {
   draftKey,
   isSignInRequired,
 } from '../../utils/guestBookingUtils'
+import { MOTORBIKE_GROUPS } from '../../constants/vehicleTypes'
 import './GuestBookingModal.css'
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -70,10 +71,25 @@ function normalizeVehicleType(type) {
 function toBackendVehicleType(type) {
   return normalizeVehicleType(type) === 'MOTORBIKE' ? 'BIKE' : 'CAR'
 }
-function packageMatchesVehicle(pkg, vehicleType) {
+// Mirrors BookingServiceImpl#isSeatCountCompatible: a package's seatCount is its
+// base tier and also covers vehicles with one extra seat (e.g. seatCount=4 fits 5-seaters).
+function seatCountMatches(pkgSeatCount, vehicleSeatCount) {
+  if (pkgSeatCount == null) return true
+  if (!vehicleSeatCount) return false
+  return Number(vehicleSeatCount) <= Number(pkgSeatCount) + 1
+}
+function packageMatchesVehicle(pkg, vehicleType, seatCount, motorbikeGroup) {
   const pt = getPackageVehicleType(pkg)
-  if (!pt) return true
-  return normalizeVehicleType(pt) === normalizeVehicleType(vehicleType)
+  if (pt && normalizeVehicleType(pt) !== normalizeVehicleType(vehicleType)) return false
+  if (normalizeVehicleType(vehicleType) === 'CAR') {
+    return seatCountMatches(getPackageSeatCount(pkg), seatCount)
+  }
+  if (normalizeVehicleType(vehicleType) === 'MOTORBIKE') {
+    const pkgGroup = getPackageMotorbikeGroup(pkg)
+    if (!pkgGroup) return true
+    return !motorbikeGroup || pkgGroup === motorbikeGroup
+  }
+  return true
 }
 
 function getCalendarDays(year, month) {
@@ -332,9 +348,10 @@ export default function GuestBookingModal({
   }, [form.garageId, form.servicePackageId, form.vehicleType, form.date])
 
   // ── Derived data ─────────────────────────────────────────────────────────────
+  const selectedVehicleType = normalizeVehicleType(form.vehicleType)
   const filteredPackages = useMemo(
-    () => packages.filter((pkg) => packageMatchesVehicle(pkg, form.vehicleType)),
-    [packages, form.vehicleType],
+    () => packages.filter((pkg) => packageMatchesVehicle(pkg, form.vehicleType, form.seatCount, form.motorbikeGroup)),
+    [packages, form.vehicleType, form.seatCount, form.motorbikeGroup],
   )
   const normalizeType = (pkg) => String(getPackageType(pkg) || 'MAIN').toUpperCase()
   const mainPackages  = useMemo(() => filteredPackages.filter((p) => normalizeType(p) === 'MAIN'),  [filteredPackages])
@@ -364,7 +381,7 @@ export default function GuestBookingModal({
     setError('')
     setFieldErrors((prev) => ({ ...prev, [name]: '' }))
     if (name === 'guestPhone') setPhoneCheckState('idle')
-    if (name === 'vehicleType' || name === 'garageId') setSelectedAddOnIds([])
+    if (['vehicleType', 'garageId', 'seatCount', 'motorbikeGroup'].includes(name)) setSelectedAddOnIds([])
     if (name === 'servicePackageId') {
       const next = packages.find((p) => String(getPackageId(p)) === String(value))
       if (next && normalizeType(next) === 'COMBO') setSelectedAddOnIds([])
@@ -373,6 +390,7 @@ export default function GuestBookingModal({
       const next = { ...prev, [name]: value }
       if (name === 'vehicleType') { next.servicePackageId = ''; next.startTime = ''; next.seatCount = ''; next.motorbikeGroup = '' }
       if (name === 'garageId') { next.servicePackageId = ''; next.startTime = '' }
+      if (name === 'seatCount' || name === 'motorbikeGroup') { next.servicePackageId = ''; next.startTime = '' }
       if (['servicePackageId', 'date'].includes(name)) next.startTime = ''
       return next
     })
@@ -423,6 +441,12 @@ export default function GuestBookingModal({
       const plateErr = getLicensePlateError(form.licensePlate, form.vehicleType)
       if (plateErr) errors.licensePlate = plateErr
       if (!form.vehicleType) errors.vehicleType = 'Please select a vehicle type.'
+      if (selectedVehicleType === 'CAR' && !form.seatCount) {
+        errors.seatCount = 'Please enter the seat count.'
+      }
+      if (selectedVehicleType === 'MOTORBIKE' && !form.motorbikeGroup) {
+        errors.motorbikeGroup = 'Please select the motorbike group.'
+      }
     }
     if (step === 'garage') {
       if (!form.garageId) errors.garageId = 'Please select a garage.'
@@ -495,9 +519,6 @@ export default function GuestBookingModal({
     setSignInRequired(false)
     try {
       setSubmitting(true)
-      const selectedVehicleType = normalizeVehicleType(form.vehicleType)
-      const pkgSeatCount = getPackageSeatCount(selectedPackage)
-      const pkgMotorbikeGroup = getPackageMotorbikeGroup(selectedPackage)
       const payload = {
         garageId: Number(form.garageId),
         guestName: form.guestName.trim(),
@@ -512,10 +533,10 @@ export default function GuestBookingModal({
         ...(form.vehicleModel.trim() ? { vehicleModel: form.vehicleModel.trim() } : {}),
         ...(form.note.trim() ? { note: form.note.trim() } : {}),
       }
-      if (selectedVehicleType === 'CAR' && pkgSeatCount && form.seatCount) {
+      if (selectedVehicleType === 'CAR' && form.seatCount) {
         payload.seatCount = Number(form.seatCount)
       }
-      if (selectedVehicleType === 'MOTORBIKE' && pkgMotorbikeGroup && form.motorbikeGroup) {
+      if (selectedVehicleType === 'MOTORBIKE' && form.motorbikeGroup) {
         payload.motorbikeGroup = form.motorbikeGroup.trim()
       }
       const result = await bookingApi.createGuestBooking(payload)
@@ -543,46 +564,50 @@ export default function GuestBookingModal({
   // ── QR confirmation screen ───────────────────────────────────────────────────
   const qrScreen = confirmedBooking && (
     <div className="gbm-overlay" onClick={onClose}>
-      <div className="gbm-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabIndex={-1}>
+      <div className="gbm-dialog gbm-dialog--qr" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabIndex={-1}>
         <div className="gbm-qr-head">
           <h2 className="gbm-qr-title">Pay deposit to confirm</h2>
           <p className="gbm-qr-sub">Scan with your banking app within 15 minutes to secure your booking.</p>
         </div>
-        {confirmedBooking.depositQrCode && (
-          <div className="gbm-qr-code">
-            <QRCodeSVG value={confirmedBooking.depositQrCode} size={200} level="M" />
-          </div>
-        )}
-        <div className="gbm-summary-rows">
-          {[
-            ['Name',    confirmedBooking.guestName],
-            ['Phone',   confirmedBooking.guestPhone],
-            ['Plate',   confirmedBooking.licensePlate],
-            ['Garage',  confirmedBooking.garageName || '—'],
-            ['Service', confirmedBooking.packageName || '—'],
-            ['Time',    confirmedBooking.startTime
-              ? `${formatDate(confirmedBooking.startTime)} · ${formatTime(confirmedBooking.startTime)} – ${formatTime(confirmedBooking.endTime)}`
-              : '—'],
-          ].map(([label, value]) => (
-            <div key={label} className="gbm-summary-row">
-              <span>{label}</span><strong>{value}</strong>
+        <div className="gbm-qr-body">
+          {confirmedBooking.depositQrCode && (
+            <div className="gbm-qr-code">
+              <QRCodeSVG value={confirmedBooking.depositQrCode} size={148} level="M" />
             </div>
-          ))}
-          <div className="gbm-summary-divider" />
-          <div className="gbm-summary-row gbm-summary-total">
-            <span>Deposit (30%)</span>
-            <strong className="gbm-price">{formatMoney(confirmedBooking.depositAmount)}</strong>
-          </div>
-          <div className="gbm-summary-row">
-            <span>Total</span><strong>{formatMoney(confirmedBooking.finalPrice)}</strong>
+          )}
+          <div className="gbm-summary-rows">
+            {[
+              ['Name',    confirmedBooking.guestName],
+              ['Phone',   confirmedBooking.guestPhone],
+              ['Plate',   confirmedBooking.licensePlate],
+              ['Garage',  confirmedBooking.garageName || '—'],
+              ['Service', confirmedBooking.packageName || '—'],
+              ['Time',    confirmedBooking.startTime
+                ? `${formatDate(confirmedBooking.startTime)} · ${formatTime(confirmedBooking.startTime)} – ${formatTime(confirmedBooking.endTime)}`
+                : '—'],
+            ].map(([label, value]) => (
+              <div key={label} className="gbm-summary-row">
+                <span>{label}</span><strong>{value}</strong>
+              </div>
+            ))}
+            <div className="gbm-summary-divider" />
+            <div className="gbm-summary-row gbm-summary-total">
+              <span>Deposit (30%)</span>
+              <strong className="gbm-price">{formatMoney(confirmedBooking.depositAmount)}</strong>
+            </div>
+            <div className="gbm-summary-row">
+              <span>Total</span><strong>{formatMoney(confirmedBooking.finalPrice)}</strong>
+            </div>
           </div>
         </div>
-        {confirmedBooking.depositCheckoutUrl && (
-          <a href={confirmedBooking.depositCheckoutUrl} target="_blank" rel="noreferrer" className="gbm-btn gbm-btn--primary">
-            Open PayOS page ↗
-          </a>
-        )}
-        <button type="button" className="gbm-btn gbm-btn--ghost" onClick={onClose}>Close</button>
+        <div className="gbm-qr-footer">
+          {confirmedBooking.depositCheckoutUrl && (
+            <a href={confirmedBooking.depositCheckoutUrl} target="_blank" rel="noreferrer" className="gbm-btn gbm-btn--primary gbm-btn--block">
+              Open PayOS page ↗
+            </a>
+          )}
+          <button type="button" className="gbm-btn gbm-btn--ghost gbm-btn--block" onClick={onClose}>Close</button>
+        </div>
       </div>
     </div>
   )
@@ -704,6 +729,34 @@ export default function GuestBookingModal({
                   </select>
                   {fieldErrors.vehicleType && <p className="gbm-field-err">{fieldErrors.vehicleType}</p>}
                 </div>
+              </div>
+              <div className="gbm-row">
+                {selectedVehicleType === 'CAR' && (
+                  <div className="gbm-field">
+                    <label>Seat count <span className="gbm-req">*</span></label>
+                    <input
+                      name="seatCount"
+                      value={form.seatCount}
+                      onChange={handleChange}
+                      type="number"
+                      min="1"
+                      placeholder="e.g. 5"
+                      className={fieldErrors.seatCount ? 'gbm-input-err' : ''}
+                    />
+                    {fieldErrors.seatCount && <p className="gbm-field-err">{fieldErrors.seatCount}</p>}
+                  </div>
+                )}
+                {selectedVehicleType === 'MOTORBIKE' && (
+                  <div className="gbm-field">
+                    <label>Motorbike group <span className="gbm-req">*</span></label>
+                    <select name="motorbikeGroup" value={form.motorbikeGroup} onChange={handleChange}
+                      className={fieldErrors.motorbikeGroup ? 'gbm-input-err' : ''}>
+                      <option value="">Select group</option>
+                      {MOTORBIKE_GROUPS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+                    </select>
+                    {fieldErrors.motorbikeGroup && <p className="gbm-field-err">{fieldErrors.motorbikeGroup}</p>}
+                  </div>
+                )}
               </div>
               <div className="gbm-row">
                 <div className="gbm-field">

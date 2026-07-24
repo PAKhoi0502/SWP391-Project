@@ -461,6 +461,65 @@
   background: rgba(248, 249, 251, 0.70);
 }
 
+.bhp-report-btn {
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 999px;
+  padding: 7px 18px;
+  background: transparent;
+  color: #b45309;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s;
+  margin-right: auto;
+}
+
+.bhp-report-btn:hover {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.6);
+}
+
+.bhp-report-status {
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  margin-right: auto;
+  white-space: nowrap;
+  font: inherit;
+  cursor: pointer;
+  transition: filter 0.14s;
+}
+
+.bhp-report-status:hover {
+  filter: brightness(0.96);
+}
+
+.bhp-report-status--pending {
+  background: rgba(245, 158, 11, 0.10);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.24);
+}
+
+.bhp-report-status--reviewed {
+  background: rgba(46, 194, 247, 0.10);
+  color: #0879B8;
+  border: 1px solid rgba(46, 194, 247, 0.24);
+}
+
+.bhp-report-status--resolved {
+  background: rgba(21, 128, 61, 0.10);
+  color: #15803d;
+  border: 1px solid rgba(21, 128, 61, 0.24);
+}
+
+.bhp-report-status--rejected {
+  background: rgba(239, 68, 68, 0.10);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.24);
+}
+
 .bhp-cancel-btn {
   border: 1px solid rgba(239, 68, 68, 0.30);
   border-radius: 999px;

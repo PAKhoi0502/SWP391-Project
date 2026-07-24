@@ -85,11 +85,31 @@
   color: #15803d;
 }
 
+.asp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
 .asp-panel {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 20px 24px;
+}
+
+.asp-panel--packages {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.asp-packages-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .asp-panel-header {
@@ -117,12 +137,17 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-width: 720px;
 }
 
 .asp-form-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
+}
+
+.asp-select-wide {
+  grid-column: span 2;
 }
 
 .asp-input,
@@ -253,15 +278,18 @@
   gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 16px;
+  max-width: 640px;
 }
 
 .asp-filters .asp-input {
   flex: 1;
   min-width: 160px;
+  max-width: 280px;
 }
 
 .asp-filters .asp-select {
   min-width: 140px;
+  max-width: 200px;
 }
 
 .asp-empty {
@@ -277,8 +305,8 @@
 
 .asp-table {
   border-collapse: collapse;
-  min-width: 860px;
   width: 100%;
+  table-layout: fixed;
 }
 
 .asp-table th {
@@ -299,7 +327,16 @@
   font-size: 13.5px;
   padding: 13px 14px;
   vertical-align: middle;
+  word-break: break-word;
 }
+
+.asp-table th:nth-child(1) { width: 24%; }
+.asp-table th:nth-child(2) { width: 10%; }
+.asp-table th:nth-child(3) { width: 10%; }
+.asp-table th:nth-child(4) { width: 14%; }
+.asp-table th:nth-child(5) { width: 9%; }
+.asp-table th:nth-child(6) { width: 13%; }
+.asp-table th:nth-child(7) { width: 20%; }
 
 .asp-table tbody tr:hover td {
   background: #f8fafc;
@@ -329,6 +366,8 @@
   font-size: 12px;
   font-weight: 600;
   padding: 3px 10px;
+  white-space: nowrap;
+  display: inline-block;
 }
 
 .asp-status-pill {
@@ -336,6 +375,8 @@
   font-size: 12px;
   font-weight: 600;
   padding: 4px 10px;
+  white-space: nowrap;
+  display: inline-block;
 }
 
 .asp-status-pill.active {
@@ -350,6 +391,7 @@
 
 .asp-row-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -551,6 +593,12 @@
   border-color: #e2e8f0;
   color: #94a3b8;
   cursor: not-allowed;
+}
+
+@media (max-width: 1200px) {
+  .asp-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 900px) {

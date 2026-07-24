@@ -10,7 +10,7 @@ public interface AuthService {
 
     AuthResponse login(LoginRequest request);
 
-    AuthResponse googleAuth(String idToken);
+    AuthResponse googleAuth(String idToken, String phone);
 
     AuthResponse refreshToken(String refreshToken);
 

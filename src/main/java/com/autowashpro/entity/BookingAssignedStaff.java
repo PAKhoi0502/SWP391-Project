@@ -36,6 +36,18 @@ public class BookingAssignedStaff {
     @Column(name = "status", nullable = false, length = 30)
     private String status = "ASSIGNED";
 
+    // Independent of `status` (ASSIGNED/RELEASED, which tracks whether the whole
+    // booking is still active) — tracks this staff member's own progress on their
+    // care task: ASSIGNED -> IN_PROGRESS -> DONE.
+    @Column(name = "care_status", nullable = false, length = 20)
+    private String careStatus = "ASSIGNED";
+
+    @Column(name = "care_started_at")
+    private LocalDateTime careStartedAt;
+
+    @Column(name = "care_completed_at")
+    private LocalDateTime careCompletedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

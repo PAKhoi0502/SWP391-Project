@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   createWashBay,
   getSupportedVehicleTypesByGarage,
@@ -87,6 +87,21 @@ export default function AdminWashBayManagementPage() {
   const [success, setSuccess] = useState("");
 
   const isEditing = Boolean(editingId);
+
+  // Match the "Wash bays" panel's height to "Create new wash bay" so its own
+  // list can scroll internally instead of growing the page.
+  const createPanelRef = useRef(null);
+  const [matchedPanelHeight, setMatchedPanelHeight] = useState(null);
+
+  useLayoutEffect(() => {
+    const el = createPanelRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => {
+      setMatchedPanelHeight(entry.contentRect.height);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const totalAvailable = useMemo(() => {
     return washBays.filter((bay) => bay.status === "AVAILABLE").length;
@@ -362,36 +377,19 @@ export default function AdminWashBayManagementPage() {
 
   return (
     <div className="wash-bay-page">
-      <div className="wash-bay-hero">
+      <div className="wash-bay-header">
         <div>
-          <p className="wash-bay-kicker">Admin Management</p>
+          <p className="wash-bay-eyebrow">Admin</p>
           <h1>Wash Bay Management</h1>
-          <p>
-            Manage wash bays by garage, vehicle type, status and capacity.
-          </p>
+          <p>Manage wash bays by garage, vehicle type, status and capacity.</p>
         </div>
 
-        <div className="wash-bay-hero-stats">
-          <div className="wash-bay-stat-card">
-            <span>Total</span>
-            <strong>{washBays.length}</strong>
-          </div>
-          <div className="wash-bay-stat-card active">
-            <span>Available</span>
-            <strong>{totalAvailable}</strong>
-          </div>
-          <div className="wash-bay-stat-card maintenance">
-            <span>Maintenance</span>
-            <strong>{totalMaintenance}</strong>
-          </div>
-          <div className="wash-bay-stat-card in-use">
-            <span>In Use</span>
-            <strong>{totalInUse}</strong>
-          </div>
-          <div className="wash-bay-stat-card inactive">
-            <span>Inactive</span>
-            <strong>{totalInactive}</strong>
-          </div>
+        <div className="wash-bay-stats">
+          <div className="wash-bay-stat"><span>Total</span><strong>{washBays.length}</strong></div>
+          <div className="wash-bay-stat"><span>Available</span><strong>{totalAvailable}</strong></div>
+          <div className="wash-bay-stat"><span>In Use</span><strong>{totalInUse}</strong></div>
+          <div className="wash-bay-stat"><span>Maintenance</span><strong>{totalMaintenance}</strong></div>
+          <div className="wash-bay-stat"><span>Inactive</span><strong>{totalInactive}</strong></div>
         </div>
       </div>
 
@@ -399,7 +397,7 @@ export default function AdminWashBayManagementPage() {
       {success && <div className="wash-bay-alert success">{success}</div>}
 
       <div className="wash-bay-grid">
-        <section className="wash-bay-panel">
+        <section className="wash-bay-panel" ref={createPanelRef}>
           <div className="wash-bay-panel-header">
             <div>
               <h2>{isEditing ? "Update wash bay" : "Create new wash bay"}</h2>
@@ -478,23 +476,25 @@ export default function AdminWashBayManagementPage() {
               </label>
             </div>
 
-            <label>
-              Capacity
-              <input
-                name="capacity"
-                value={1}
-                readOnly
-                type="number"
-                min="1"
-                disabled={isEditing}
-                style={{ opacity: 0.6, cursor: "not-allowed" }}
-              />
+            <div>
+              <label className="wash-bay-field-narrow">
+                Capacity
+                <input
+                  name="capacity"
+                  value={1}
+                  readOnly
+                  type="number"
+                  min="1"
+                  disabled={isEditing}
+                  style={{ opacity: 0.6, cursor: "not-allowed" }}
+                />
+              </label>
               {isEditing && (
                 <small>
                   Garage capacity equals the number of wash bays. To increase capacity, create more wash bays.
                 </small>
               )}
-            </label>
+            </div>
 
             <label>
               Description
@@ -529,93 +529,71 @@ export default function AdminWashBayManagementPage() {
           </form>
         </section>
 
-        <section className="wash-bay-panel">
+        <section
+          className="wash-bay-panel wash-bay-panel--list"
+          style={matchedPanelHeight ? { height: matchedPanelHeight } : undefined}
+        >
           <div className="wash-bay-panel-header">
             <div>
-              <h2>Filters</h2>
-              <p>Filter wash bays by garage, vehicle type and status.</p>
+              <h2>Wash bays</h2>
+              <p>View, filter, edit and update wash bay status.</p>
             </div>
+
+            <button className="wash-bay-ghost-btn" type="button" onClick={loadWashBays}>
+              Refresh
+            </button>
           </div>
 
-          <div className="wash-bay-filter-box">
-            <label>
-              Garage ID
+          <div className="wash-bay-filters">
+            <div className="wash-bay-filter-field">
+              <label>Garage ID</label>
               <input
                 value={filters.garageId}
                 onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    garageId: e.target.value,
-                  }))
+                  setFilters((prev) => ({ ...prev, garageId: e.target.value }))
                 }
                 placeholder="e.g. 1"
                 type="number"
                 min="1"
               />
-            </label>
+            </div>
 
-            <label>
-              Vehicle type
+            <div className="wash-bay-filter-field">
+              <label>Vehicle type</label>
               <select
                 value={filters.vehicleType}
                 onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    vehicleType: e.target.value,
-                  }))
+                  setFilters((prev) => ({ ...prev, vehicleType: e.target.value }))
                 }
               >
                 {VEHICLE_TYPES.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
+                  <option key={item.value} value={item.value}>{item.label}</option>
                 ))}
               </select>
-            </label>
+            </div>
 
-            <label>
-              Status
+            <div className="wash-bay-filter-field">
+              <label>Status</label>
               <select
                 value={filters.status}
                 onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    status: e.target.value,
-                  }))
+                  setFilters((prev) => ({ ...prev, status: e.target.value }))
                 }
               >
                 {STATUS_OPTIONS.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
+                  <option key={item.value} value={item.value}>{item.label}</option>
                 ))}
               </select>
-            </label>
-
-            <div className="wash-bay-actions">
-              <button
-                className="wash-bay-primary-btn"
-                type="button"
-                onClick={handleApplyFilter}
-              >
-                Apply filters
-              </button>
-
-              <button
-                className="wash-bay-ghost-btn"
-                type="button"
-                onClick={handleResetFilter}
-              >
-                Clear filters
-              </button>
             </div>
 
-            <button
-              className="wash-bay-info-btn"
-              type="button"
-              onClick={handleCheckGarageInfo}
-            >
-              View garage capacity & supported types
+            <button className="wash-bay-primary-btn" type="button" onClick={handleApplyFilter}>
+              Apply
+            </button>
+            <button className="wash-bay-ghost-btn" type="button" onClick={handleResetFilter}>
+              Clear
+            </button>
+            <button className="wash-bay-info-btn" type="button" onClick={handleCheckGarageInfo}>
+              View capacity &amp; types
             </button>
           </div>
 
@@ -626,9 +604,7 @@ export default function AdminWashBayManagementPage() {
               <div>
                 <span>Supported types:</span>
                 <strong>
-                  {supportedTypes.length > 0
-                    ? supportedTypes.join(", ")
-                    : "No data"}
+                  {supportedTypes.length > 0 ? supportedTypes.join(", ") : "No data"}
                 </strong>
               </div>
 
@@ -642,105 +618,85 @@ export default function AdminWashBayManagementPage() {
               </div>
             </div>
           )}
+
+          <div className="wash-bay-scroll">
+            <div className="wash-bay-table-wrap">
+              <table className="wash-bay-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Garage</th>
+                    <th>Code</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Capacity</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan="8" className="wash-bay-empty">
+                        Loading wash bays...
+                      </td>
+                    </tr>
+                  ) : sortedWashBays.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="wash-bay-empty">
+                        No wash bays found.
+                      </td>
+                    </tr>
+                  ) : (
+                    sortedWashBays.map((bay) => (
+                      <tr key={getBayId(bay)}>
+                        <td>#{getBayId(bay)}</td>
+                        <td>
+                          <div className="wash-bay-garage-cell">
+                            <strong>{getGarageName(bay)}</strong>
+                            <span>Garage ID: {getGarageId(bay)}</span>
+                          </div>
+                        </td>
+                        <td>{getBayCode(bay)}</td>
+                        <td>{getBayName(bay)}</td>
+                        <td>
+                          <span className="wash-bay-type-pill">
+                            {bay.vehicleType === "BIKE" || bay.vehicleType === "MOTORBIKE" ? "Motorcycle" : "Car"}
+                          </span>
+                        </td>
+                        <td>1 slot</td>
+                        <td>
+                          <span className={`wash-bay-status ${bay.status || "UNKNOWN"}`}>
+                            {bay.status || "UNKNOWN"}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="wash-bay-table-actions">
+                            <button type="button" onClick={() => handleEdit(bay)}>
+                              Edit
+                            </button>
+
+                            <select
+                              value={bay.status || "AVAILABLE"}
+                              onChange={(e) => handleChangeStatus(bay, e.target.value)}
+                            >
+                              <option value="AVAILABLE">Available</option>
+                              <option value="IN_USE">In Use</option>
+                              <option value="MAINTENANCE">Maintenance</option>
+                              <option value="INACTIVE">Inactive</option>
+                            </select>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </section>
       </div>
-
-      <section className="wash-bay-panel wash-bay-table-panel">
-        <div className="wash-bay-panel-header">
-          <div>
-            <h2>Wash bays</h2>
-            <p>View, filter, edit and update wash bay status.</p>
-          </div>
-
-          <button
-            className="wash-bay-ghost-btn"
-            type="button"
-            onClick={loadWashBays}
-          >
-            Refresh
-          </button>
-        </div>
-
-        <div className="wash-bay-table-wrap">
-          <table className="wash-bay-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Garage</th>
-                <th>Code</th>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Capacity</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan="8" className="wash-bay-empty">
-                    Loading wash bays...
-                  </td>
-                </tr>
-              ) : sortedWashBays.length === 0 ? (
-                <tr>
-                  <td colSpan="8" className="wash-bay-empty">
-                    No wash bays found.
-                  </td>
-                </tr>
-              ) : (
-                sortedWashBays.map((bay) => (
-                  <tr key={getBayId(bay)}>
-                    <td>#{getBayId(bay)}</td>
-                    <td>
-                      <div className="wash-bay-garage-cell">
-                        <strong>{getGarageName(bay)}</strong>
-                        <span>Garage ID: {getGarageId(bay)}</span>
-                      </div>
-                    </td>
-                    <td>{getBayCode(bay)}</td>
-                    <td>{getBayName(bay)}</td>
-                    <td>
-                      <span className="wash-bay-type-pill">
-                        {bay.vehicleType === "BIKE" || bay.vehicleType === "MOTORBIKE" ? "Motorcycle" : "Car"}
-                      </span>
-                    </td>
-                    <td>1 slot</td>
-                    <td>
-                      <span
-                        className={`wash-bay-status ${bay.status || "UNKNOWN"
-                          }`}
-                      >
-                        {bay.status || "UNKNOWN"}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="wash-bay-table-actions">
-                        <button type="button" onClick={() => handleEdit(bay)}>
-                          Edit
-                        </button>
-
-                        <select
-                          value={bay.status || "AVAILABLE"}
-                          onChange={(e) =>
-                            handleChangeStatus(bay, e.target.value)
-                          }
-                        >
-                          <option value="AVAILABLE">Available</option>
-                          <option value="IN_USE">In Use</option>
-                          <option value="MAINTENANCE">Maintenance</option>
-                          <option value="INACTIVE">Inactive</option>
-                        </select>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
     </div>
   );
 }

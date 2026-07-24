@@ -9,4 +9,6 @@ public interface BookingServiceStepRepository
 
         List<BookingServiceStep> findByBookingIdOrderByStepOrder(Long bookingId);
 
+        List<BookingServiceStep> findByCompletedByStaffIdAndStatus(Long completedByStaffId, String status);
+
 }

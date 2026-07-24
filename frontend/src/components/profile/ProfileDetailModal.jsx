@@ -10,6 +10,8 @@ function normalizeRole(role) {
 
 export default function ProfileDetailModal({ open, onClose, profile, autoOpenPw = false }) {
   const [showPwForm, setShowPwForm] = useState(false)
+  // Google-only accounts have no local password to change — hide the whole row for them.
+  const canChangePassword = profile?.hasPassword !== false
 
   useEffect(() => {
     if (open) setShowPwForm(autoOpenPw)
@@ -49,22 +51,26 @@ export default function ProfileDetailModal({ open, onClose, profile, autoOpenPw 
             <span className="ps-info-value">{normalizeRole(profile?.role)}</span>
           </div>
 
-          <div className="ps-info-row">
-            <span className="ps-info-label">Password</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-              <span className="ps-info-value dots">••••••••</span>
-              <button
-                type="button"
-                className="ps-change-pw-btn"
-                onClick={() => setShowPwForm((v) => !v)}
-              >
-                {showPwForm ? 'Hide' : 'Change Password'}
-              </button>
-            </div>
-          </div>
+          {canChangePassword && (
+            <>
+              <div className="ps-info-row">
+                <span className="ps-info-label">Password</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  <span className="ps-info-value dots">••••••••</span>
+                  <button
+                    type="button"
+                    className="ps-change-pw-btn"
+                    onClick={() => setShowPwForm((v) => !v)}
+                  >
+                    {showPwForm ? 'Hide' : 'Change Password'}
+                  </button>
+                </div>
+              </div>
 
-          {showPwForm && (
-            <PasswordChangeForm onCancel={() => setShowPwForm(false)} />
+              {showPwForm && (
+                <PasswordChangeForm onCancel={() => setShowPwForm(false)} />
+              )}
+            </>
           )}
         </div>
       </div>

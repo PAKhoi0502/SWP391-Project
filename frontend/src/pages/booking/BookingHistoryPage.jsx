@@ -11,6 +11,9 @@ import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import DepositQrModal from '../../components/Booking/DepositQrModal'
 import DepositRefundPanel from '../../components/Booking/DepositRefundPanel'
 import ReviewModal from '../../components/reviews/ReviewModal'
+import ReportIssueModal from '../../components/Booking/ReportIssueModal'
+import ReportStatusViewModal from '../../components/Booking/ReportStatusViewModal'
+import exceptionReportApi from '../../api/exceptionReportApi'
 import './BookingHistoryPage.css'
 
 /* ─── Cache keys ─── */
@@ -133,6 +136,15 @@ const getStatusText = (status) => {
   if (v === 'CANCELED' || v === 'CANCELLED') return 'Cancelled'
   if (v === 'NO_SHOW')         return 'No Show'
   return status || 'N/A'
+}
+
+const getReportStatusText = (status) => {
+  const v = String(status || '').toUpperCase()
+  if (v === 'PENDING')  return 'Pending review'
+  if (v === 'REVIEWED') return 'Reviewed'
+  if (v === 'RESOLVED') return 'Resolved'
+  if (v === 'REJECTED') return 'Rejected'
+  return status || '—'
 }
 
 const persistPayOSReturnPath = (path, result) => {
@@ -482,6 +494,10 @@ export default function BookingHistoryPage() {
   const [cancelModalBookingId, setCancelModalBookingId] = useState(null)
   const [cancelModalBooking,   setCancelModalBooking]   = useState(null)
   const [reviewModal,          setReviewModal]          = useState(null)
+  const [reportModal,          setReportModal]          = useState(null)
+  const [viewReportModal,      setViewReportModal]      = useState(null)
+  const [reportByBookingId,    setReportByBookingId]    = useState({})
+  const [reportStatusLoaded,   setReportStatusLoaded]   = useState(false)
   const [reviewedIds,          setReviewedIds]          = useState(new Set())
   const [reviewedIdsLoaded,    setReviewedIdsLoaded]    = useState(false)
   const [reviewedIdsError,     setReviewedIdsError]     = useState(false)
@@ -627,6 +643,24 @@ export default function BookingHistoryPage() {
           setReviewedIdsLoaded(true)
           setReviewedIdsError(true)
         }
+      })
+    return () => { mounted = false }
+  }, [])
+
+  useEffect(() => {
+    let mounted = true
+    exceptionReportApi.getMyReports()
+      .then((reports) => {
+        if (!mounted) return
+        const map = {}
+        for (const r of Array.isArray(reports) ? reports : []) {
+          map[String(r.bookingId)] = r
+        }
+        setReportByBookingId(map)
+        setReportStatusLoaded(true)
+      })
+      .catch(() => {
+        if (mounted) setReportStatusLoaded(true)
       })
     return () => { mounted = false }
   }, [])
@@ -922,7 +956,7 @@ export default function BookingHistoryPage() {
         {/* Page header */}
         <div className="bhp-header">
           <div>
-            <p className="bhp-header-eyebrow">AutoWash Pro</p>
+            <p className="bhp-header-eyebrow">Audela Washing</p>
             <h1 className="bhp-header-title">Booking History</h1>
             <p className="bhp-header-sub">Track your appointments, service status, and payments.</p>
           </div>
@@ -1082,6 +1116,27 @@ export default function BookingHistoryPage() {
 
                   {/* Card footer */}
                   <div className="bhp-card-foot">
+                    {status === 'COMPLETED' && reportStatusLoaded && (
+                      reportByBookingId[String(bookingId)]
+                        ? (
+                          <button
+                            type="button"
+                            className={`bhp-report-status bhp-report-status--${String(reportByBookingId[String(bookingId)].status).toLowerCase()}`}
+                            onClick={() => setViewReportModal(reportByBookingId[String(bookingId)])}
+                          >
+                            Reported · {getReportStatusText(reportByBookingId[String(bookingId)].status)}
+                          </button>
+                        )
+                        : (
+                          <button
+                            type="button"
+                            className="bhp-report-btn"
+                            onClick={() => setReportModal({ bookingId })}
+                          >
+                            Report
+                          </button>
+                        )
+                    )}
                     {depositPending && booking?.paymentExpiredAt && (
                       <DepositCountdown
                         paymentExpiredAt={booking.paymentExpiredAt}
@@ -1191,6 +1246,29 @@ export default function BookingHistoryPage() {
           onAlreadyReviewed={() => {
             setReviewedIds((prev) => new Set(prev).add(String(reviewModal.bookingId)))
           }}
+        />
+      )}
+
+      {/* Report issue modal */}
+      {reportModal && (
+        <ReportIssueModal
+          bookingId={reportModal.bookingId}
+          open={!!reportModal}
+          onClose={() => setReportModal(null)}
+          onSubmitted={(created) => {
+            setReportByBookingId((prev) => ({
+              ...prev,
+              [String(reportModal.bookingId)]: created || { bookingId: reportModal.bookingId, status: 'PENDING' },
+            }))
+            setReportModal(null)
+          }}
+        />
+      )}
+
+      {viewReportModal && (
+        <ReportStatusViewModal
+          report={viewReportModal}
+          onClose={() => setViewReportModal(null)}
         />
       )}
     </div>

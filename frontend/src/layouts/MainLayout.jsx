@@ -15,7 +15,7 @@ function MainLayout() {
         }}
       >
         <Link to="/" style={{ fontWeight: 700, fontSize: 18, textDecoration: 'none', color: '#111' }}>
-          AutoWash Pro
+          Audela Washing
         </Link>
         <nav style={{ display: 'flex', gap: 16 }}>
           <Link to="/" style={{ textDecoration: 'none', color: '#374151' }}>
@@ -36,7 +36,7 @@ function MainLayout() {
           fontSize: 14,
         }}
       >
-        © {new Date().getFullYear()} AutoWash Pro
+        © {new Date().getFullYear()} Audela Washing
       </footer>
     </div>
   )

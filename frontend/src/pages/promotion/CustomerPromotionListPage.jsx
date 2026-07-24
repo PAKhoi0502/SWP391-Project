@@ -162,7 +162,7 @@ export default function CustomerPromotionListPage() {
     <div className="promo-list-inner">
       <div className="promo-list-hero">
         <div className="promo-list-hero-text">
-          <p className="promo-list-kicker">AutoWash Pro</p>
+          <p className="promo-list-kicker">Audela Washing</p>
           <h1>Your Promotions</h1>
           <span>Active offers — apply them when booking a wash.</span>
         </div>

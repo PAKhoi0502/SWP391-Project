@@ -175,7 +175,7 @@ export default function PublicCustomerDashboardPage() {
 
   const displayTiers = tierRules.length > 0
     ? [...tierRules]
-        .sort((a, b) => (a.priorityLevel ?? 0) - (b.priorityLevel ?? 0))
+        .sort((a, b) => (b.priorityLevel ?? 0) - (a.priorityLevel ?? 0))
         .map((rule) => ({ name: rule.tier, desc: describeTierRule(rule), color: rule.color || getTierColor(rule.tier) }))
     : FALLBACK_TIERS
 

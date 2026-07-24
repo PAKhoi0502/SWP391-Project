@@ -18,11 +18,19 @@ public class CareTaskResponse {
     private Long bookingId;
     private String vehicleType;
     private String licensePlate;
+    private String servicePackageName;
+    private List<String> addOnNames;
     private List<String> serviceNames;
     private String instructions;
+    private List<String> tasks;
 
+    private LocalDateTime expectedStartTime;
+    private LocalDateTime expectedEndTime;
     private LocalDateTime plannedStartAt;
     private LocalDateTime plannedEndAt;
+
+    private String previousWashBay;
+    private String lane;
 
     /** Assignment status: RESERVED, ACTIVE, RELEASED, CANCELED */
     private String status;

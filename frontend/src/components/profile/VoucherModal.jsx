@@ -175,23 +175,23 @@ export default function VoucherModal({ open, onClose, currentTier }) {
           )}
 
           {!loading && !error && display.length === 0 && (
-            <div className="vm-empty">
-              <div className="vm-empty-icon">🎟️</div>
-              <p className="vm-empty-title">No vouchers available</p>
-              <p className="vm-empty-sub">Promotions matching your membership tier will appear here</p>
+            <div className="vch-empty">
+              <div className="vch-empty-icon">🎟️</div>
+              <p className="vch-empty-title">No vouchers available</p>
+              <p className="vch-empty-sub">Promotions matching your membership tier will appear here</p>
             </div>
           )}
 
           {!loading && !error && display.length > 0 && (
-            <div className="vm-list">
+            <div className="vch-list">
               {display.map((p) => {
                 const desc = [formatDiscount(p), formatExpiry(p.endAt)].filter(Boolean).join(' · ')
                 return (
-                  <div key={p.id} className="vm-item">
-                    <span className="vm-code">{p.code}</span>
-                    <div className="vm-info">
-                      <p className="vm-name">{p.name || p.code}</p>
-                      {desc && <p className="vm-desc">{desc}</p>}
+                  <div key={p.id} className="vch-item">
+                    <span className="vch-code">{p.code}</span>
+                    <div className="vch-info">
+                      <p className="vch-name">{p.name || p.code}</p>
+                      {desc && <p className="vch-desc">{desc}</p>}
                     </div>
                   </div>
                 )

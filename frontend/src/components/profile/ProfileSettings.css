@@ -831,14 +831,17 @@
   padding: 2px 7px;
 }
 
-/* ── Voucher modal ── */
-.vm-list {
+/* ── Voucher modal ──
+   Prefixed "vch-" (not "vm-") to avoid colliding with VehiclesModal.css's
+   unrelated .vm-* classes — a past collision silently broke that modal's
+   layout since both files targeted the same class names. */
+.vch-list {
   display: flex;
   flex-direction: column;
   gap: 9px;
 }
 
-.vm-item {
+.vch-item {
   background: #F8F9FB;
   border: 1px solid rgba(23, 32, 51, 0.07);
   border-radius: 13px;
@@ -848,7 +851,7 @@
   padding: 12px 15px;
 }
 
-.vm-code {
+.vch-code {
   font-family: 'Courier New', monospace;
   font-size: 13px;
   font-weight: 800;
@@ -861,9 +864,9 @@
   flex-shrink: 0;
 }
 
-.vm-info { flex: 1; min-width: 0; }
+.vch-info { flex: 1; min-width: 0; }
 
-.vm-name {
+.vch-name {
   font-size: 13px;
   font-weight: 700;
   color: #172033;
@@ -873,27 +876,27 @@
   text-overflow: ellipsis;
 }
 
-.vm-desc {
+.vch-desc {
   font-size: 11.5px;
   color: #667085;
   margin: 0;
 }
 
-.vm-empty {
+.vch-empty {
   text-align: center;
   padding: 28px 0 8px;
 }
 
-.vm-empty-icon { font-size: 28px; margin-bottom: 10px; }
+.vch-empty-icon { font-size: 28px; margin-bottom: 10px; }
 
-.vm-empty-title {
+.vch-empty-title {
   font-size: 14px;
   font-weight: 700;
   color: #334155;
   margin: 0 0 4px;
 }
 
-.vm-empty-sub {
+.vch-empty-sub {
   font-size: 12px;
   color: #94a3b8;
   margin: 0;

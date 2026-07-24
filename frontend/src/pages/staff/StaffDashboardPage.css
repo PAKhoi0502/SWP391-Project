@@ -125,64 +125,6 @@
   line-height: 1.55;
 }
 
-/* ── Stat cards (CUSTOMER_SERVICE_STAFF dashboard) ── */
-.staff-stat-cards {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  margin-bottom: 32px;
-  max-width: 740px;
-}
-
-.staff-stat-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  border-top: 3px solid transparent;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 18px 20px 16px;
-}
-
-.staff-stat-card--total      { border-top-color: #0B2A4A; }
-.staff-stat-card--confirmed  { border-top-color: #25BCEB; }
-.staff-stat-card--inprogress { border-top-color: #f59e0b; }
-.staff-stat-card--cancelled  { border-top-color: #ef4444; }
-
-.staff-stat-card-number {
-  color: #071A33;
-  display: block;
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1;
-  min-height: 36px;
-}
-
-.staff-stat-card-label {
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.staff-stat-skeleton {
-  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
-  background-size: 200% 100%;
-  animation: staff-stat-shimmer 1.4s infinite;
-  border-radius: 6px;
-  display: inline-block;
-  height: 32px;
-  width: 56px;
-}
-
-@keyframes staff-stat-shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
 /* ── Care Staff Dashboard ── */
 .care-dash { }
 

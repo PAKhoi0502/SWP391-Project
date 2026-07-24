@@ -161,19 +161,6 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                         @Param("vehicleId") Long vehicleId,
                         @Param("now") LocalDateTime now);
 
-        // Lấy active booking đầu tiên theo vehicleId (để trả thông tin trong 409)
-        @Query("""
-                        SELECT b FROM Booking b
-                        WHERE b.vehicleId = :vehicleId
-                        AND (b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
-                             OR (b.status = 'PENDING_DEPOSIT' AND b.paymentExpiredAt > :now))
-                        ORDER BY b.startTime ASC
-                        LIMIT 1
-                        """)
-        Optional<Booking> findFirstActiveBookingByVehicleId(
-                        @Param("vehicleId") Long vehicleId,
-                        @Param("now") LocalDateTime now);
-
         // Kiểm tra biển số đã có active booking chưa (guest — by licensePlate + vehicleType)
         @Query("""
                         SELECT COUNT(b) FROM Booking b
@@ -183,21 +170,6 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                              OR (b.status = 'PENDING_DEPOSIT' AND b.paymentExpiredAt > :now))
                         """)
         long countActiveBookingsByLicensePlate(
-                        @Param("licensePlate") String licensePlate,
-                        @Param("vehicleType") String vehicleType,
-                        @Param("now") LocalDateTime now);
-
-        // Lấy active booking đầu tiên theo biển số (để trả thông tin trong 409)
-        @Query("""
-                        SELECT b FROM Booking b
-                        WHERE b.licensePlate = :licensePlate
-                        AND b.vehicleType = :vehicleType
-                        AND (b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
-                             OR (b.status = 'PENDING_DEPOSIT' AND b.paymentExpiredAt > :now))
-                        ORDER BY b.startTime ASC
-                        LIMIT 1
-                        """)
-        Optional<Booking> findFirstActiveBookingByLicensePlate(
                         @Param("licensePlate") String licensePlate,
                         @Param("vehicleType") String vehicleType,
                         @Param("now") LocalDateTime now);
@@ -227,6 +199,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                         """)
         List<Booking> findRefundPendingBookings();
         Optional<Booking> findByTrackingToken(String trackingToken);
+
+        List<Booking> findByGarageIdAndStatusInOrderByStartTimeAsc(Long garageId, List<String> statuses);
 
         /**
          * Task 3: Count bookings for a customer with id <= bookingId (inclusive).

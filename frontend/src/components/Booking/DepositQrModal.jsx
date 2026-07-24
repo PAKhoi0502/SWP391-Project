@@ -30,7 +30,7 @@ const renderQR = (qrContent) => {
   if (qrContent.startsWith('http') || qrContent.startsWith('data:image')) {
     return <img src={qrContent} alt="QR Code" className="dqm-qr-img" />
   }
-  return <QRCodeSVG value={qrContent} size={220} level="M" />
+  return <QRCodeSVG value={qrContent} size={144} level="M" />
 }
 
 export default function DepositQrModal({
@@ -95,7 +95,6 @@ export default function DepositQrModal({
         aria-modal="true"
       >
         <div className="dqm-header">
-          <div className="dqm-icon">QR</div>
           <h2 className="dqm-title">Deposit Payment</h2>
           {displayNo != null && <p className="dqm-subtitle">Booking #{displayNo}</p>}
         </div>

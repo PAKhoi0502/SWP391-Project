@@ -345,3 +345,29 @@
   color: rgba(255, 255, 255, 0.50);
   font-weight: 600;
 }
+
+/* Delete button only appears on :hover, which touch devices can never trigger —
+   keep it visible on touch/narrow screens so it stays reachable there. */
+@media (hover: none), (max-width: 640px) {
+  .cn-del-btn {
+    opacity: 0.6;
+  }
+}
+
+@media (max-width: 640px) {
+  .cn-content {
+    padding: 28px 14px 48px;
+  }
+
+  .cn-hero-title {
+    font-size: 24px;
+  }
+
+  .cn-item {
+    padding: 14px;
+  }
+
+  .cn-toolbar {
+    justify-content: flex-start;
+  }
+}

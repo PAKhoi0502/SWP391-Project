@@ -255,7 +255,10 @@ function StaffBookingListPage() {
     try {
       if (!silent) setLoading(true)
       setError('')
-      const data = await bookingApi.getStaffBookings({ status, date })
+      // "WALKIN" is a client-side-only filter (see visibleBookings) — the backend
+      // has no such status, so fetch the unfiltered list in that case.
+      const apiStatus = status === 'WALKIN' ? 'ALL' : status
+      const data = await bookingApi.getStaffBookings({ status: apiStatus, date })
       setBookings(await enrichBookingsWithPayment(data))
     } catch (err) {
       if (!silent) setBookings([])
@@ -304,6 +307,7 @@ function StaffBookingListPage() {
   const visibleBookings = bookings
     .filter((booking) => {
       const bookingStatus = String(booking?.status || '').toUpperCase()
+      if (status === 'WALKIN') return Boolean(booking.isWalkIn)
       if (status === 'ALL') return !closedStatuses.has(bookingStatus)
       if (status === 'CANCELED') return bookingStatus === 'CANCELED' || bookingStatus === 'CANCELLED'
       return bookingStatus === status
@@ -385,6 +389,13 @@ function StaffBookingListPage() {
               {item === 'ALL' ? 'Active' : getStatusText(item)}
             </button>
           ))}
+          <button
+            type="button"
+            className={`sbl-pill${status === 'WALKIN' ? ' sbl-pill--active' : ''}`}
+            onClick={() => setStatus('WALKIN')}
+          >
+            Walk-in
+          </button>
         </div>
 
         <div className={`sbl-date-wrap${dateOpen ? ' open' : ''}`}>
