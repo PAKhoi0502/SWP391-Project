@@ -158,16 +158,17 @@ export const customerBookingFlowApi = {
     })
   },
 
-  async getAvailableSlots({ garageId, servicePackageId, vehicle, date }) {
-    const response = await api.get('/bookings/available-slots', {
-      params: {
-        garage_id: garageId,
-        service_package_id: servicePackageId,
-        vehicle_type: getVehicleType(vehicle),
-        date,
-      },
-    })
-
+  async getAvailableSlots({ garageId, servicePackageId, vehicle, date, addOnServicePackageIds }) {
+    const params = {
+      garage_id: garageId,
+      service_package_id: servicePackageId,
+      vehicle_type: getVehicleType(vehicle),
+      date,
+    }
+    if (addOnServicePackageIds && addOnServicePackageIds.length > 0) {
+      params.add_on_service_package_ids = addOnServicePackageIds
+    }
+    const response = await api.get('/bookings/available-slots', { params })
     return toArray(response)
   },
 
