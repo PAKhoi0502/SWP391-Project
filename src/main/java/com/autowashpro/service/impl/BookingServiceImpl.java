@@ -819,6 +819,12 @@ public class BookingServiceImpl implements BookingService {
                         bookingAddOnServicePackageRepository.save(bookingAddOn);
                 }
 
+                // Hold care staff immediately so concurrent PENDING_DEPOSIT bookings cannot
+                // claim the same staff. Upgraded to RESERVED after deposit payment.
+                if (rw.requiresCareStaff && plannedCareStart != null && plannedCareEnd != null) {
+                        reserveCareStaff(saved, rw, plannedCareStart, plannedCareEnd, "HELD_PENDING_DEPOSIT");
+                }
+
                 // TODO ISSUE-55
                 // loyaltyService.updateBookingStatistics(saved.getId());
 
@@ -1243,6 +1249,11 @@ public class BookingServiceImpl implements BookingService {
                         bookingAddOn.setServicePackageId(addOn.getId());
                         bookingAddOn.setSortOrder(sortOrder++);
                         bookingAddOnServicePackageRepository.save(bookingAddOn);
+                }
+
+                // Hold care staff so concurrent PENDING_DEPOSIT bookings cannot claim the same staff.
+                if (rw.requiresCareStaff && plannedCareStart != null && plannedCareEnd != null) {
+                        reserveCareStaff(saved, rw, plannedCareStart, plannedCareEnd, "HELD_PENDING_DEPOSIT");
                 }
 
                 return toResponse(saved);
@@ -3183,6 +3194,7 @@ public class BookingServiceImpl implements BookingService {
         private boolean isActiveCareAssignment(BookingAssignedStaff a) {
                 return "VEHICLE_CARE_STAFF".equals(a.getRoleInBooking())
                                 && (ASSIGNED_STAFF_STATUS.equals(a.getStatus())
+                                                || "HELD_PENDING_DEPOSIT".equals(a.getStatus())
                                                 || "RESERVED".equals(a.getStatus())
                                                 || "ACTIVE".equals(a.getStatus()));
         }
@@ -3973,8 +3985,23 @@ public class BookingServiceImpl implements BookingService {
                         return; // no care window — nothing to reserve
                 }
 
-                // Idempotency: skip if a RESERVED / ACTIVE / ASSIGNED VEHICLE_CARE_STAFF entry already exists.
-                // Filter by roleInBooking so a WASH_BAY_OPERATOR assignment does not falsely prevent care reservation.
+                // Primary path: upgrade any existing HELD_PENDING_DEPOSIT records to RESERVED.
+                // This is idempotent — a repeated webhook call for the same booking is a no-op.
+                List<BookingAssignedStaff> held = bookingAssignedStaffRepository.findByBookingId(bookingId)
+                                .stream()
+                                .filter(a -> "VEHICLE_CARE_STAFF".equals(a.getRoleInBooking()))
+                                .filter(a -> "HELD_PENDING_DEPOSIT".equals(a.getStatus()))
+                                .collect(java.util.stream.Collectors.toList());
+                if (!held.isEmpty()) {
+                        held.forEach(a -> {
+                                a.setStatus("RESERVED");
+                                bookingAssignedStaffRepository.save(a);
+                        });
+                        log.info("Upgraded {} HELD_PENDING_DEPOSIT → RESERVED for booking {}", held.size(), bookingId);
+                        return;
+                }
+
+                // Idempotency: skip if already RESERVED / ACTIVE / ASSIGNED.
                 boolean alreadyReserved = bookingAssignedStaffRepository.findByBookingId(bookingId)
                                 .stream()
                                 .anyMatch(this::isActiveCareAssignment);
@@ -3983,6 +4010,8 @@ public class BookingServiceImpl implements BookingService {
                         return;
                 }
 
+                // Fallback: no prior hold exists (e.g. old booking created before this change).
+                // Create a fresh RESERVED assignment now.
                 ServicePackage mainPkg = booking.getServicePackageId() != null
                                 ? servicePackageRepository.findById(booking.getServicePackageId()).orElse(null)
                                 : null;
@@ -3990,17 +4019,27 @@ public class BookingServiceImpl implements BookingService {
                 ResourceWindows rw = computeResourceWindows(allPackages);
 
                 if (rw.requiresCareStaff) {
-                        reserveCareStaff(booking, rw, careStart, careEnd);
+                        reserveCareStaff(booking, rw, careStart, careEnd, "RESERVED");
                 }
         }
 
         /**
-         * Issue #5: Reserve care staff for a CONFIRMED walk-in booking immediately at creation.
-         * Creates BookingAssignedStaff records with status RESERVED using the care window
-         * (plannedCareStart → plannedCareEnd) rather than the full booking window.
+         * Reserve care staff for a booking immediately at creation with RESERVED status.
+         * Used for CONFIRMED walk-in and after-deposit paths.
          */
         private void reserveCareStaff(Booking booking, ResourceWindows rw,
                         LocalDateTime careStart, LocalDateTime careEnd) {
+                reserveCareStaff(booking, rw, careStart, careEnd, "RESERVED");
+        }
+
+        /**
+         * Reserve care staff with an explicit initial status.
+         * Use "HELD_PENDING_DEPOSIT" when the booking is in PENDING_DEPOSIT state so the hold
+         * is visible to availability queries but can be upgraded to RESERVED after payment.
+         * Use "RESERVED" for CONFIRMED walk-ins and after deposit webhook.
+         */
+        private void reserveCareStaff(Booking booking, ResourceWindows rw,
+                        LocalDateTime careStart, LocalDateTime careEnd, String initialStatus) {
                 if (!rw.requiresCareStaff || rw.requiredCareStaffCount <= 0
                                 || rw.careStaffType == null || rw.careStaffType.isBlank()) {
                         return;
@@ -4018,10 +4057,12 @@ public class BookingServiceImpl implements BookingService {
                 int reserved = 0;
                 for (StaffProfile candidate : candidates) {
                         if (reserved >= rw.requiredCareStaffCount) break;
+                        // Reuse an existing CANCELED or HELD_PENDING_DEPOSIT record for idempotency
                         BookingAssignedStaff bas = bookingAssignedStaffRepository.findByBookingId(booking.getId()).stream()
                                         .filter(a -> candidate.getId().equals(a.getStaffProfileId()))
                                         .filter(a -> "VEHICLE_CARE_STAFF".equals(a.getRoleInBooking()))
-                                        .filter(a -> "CANCELED".equals(a.getStatus()))
+                                        .filter(a -> "CANCELED".equals(a.getStatus())
+                                                || "HELD_PENDING_DEPOSIT".equals(a.getStatus()))
                                         .findFirst()
                                         .orElseGet(BookingAssignedStaff::new);
                         bas.setBookingId(booking.getId());
@@ -4029,19 +4070,15 @@ public class BookingServiceImpl implements BookingService {
                         bas.setAssignedFrom(careStart);
                         bas.setAssignedTo(careEnd);
                         bas.setRoleInBooking(rw.careStaffType);
-                        bas.setStatus("RESERVED");
+                        bas.setStatus(initialStatus);
                         bookingAssignedStaffRepository.save(bas);
                         reserved++;
                 }
                 if (reserved < rw.requiredCareStaffCount) {
-                        // Log at ERROR so this surfaces in monitoring.
-                        // The booking remains CONFIRMED because payment is already committed.
-                        // Action required: Admin must manually assign care staff via
-                        // PATCH /bookings/{id}/care-assignment before Start Care is possible.
                         log.error(
-                                "[CARE_STAFF_SHORTAGE] Booking {} confirmed but only {}/{} care staff reserved "
+                                "[CARE_STAFF_SHORTAGE] Booking {} ({}) only {}/{} care staff held "
                                 + "(garage={}, careWindow={} – {}). Manual assignment required.",
-                                booking.getId(), reserved, rw.requiredCareStaffCount,
+                                booking.getId(), initialStatus, reserved, rw.requiredCareStaffCount,
                                 booking.getGarageId(), careStart, careEnd);
                 }
         }
