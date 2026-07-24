@@ -1463,13 +1463,24 @@ public class BookingServiceImpl implements BookingService {
 
                 }
 
+                List<Long> staffCustomerIds = bookings.stream()
+                                .map(Booking::getCustomerId)
+                                .filter(Objects::nonNull)
+                                .distinct()
+                                .toList();
+                Map<Long, User> staffUserMap = new HashMap<>();
+                if (!staffCustomerIds.isEmpty()) {
+                        userRepository.findAllById(staffCustomerIds)
+                                        .forEach(u -> staffUserMap.put(u.getId(), u));
+                }
+
                 return bookings.stream()
 
                                 .filter(b -> status == null
                                                 || status.isBlank()
                                                 || b.getStatus().equalsIgnoreCase(status))
 
-                                .map(this::toSummaryResponse)
+                                .map(b -> toSummaryResponse(b, staffUserMap))
 
                                 .toList();
         }
@@ -1481,6 +1492,17 @@ public class BookingServiceImpl implements BookingService {
                         String paymentStatus) {
 
                 List<Booking> bookings = bookingRepository.findAllByOrderByStartTimeDesc();
+
+                List<Long> adminCustomerIds = bookings.stream()
+                                .map(Booking::getCustomerId)
+                                .filter(Objects::nonNull)
+                                .distinct()
+                                .toList();
+                Map<Long, User> adminUserMap = new HashMap<>();
+                if (!adminCustomerIds.isEmpty()) {
+                        userRepository.findAllById(adminCustomerIds)
+                                        .forEach(u -> adminUserMap.put(u.getId(), u));
+                }
 
                 return bookings.stream()
 
@@ -1495,7 +1517,7 @@ public class BookingServiceImpl implements BookingService {
                                                 || paymentStatus.isBlank()
                                                 || b.getPaymentStatus().equalsIgnoreCase(paymentStatus))
 
-                                .map(this::toSummaryResponse)
+                                .map(b -> toSummaryResponse(b, adminUserMap))
 
                                 .toList();
         }
@@ -2981,6 +3003,10 @@ public class BookingServiceImpl implements BookingService {
         }
 
         private BookingSummaryResponse toSummaryResponse(Booking b) {
+                return toSummaryResponse(b, Map.of());
+        }
+
+        private BookingSummaryResponse toSummaryResponse(Booking b, Map<Long, User> userMap) {
                 Vehicle vehicle = b.getVehicleId() != null
                                 ? vehicleRepository.findById(b.getVehicleId()).orElse(null)
                                 : null;
@@ -2991,6 +3017,9 @@ public class BookingServiceImpl implements BookingService {
                         long pos = bookingRepository.countByCustomerIdAndIdLessThanEqual(b.getCustomerId(), b.getId());
                         if (pos > 0) customerBookingNumber = (int) pos;
                 }
+                User customer = b.getCustomerId() != null ? userMap.get(b.getCustomerId()) : null;
+                String customerName = customer != null ? customer.getFullName() : b.getGuestName();
+                String customerPhone = customer != null ? customer.getPhone() : b.getGuestPhone();
                 return BookingSummaryResponse.builder()
                                 .id(b.getId())
                                 .customerId(b.getCustomerId())
@@ -3007,6 +3036,8 @@ public class BookingServiceImpl implements BookingService {
                                 .isWalkIn(b.getIsWalkIn())
                                 .guestName(b.getGuestName())
                                 .guestPhone(b.getGuestPhone())
+                                .customerName(customerName)
+                                .customerPhone(customerPhone)
                                 .licensePlate(resolveLicensePlate(b))
                                 .vehicleName(buildVehicleName(vehicle))
                                 .rewardProcessed(b.getRewardProcessed())

@@ -25,7 +25,7 @@ export function useBookingEntry() {
         const q = params.toString()
         navigate(q ? `/booking?${q}` : '/booking')
       } else {
-        openGuestModal({ garageId, servicePackageId })
+        openGuestModal()
       }
     },
     [isAuthenticated, role, navigate, openGuestModal],

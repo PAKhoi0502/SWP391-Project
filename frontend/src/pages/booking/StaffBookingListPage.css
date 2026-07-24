@@ -464,6 +464,13 @@
   word-break: break-word;
 }
 
+.sbl-info-sub {
+  color: #64748b;
+  font-size: 11.5px;
+  font-weight: 400;
+  margin-top: 1px;
+}
+
 /* ── Total row ── */
 .sbl-total-cell {
   border-top: 1px solid #f1f5f9;

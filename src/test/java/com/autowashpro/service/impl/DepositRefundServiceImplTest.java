@@ -188,11 +188,24 @@ class DepositRefundServiceImplTest {
     }
 
     @Test
-    void rejectDoesNotNotifyCustomer() {
+    void rejectNotifiesCustomer() {
         DepositRefund refund = refund("REQUESTED");
         when(depositRefundRepository.findByIdWithLock(REFUND_ID)).thenReturn(Optional.of(refund));
         RejectDepositRefundRequest request = new RejectDepositRefundRequest();
         request.setReason("Insufficient documentation");
+
+        DepositRefundResponse response = service.reject(REFUND_ID, ADMIN_ID, request);
+
+        assertEquals("REJECTED", response.getStatus());
+        verify(notificationService).notifyDepositRefundRejected(any(), any(), any());
+    }
+
+    @Test
+    void rejectIdempotentSkipsNotification() {
+        DepositRefund refund = refund("REJECTED");
+        when(depositRefundRepository.findByIdWithLock(REFUND_ID)).thenReturn(Optional.of(refund));
+        RejectDepositRefundRequest request = new RejectDepositRefundRequest();
+        request.setReason("Already rejected");
 
         DepositRefundResponse response = service.reject(REFUND_ID, ADMIN_ID, request);
 

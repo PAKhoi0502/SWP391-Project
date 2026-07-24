@@ -205,6 +205,7 @@ const enrichBookingsWithPayment = async (items) => {
           userMap[String(booking.customerId)] ||
           readCachedCustomerName(booking.customerId) ||
           (booking.customerId ? `Customer #${booking.customerId}` : 'Walk-in guest'),
+        customerPhone: booking.customerPhone || null,
         paymentMethod:
           booking.paymentMethod ||
           cached.paymentMethod ||
@@ -316,9 +317,9 @@ function StaffBookingListPage() {
       const keyword = normalizeText(searchTerm)
       if (!keyword) return true
       const fields = [
-        booking.id, booking.customerId, booking.customerName, booking.vehicleId,
-        booking.vehicleName, booking.garageId, booking.garageName, booking.servicePackageId,
-        booking.servicePackageName, booking.licensePlate,
+        booking.id, booking.customerId, booking.customerName, booking.customerPhone,
+        booking.vehicleId, booking.vehicleName, booking.garageId, booking.garageName,
+        booking.servicePackageId, booking.servicePackageName, booking.licensePlate,
       ]
       return fields.some((field) => normalizeText(field).includes(keyword))
     })
@@ -482,6 +483,13 @@ function StaffBookingListPage() {
                     <span className="sbl-info-label">Customer</span>
                     <span className="sbl-info-value">
                       {booking.customerName || (booking.customerId ? `Customer #${booking.customerId}` : 'Walk-in guest')}
+                    </span>
+                    <span className="sbl-info-sub">
+                      {booking.customerId
+                        ? `#${booking.customerId} · ${booking.customerPhone || 'No phone provided'}`
+                        : booking.isWalkIn
+                          ? `Walk-in · ${booking.customerPhone || 'No phone provided'}`
+                          : `Guest · ${booking.customerPhone || 'No phone provided'}`}
                     </span>
                   </div>
                   <div className="sbl-info-cell">

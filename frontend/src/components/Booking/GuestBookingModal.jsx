@@ -236,6 +236,7 @@ export default function GuestBookingModal({
   const draftDebounce = useRef(null)
   const phoneCheckGenRef = useRef(0)
   const phoneDebounceRef = useRef(null)
+  const handleNextInProgressRef = useRef(false)
 
   const currentStep = activeSteps[stepIndex] || 'info'
   const isLastStep = stepIndex === activeSteps.length - 1
@@ -402,22 +403,24 @@ export default function GuestBookingModal({
 
   const triggerPhoneCheck = useCallback(async (phone) => {
     const phoneErr = getVietnameseMobileError(phone)
-    if (phoneErr) { setPhoneCheckState('idle'); return }
+    if (phoneErr) { setPhoneCheckState('idle'); return 'invalid' }
     const gen = ++phoneCheckGenRef.current
     setPhoneCheckState('checking')
     try {
       await bookingApi.checkGuestPhoneEligibility(phone)
-      if (phoneCheckGenRef.current !== gen) return
+      if (phoneCheckGenRef.current !== gen) return 'stale'
       setPhoneCheckState('eligible')
+      return 'eligible'
     } catch (err) {
-      if (phoneCheckGenRef.current !== gen) return
+      if (phoneCheckGenRef.current !== gen) return 'stale'
       const status = err?.response?.status
       const msg = String(err?.response?.data?.message || err?.message || '')
       if (status === 409 || msg.includes('ACCOUNT_EXISTS')) {
         setPhoneCheckState('accountExists')
-      } else {
-        setPhoneCheckState('networkError')
+        return 'accountExists'
       }
+      setPhoneCheckState('networkError')
+      return 'networkError'
     }
   }, [])
 
@@ -466,15 +469,19 @@ export default function GuestBookingModal({
     return Object.keys(errors).length === 0
   }
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    if (handleNextInProgressRef.current) return
     if (!validateStep(currentStep)) return
     if (currentStep === 'info') {
-      if (phoneCheckState === 'idle') {
-        triggerPhoneCheck(form.guestPhone)
-        return
+      handleNextInProgressRef.current = true
+      try {
+        const result = phoneCheckState === 'eligible'
+          ? 'eligible'
+          : await triggerPhoneCheck(form.guestPhone)
+        if (result !== 'eligible') return
+      } finally {
+        handleNextInProgressRef.current = false
       }
-      if (phoneCheckState === 'checking') return
-      if (phoneCheckState === 'accountExists' || phoneCheckState === 'networkError') return
     }
     if (isLastStep) {
       handleSubmit()
