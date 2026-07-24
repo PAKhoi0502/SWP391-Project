@@ -32,9 +32,9 @@ class BookingRepositoryOverlapTest {
         persistBooking(1L, vehicle.getId(), 1L, "CANCELED", start, start.plusHours(1), "51H12345");
 
         long overlapping = bookingRepository.countOverlappingBookingsByVehicle(
-                vehicle.getId(), start.plusMinutes(30), start.plusMinutes(90));
+                vehicle.getId(), start.plusMinutes(30), start.plusMinutes(90), LocalDateTime.now());
         long adjacent = bookingRepository.countOverlappingBookingsByVehicle(
-                vehicle.getId(), start.plusHours(1), start.plusHours(2));
+                vehicle.getId(), start.plusHours(1), start.plusHours(2), LocalDateTime.now());
 
         assertEquals(1, overlapping);
         assertEquals(0, adjacent);
@@ -49,9 +49,9 @@ class BookingRepositoryOverlapTest {
         persistBooking(2L, bike.getId(), 7L, "CHECKED_IN", start, start.plusHours(1), "59A122345");
 
         long carOverlaps = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
-                7L, "CAR", start.plusMinutes(15), start.plusMinutes(45));
+                7L, "CAR", start.plusMinutes(15), start.plusMinutes(45), LocalDateTime.now());
         long bikeOverlaps = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
-                7L, "BIKE", start.plusMinutes(15), start.plusMinutes(45));
+                7L, "BIKE", start.plusMinutes(15), start.plusMinutes(45), LocalDateTime.now());
 
         assertEquals(1, carOverlaps);
         assertEquals(1, bikeOverlaps);
@@ -64,7 +64,7 @@ class BookingRepositoryOverlapTest {
         persistBooking(null, null, 3L, "NO_SHOW", start, start.plusHours(1), "51H99999");
 
         long overlaps = bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(
-                "51H99999", "CAR", start.plusMinutes(10), start.plusMinutes(20));
+                "51H99999", "CAR", start.plusMinutes(10), start.plusMinutes(20), LocalDateTime.now());
 
         assertEquals(1, overlaps);
     }
@@ -77,9 +77,9 @@ class BookingRepositoryOverlapTest {
         persistBooking(11L, vehicle.getId(), 6L, "CONFIRMED", start, start.plusHours(1), "51H32345");
 
         long sameGarage = bookingRepository.countOverlappingBookingsByCustomerAndGarage(
-                11L, 5L, start.plusMinutes(30), start.plusMinutes(90));
+                11L, 5L, start.plusMinutes(30), start.plusMinutes(90), LocalDateTime.now());
         long otherCustomer = bookingRepository.countOverlappingBookingsByCustomerAndGarage(
-                12L, 5L, start.plusMinutes(30), start.plusMinutes(90));
+                12L, 5L, start.plusMinutes(30), start.plusMinutes(90), LocalDateTime.now());
 
         assertEquals(1, sameGarage);
         assertEquals(0, otherCustomer);

@@ -11,6 +11,7 @@ public class NotificationResponse {
     private Long id;
     private Long userId;
     private Long bookingId;
+    private Integer customerBookingNumber;
     private String channel;
     private String eventType;
     private String title;

@@ -40,4 +40,6 @@ public class CreateServicePackageRequest {
     private List<Long> includedServiceIds;
 
     private List<CreateServicePackageStepRequest> steps;
+
+    private List<Long> garageIds;
 }

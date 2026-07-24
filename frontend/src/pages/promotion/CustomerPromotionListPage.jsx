@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { customerBookingFlowApi } from '../../api/customerBookingFlowApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
 import promotionApi from '../../api/promotionApi'
-import PromotionUsageHistoryModal from '../../components/promotion/PromotionUsageHistoryModal'
+import PromoHistoryModal from '../../components/profile/PromoHistoryModal'
 import './CustomerPromotionListPage.css'
 
 // Module-level cache: persists across modal opens within the session
@@ -159,6 +159,7 @@ export default function CustomerPromotionListPage() {
 
   return (
     <div className="promo-list-page">
+    <div className="promo-list-inner">
       <div className="promo-list-hero">
         <div className="promo-list-hero-text">
           <p className="promo-list-kicker">Audela Washing</p>
@@ -221,15 +222,14 @@ export default function CustomerPromotionListPage() {
           ))}
         </div>
       )}
-      <PromotionUsageHistoryModal
+      <PromoHistoryModal
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
-        title="Promotion Usage History"
         usages={historyUsages}
         loading={historyLoading}
         error={historyError}
-        mode="customer"
       />
+    </div>
     </div>
   )
 }

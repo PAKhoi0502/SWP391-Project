@@ -80,6 +80,7 @@ public class BookingServiceImpl implements BookingService {
         private static final BigDecimal REFUND_PERCENT_0 = BigDecimal.ZERO;
 
         private static final long PAYMENT_TIMEOUT_MINUTES = 15L;
+        private static final long ONLINE_BOOKING_MIN_LEAD_MINUTES = 15L;
         private static final long GRACE_PERIOD_MINUTES = 30L;
 
         private static final long GRACE_MIN_HOURS_BEFORE_SERVICE = 2L;
@@ -116,6 +117,7 @@ public class BookingServiceImpl implements BookingService {
         private final EmailService emailService;
         private final BookingReviewService bookingReviewService;
         private final StaffOperationAccessPolicy staffOperationAccessPolicy;
+        private final GarageServicePackageRepository garageServicePackageRepository;
 
         // ===================== ISSUE #10 =====================
 
@@ -166,19 +168,11 @@ public class BookingServiceImpl implements BookingService {
 
                 List<SlotResponse> slots = new ArrayList<>();
 
-                // Rule 1: online booking phải đặt trước ít nhất 1 ngày.
-                // Rule 2: walk-in được phép đặt trong ngày nếu còn slot trống.
-                if (!isWalkIn && date.isBefore(LocalDate.now().plusDays(1))) {
-                        return AvailableSlotResponse.builder()
-                                        .garageId(garageId)
-                                        .servicePackageId(servicePackageId)
-                                        .date(date)
-                                        .slots(slots)
-                                        .build();
-                }
-
                 LocalTime current = garage.getOpeningTime();
                 LocalDateTime now = LocalDateTime.now();
+                LocalDateTime earliestAllowedStart = isWalkIn
+                                ? now
+                                : now.plusMinutes(ONLINE_BOOKING_MIN_LEAD_MINUTES);
                 int slotDurationMinutes = resolveSlotDurationMinutes(allPackages, garage);
 
                 while (current.plusMinutes(slotDurationMinutes).isBefore(garage.getClosingTime())
@@ -188,7 +182,7 @@ public class BookingServiceImpl implements BookingService {
                         LocalDateTime start = LocalDateTime.of(date, current);
                         LocalDateTime end = start.plusMinutes(slotDurationMinutes);
 
-                        if (!start.isAfter(now)) {
+                        if (start.isBefore(earliestAllowedStart)) {
                                 current = current.plusMinutes(garage.getSlotIntervalMinutes());
                                 continue;
                         }
@@ -528,7 +522,8 @@ public class BookingServiceImpl implements BookingService {
                                 garageId,
                                 bayType,
                                 start,
-                                end);
+                                end,
+                                LocalDateTime.now());
 
                 return occupied < totalBays;
         }
@@ -605,18 +600,18 @@ public class BookingServiceImpl implements BookingService {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Garage is inactive");
                 }
 
+                requirePackageMappedToGarage(request.getGarageId(), request.getServicePackageId());
+                for (ServicePackage addOn : addOns) {
+                        requirePackageMappedToGarage(request.getGarageId(), addOn.getId());
+                }
+
                 LocalDateTime startTime = request.getStartTime();
                 LocalDateTime endTime = startTime.plusMinutes(resolveSlotDurationMinutes(selectedPackages, garage));
                 LocalDateTime now = LocalDateTime.now();
 
-                if (!startTime.isAfter(now)) {
+                if (startTime.isBefore(now.plusMinutes(ONLINE_BOOKING_MIN_LEAD_MINUTES))) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                        "Booking time must be in the future");
-                }
-
-                if (startTime.toLocalDate().isBefore(LocalDate.now().plusDays(1))) {
-                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                        "Booking must be made at least 1 day in advance");
+                                        "Online bookings must be made at least 15 minutes in advance");
                 }
 
                 String bayType = mapVehicleTypeToBayType(vehicle.getVehicleType());
@@ -654,22 +649,31 @@ public class BookingServiceImpl implements BookingService {
                                                         + " days for tier " + tier);
                 }
 
-                long upcomingCount = bookingRepository.countUpcomingBookings(customerId, now);
-                if (upcomingCount >= tierRule.getMaxUpcomingBookings()) {
+                // Section F: booking limit phải tính PENDING_DEPOSIT còn hạn
+                long activeHolds = bookingRepository.countActiveHolds(customerId, now);
+                if (activeHolds >= tierRule.getMaxUpcomingBookings()) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                        "Exceeded maximum upcoming bookings limit of "
+                                        "BOOKING_LIMIT_REACHED: Exceeded maximum active bookings limit of "
                                                         + tierRule.getMaxUpcomingBookings() + " for tier " + tier);
                 }
 
+                // Section E: chặn cùng xe có nhiều active booking (không phụ thuộc time overlap)
+                long activeVehicleBookings = bookingRepository.countActiveBookingsByVehicleId(
+                                request.getVehicleId(), now);
+                if (activeVehicleBookings > 0) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                        "This vehicle already has an active booking");
+                }
+
                 long vehicleOverlap = bookingRepository.countOverlappingBookingsByVehicle(
-                                request.getVehicleId(), startTime, endTime);
+                                request.getVehicleId(), startTime, endTime, now);
                 if (vehicleOverlap > 0) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT,
                                         "Vehicle already has an active booking during this time");
                 }
 
                 long customerGarageOverlap = bookingRepository.countOverlappingBookingsByCustomerAndGarage(
-                                customerId, request.getGarageId(), startTime, endTime);
+                                customerId, request.getGarageId(), startTime, endTime, now);
                 if (customerGarageOverlap > 0) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT,
                                         "Bạn đã có lịch đặt tại garage này trong khung giờ này");
@@ -687,10 +691,10 @@ public class BookingServiceImpl implements BookingService {
                         long totalBays = washBayRepository
                                         .countActiveByGarageAndVehicleType(request.getGarageId(), bayType);
                         long occupiedBays = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
-                                        request.getGarageId(), bayType, startTime, plannedWashEnd);
+                                        request.getGarageId(), bayType, startTime, plannedWashEnd, now);
                         if (occupiedBays >= totalBays) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
-                                                "No wash bay available for this time slot");
+                                                "SLOT_NO_LONGER_AVAILABLE: No wash bay available for this time slot");
                         }
                 }
 
@@ -867,11 +871,15 @@ public class BookingServiceImpl implements BookingService {
                 if (!Boolean.TRUE.equals(pkg.getIsActive())) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Service package is inactive");
                 }
+                requirePackageMappedToGarage(request.getGarageId(), request.getServicePackageId());
 
                 List<ServicePackage> addOns = loadWalkInAddOnPackages(
                                 request.getAddOnServicePackageIds(),
                                 request.getServicePackageId(),
                                 request);
+                for (ServicePackage addOn : addOns) {
+                        requirePackageMappedToGarage(request.getGarageId(), addOn.getId());
+                }
                 List<ServicePackage> selectedPackages = buildSelectedPackages(pkg, addOns);
 
                 String bayType = VietnameseLicensePlate.normalizeVehicleType(request.getVehicleType());
@@ -895,8 +903,10 @@ public class BookingServiceImpl implements BookingService {
                                         "Vehicle is not compatible with selected service package");
                 }
 
+                LocalDateTime walkInNow = LocalDateTime.now();
+
                 long plateOverlap = bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(
-                                normalizedPlate, bayType, startTime, endTime);
+                                normalizedPlate, bayType, startTime, endTime, walkInNow);
                 if (plateOverlap > 0) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT,
                                         "License plate already has an active booking during this time");
@@ -914,10 +924,10 @@ public class BookingServiceImpl implements BookingService {
                         long totalBays = washBayRepository.countActiveByGarageAndVehicleType(
                                         request.getGarageId(), bayType);
                         long occupiedBays = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
-                                        request.getGarageId(), bayType, startTime, plannedWashEnd);
+                                        request.getGarageId(), bayType, startTime, plannedWashEnd, walkInNow);
                         if (occupiedBays >= totalBays) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
-                                                "No wash bay available for this time slot");
+                                                "SLOT_NO_LONGER_AVAILABLE: No wash bay available for this time slot");
                         }
                 }
 
@@ -931,7 +941,7 @@ public class BookingServiceImpl implements BookingService {
 
                 if (matchedCustomer != null) {
                         long customerGarageOverlap = bookingRepository.countOverlappingBookingsByCustomerAndGarage(
-                                        matchedCustomer.getId(), request.getGarageId(), startTime, endTime);
+                                        matchedCustomer.getId(), request.getGarageId(), startTime, endTime, walkInNow);
                         if (customerGarageOverlap > 0) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                                                 "Khách hàng này đã có lịch đặt tại garage trong khung giờ này");
@@ -1098,11 +1108,15 @@ public class BookingServiceImpl implements BookingService {
                 if (!Boolean.TRUE.equals(pkg.getIsActive())) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Service package is inactive");
                 }
+                requirePackageMappedToGarage(request.getGarageId(), request.getServicePackageId());
 
                 List<ServicePackage> addOns = loadWalkInAddOnPackages(
                                 request.getAddOnServicePackageIds(),
                                 request.getServicePackageId(),
                                 request);
+                for (ServicePackage addOn : addOns) {
+                        requirePackageMappedToGarage(request.getGarageId(), addOn.getId());
+                }
                 List<ServicePackage> selectedPackages = buildSelectedPackages(pkg, addOns);
 
                 String bayType = VietnameseLicensePlate.normalizeVehicleType(request.getVehicleType());
@@ -1111,6 +1125,12 @@ public class BookingServiceImpl implements BookingService {
 
                 LocalDateTime startTime = request.getStartTime();
                 LocalDateTime endTime = startTime.plusMinutes(resolveSlotDurationMinutes(selectedPackages, garage));
+
+                LocalDateTime guestNow = LocalDateTime.now();
+                if (startTime.isBefore(guestNow.plusMinutes(ONLINE_BOOKING_MIN_LEAD_MINUTES))) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Online bookings must be made at least 15 minutes in advance");
+                }
 
                 List<String> supportedTypes = washBayRepository
                                 .findDistinctVehicleTypesByGarageId(request.getGarageId());
@@ -1128,8 +1148,23 @@ public class BookingServiceImpl implements BookingService {
                                         "Vehicle is not compatible with selected service package");
                 }
 
+                // Section C: guest booking không được tự liên kết với registered account chỉ bằng phone
+                User registeredAccount = findActiveCustomerByPhone(request.getGuestPhone());
+                if (registeredAccount != null) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                        "ACCOUNT_EXISTS_SIGN_IN_REQUIRED: This phone number belongs to an existing account. Please sign in to continue.");
+                }
+
+                // Section E: chặn cùng biển số có active booking đang tồn tại (guest flow)
+                long activePlateBookings = bookingRepository.countActiveBookingsByLicensePlate(
+                                normalizedPlate, bayType, guestNow);
+                if (activePlateBookings > 0) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                        "This vehicle already has an active booking");
+                }
+
                 long plateOverlap = bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(
-                                normalizedPlate, bayType, startTime, endTime);
+                                normalizedPlate, bayType, startTime, endTime, guestNow);
                 if (plateOverlap > 0) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT,
                                         "License plate already has an active booking during this time");
@@ -1147,49 +1182,16 @@ public class BookingServiceImpl implements BookingService {
                         long totalBays = washBayRepository.countActiveByGarageAndVehicleType(
                                         request.getGarageId(), bayType);
                         long occupiedBays = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
-                                        request.getGarageId(), bayType, startTime, plannedWashEnd);
+                                        request.getGarageId(), bayType, startTime, plannedWashEnd, guestNow);
                         if (occupiedBays >= totalBays) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
-                                                "No wash bay available for this time slot");
+                                                "SLOT_NO_LONGER_AVAILABLE: No wash bay available for this time slot");
                         }
                 }
 
                 if (rw.requiresCareStaff && plannedCareStart != null && plannedCareEnd != null) {
                         validateCareStaffAvailability(request.getGarageId(), selectedPackages,
                                         plannedCareStart, plannedCareEnd);
-                }
-
-                User matchedCustomer = findActiveCustomerByPhone(request.getGuestPhone());
-                Vehicle matchedVehicle = findMatchedCustomerVehicle(matchedCustomer, normalizedPlate, bayType);
-
-                if (matchedCustomer != null) {
-                        long customerGarageOverlap = bookingRepository.countOverlappingBookingsByCustomerAndGarage(
-                                        matchedCustomer.getId(), request.getGarageId(), startTime, endTime);
-                        if (customerGarageOverlap > 0) {
-                                throw new ResponseStatusException(HttpStatus.CONFLICT,
-                                                "Khách hàng này đã có lịch đặt tại garage trong khung giờ này");
-                        }
-                }
-
-                // Auto-save new vehicle for known customers when the plate is not in their profile yet
-                if (matchedCustomer != null && matchedVehicle == null) {
-                        assertLicensePlateAvailable(normalizedPlate, bayType);
-                        Vehicle newVehicle = new Vehicle();
-                        newVehicle.setCustomer(matchedCustomer);
-                        newVehicle.setRawLicensePlate(request.getLicensePlate().trim());
-                        newVehicle.setNormalizedLicensePlate(normalizedPlate);
-                        newVehicle.setVehicleType(bayType);
-                        String brand = request.getVehicleBrand() != null && !request.getVehicleBrand().isBlank()
-                                        ? request.getVehicleBrand().trim() : "Không rõ";
-                        String model = request.getVehicleModel() != null && !request.getVehicleModel().isBlank()
-                                        ? request.getVehicleModel().trim() : "Không rõ";
-                        newVehicle.setBrand(brand);
-                        newVehicle.setModel(model);
-                        newVehicle.setSeatCount(request.getSeatCount());
-                        newVehicle.setMotorbikeGroup(request.getMotorbikeGroup());
-                        newVehicle.setIsDefault(false);
-                        newVehicle.setIsActive(true);
-                        matchedVehicle = vehicleRepository.save(newVehicle);
                 }
 
                 BigDecimal originalPrice = sumBasePrice(selectedPackages);
@@ -1200,8 +1202,9 @@ public class BookingServiceImpl implements BookingService {
                                 .plusMinutes(PAYMENT_TIMEOUT_MINUTES);
 
                 Booking booking = new Booking();
-                booking.setCustomerId(matchedCustomer != null ? matchedCustomer.getId() : null);
-                booking.setVehicleId(matchedVehicle != null ? matchedVehicle.getId() : null);
+                // Section C: guest booking luôn có customerId = null và vehicleId = null
+                booking.setCustomerId(null);
+                booking.setVehicleId(null);
                 booking.setVehicleType(bayType);
                 booking.setGarageId(request.getGarageId());
                 booking.setServicePackageId(request.getServicePackageId());
@@ -1220,10 +1223,8 @@ public class BookingServiceImpl implements BookingService {
                 booking.setPaymentExpiredAt(paymentExpiredAt);
                 booking.setRefundAmount(BigDecimal.ZERO);
                 booking.setIsWalkIn(false);
-                booking.setGuestName(matchedCustomer != null ? matchedCustomer.getFullName() : request.getGuestName());
-                booking.setGuestPhone(matchedCustomer != null
-                                ? matchedCustomer.getPhone()
-                                : VietnamesePhoneNumber.normalizeMobile(request.getGuestPhone()));
+                booking.setGuestName(request.getGuestName());
+                booking.setGuestPhone(VietnamesePhoneNumber.normalizeMobile(request.getGuestPhone()));
                 booking.setLicensePlate(normalizedPlate);
                 booking.setRewardProcessed(false);
                 booking.setUsedPoints(0);
@@ -1319,6 +1320,28 @@ public class BookingServiceImpl implements BookingService {
                         return brand.trim() + " " + model.trim();
                 }
                 return null;
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public void checkGuestPhoneEligibility(String phone) {
+                String normalized;
+                try {
+                        normalized = VietnamesePhoneNumber.normalizeMobile(phone);
+                } catch (Exception e) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid phone number format");
+                }
+                if (normalized == null || normalized.isBlank()) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid phone number format");
+                }
+                User existing = userRepository.findByPhone(normalized)
+                                .filter(u -> Boolean.TRUE.equals(u.getIsActive()))
+                                .filter(u -> "CUSTOMER".equalsIgnoreCase(u.getRole()))
+                                .orElse(null);
+                if (existing != null) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                        "ACCOUNT_EXISTS_SIGN_IN_REQUIRED");
+                }
         }
 
         // ===================== ISSUE #13 =====================
@@ -2568,7 +2591,15 @@ public class BookingServiceImpl implements BookingService {
 
         // ===================== HELPER =====================
 
+        private void requirePackageMappedToGarage(Long garageId, Long packageId) {
+                if (!garageServicePackageRepository.existsByGarageIdAndServicePackageIdAndIsActiveTrue(garageId, packageId)) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "PACKAGE_NOT_AVAILABLE_AT_GARAGE: This service package is not available at the selected garage");
+                }
+        }
+
         private User findActiveCustomerByPhone(String phone) {
+                if (phone == null || phone.isBlank()) return null;
                 String normalizedPhone = VietnamesePhoneNumber.normalizeMobile(phone);
 
                 return userRepository.findByPhone(normalizedPhone)

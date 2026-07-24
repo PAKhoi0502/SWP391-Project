@@ -324,12 +324,15 @@ public class BookingReviewServiceImpl implements BookingReviewService {
                 return;
             }
 
+            long customerBookingNumber = bookingRepository
+                    .countByCustomerIdAndIdLessThanEqual(booking.getCustomerId(), bookingId);
             notificationService.createInAppNotification(
                     booking.getCustomerId(),
                     bookingId,
                     "REVIEW_REQUEST",
                     "Rate your experience",
-                    "How was your wash? Please rate our service for booking #" + bookingId + "."
+                    "How was your wash? Please rate our service for booking #"
+                            + customerBookingNumber + "."
             );
 
             log.info("[REVIEW_REQUEST_NOTIF] Sent review request for bookingId={}", bookingId);

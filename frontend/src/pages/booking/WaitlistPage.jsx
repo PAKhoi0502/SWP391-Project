@@ -218,7 +218,7 @@ export default function WaitlistPage() {
             <Link className="waitlist-primary-link" to="/booking">
               New Booking
             </Link>
-            <Link className="waitlist-link-button" to="/customer/bookings">
+            <Link className="waitlist-link-button" to="/customer/booking-history">
               View appointments
             </Link>
           </div>

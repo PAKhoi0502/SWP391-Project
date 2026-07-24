@@ -1,42 +1,35 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ROLES } from '../constants/roles'
 import AdminLayout from '../layouts/AdminLayout'
-import CustomerLayout from '../layouts/CustomerLayout'
 import PublicLayout from '../layouts/PublicLayout'
 import StaffLayout from '../layouts/StaffLayout'
 import AdminUsersPage from '../pages/AdminUsersPage'
 import AdminStaffProfilesPage from '../pages/AdminStaffProfilesPage'
 import ProtectedRoute from './ProtectedRoute'
+import GuestOnlyRoute from './GuestOnlyRoute'
 import StaffTypeGuard from './StaffTypeGuard'
-import DashboardPlaceholderPage from '../pages/DashboardPlaceholderPage'
 import StaffDashboardPage from '../pages/staff/StaffDashboardPage'
 import ForbiddenPage from '../pages/ForbiddenPage'
 import ForgotPasswordPage from '../pages/ForgotPasswordPage'
 import HomePage from '../pages/HomePage'
-import LoginPage from '../pages/LoginPage'
 import NotFoundPage from '../pages/NotFoundPage'
 import ProfilePage from '../pages/ProfilePage'
-import RegisterPage from '../pages/RegisterPage'
 import AnimatedAuthShell from '../components/auth/AnimatedAuthShell'
 import ResetPasswordPage from '../pages/ResetPasswordPage'
 import StaffProfilePage from '../pages/StaffProfilePage'
 import UikitDemo from '../pages/UikitDemo'
-import GarageListPage from '../pages/GarageListPage'
 import GarageDetailPage from '../pages/GarageDetailPage'
 import AdminGarageListPage from '../pages/admin/AdminGarageListPage'
 import AdminGarageFormPage from '../pages/admin/AdminGarageFormPage'
 import AdminWashBayManagementPage from '../pages/admin/AdminWashBayManagementPage'
 import AdminVehiclesPage from '../pages/admin/AdminVehiclesPage'
-import CustomerVehiclesPage from '../pages/CustomerVehiclesPage'
 import ServicePackageListPage from '../pages/ServicePackageListPage'
 import ServicePackageDetailPage from '../pages/ServicePackageDetailPage'
 import AdminServicePackagePage from '../pages/admin/AdminServicePackagePage'
-import AvailableSlotsPickerPage from '../pages/booking/AvailableSlotsPickerPage'
 import CustomerCreateBookingPage from '../pages/booking/CustomerCreateBookingPage'
 import WaitlistPage from '../pages/booking/WaitlistPage'
 import StaffWaitlistPage from '../pages/booking/StaffWaitlistPage'
 import BookingHistoryPage from '../pages/booking/BookingHistoryPage'
-import CustomerBookingListPage from '../pages/booking/CustomerBookingListPage'
 import BookingDetailPage from '../pages/booking/BookingDetailPage'
 import StaffBookingListPage from '../pages/booking/StaffBookingListPage'
 import StaffWalkInBookingPage from '../pages/booking/StaffWalkInBookingPage'
@@ -71,17 +64,30 @@ function AppRoutes() {
       <Route element={<PublicLayout />}>
         <Route index element={<HomePage />} />
         <Route path="about" element={<AboutUsPage />} />
-        <Route path="login" element={<AnimatedAuthShell />} />
+        {/* Guest-only: redirect authenticated users to their home page */}
+        <Route element={<GuestOnlyRoute />}>
+          <Route path="login" element={<AnimatedAuthShell />} />
+          <Route path="register" element={<AnimatedAuthShell />} />
+        </Route>
+        {/* Not guest-only: available to everyone */}
         <Route path="forgot-password" element={<ForgotPasswordPage />} />
         <Route path="reset-password" element={<ResetPasswordPage />} />
         <Route path="payment/success" element={<PaymentReturnPage />} />
         <Route path="payment/cancel" element={<PaymentReturnPage />} />
-        <Route path="register" element={<AnimatedAuthShell />} />
         <Route path="uikit" element={<UikitDemo />} />
         <Route path="forbidden" element={<ForbiddenPage />} />
       </Route>
 
-      {/* Customer standalone pages — ProfileLayout (no sidebar dashboard chrome) */}
+      {/* Public pages — no auth required; uses PublicPillNavbar via ProfileLayout */}
+      <Route element={<ProfileLayout />}>
+        <Route path="customer/service-packages" element={<ServicePackageListPage />} />
+        <Route path="customer/service-packages/:id" element={<ServicePackageDetailPage />} />
+        <Route path="customer/garages" element={<Navigate to="/#services" replace />} />
+        <Route path="customer/garages/:id" element={<Navigate to="/#services" replace />} />
+        <Route path="guest-booking" element={<GuestBookingPage />} />
+      </Route>
+
+      {/* Customer authenticated pages — ProfileLayout (PublicPillNavbar, no sidebar) */}
       <Route element={<ProtectedRoute allowedRoles={[ROLES.CUSTOMER]} />}>
         <Route element={<ProfileLayout />}>
           <Route path="customer/profile" element={<ProfilePage />} />
@@ -92,28 +98,16 @@ function AppRoutes() {
           <Route path="/customer/notifications/:id" element={<CustomerNotificationDetailPage />} />
           <Route path="/customer/waitlist" element={<WaitlistPage />} />
           <Route path="/customer/leaderboard" element={<CustomerLeaderboardPage />} />
-        </Route>
-      </Route>
-
-      {/* Service packages — public, no auth required; uses PublicPillNavbar via ProfileLayout */}
-      <Route element={<ProfileLayout />}>
-        <Route path="customer/service-packages" element={<ServicePackageListPage />} />
-        <Route path="customer/service-packages/:id" element={<ServicePackageDetailPage />} />
-        <Route path="guest-booking" element={<GuestBookingPage />} />
-      </Route>
-
-      <Route element={<ProtectedRoute allowedRoles={[ROLES.CUSTOMER]} />}>
-        <Route element={<CustomerLayout />}>
-          <Route path="customer" element={<Navigate to="/" replace />} />
-          <Route path="customer/vehicles" element={<CustomerVehiclesPage />} />
-          <Route path="customer/garages" element={<GarageListPage />} />
-          <Route path="customer/garages/:id" element={<GarageDetailPage />} />
-          <Route path="/booking/available-slots" element={<AvailableSlotsPickerPage />} />
-          <Route path="/customer/bookings" element={<CustomerBookingListPage />} />
-          <Route path="/customer/wash-histories" element={<CustomerWashHistoryListPage />} />
-          <Route path="/customer/wash-histories/:id" element={<WashHistoryDetailPage />} />
+          {/* Promotions — moved from old CustomerLayout */}
           <Route path="/customer/promotions" element={<CustomerPromotionListPage />} />
           <Route path="/customer/promotions/:id" element={<CustomerPromotionDetailPage />} />
+          {/* Wash history — moved from old CustomerLayout */}
+          <Route path="/customer/wash-histories" element={<CustomerWashHistoryListPage />} />
+          <Route path="/customer/wash-histories/:id" element={<WashHistoryDetailPage />} />
+          {/* Compatibility redirects */}
+          <Route path="/customer/bookings" element={<Navigate to="/customer/booking-history" replace />} />
+          <Route path="/customer/vehicles" element={<Navigate to="/customer/profile" replace />} />
+          <Route path="/booking/available-slots" element={<Navigate to="/booking" replace />} />
         </Route>
       </Route>
 

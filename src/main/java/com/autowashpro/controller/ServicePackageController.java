@@ -82,9 +82,10 @@ public class ServicePackageController {
 
     @GetMapping("/available")
     public List<ServicePackageResponse> getAvailable(
-            @RequestParam String vehicleType) {
+            @RequestParam(required = false) String vehicleType,
+            @RequestParam(required = false) Long garageId) {
 
         return servicePackageService
-                .getAvailable(vehicleType);
+                .getAvailable(vehicleType, garageId);
     }
 }

@@ -162,7 +162,7 @@ export default function AvailableSlotsPickerPage() {
     searchParams.get("servicePackageId") || ""
   );
   const [vehicleType, setVehicleType] = useState(searchParams.get("vehicleType") || "");
-  const [date, setDate] = useState(searchParams.get("date") || getTomorrow());
+  const [date, setDate] = useState(searchParams.get("date") || getToday());
 
   const [garages, setGarages] = useState([]);
   const [servicePackages, setServicePackages] = useState([]);
@@ -495,7 +495,11 @@ export default function AvailableSlotsPickerPage() {
                 <div className="waitlist-box">
                   <div>
                     <strong>No available slots</strong>
-                    <p>You can choose a different date or join the waitlist.</p>
+                    <p>
+                      {date === getToday()
+                        ? 'No more available slots for today. Please choose another date.'
+                        : 'You can choose a different date or join the waitlist.'}
+                    </p>
                   </div>
 
                   <Button variant="secondary" onClick={() => handleJoinWaitlist(null)}>

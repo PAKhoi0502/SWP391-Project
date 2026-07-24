@@ -21,6 +21,7 @@ import com.autowashpro.repository.BookingRepository;
 import com.autowashpro.repository.BookingServiceStepRepository;
 import com.autowashpro.repository.CustomerLoyaltyRepository;
 import com.autowashpro.repository.GarageRepository;
+import com.autowashpro.repository.GarageServicePackageRepository;
 import com.autowashpro.repository.LoyaltyTierRuleRepository;
 import com.autowashpro.repository.PaymentTransactionRepository;
 import com.autowashpro.repository.PointTransactionRepository;
@@ -81,6 +82,7 @@ import static org.mockito.Mockito.lenient;
 class BookingOperationPhaseTest {
 
     @Mock private GarageRepository garageRepository;
+    @Mock private GarageServicePackageRepository garageServicePackageRepository;
     @Mock private ServicePackageRepository servicePackageRepository;
     @Mock private WashBayRepository washBayRepository;
     @Mock private BookingRepository bookingRepository;
@@ -114,6 +116,8 @@ class BookingOperationPhaseTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(garageServicePackageRepository
+                .existsByGarageIdAndServicePackageIdAndIsActiveTrue(anyLong(), anyLong())).thenReturn(true);
         lenient().when(packageResourceResolver.resolveEffectivePackages(any()))
                 .thenAnswer(inv -> List.of(inv.<ServicePackage>getArgument(0)));
         lenient().when(staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(anyLong(), any(), anyLong()))
@@ -388,9 +392,9 @@ class BookingOperationPhaseTest {
         when(garageRepository.findById(garage.getId())).thenReturn(Optional.of(garage));
         when(servicePackageRepository.findById(pkg.getId())).thenReturn(Optional.of(pkg));
         when(washBayRepository.findDistinctVehicleTypesByGarageId(garage.getId())).thenReturn(List.of("CAR"));
-        when(bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(any(), any(), any(), any())).thenReturn(0L);
+        when(bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(any(), any(), any(), any(), any())).thenReturn(0L);
         when(washBayRepository.countActiveByGarageAndVehicleType(garage.getId(), "CAR")).thenReturn(2L);
-        when(bookingRepository.countOverlappingBookingsByGarageAndVehicleType(any(), any(), any(), any())).thenReturn(0L);
+        when(bookingRepository.countOverlappingBookingsByGarageAndVehicleType(any(), any(), any(), any(), any())).thenReturn(0L);
         when(staffProfileRepository.countByGarageIdAndStaffTypeAndIsActiveTrue(
                 garage.getId(), StaffType.VEHICLE_CARE_STAFF)).thenReturn(1L);
         when(bookingAssignedStaffRepository.countAssignedStaffByGarageAndTypeAndTime(
@@ -425,9 +429,9 @@ class BookingOperationPhaseTest {
         when(garageRepository.findById(garage.getId())).thenReturn(Optional.of(garage));
         when(servicePackageRepository.findById(pkg.getId())).thenReturn(Optional.of(pkg));
         when(washBayRepository.findDistinctVehicleTypesByGarageId(garage.getId())).thenReturn(List.of("CAR"));
-        when(bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(any(), any(), any(), any())).thenReturn(0L);
+        when(bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(any(), any(), any(), any(), any())).thenReturn(0L);
         when(washBayRepository.countActiveByGarageAndVehicleType(garage.getId(), "CAR")).thenReturn(2L);
-        when(bookingRepository.countOverlappingBookingsByGarageAndVehicleType(any(), any(), any(), any())).thenReturn(0L);
+        when(bookingRepository.countOverlappingBookingsByGarageAndVehicleType(any(), any(), any(), any(), any())).thenReturn(0L);
         when(userRepository.findByPhone(any())).thenReturn(Optional.empty());
 
         bookingService.createWalkInBooking(request, staffUser.getId(), "ROLE_ADMIN");
@@ -498,9 +502,9 @@ class BookingOperationPhaseTest {
         when(garageRepository.findById(garage.getId())).thenReturn(Optional.of(garage));
         when(servicePackageRepository.findById(pkg.getId())).thenReturn(Optional.of(pkg));
         when(washBayRepository.findDistinctVehicleTypesByGarageId(garage.getId())).thenReturn(List.of("CAR"));
-        when(bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(any(), any(), any(), any())).thenReturn(0L);
+        when(bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(any(), any(), any(), any(), any())).thenReturn(0L);
         when(washBayRepository.countActiveByGarageAndVehicleType(garage.getId(), "CAR")).thenReturn(2L);
-        when(bookingRepository.countOverlappingBookingsByGarageAndVehicleType(any(), any(), any(), any())).thenReturn(0L);
+        when(bookingRepository.countOverlappingBookingsByGarageAndVehicleType(any(), any(), any(), any(), any())).thenReturn(0L);
         when(userRepository.findByPhone(any())).thenReturn(Optional.empty());
 
         bookingService.createWalkInBooking(request, staffUser.getId(), "ROLE_ADMIN");
@@ -508,7 +512,7 @@ class BookingOperationPhaseTest {
         // The overlap check must use the wash window end (startTime+30m), not the full booking end (startTime+60m)
         ArgumentCaptor<LocalDateTime> endCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
         verify(bookingRepository).countOverlappingBookingsByGarageAndVehicleType(
-                eq(garage.getId()), eq("CAR"), eq(slotStart), endCaptor.capture());
+                eq(garage.getId()), eq("CAR"), eq(slotStart), endCaptor.capture(), any());
         assertEquals(expectedWashEnd, endCaptor.getValue(),
                 "Wash bay overlap check should use wash window end, not full booking end");
     }

@@ -26,27 +26,35 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                         LocalDateTime start,
                         LocalDateTime end);
 
-        // Issue #11: Kiểm tra xe có booking active nào overlap không
+        // ── ACTIVE HOLD condition (shared across queries) ──────────────────────────
+        // An "active hold" is any booking that occupies a slot/resource:
+        //   CONFIRMED, CHECKED_IN, IN_PROGRESS — always active
+        //   PENDING_DEPOSIT — active only while paymentExpiredAt > :now
+        // CANCELED, COMPLETED, NO_SHOW, and expired PENDING_DEPOSIT are terminal.
+
+        // Issue #11 (updated): Kiểm tra xe có booking active (overlap time) không — tính cả PENDING_DEPOSIT còn hạn
         @Query("""
                         SELECT COUNT(b) FROM Booking b
                         WHERE b.vehicleId = :vehicleId
-                        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                        AND (b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                             OR (b.status = 'PENDING_DEPOSIT' AND b.paymentExpiredAt > :now))
                         AND b.startTime < :endTime
                         AND b.endTime > :startTime
                         """)
         long countOverlappingBookingsByVehicle(
                         @Param("vehicleId") Long vehicleId,
                         @Param("startTime") LocalDateTime startTime,
-                        @Param("endTime") LocalDateTime endTime);
+                        @Param("endTime") LocalDateTime endTime,
+                        @Param("now") LocalDateTime now);
 
-        // Issue #11: Đếm upcoming bookings của customer
+        // Issue #11 (updated): Đếm active holds của customer (thay cho countUpcomingBookings — không lọc theo startTime)
         @Query("""
                         SELECT COUNT(b) FROM Booking b
                         WHERE b.customerId = :customerId
-                        AND b.status IN ('CONFIRMED', 'CHECKED_IN')
-                        AND b.startTime > :now
+                        AND (b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                             OR (b.status = 'PENDING_DEPOSIT' AND b.paymentExpiredAt > :now))
                         """)
-        long countUpcomingBookings(
+        long countActiveHolds(
                         @Param("customerId") Long customerId,
                         @Param("now") LocalDateTime now);
 
@@ -74,14 +82,13 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
         // ====================
 
-        // Issue #11: Đếm booking chiếm wash bay theo garage + vehicle type.
-        // Dùng b.vehicleType (lưu trực tiếp trên booking) thay vì JOIN sang Vehicle,
-        // vì khách vãng lai (walk-in) không có vehicle_id nên sẽ bị JOIN loại bỏ nhầm.
+        // Issue #11 (updated): Đếm booking chiếm wash bay theo garage + vehicle type — tính cả PENDING_DEPOSIT còn hạn
         @Query("""
                         SELECT COUNT(b) FROM Booking b
                         WHERE b.garageId = :garageId
                         AND b.vehicleType = :vehicleType
-                        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                        AND (b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                             OR (b.status = 'PENDING_DEPOSIT' AND b.paymentExpiredAt > :now))
                         AND b.startTime < :endTime
                         AND b.endTime > :startTime
                         """)
@@ -89,14 +96,16 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                         @Param("garageId") Long garageId,
                         @Param("vehicleType") String vehicleType,
                         @Param("startTime") LocalDateTime startTime,
-                        @Param("endTime") LocalDateTime endTime);
+                        @Param("endTime") LocalDateTime endTime,
+                        @Param("now") LocalDateTime now);
 
-        // Issue #12: Kiểm tra license plate overlap (walk-in booking)
+        // Issue #12 (updated): Kiểm tra license plate overlap — tính cả PENDING_DEPOSIT còn hạn
         @Query("""
                         SELECT COUNT(b) FROM Booking b
                         WHERE b.licensePlate = :licensePlate
                         AND b.vehicleType = :vehicleType
-                        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                        AND (b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                             OR (b.status = 'PENDING_DEPOSIT' AND b.paymentExpiredAt > :now))
                         AND b.startTime < :endTime
                         AND b.endTime > :startTime
                         """)
@@ -104,27 +113,31 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                         @Param("licensePlate") String licensePlate,
                         @Param("vehicleType") String vehicleType,
                         @Param("startTime") LocalDateTime startTime,
-                        @Param("endTime") LocalDateTime endTime);
+                        @Param("endTime") LocalDateTime endTime,
+                        @Param("now") LocalDateTime now);
 
-        // Issue #12: Đếm tất cả booking đang chiếm wash bay theo garage (dùng cho
-        // walk-in)
+        // Issue #12 (updated): Đếm tất cả booking đang chiếm wash bay theo garage — tính cả PENDING_DEPOSIT còn hạn
         @Query("""
                         SELECT COUNT(b) FROM Booking b
                         WHERE b.garageId = :garageId
-                        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                        AND (b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                             OR (b.status = 'PENDING_DEPOSIT' AND b.paymentExpiredAt > :now))
                         AND b.startTime < :endTime
                         AND b.endTime > :startTime
                         """)
         long countOverlappingBookingsByGarage(
                         @Param("garageId") Long garageId,
                         @Param("startTime") LocalDateTime startTime,
-                        @Param("endTime") LocalDateTime endTime);
+                        @Param("endTime") LocalDateTime endTime,
+                        @Param("now") LocalDateTime now);
 
+        // (updated): tính cả PENDING_DEPOSIT còn hạn
         @Query("""
                         SELECT COUNT(b) FROM Booking b
                         WHERE b.customerId = :customerId
                         AND b.garageId = :garageId
-                        AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                        AND (b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                             OR (b.status = 'PENDING_DEPOSIT' AND b.paymentExpiredAt > :now))
                         AND b.startTime < :endTime
                         AND b.endTime > :startTime
                         """)
@@ -132,7 +145,34 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                         @Param("customerId") Long customerId,
                         @Param("garageId") Long garageId,
                         @Param("startTime") LocalDateTime startTime,
-                        @Param("endTime") LocalDateTime endTime);
+                        @Param("endTime") LocalDateTime endTime,
+                        @Param("now") LocalDateTime now);
+
+        // ── Section E: Chặn cùng xe có nhiều active booking (không phụ thuộc time overlap) ──
+
+        // Kiểm tra xe đã có active booking chưa (registered customer — by vehicleId)
+        @Query("""
+                        SELECT COUNT(b) FROM Booking b
+                        WHERE b.vehicleId = :vehicleId
+                        AND (b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                             OR (b.status = 'PENDING_DEPOSIT' AND b.paymentExpiredAt > :now))
+                        """)
+        long countActiveBookingsByVehicleId(
+                        @Param("vehicleId") Long vehicleId,
+                        @Param("now") LocalDateTime now);
+
+        // Kiểm tra biển số đã có active booking chưa (guest — by licensePlate + vehicleType)
+        @Query("""
+                        SELECT COUNT(b) FROM Booking b
+                        WHERE b.licensePlate = :licensePlate
+                        AND b.vehicleType = :vehicleType
+                        AND (b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                             OR (b.status = 'PENDING_DEPOSIT' AND b.paymentExpiredAt > :now))
+                        """)
+        long countActiveBookingsByLicensePlate(
+                        @Param("licensePlate") String licensePlate,
+                        @Param("vehicleType") String vehicleType,
+                        @Param("now") LocalDateTime now);
 
         List<Booking> findByStatusAndDepositStatus(
                         String status,

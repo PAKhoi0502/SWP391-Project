@@ -38,4 +38,6 @@ public class UpdateServicePackageRequest {
     private List<CreateServicePackageStepRequest> steps;
 
     private List<Long> includedServiceIds;
+
+    private List<Long> garageIds;
 }

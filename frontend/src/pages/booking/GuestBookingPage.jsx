@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { bookingApi } from '../../api/bookingApi'
 import { getGarages } from '../../api/GarageApi'
@@ -21,9 +21,8 @@ import {
 import './StaffWalkInBookingPage.css'
 import './GuestBookingPage.css'
 
-function tomorrowIso() {
+function todayIso() {
   const d = new Date()
-  d.setDate(d.getDate() + 1)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
@@ -110,7 +109,7 @@ const INIT_FORM = {
   motorbikeGroup: '',
   garageId: '',
   servicePackageId: '',
-  date: tomorrowIso(),
+  date: todayIso(),
   startTime: '',
   note: '',
 }
@@ -118,8 +117,12 @@ const INIT_FORM = {
 export default function GuestBookingPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const slotDebounce = useRef(null)
-  const preselectedPackageId = location.state?.servicePackageId
+  // Accept preselection from URL query params (preferred) or legacy location.state
+  const preselectedGarageId   = searchParams.get('garageId') || ''
+  const preselectedPackageId  =
+    searchParams.get('servicePackageId') || location.state?.servicePackageId || ''
 
   const [form, setForm] = useState(INIT_FORM)
   const [selectedAddOnIds, setSelectedAddOnIds] = useState([])
@@ -147,20 +150,30 @@ export default function GuestBookingPage() {
 
         if (!active) return
 
-        setGarages(garageResult.status === 'fulfilled' ? extractGarages(garageResult.value) : [])
+        const loadedGarages = garageResult.status === 'fulfilled' ? extractGarages(garageResult.value) : []
+        setGarages(loadedGarages)
         const allPackages = packageResult.status === 'fulfilled' ? extractList(packageResult.value) : []
         setPackages(allPackages)
+
+        const formUpdates = {}
+
+        if (preselectedGarageId) {
+          const matchedGarage = loadedGarages.find(
+            (g) => String(getGarageId(g)) === String(preselectedGarageId),
+          )
+          if (matchedGarage) formUpdates.garageId = String(preselectedGarageId)
+        }
 
         if (preselectedPackageId) {
           const match = allPackages.find((pkg) => String(getPackageId(pkg)) === String(preselectedPackageId))
           if (match) {
-            const vehicleType = normalizeVehicleType(getPackageVehicleType(match)) || 'CAR'
-            setForm((prev) => ({
-              ...prev,
-              vehicleType,
-              servicePackageId: String(getPackageId(match)),
-            }))
+            formUpdates.vehicleType = normalizeVehicleType(getPackageVehicleType(match)) || 'CAR'
+            formUpdates.servicePackageId = String(getPackageId(match))
           }
+        }
+
+        if (Object.keys(formUpdates).length > 0) {
+          setForm((prev) => ({ ...prev, ...formUpdates }))
         }
       } finally {
         if (active) setLoadingInitial(false)
@@ -702,11 +715,11 @@ export default function GuestBookingPage() {
                 name="date"
                 type="date"
                 value={form.date}
-                min={tomorrowIso()}
+                min={todayIso()}
                 onChange={handleChange}
                 className={fieldErrors.date ? 'swi-input-error' : ''}
               />
-              <span className="swi-help">Online bookings must be made at least 1 day in advance.</span>
+              <span className="swi-help">Online bookings must be made at least 15 minutes in advance.</span>
               {fieldErrors.date && <p className="swi-field-error">{fieldErrors.date}</p>}
             </div>
 

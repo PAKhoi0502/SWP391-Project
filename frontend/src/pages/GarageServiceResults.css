@@ -1,0 +1,358 @@
+/* ─── GarageServiceResults — dark glass theme matching spp-page / Hero1.jpg ─
+   Rendered inside .spp-page (Hero1.jpg dark overlay).
+   CSS prefix: gsr-
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* ── Back button ── */
+.gsr-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  padding: 8px 18px;
+  color: rgba(255, 255, 255, 0.80);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background 0.14s, border-color 0.14s, color 0.14s;
+  margin-bottom: 22px;
+}
+
+.gsr-back:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.40);
+  color: #ffffff;
+}
+
+/* ── Garage header card ── */
+.gsr-header-card {
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 22px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 8px 36px rgba(0, 0, 0, 0.22);
+  padding: 24px 28px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.gsr-garage-meta { flex: 1; min-width: 200px; }
+
+.gsr-garage-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #2EC2F7;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.gsr-garage-name {
+  margin: 0 0 10px;
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 900;
+  color: #ffffff;
+  line-height: 1.15;
+  -webkit-font-smoothing: antialiased;
+}
+
+.gsr-garage-info-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.gsr-garage-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+/* ── Stats ── */
+.gsr-stats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-self: center;
+}
+
+.gsr-stat {
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 12px 16px;
+  min-width: 70px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.gsr-stat strong {
+  display: block;
+  font-size: 24px;
+  font-weight: 900;
+  color: #ffffff;
+  line-height: 1;
+  margin-bottom: 3px;
+}
+
+.gsr-stat span {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.52);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Filter section ── */
+.gsr-filter-section {
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 20px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Search ── */
+.gsr-search-wrap {
+  position: relative;
+}
+
+.gsr-search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.42);
+  display: flex;
+  pointer-events: none;
+}
+
+.gsr-search {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  color: #ffffff;
+  font: inherit;
+  font-size: 13.5px;
+  padding: 10px 14px 10px 40px;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.gsr-search::placeholder { color: rgba(255, 255, 255, 0.38); }
+
+.gsr-search:focus {
+  border-color: rgba(46, 194, 247, 0.55);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* ── Filter rows ── */
+.gsr-filter-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.gsr-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.gsr-filter-label {
+  font-size: 11px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.gsr-filter-sep {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.14);
+  flex-shrink: 0;
+}
+
+/* ── Pills ── */
+.gsr-pill {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 5px 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.70);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  transition: background 0.13s, border-color 0.13s, color 0.13s;
+  white-space: nowrap;
+}
+
+.gsr-pill:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.32);
+  color: #ffffff;
+}
+
+.gsr-pill--active {
+  background: #2EC2F7;
+  border-color: #2EC2F7;
+  color: #0a1224;
+}
+
+.gsr-pill--active:hover {
+  background: #52ccf8;
+  border-color: #52ccf8;
+  color: #0a1224;
+}
+
+/* ── Clear button ── */
+.gsr-clear-btn {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 5px 14px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.44);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.13s, border-color 0.13s;
+  margin-left: auto;
+}
+
+.gsr-clear-btn:hover {
+  color: rgba(255, 255, 255, 0.72);
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+/* ── Results count ── */
+.gsr-results-head {
+  margin-bottom: 14px;
+}
+
+.gsr-results-count {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.52);
+}
+
+/* ── Error banner ── */
+.gsr-error {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: rgba(254, 226, 226, 0.95);
+  border: 1px solid #fecaca;
+  border-radius: 14px;
+  color: #991b1b;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+
+.gsr-retry-btn {
+  border: 1px solid #fca5a5;
+  border-radius: 999px;
+  padding: 6px 16px;
+  background: white;
+  color: #b91c1c;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.13s;
+  flex-shrink: 0;
+}
+
+.gsr-retry-btn:hover { background: #fee2e2; }
+
+/* ── Empty state (reuses spp-empty) ── */
+.gsr-empty-icon {
+  color: rgba(46, 194, 247, 0.45);
+  margin-bottom: 12px;
+}
+
+/* ── Skeleton cards (glass shimmer) ── */
+.gsr-skeleton-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 18px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@keyframes gsr-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+.gsr-skel {
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 25%,
+    rgba(255, 255, 255, 0.14) 50%,
+    rgba(255, 255, 255, 0.06) 75%
+  );
+  background-size: 200% auto;
+  animation: gsr-shimmer 1.5s linear infinite;
+}
+
+.gsr-skel--h10 { height: 10px; }
+.gsr-skel--h14 { height: 14px; }
+.gsr-skel--h20 { height: 20px; }
+.gsr-skel--w40 { width: 40%; }
+.gsr-skel--w60 { width: 60%; }
+.gsr-skel--w80 { width: 80%; }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .gsr-header-card {
+    flex-direction: column;
+    padding: 18px 20px;
+  }
+
+  .gsr-stats {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .gsr-stat strong { font-size: 18px; }
+}
+
+@media (max-width: 480px) {
+  .gsr-stats { grid-template-columns: repeat(2, 1fr); }
+}

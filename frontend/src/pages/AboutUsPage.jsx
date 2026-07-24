@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useBookingEntry } from '../hooks/useBookingEntry'
 import './AboutUsPage.css'
 
 /* ── Scroll-reveal ── */
@@ -123,6 +124,7 @@ const PROMISES = [
 
 export default function AboutUsPage() {
   const navigate = useNavigate()
+  const handleBookingEntry = useBookingEntry()
   useScrollReveal()
 
   return (
@@ -273,7 +275,7 @@ export default function AboutUsPage() {
             Your car deserves<br />better care.
           </h2>
           <div className="au-cta-actions">
-            <button className="au-cta-btn au-cta-btn--primary" onClick={() => navigate('/booking')}>
+            <button className="au-cta-btn au-cta-btn--primary" onClick={() => handleBookingEntry()}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="4.5" width="18" height="16" rx="2.5"/>
                 <path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>

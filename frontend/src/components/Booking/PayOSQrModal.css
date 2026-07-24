@@ -245,6 +245,24 @@
   flex: 1;
 }
 
+.pqm-confirm-cancel {
+  width: 100%;
+}
+.pqm-confirm-cancel-text {
+  font-size: 13px;
+  color: #dc2626;
+  font-weight: 600;
+  margin: 0 0 8px;
+  text-align: center;
+}
+.pqm-confirm-cancel-btns {
+  display: flex;
+  gap: 8px;
+}
+.pqm-confirm-cancel-btns .pqm-btn {
+  flex: 1;
+}
+
 .pqm-btn--cancel-tx {
   background: #fef2f2;
   border: 1px solid #fecaca;

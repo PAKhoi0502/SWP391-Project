@@ -6,6 +6,7 @@ import customerBookingFlowApi from '../../api/customerBookingFlowApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
 import { getServicePackageById, getPackageName } from '../../services/servicePackageApi'
 import { vehicleInspectionApi } from '../../api/vehicleInspectionApi'
+import { getInspectionByType, getHistoryTimelineItems } from '../../utils/bookingTimeline'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import DepositQrModal from '../../components/Booking/DepositQrModal'
 import DepositRefundPanel from '../../components/Booking/DepositRefundPanel'
@@ -309,66 +310,6 @@ const getPackageSteps = async (packageId) => {
   return []
 }
 
-const getInspectionByType = (inspections, type) =>
-  Array.isArray(inspections) ? inspections.find((item) => String(item?.type || '').toUpperCase() === type) : null
-
-const getHistoryTimelineItems = (booking, serviceSteps = [], inspections = []) => {
-  const status = String(booking?.status || '').toUpperCase()
-  const paymentStatus = String(booking?.paymentStatus || '').toUpperCase()
-  const checkedInAt = booking?.checkedInAt
-  const operationPhase = String(booking?.operationPhase || '').toUpperCase()
-
-  if (status === 'NO_SHOW') {
-    return [
-      { label: 'Booked', active: true, time: booking?.startTime },
-      { label: 'No Show', active: true, danger: true, time: booking?.updatedAt || booking?.startTime },
-    ]
-  }
-
-  if (status === 'CANCELED' || status === 'CANCELLED') {
-    return [
-      { label: 'Booked', active: true, time: booking?.startTime },
-      { label: 'Cancelled', active: true, danger: true, time: booking?.updatedAt || booking?.startTime },
-    ]
-  }
-
-  const checkinActive = ['CHECKED_IN', 'IN_PROGRESS', 'COMPLETED'].includes(status) || Boolean(checkedInAt)
-  const beforeWashInspection = getInspectionByType(inspections, 'BEFORE_WASH')
-  const afterWashInspection  = getInspectionByType(inspections, 'AFTER_WASH')
-  const inspectionActive = Boolean(beforeWashInspection)
-
-  const requiresCare = Boolean(booking?.requiresCareStaff) || Boolean(booking?.plannedCareStartAt)
-
-  const washPhases = ['AUTOMATED_WASH', 'WAITING_FOR_CARE', 'VEHICLE_CARE', 'FINAL_INSPECTION', 'READY_FOR_HANDOVER', 'DONE']
-  const carePhases = ['VEHICLE_CARE', 'FINAL_INSPECTION', 'READY_FOR_HANDOVER', 'DONE']
-  const finalPhases = ['FINAL_INSPECTION', 'READY_FOR_HANDOVER', 'DONE']
-
-  const washActive = washPhases.includes(operationPhase) || status === 'COMPLETED'
-  const careActive = requiresCare && (carePhases.includes(operationPhase) || status === 'COMPLETED')
-  const finalCheckActive = Boolean(afterWashInspection) || finalPhases.includes(operationPhase) || status === 'COMPLETED'
-  const completedActive = status === 'COMPLETED'
-
-  const nodes = [
-    { label: 'Booked', active: true, time: booking?.startTime },
-    { label: 'Confirmed', active: status !== 'PENDING_DEPOSIT' && status !== 'CANCELED' && status !== 'CANCELLED', time: booking?.createdAt },
-    { label: 'Check-in', active: checkinActive, time: checkedInAt },
-    { label: 'Intake', active: inspectionActive, time: beforeWashInspection?.createdAt },
-    { label: 'Wash', active: washActive, time: booking?.washBayStartTime },
-  ]
-
-  if (requiresCare) {
-    nodes.push({ label: 'Care', active: careActive, time: booking?.careStartedAt })
-    nodes.push({ label: 'Final Check', active: finalCheckActive, time: afterWashInspection?.createdAt || booking?.careCompletedAt })
-  }
-
-  nodes.push({ label: 'Completed', active: completedActive, time: booking?.completedAt })
-
-  if (paymentStatus === 'PAID') {
-    nodes.push({ label: 'Paid', active: true, time: booking?.paidAt })
-  }
-
-  return nodes
-}
 
 /* ══════════════════════════════════════════════════
    BookingDetailModal — inline, same vibe
@@ -1075,8 +1016,6 @@ export default function BookingHistoryPage() {
                 && Boolean(booking?.paymentExpiredAt)
                 && new Date(booking.paymentExpiredAt).getTime() <= Date.now()
               const canCancel          = (status === 'CONFIRMED' || status === 'PENDING_DEPOSIT') && !depositPending
-              const steps             = serviceStepsByBookingId[String(bookingId)] || []
-              const timelineItems     = getHistoryTimelineItems(booking, steps)
               const batchDelay        = `${(idx % PAGE_SIZE) * 0.06}s`
 
               return (

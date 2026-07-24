@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
 import { flushSync } from 'react-dom'
 import reviewApi from '../../api/reviewApi'
+import { onReviewCreated } from '../../utils/reviewEvents'
 import { LeaderboardAvatar } from '../../pages/leaderboard/LeaderboardAvatar'
 import './PublicReviewShowcase.css'
 
@@ -142,20 +143,36 @@ export default function PublicReviewShowcase() {
     }
   }, [])
 
-  useEffect(() => {
+  const fetchReviews = useCallback(() => {
+    if (!mountedRef.current) return
     Promise.all([
       reviewApi.getPublicReviews({ page: 1, limit: 10 }),
       reviewApi.getPublicStats().catch(() => null),
     ])
       .then(([page, s]) => {
+        if (!mountedRef.current) return
         const list = page?.content ?? []
+        // Clear animation state before swapping data to avoid carousel flicker
+        window.clearInterval(timerRef.current)
+        window.clearTimeout(exitTimer.current)
+        animatingRef.current = false
+        timerRef.current = null
+        exitTimer.current = null
         setReviews(list)
         setStats(s)
         setActiveIdx(0)
         setStatus(list.length > 0 ? 'ready' : 'empty')
       })
-      .catch(() => setStatus('empty'))
+      .catch(() => { if (mountedRef.current) setStatus('empty') })
   }, [])
+
+  // Initial fetch
+  useEffect(() => { fetchReviews() }, [fetchReviews])
+
+  // Re-fetch when any review is created elsewhere in the app
+  useEffect(() => {
+    return onReviewCreated(fetchReviews)
+  }, [fetchReviews])
 
   useLayoutEffect(() => {
     if (status !== 'ready') return

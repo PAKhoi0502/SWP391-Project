@@ -16,7 +16,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+import java.text.NumberFormat;
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -63,7 +70,8 @@ public class NotificationServiceImpl implements NotificationService {
                     bookingId,
                     "BOOKING_CONFIRMED",
                     "Booking Confirmed",
-                    "Your booking #" + bookingId + " has been confirmed successfully."
+                    "Your booking #" + bookingReference(booking.getCustomerId(), bookingId)
+                            + " has been confirmed successfully."
             );
         });
     }
@@ -80,7 +88,8 @@ public class NotificationServiceImpl implements NotificationService {
                     bookingId,
                     "BOOKING_CANCELED",
                     "Booking Canceled",
-                    "Your booking #" + bookingId + " has been canceled." + reason
+                    "Your booking #" + bookingReference(booking.getCustomerId(), bookingId)
+                            + " has been canceled." + reason
             );
         });
     }
@@ -96,7 +105,8 @@ public class NotificationServiceImpl implements NotificationService {
                     bookingId,
                     "PAYMENT_CONFIRMED",
                     "Payment Confirmed",
-                    "Payment for booking #" + bookingId + " has been confirmed. Thank you!"
+                    "Payment for booking #" + bookingReference(booking.getCustomerId(), bookingId)
+                            + " has been confirmed. Thank you!"
             );
         });
     }
@@ -118,7 +128,8 @@ public class NotificationServiceImpl implements NotificationService {
                         bookingId,
                         "REWARD_EARNED",
                         "Points Earned",
-                        "You earned " + pt.getPoints() + " loyalty points from booking #" + bookingId + "!"
+                        "You earned " + pt.getPoints() + " loyalty points from booking #"
+                                + bookingReference(booking.getCustomerId(), bookingId) + "!"
                 );
             });
         });
@@ -157,7 +168,8 @@ public class NotificationServiceImpl implements NotificationService {
                     bookingId,
                     "PAYMENT_CONFIRMED",
                     "Payment confirmed" + (pointsPart.isEmpty() ? "" : " & points earned"),
-                    "Payment for booking #" + bookingId + " has been confirmed." + pointsPart + " Thank you!"
+                    "Payment for booking #" + bookingReference(booking.getCustomerId(), bookingId)
+                            + " has been confirmed." + pointsPart + " Thank you!"
             );
         });
     }
@@ -203,7 +215,8 @@ public void notifyVoucherReceived(Long customerId, String promotionCode, String 
                 bookingId,
                 "DEPOSIT_REFUND_APPROVED",
                 "Refund Request Approved",
-                "Your deposit refund request of " + amount + " for booking #" + bookingId
+                "Your deposit refund request of " + formatVnd(amount) + " for booking #"
+                        + bookingReference(customerId, bookingId)
                         + " has been approved and will be processed soon."
         );
     }
@@ -216,7 +229,8 @@ public void notifyVoucherReceived(Long customerId, String promotionCode, String 
                 bookingId,
                 "DEPOSIT_REFUND_REJECTED",
                 "Refund Request Rejected",
-                "Your deposit refund request for booking #" + bookingId + " was rejected." +
+                "Your deposit refund request for booking #" + bookingReference(customerId, bookingId)
+                        + " was rejected." +
                         (reason != null && !reason.isBlank() ? " Reason: " + reason : "")
         );
     }
@@ -229,7 +243,8 @@ public void notifyVoucherReceived(Long customerId, String promotionCode, String 
                 bookingId,
                 "DEPOSIT_REFUND_COMPLETED",
                 "Deposit Refunded",
-                "Your deposit refund of " + amount + " for booking #" + bookingId
+                "Your deposit refund of " + formatVnd(amount) + " for booking #"
+                        + bookingReference(customerId, bookingId)
                         + " has been transferred to your bank account."
         );
     }
@@ -239,16 +254,17 @@ public void notifyVoucherReceived(Long customerId, String promotionCode, String 
     @Override
     public Page<NotificationResponse> getMyNotifications(Long userId, Boolean isRead, int page, int limit) {
         PageRequest pageable = PageRequest.of(page - 1, limit);
+        Map<Long, Integer> bookingNumbers = buildCustomerBookingNumberMap(userId);
 
         if (isRead != null) {
             return notificationRepository
                     .findByUserIdAndIsReadOrderByCreatedAtDesc(userId, isRead, pageable)
-                    .map(this::toResponse);
+                    .map(notification -> toResponse(notification, bookingNumbers));
         }
 
         return notificationRepository
                 .findByUserIdOrderByCreatedAtDesc(userId, pageable)
-                .map(this::toResponse);
+                .map(notification -> toResponse(notification, bookingNumbers));
     }
 
     @Override
@@ -310,10 +326,19 @@ public void notifyVoucherReceived(Long customerId, String promotionCode, String 
     // ===================== HELPER =====================
 
     private NotificationResponse toResponse(Notification n) {
+        Integer customerBookingNumber = resolveCustomerBookingNumber(n.getUserId(), n.getBookingId());
+        Map<Long, Integer> bookingNumbers = customerBookingNumber == null || n.getBookingId() == null
+                ? Map.of()
+                : Map.of(n.getBookingId(), customerBookingNumber);
+        return toResponse(n, bookingNumbers);
+    }
+
+    private NotificationResponse toResponse(Notification n, Map<Long, Integer> bookingNumbers) {
         return NotificationResponse.builder()
                 .id(n.getId())
                 .userId(n.getUserId())
                 .bookingId(n.getBookingId())
+                .customerBookingNumber(n.getBookingId() == null ? null : bookingNumbers.get(n.getBookingId()))
                 .channel(n.getChannel())
                 .eventType(n.getEventType())
                 .title(n.getTitle())
@@ -323,5 +348,40 @@ public void notifyVoucherReceived(Long customerId, String promotionCode, String 
                 .sentAt(n.getSentAt())
                 .createdAt(n.getCreatedAt())
                 .build();
+    }
+
+    private Map<Long, Integer> buildCustomerBookingNumberMap(Long customerId) {
+        if (customerId == null) return Map.of();
+
+        List<com.autowashpro.entity.Booking> bookings =
+                bookingRepository.findByCustomerIdOrderByStartTimeDesc(customerId)
+                        .stream()
+                        .sorted(Comparator.comparingLong(com.autowashpro.entity.Booking::getId))
+                        .toList();
+
+        Map<Long, Integer> result = new HashMap<>();
+        for (int i = 0; i < bookings.size(); i++) {
+            result.put(bookings.get(i).getId(), i + 1);
+        }
+        return result;
+    }
+
+    private Integer resolveCustomerBookingNumber(Long customerId, Long bookingId) {
+        if (customerId == null || bookingId == null) return null;
+        return bookingRepository.findByIdAndCustomerId(bookingId, customerId)
+                .map(booking -> (int) bookingRepository
+                        .countByCustomerIdAndIdLessThanEqual(customerId, bookingId))
+                .orElse(null);
+    }
+
+    private String bookingReference(Long customerId, Long bookingId) {
+        Integer customerBookingNumber = resolveCustomerBookingNumber(customerId, bookingId);
+        return String.valueOf(customerBookingNumber != null ? customerBookingNumber : bookingId);
+    }
+
+    private String formatVnd(BigDecimal amount) {
+        NumberFormat formatter = NumberFormat.getIntegerInstance(Locale.forLanguageTag("vi-VN"));
+        formatter.setMaximumFractionDigits(0);
+        return formatter.format(amount == null ? BigDecimal.ZERO : amount) + " ₫";
     }
 }
