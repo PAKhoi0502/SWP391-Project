@@ -33,7 +33,8 @@ public interface BookingAssignedStaffRepository extends JpaRepository<BookingAss
             Pageable pageable);
 
     // Đếm số staff đang được assign trong khoảng thời gian
-    // Includes ASSIGNED (legacy), RESERVED, and ACTIVE statuses to prevent double-booking
+    // Includes ASSIGNED (legacy), HELD_PENDING_DEPOSIT, RESERVED, and ACTIVE to prevent double-booking.
+    // HELD_PENDING_DEPOSIT = care staff held for a PENDING_DEPOSIT booking not yet confirmed by payment.
     @Query("""
             SELECT COUNT(DISTINCT bas.staffProfileId)
             FROM BookingAssignedStaff bas
@@ -41,7 +42,7 @@ public interface BookingAssignedStaffRepository extends JpaRepository<BookingAss
             WHERE sp.garageId = :garageId
               AND sp.staffType = :staffType
               AND sp.isActive = true
-              AND bas.status IN ('ASSIGNED', 'RESERVED', 'ACTIVE')
+              AND bas.status IN ('ASSIGNED', 'HELD_PENDING_DEPOSIT', 'RESERVED', 'ACTIVE')
               AND bas.assignedFrom < :endTime
               AND bas.assignedTo > :startTime
             """)
@@ -61,7 +62,7 @@ public interface BookingAssignedStaffRepository extends JpaRepository<BookingAss
               AND sp.id NOT IN (
                     SELECT bas.staffProfileId
                     FROM BookingAssignedStaff bas
-                    WHERE bas.status IN ('ASSIGNED', 'RESERVED', 'ACTIVE')
+                    WHERE bas.status IN ('ASSIGNED', 'HELD_PENDING_DEPOSIT', 'RESERVED', 'ACTIVE')
                       AND bas.assignedFrom < :endTime
                       AND bas.assignedTo > :startTime
               )
@@ -77,7 +78,7 @@ public interface BookingAssignedStaffRepository extends JpaRepository<BookingAss
             SELECT COUNT(b)
             FROM BookingAssignedStaff b
             WHERE b.staffProfileId = :staffProfileId
-              AND b.status IN ('ASSIGNED', 'RESERVED', 'ACTIVE')
+              AND b.status IN ('ASSIGNED', 'HELD_PENDING_DEPOSIT', 'RESERVED', 'ACTIVE')
               AND b.assignedFrom < :endTime
               AND b.assignedTo > :startTime
             """)

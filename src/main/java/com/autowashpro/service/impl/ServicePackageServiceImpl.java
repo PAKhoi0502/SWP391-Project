@@ -60,8 +60,9 @@ public class ServicePackageServiceImpl
             }
         }
 
-        // 3. Derive washBayDurationMinutes from AUTOMATED_WASH steps (override client value)
+        // 3. Derive resource durations from steps (override client values)
         int derivedWashBayDuration = deriveWashBayDurationFromSteps(request.getSteps(), isCombo);
+        int derivedCareStaffDuration = deriveCareStaffDurationFromSteps(request.getSteps(), isCombo);
 
         // 4. Save package
         ServicePackage servicePackage = ServicePackage.builder()
@@ -77,7 +78,7 @@ public class ServicePackageServiceImpl
                 .requiresCareStaff(request.getRequiresCareStaff())
                 .careStaffType(request.getCareStaffType())
                 .careStaffRequiredCount(request.getCareStaffRequiredCount())
-                .careStaffDurationMinutes(request.getCareStaffDurationMinutes())
+                .careStaffDurationMinutes(derivedCareStaffDuration)
                 .isActive(true)
                 .seatCountAndAbove(false)
                 .createdAt(LocalDateTime.now())
@@ -173,14 +174,18 @@ public class ServicePackageServiceImpl
             }
         }
 
-        // 2. Derive washBayDurationMinutes from steps (if steps are being updated)
+        // 2. Derive resource durations from steps (if steps are being updated)
         int derivedWashBayDuration;
+        int derivedCareStaffDuration;
         if (request.getSteps() != null) {
             derivedWashBayDuration = deriveWashBayDurationFromSteps(request.getSteps(), isCombo);
+            derivedCareStaffDuration = deriveCareStaffDurationFromSteps(request.getSteps(), isCombo);
         } else {
-            // Keep existing value if steps not updated
+            // Keep existing derived values if steps not updated
             derivedWashBayDuration = servicePackage.getWashBayDurationMinutes() != null
                     ? servicePackage.getWashBayDurationMinutes() : 0;
+            derivedCareStaffDuration = servicePackage.getCareStaffDurationMinutes() != null
+                    ? servicePackage.getCareStaffDurationMinutes() : 0;
         }
 
         // 3. Update package fields
@@ -195,7 +200,7 @@ public class ServicePackageServiceImpl
         servicePackage.setRequiresCareStaff(request.getRequiresCareStaff());
         servicePackage.setCareStaffType(request.getCareStaffType());
         servicePackage.setCareStaffRequiredCount(request.getCareStaffRequiredCount());
-        servicePackage.setCareStaffDurationMinutes(request.getCareStaffDurationMinutes());
+        servicePackage.setCareStaffDurationMinutes(derivedCareStaffDuration);
         servicePackage.setUpdatedAt(LocalDateTime.now());
         servicePackageRepository.save(servicePackage);
 
@@ -455,6 +460,14 @@ public class ServicePackageServiceImpl
         if (isCombo || steps == null) return 0;
         return steps.stream()
                 .filter(s -> "AUTOMATED_WASH".equalsIgnoreCase(s.getExecutionPhase()))
+                .mapToInt(s -> s.getDurationMinutes() != null ? s.getDurationMinutes() : 0)
+                .sum();
+    }
+
+    private int deriveCareStaffDurationFromSteps(List<CreateServicePackageStepRequest> steps, boolean isCombo) {
+        if (isCombo || steps == null) return 0;
+        return steps.stream()
+                .filter(s -> "VEHICLE_CARE".equalsIgnoreCase(s.getExecutionPhase()))
                 .mapToInt(s -> s.getDurationMinutes() != null ? s.getDurationMinutes() : 0)
                 .sum();
     }

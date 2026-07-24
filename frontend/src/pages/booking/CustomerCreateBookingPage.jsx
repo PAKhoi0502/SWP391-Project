@@ -357,6 +357,13 @@ export default function CustomerCreateBookingPage() {
     [visibleSlots, selectedSlotId],
   )
 
+  const durationSummary = useMemo(() => {
+    const allPkgs = selectedPackage ? [selectedPackage, ...selectedAddOns] : []
+    const washMinutes = allPkgs.reduce((sum, p) => sum + (Number(p?.washBayDurationMinutes) || 0), 0)
+    const careMinutes = allPkgs.reduce((sum, p) => sum + (Number(p?.careStaffDurationMinutes) || 0), 0)
+    return { washMinutes, careMinutes }
+  }, [selectedPackage, selectedAddOns])
+
   const priceSummary = useMemo(() => {
     const mainPrice = bookingFlowUtils.getPackagePrice(selectedPackage)
     const addOnsPrice = selectedAddOns.reduce(
@@ -494,6 +501,7 @@ export default function CustomerCreateBookingPage() {
           servicePackageId: selectedPackageId,
           vehicle: selectedVehicle,
           date: selectedDate,
+          addOnServicePackageIds: selectedAddOnIds.map(Number),
         })
 
         if (mounted) setSlots(data)
@@ -515,7 +523,7 @@ export default function CustomerCreateBookingPage() {
     return () => {
       mounted = false
     }
-  }, [selectedDate, selectedGarageId, selectedPackageId, selectedVehicle])
+  }, [selectedDate, selectedGarageId, selectedPackageId, selectedVehicle, selectedAddOnIds])
 
   useEffect(() => {
     if (
@@ -1609,6 +1617,24 @@ export default function CustomerCreateBookingPage() {
                     <span>Time</span>
                     <strong>{selectedSlot ? `${selectedDate} · ${getSlotLabel(selectedSlot)}` : '—'}</strong>
                   </div>
+                  {durationSummary.washMinutes > 0 && (
+                    <div className="bk-summary-row bk-summary-row--sub">
+                      <span>Wash bay</span>
+                      <strong>{durationSummary.washMinutes} min</strong>
+                    </div>
+                  )}
+                  {durationSummary.careMinutes > 0 && (
+                    <div className="bk-summary-row bk-summary-row--sub">
+                      <span>Care staff</span>
+                      <strong>{durationSummary.careMinutes} min</strong>
+                    </div>
+                  )}
+                  {durationSummary.washMinutes > 0 && (
+                    <div className="bk-summary-row bk-summary-row--sub">
+                      <span>Est. total</span>
+                      <strong>{durationSummary.washMinutes + durationSummary.careMinutes} min</strong>
+                    </div>
+                  )}
                 </div>
 
                 <div className="bk-summary-divider" />
