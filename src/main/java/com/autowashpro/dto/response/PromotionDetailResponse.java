@@ -45,4 +45,6 @@ public class PromotionDetailResponse {
 
     private List<String> applicableTiers;
 
+    private Long targetCustomerId;
+
 }

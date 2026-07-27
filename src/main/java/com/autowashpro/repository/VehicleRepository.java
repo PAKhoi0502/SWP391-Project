@@ -15,6 +15,8 @@ public interface VehicleRepository
 
     List<Vehicle> findByCustomer_IdAndIsActiveTrue(Long customerId);
 
+    List<Vehicle> findByCustomer_IdInAndIsActiveTrue(List<Long> customerIds);
+
     boolean existsByNormalizedLicensePlateAndVehicleType(String normalizedLicensePlate, String vehicleType);
 
     Optional<Vehicle> findByIdAndCustomer_Id(Long id, Long customerId);

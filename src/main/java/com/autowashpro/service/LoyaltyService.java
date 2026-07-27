@@ -4,6 +4,7 @@ import com.autowashpro.dto.request.UpdateLoyaltyTierRuleRequest;
 import com.autowashpro.dto.response.LeaderboardResponse;
 import com.autowashpro.dto.response.LoyaltyOverviewResponse;
 import com.autowashpro.dto.response.LoyaltyTierRuleResponse;
+import com.autowashpro.dto.response.TopCustomerResponse;
 import com.autowashpro.entity.CustomerLoyalty;
 import com.autowashpro.dto.request.CreateLoyaltyTierRuleRequest;
 import com.autowashpro.dto.request.RedeemPreviewRequest;
@@ -45,4 +46,6 @@ Page<PointTransactionResponse> getMyTransactions(Long customerId, int page, int 
 RedeemPreviewResponse redeemPreview(Long customerId, RedeemPreviewRequest request);
 
 LeaderboardResponse getLeaderboard(String period, int page, int limit, Long currentCustomerId);
+
+Page<TopCustomerResponse> getTopCustomers(String tier, String licensePlate, int page, int limit);
 }

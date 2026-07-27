@@ -222,6 +222,7 @@ export default function GuestBookingModal({
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [confirmedBooking, setConfirmedBooking] = useState(null)
+  const [depositPaid, setDepositPaid] = useState(false)
   const [signInRequired, setSignInRequired] = useState(false)
   // Phone eligibility: idle | checking | eligible | accountExists | networkError
   const [phoneCheckState, setPhoneCheckState] = useState('idle')
@@ -247,6 +248,7 @@ export default function GuestBookingModal({
     let active = true
     setStepIndex(0)
     setConfirmedBooking(null)
+    setDepositPaid(false)
     setSignInRequired(false)
     setError('')
     setFieldErrors({})
@@ -521,6 +523,7 @@ export default function GuestBookingModal({
     setError('')
     setFieldErrors({})
     setConfirmedBooking(null)
+    setDepositPaid(false)
     setSignInRequired(false)
     setPhoneCheckState('idle')
   }
@@ -570,7 +573,53 @@ export default function GuestBookingModal({
     }
   }
 
+  // ── Poll for deposit payment while the QR screen is showing ─────────────────
+  useEffect(() => {
+    if (!confirmedBooking || depositPaid || !confirmedBooking.trackingToken) return undefined
+
+    const token = confirmedBooking.trackingToken
+    const poll = async () => {
+      try {
+        const status = await bookingApi.getGuestBookingByTrackingToken(token)
+        if (String(status?.depositStatus || '').toUpperCase() === 'PAID') {
+          setDepositPaid(true)
+        }
+      } catch {
+        // silently ignore — keep polling until the QR expires or the user closes the modal
+      }
+    }
+
+    const timer = setInterval(poll, 4000)
+    return () => clearInterval(timer)
+  }, [confirmedBooking, depositPaid])
+
   if (!open) return null
+
+  // ── Deposit paid success screen ──────────────────────────────────────────────
+  const successScreen = confirmedBooking && depositPaid && (
+    <div className="gbm-overlay" onClick={onClose}>
+      <div
+        className="gbm-dialog gbm-dialog--qr gbm-dialog--success"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="gbm-success-screen">
+          <svg className="gbm-checkmark" viewBox="0 0 52 52" aria-hidden="true">
+            <circle className="gbm-checkmark-circle" cx="26" cy="26" r="25" fill="none" />
+            <path className="gbm-checkmark-check" fill="none" d="M14 27l8 8 16-16" />
+          </svg>
+          <h2 className="gbm-success-title">Deposit paid!</h2>
+          <p className="gbm-success-sub">Your booking is confirmed. See you soon!</p>
+          <button type="button" className="gbm-btn gbm-btn--primary" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
+  if (confirmedBooking && depositPaid) return createPortal(successScreen, document.body)
 
   // ── QR confirmation screen ───────────────────────────────────────────────────
   const qrScreen = confirmedBooking && (

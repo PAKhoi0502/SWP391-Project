@@ -56,6 +56,7 @@ export default function AdminPromotionManagementPage() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [modalPresetTarget, setModalPresetTarget] = useState(null)
 
   // ── Sort / Filter state ────────────────────────────────────
   const [sortField, setSortField] = useState('')       // '' | 'code' | 'startAt' | 'endAt'
@@ -151,8 +152,36 @@ export default function AdminPromotionManagementPage() {
     try {
       setLoading(true)
       setError(null)
-      const data = await promotionApi.getActivePromotions()
-      setPromotions(data)
+      const data = await promotionApi.getAllPromotionsAdmin()
+
+      // Enrich customer-targeted promotions with the target's display name
+      const missingIds = [
+        ...new Set(
+          data
+            .map((p) => p.targetCustomerId)
+            .filter((id) => id != null && !customerInfoCache.has(Number(id)))
+        ),
+      ]
+      await Promise.allSettled(
+        missingIds.map(async (id) => {
+          try {
+            const user = await promotionApi.getUserById(id)
+            customerInfoCache.set(Number(id), {
+              fullName: user?.fullName ?? null,
+              phone: user?.phone ?? null,
+            })
+          } catch {}
+        })
+      )
+
+      setPromotions(
+        data.map((p) => ({
+          ...p,
+          targetCustomerName: p.targetCustomerId != null
+            ? customerInfoCache.get(Number(p.targetCustomerId))?.fullName ?? `#${p.targetCustomerId}`
+            : null,
+        }))
+      )
     } catch {
       setError('Failed to load promotions.')
     } finally {
@@ -162,8 +191,16 @@ export default function AdminPromotionManagementPage() {
 
   useEffect(() => { loadPromotions() }, [])
 
-  const openCreate = () => { setEditingId(null); setModalOpen(true) }
-  const openEdit = (id) => { setEditingId(id); setModalOpen(true) }
+  const openCreate = () => { setEditingId(null); setModalPresetTarget(null); setModalOpen(true) }
+  const openEdit = (promo) => {
+    setEditingId(promo.id)
+    setModalPresetTarget(
+      promo.targetCustomerId != null
+        ? { customerId: promo.targetCustomerId, label: promo.targetCustomerName }
+        : null
+    )
+    setModalOpen(true)
+  }
 
   const askDelete = (promo) => { setDeleteTarget(promo) }
   const cancelDelete = () => { setDeleteTarget(null) }
@@ -270,7 +307,7 @@ export default function AdminPromotionManagementPage() {
   const openSendVoucher = (promo) => {
     const hasTiers = Array.isArray(promo.applicableTiers) && promo.applicableTiers.length > 0
     setSvTarget(promo)
-    setSvFilterType(hasTiers ? 'TIER' : 'ALL')
+    setSvFilterType(promo.targetCustomerId != null ? 'TARGET' : hasTiers ? 'TIER' : 'ALL')
     setSvTier(hasTiers ? promo.applicableTiers[0] : '')
     setSvMinVisits('')
     setSvMinSpent('')
@@ -317,12 +354,7 @@ export default function AdminPromotionManagementPage() {
         <div className="adm-promo-hero-text">
           <p className="adm-promo-kicker">Admin</p>
           <h1>Promotions</h1>
-          <span>
-            Create, edit and toggle promotions.{' '}
-            <em className="adm-promo-note">
-              List shows active promotions only — reload to update after deactivating.
-            </em>
-          </span>
+          <span>Create, edit and toggle promotions.</span>
         </div>
         <div className="adm-promo-hero-actions">
           <button
@@ -445,7 +477,7 @@ export default function AdminPromotionManagementPage() {
         <div className="adm-promo-loading">Loading promotions...</div>
       ) : promotions.length === 0 ? (
         <div className="adm-promo-empty">
-          <p>No active promotions.</p>
+          <p>No promotions yet.</p>
           <button className="adm-promo-create-btn" onClick={openCreate}>
             Create first promotion
           </button>
@@ -472,6 +504,11 @@ export default function AdminPromotionManagementPage() {
                 <tr key={promo.id} className={`${promo.isActive === false ? 'row-inactive' : ''}${isExpired(promo) ? ' row-expired' : ''}`}>
                   <td>
                     <span className="adm-promo-code">{promo.code}</span>
+                    {promo.targetCustomerId != null && (
+                      <div className="adm-promo-target-badge" title={`Only redeemable by ${promo.targetCustomerName}`}>
+                        🔒 Private · {promo.targetCustomerName}
+                      </div>
+                    )}
                   </td>
                   <td>
                     <div className="adm-promo-name">{promo.name}</div>
@@ -502,7 +539,7 @@ export default function AdminPromotionManagementPage() {
                     <div className="adm-promo-row-actions">
                       <button
                         className="adm-promo-btn-edit"
-                        onClick={() => openEdit(promo.id)}
+                        onClick={() => openEdit(promo)}
                       >
                         Edit
                       </button>
@@ -571,28 +608,38 @@ export default function AdminPromotionManagementPage() {
               Code: <strong>{svTarget.code}</strong> — {svTarget.name}
             </p>
 
-            <div className="adm-sv-group">
-              <span className="adm-sv-label">Send to:</span>
-              <div className="adm-sv-types">
-                {[
-                  { key: 'ALL', label: 'All customers' },
-                  { key: 'TIER', label: 'By loyalty tier' },
-                  { key: 'MIN_VISITS', label: 'By visit count' },
-                  { key: 'MIN_SPENT', label: 'By spend amount' },
-                ].map(({ key, label }) => (
-                  <label key={key} className="adm-sv-radio">
-                    <input
-                      type="radio"
-                      name="svFilterType"
-                      value={key}
-                      checked={svFilterType === key}
-                      onChange={() => setSvFilterType(key)}
-                    />
-                    {label}
-                  </label>
-                ))}
+            {svTarget.targetCustomerId != null ? (
+              <div className="adm-sv-group">
+                <span className="adm-sv-label">Send to:</span>
+                <p className="adm-sv-target-note">
+                  🔒 This is a private promotion — it will be sent only to{' '}
+                  <strong>{svTarget.targetCustomerName || `customer #${svTarget.targetCustomerId}`}</strong>.
+                </p>
               </div>
-            </div>
+            ) : (
+              <div className="adm-sv-group">
+                <span className="adm-sv-label">Send to:</span>
+                <div className="adm-sv-types">
+                  {[
+                    { key: 'ALL', label: 'All customers' },
+                    { key: 'TIER', label: 'By loyalty tier' },
+                    { key: 'MIN_VISITS', label: 'By visit count' },
+                    { key: 'MIN_SPENT', label: 'By spend amount' },
+                  ].map(({ key, label }) => (
+                    <label key={key} className="adm-sv-radio">
+                      <input
+                        type="radio"
+                        name="svFilterType"
+                        value={key}
+                        checked={svFilterType === key}
+                        onChange={() => setSvFilterType(key)}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {svFilterType === 'TIER' && (
               <div className="adm-sv-group">
@@ -671,6 +718,7 @@ export default function AdminPromotionManagementPage() {
         onClose={() => setModalOpen(false)}
         onSuccess={loadPromotions}
         promotionId={editingId}
+        presetTarget={modalPresetTarget}
       />
 
       <PromotionUsageHistoryModal

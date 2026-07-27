@@ -100,6 +100,9 @@ public class SecurityConfig {
 .requestMatchers(HttpMethod.POST, "/bookings/guest/phone-eligibility")
 .permitAll()
 
+.requestMatchers(HttpMethod.GET, "/bookings/guest/track/*")
+.permitAll()
+
 .requestMatchers(HttpMethod.GET, "/loyalty/tier-rules")
 .permitAll()
 

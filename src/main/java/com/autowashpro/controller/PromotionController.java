@@ -98,6 +98,17 @@ public class PromotionController {
                 .build();
     }
 
+    @GetMapping("/admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<PromotionResponse>> getAllPromotionsForAdmin() {
+
+        return ApiResponse.<List<PromotionResponse>>builder()
+                .success(true)
+                .message("Promotions retrieved successfully")
+                .data(promotionService.getAllPromotionsForAdmin())
+                .build();
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<PromotionDetailResponse> getPromotion(
             @PathVariable Long id) {

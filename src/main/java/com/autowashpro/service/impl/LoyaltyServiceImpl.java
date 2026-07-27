@@ -15,6 +15,11 @@ import com.autowashpro.repository.PointTransactionRepository;
 import com.autowashpro.repository.ServicePackageRepository;
 import com.autowashpro.repository.UploadRepository;
 import com.autowashpro.repository.UserRepository;
+import com.autowashpro.repository.VehicleRepository;
+import com.autowashpro.repository.projection.TopCustomerProjection;
+import com.autowashpro.dto.response.TopCustomerResponse;
+import com.autowashpro.entity.Vehicle;
+import java.util.Locale;
 import com.autowashpro.service.EmailService;
 import com.autowashpro.service.LoyaltyPointExpiryService;
 import com.autowashpro.service.LoyaltyService;
@@ -60,6 +65,7 @@ public class LoyaltyServiceImpl implements LoyaltyService {
     private final EmailService emailService;
     private final UploadRepository uploadRepository;
     private final LoyaltyPointExpiryService loyaltyPointExpiryService;
+    private final VehicleRepository vehicleRepository;
 
     @Value("${loyalty.points.expiry-months:6}")
     private int expiryMonths;
@@ -476,6 +482,50 @@ String newTier = newTierHolder[0];
                 .source(t.getSource())
                 .note(t.getNote())
                 .createdAt(t.getCreatedAt())
+                .build());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<TopCustomerResponse> getTopCustomers(String tier, String licensePlate, int page, int limit) {
+        String normalizedTier = (tier != null && !tier.isBlank())
+                ? tier.trim().toUpperCase(Locale.ROOT)
+                : null;
+        String normalizedPlate = (licensePlate != null && !licensePlate.isBlank())
+                ? licensePlate.trim().toUpperCase(Locale.ROOT).replaceAll("[\\s.\\-]", "")
+                : null;
+
+        PageRequest pageable = PageRequest.of(Math.max(page - 1, 0), limit);
+        Page<TopCustomerProjection> result = customerLoyaltyRepository
+                .findTopCustomers(normalizedTier, normalizedPlate, pageable);
+
+        List<Long> customerIds = result.getContent().stream()
+                .map(TopCustomerProjection::getCustomerId)
+                .toList();
+
+        Map<Long, List<String>> platesByCustomer = customerIds.isEmpty()
+                ? Map.of()
+                : vehicleRepository.findByCustomer_IdInAndIsActiveTrue(customerIds).stream()
+                        .collect(Collectors.groupingBy(
+                                v -> v.getCustomer().getId(),
+                                Collectors.mapping(Vehicle::getRawLicensePlate, Collectors.toList())));
+
+        Map<Long, String> avatarByCustomer = customerIds.isEmpty()
+                ? Map.of()
+                : uploadRepository.findAvatarsByOwnerIds(customerIds).stream()
+                        .collect(Collectors.toMap(Upload::getOwnerId, Upload::getFileUrl, (a, b) -> a));
+
+        return result.map(p -> TopCustomerResponse.builder()
+                .customerId(p.getCustomerId())
+                .fullName(p.getFullName())
+                .email(p.getEmail())
+                .phone(p.getPhone())
+                .avatarUrl(avatarByCustomer.get(p.getCustomerId()))
+                .currentTier(p.getCurrentTier())
+                .totalVisits(p.getTotalVisits())
+                .totalPoints(p.getTotalPoints())
+                .totalSpent(p.getTotalSpent())
+                .licensePlates(platesByCustomer.getOrDefault(p.getCustomerId(), List.of()))
                 .build());
     }
 

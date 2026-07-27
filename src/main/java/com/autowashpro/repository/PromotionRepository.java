@@ -14,6 +14,8 @@ public interface PromotionRepository
 
     List<Promotion> findByIsActiveTrue();
 
+    List<Promotion> findByIsActiveTrueAndTargetCustomerIdIsNull();
+
     boolean existsByCode(String code);
 
 }

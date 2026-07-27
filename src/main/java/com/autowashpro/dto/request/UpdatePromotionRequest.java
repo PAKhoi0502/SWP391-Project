@@ -38,4 +38,6 @@ public class UpdatePromotionRequest {
     private Integer maxLoyaltyPoints;
 
     private List<String> applicableTiers;
+
+    private Long targetCustomerId;
 }
