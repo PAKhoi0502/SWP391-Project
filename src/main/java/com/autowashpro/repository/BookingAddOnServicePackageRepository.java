@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface BookingAddOnServicePackageRepository extends JpaRepository<BookingAddOnServicePackage, Long> {
     List<BookingAddOnServicePackage> findByBookingIdOrderBySortOrderAsc(Long bookingId);
+
+    boolean existsByBookingIdAndServicePackageId(Long bookingId, Long servicePackageId);
 }

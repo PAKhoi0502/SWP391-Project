@@ -9,6 +9,7 @@ public final class AuditAction {
     public static final String BOOKING_SERVICE_STARTED = "BOOKING_SERVICE_STARTED";
     public static final String BOOKING_CANCELLED = "BOOKING_CANCELLED";
     public static final String BOOKING_MARKED_NO_SHOW = "BOOKING_MARKED_NO_SHOW";
+    public static final String BOOKING_ADD_ONS_ADDED = "BOOKING_ADD_ONS_ADDED";
     public static final String BOOKING_SERVICE_STEP_COMPLETED = "BOOKING_SERVICE_STEP_COMPLETED";
     public static final String BOOKING_SERVICE_STEP_REOPENED = "BOOKING_SERVICE_STEP_REOPENED";
     public static final String BOOKING_SERVICE_COMPLETED = "BOOKING_SERVICE_COMPLETED";

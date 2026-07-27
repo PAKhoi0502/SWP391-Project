@@ -4,6 +4,7 @@ import com.autowashpro.common.ApiResponse;
 import com.autowashpro.common.AuditAction;
 import com.autowashpro.common.AuditTargetType;
 import com.autowashpro.dto.request.BookingCreateRequest;
+import com.autowashpro.dto.request.AddBookingAddOnsRequest;
 import com.autowashpro.dto.request.MarkBookingPaidRequest;
 import com.autowashpro.dto.response.BookingResponse;
 import com.autowashpro.service.AuditLogService;
@@ -15,6 +16,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+
+import java.math.BigDecimal;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -69,6 +75,33 @@ class BookingControllerAuditTest {
         verify(auditLogService).createAuditLog(
                 eq(5L),
                 eq(AuditAction.BOOKING_MARK_PAID),
+                eq(AuditTargetType.BOOKING),
+                eq(20L),
+                any());
+    }
+
+    @Test
+    void addBookingAddOnsWritesExpectedAuditAction() {
+        AddBookingAddOnsRequest request = new AddBookingAddOnsRequest();
+        request.setServicePackageIds(List.of(2L));
+        UserDetails staff = user("5", "STAFF");
+        Authentication authentication = org.mockito.Mockito.mock(Authentication.class);
+        when(authentication.getAuthorities()).thenAnswer(invocation -> List.of(
+                new SimpleGrantedAuthority("ROLE_STAFF")));
+        when(bookingService.addBookingAddOns(20L, 5L, "ROLE_STAFF", request))
+                .thenReturn(BookingResponse.builder()
+                        .id(20L)
+                        .originalPrice(new BigDecimal("150000.00"))
+                        .finalPrice(new BigDecimal("150000.00"))
+                        .build());
+
+        ApiResponse<BookingResponse> response =
+                bookingController.addBookingAddOns(20L, request, staff, authentication);
+
+        assertEquals(20L, response.getData().getId());
+        verify(auditLogService).createAuditLog(
+                eq(5L),
+                eq(AuditAction.BOOKING_ADD_ONS_ADDED),
                 eq(AuditTargetType.BOOKING),
                 eq(20L),
                 any());
