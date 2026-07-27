@@ -1,6 +1,7 @@
 package com.autowashpro.service.impl;
 
 import com.autowashpro.dto.request.BookingCreateRequest;
+import com.autowashpro.dto.request.AddBookingAddOnsRequest;
 import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
 import com.autowashpro.dto.request.MarkBookingPaidRequest;
 import com.autowashpro.dto.request.StartServiceRequest;
@@ -227,6 +228,141 @@ class BookingServiceImplTest {
         assertEquals("PAYOS", response.getPaymentMethod());
         assertFalse(response.getIsWalkIn());
         verify(paymentTransactionRepository).save(any());
+    }
+
+    @Test
+    void addBookingAddOnsWhileCheckedInUpdatesSameBookingTotalAndSchedule() {
+        Garage garage = TestFixtures.garage();
+        User customer = TestFixtures.customer();
+        Vehicle vehicle = TestFixtures.car(customer);
+        ServicePackage mainPackage = mainPackage();
+        ServicePackage addOn = addOnPackage();
+        Booking booking = confirmedBooking(vehicle, garage, mainPackage);
+        booking.setStatus("CHECKED_IN");
+        booking.setOperationPhase("WAITING_FOR_INTAKE");
+        booking.setPaymentStatus("UNPAID");
+
+        when(bookingRepository.findByIdWithLock(booking.getId())).thenReturn(Optional.of(booking));
+        when(servicePackageRepository.findById(mainPackage.getId())).thenReturn(Optional.of(mainPackage));
+        when(servicePackageRepository.findById(addOn.getId())).thenReturn(Optional.of(addOn));
+        when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
+        when(garageRepository.findById(garage.getId())).thenReturn(Optional.of(garage));
+        when(garageServicePackageRepository.existsByGarageIdAndServicePackageIdAndIsActiveTrue(
+                garage.getId(), addOn.getId())).thenReturn(true);
+        when(servicePackageStepRepository.findByServicePackage_IdOrderByStepOrder(addOn.getId()))
+                .thenReturn(List.of());
+        when(washBayRepository.countActiveByGarageAndVehicleType(garage.getId(), "CAR")).thenReturn(2L);
+        when(bookingRepository.countOtherOverlappingBookingsByGarageAndVehicleType(
+                eq(booking.getId()), eq(garage.getId()), eq("CAR"), any(), any(), any())).thenReturn(0L);
+
+        BookingResponse response = bookingService.addBookingAddOns(
+                booking.getId(), 99L, "ROLE_STAFF", addOnRequest(addOn.getId()));
+
+        assertEquals(List.of(addOn.getId()), response.getAddOnServicePackageIds());
+        assertMoney("150000.00", response.getOriginalPrice());
+        assertMoney("150000.00", response.getFinalPrice());
+        assertEquals(booking.getStartTime()
+                .plusMinutes(mainPackage.getDurationMinutes() + addOn.getDurationMinutes()), response.getEndTime());
+
+        ArgumentCaptor<BookingAddOnServicePackage> linkCaptor =
+                ArgumentCaptor.forClass(BookingAddOnServicePackage.class);
+        verify(bookingAddOnServicePackageRepository).save(linkCaptor.capture());
+        assertMoney("30000.00", linkCaptor.getValue().getUnitPrice());
+        assertEquals(99L, linkCaptor.getValue().getAddedByUserId());
+        verify(bookingServiceStepRepository, never()).save(any());
+    }
+
+    @Test
+    void addBookingAddOnsDuringWashCreatesPendingStepsAndKeepsExistingDiscountFixed() {
+        Garage garage = TestFixtures.garage();
+        User customer = TestFixtures.customer();
+        Vehicle vehicle = TestFixtures.car(customer);
+        ServicePackage mainPackage = mainPackage();
+        ServicePackage addOn = addOnPackage();
+        ServicePackageStep template = serviceStep(addOn);
+        template.setExecutionPhase("AUTOMATED_WASH");
+        template.setDurationMinutes(20);
+        Booking booking = confirmedBooking(vehicle, garage, mainPackage);
+        booking.setStatus("IN_PROGRESS");
+        booking.setOperationPhase("AUTOMATED_WASH");
+        booking.setPaymentStatus("UNPAID");
+        booking.setDiscountAmount(new BigDecimal("15000.00"));
+        booking.setFinalPrice(new BigDecimal("105000.00"));
+        booking.setStartedAt(LocalDateTime.now().minusMinutes(10));
+        booking.setWashBayStartTime(booking.getStartedAt());
+        booking.setWashBayId(7L);
+
+        when(bookingRepository.findByIdWithLock(booking.getId())).thenReturn(Optional.of(booking));
+        when(servicePackageRepository.findById(mainPackage.getId())).thenReturn(Optional.of(mainPackage));
+        when(servicePackageRepository.findById(addOn.getId())).thenReturn(Optional.of(addOn));
+        when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
+        when(garageRepository.findById(garage.getId())).thenReturn(Optional.of(garage));
+        when(garageServicePackageRepository.existsByGarageIdAndServicePackageIdAndIsActiveTrue(
+                garage.getId(), addOn.getId())).thenReturn(true);
+        when(servicePackageStepRepository.findByServicePackage_IdOrderByStepOrder(addOn.getId()))
+                .thenReturn(List.of(template));
+        when(bookingServiceStepRepository.findByBookingIdOrderByStepOrder(booking.getId()))
+                .thenReturn(List.of());
+        when(washBayRepository.countActiveByGarageAndVehicleType(garage.getId(), "CAR")).thenReturn(2L);
+        when(bookingRepository.countOtherOverlappingBookingsByGarageAndVehicleType(
+                eq(booking.getId()), eq(garage.getId()), eq("CAR"), any(), any(), any())).thenReturn(0L);
+
+        BookingResponse response = bookingService.addBookingAddOns(
+                booking.getId(), 99L, "ROLE_STAFF", addOnRequest(addOn.getId()));
+
+        assertMoney("150000.00", response.getOriginalPrice());
+        assertMoney("135000.00", response.getFinalPrice());
+        assertMoney("15000.00", response.getDiscountAmount());
+
+        ArgumentCaptor<BookingServiceStep> stepCaptor = ArgumentCaptor.forClass(BookingServiceStep.class);
+        verify(bookingServiceStepRepository).save(stepCaptor.capture());
+        assertEquals(addOn.getId(), stepCaptor.getValue().getServicePackageId());
+        assertEquals("PENDING", stepCaptor.getValue().getStatus());
+        assertEquals("AUTOMATED_WASH", stepCaptor.getValue().getExecutionPhase());
+    }
+
+    @Test
+    void addBookingAddOnsRejectsOperationAfterWash() {
+        Garage garage = TestFixtures.garage();
+        Vehicle vehicle = TestFixtures.car(TestFixtures.customer());
+        ServicePackage mainPackage = mainPackage();
+        Booking booking = confirmedBooking(vehicle, garage, mainPackage);
+        booking.setStatus("IN_PROGRESS");
+        booking.setOperationPhase("WAITING_FOR_CARE");
+        booking.setPaymentStatus("UNPAID");
+
+        when(bookingRepository.findByIdWithLock(booking.getId())).thenReturn(Optional.of(booking));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> bookingService.addBookingAddOns(
+                        booking.getId(), 99L, "ROLE_STAFF", addOnRequest(2L)));
+
+        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+        verify(bookingAddOnServicePackageRepository, never()).save(any());
+    }
+
+    @Test
+    void addBookingAddOnsRejectsPackageAlreadyIncludedInComboOrBooking() {
+        Garage garage = TestFixtures.garage();
+        Vehicle vehicle = TestFixtures.car(TestFixtures.customer());
+        ServicePackage mainPackage = mainPackage();
+        ServicePackage addOn = addOnPackage();
+        Booking booking = confirmedBooking(vehicle, garage, mainPackage);
+        booking.setStatus("CHECKED_IN");
+        booking.setOperationPhase("WAITING_FOR_INTAKE");
+        booking.setPaymentStatus("UNPAID");
+
+        when(bookingRepository.findByIdWithLock(booking.getId())).thenReturn(Optional.of(booking));
+        when(servicePackageRepository.findById(mainPackage.getId())).thenReturn(Optional.of(mainPackage));
+        when(packageResourceResolver.resolveEffectivePackages(mainPackage))
+                .thenReturn(List.of(mainPackage, addOn));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> bookingService.addBookingAddOns(
+                        booking.getId(), 99L, "ROLE_STAFF", addOnRequest(addOn.getId())));
+
+        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+        verify(bookingAddOnServicePackageRepository, never()).save(any());
     }
 
     @Test
@@ -1258,6 +1394,12 @@ class BookingServiceImplTest {
         request.setServicePackageId(servicePackage.getId());
         request.setStartTime(slotStart());
         request.setPaymentMethod("ONLINE");
+        return request;
+    }
+
+    private AddBookingAddOnsRequest addOnRequest(Long... packageIds) {
+        AddBookingAddOnsRequest request = new AddBookingAddOnsRequest();
+        request.setServicePackageIds(List.of(packageIds));
         return request;
     }
 

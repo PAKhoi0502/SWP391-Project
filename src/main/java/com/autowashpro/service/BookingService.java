@@ -21,6 +21,7 @@ import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
 import com.autowashpro.dto.response.BookingServiceStepResponse;
 import com.autowashpro.dto.request.MarkBookingPaidRequest;
 import com.autowashpro.dto.request.UpdatePaymentMethodRequest;
+import com.autowashpro.dto.request.AddBookingAddOnsRequest;
 import com.autowashpro.dto.response.CancellationPreviewResponse;
 
 import java.time.LocalDate;
@@ -98,6 +99,13 @@ public interface BookingService {
         CancellationPreviewResponse getCancellationPreview(Long bookingId, Long customerId);
 
         BookingResponse markNoShow(Long bookingId, Long staffUserId, String role, String reason);
+
+        BookingResponse addBookingAddOns(
+                        Long bookingId,
+                        Long staffUserId,
+                        String role,
+                        AddBookingAddOnsRequest request);
+
         // ===================== ISSUE #54 =====================
 
         BookingResponse completeManualRefund(

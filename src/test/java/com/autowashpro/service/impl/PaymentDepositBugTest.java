@@ -37,6 +37,7 @@ import com.autowashpro.service.NotificationService;
 import com.autowashpro.service.PromotionService;
 import com.autowashpro.service.WashHistoryService;
 import com.autowashpro.service.support.InspectionAccessPolicy;
+import com.autowashpro.service.support.PackageResourceResolver;
 import com.autowashpro.service.support.StaffOperationAccessPolicy;
 import com.autowashpro.support.TestFixtures;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -350,6 +351,7 @@ class PaymentDepositBugTest {
         @Mock private PromotionService promotionService;
         @Mock private NotificationService notificationService;
         @Mock private EmailService emailService;
+        @Mock private PackageResourceResolver packageResourceResolver;
 
         @InjectMocks private BookingServiceImpl bookingService;
 
@@ -359,6 +361,8 @@ class PaymentDepositBugTest {
                     .thenReturn(List.of());
             lenient().when(bookingAssignedStaffRepository.findByBookingId(anyLong()))
                     .thenReturn(List.of());
+            lenient().when(packageResourceResolver.resolveEffectivePackages(any()))
+                    .thenAnswer(inv -> List.of(inv.<ServicePackage>getArgument(0)));
             lenient().when(pointTransactionRepository.findByBookingIdAndType(anyLong(), eq("EARN")))
                     .thenReturn(Optional.empty());
             lenient().when(bookingRepository.save(any(Booking.class)))

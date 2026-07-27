@@ -41,6 +41,7 @@ import com.autowashpro.dto.request.CompleteServiceRequest;
 import com.autowashpro.dto.request.MarkBookingPaidRequest;
 import com.autowashpro.dto.request.UpdatePaymentMethodRequest;
 import com.autowashpro.dto.request.NoShowBookingRequest;
+import com.autowashpro.dto.request.AddBookingAddOnsRequest;
 import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
 import com.autowashpro.dto.response.BookingServiceStepResponse;
 import com.autowashpro.dto.response.CancellationPreviewResponse;
@@ -452,6 +453,34 @@ public class BookingController {
                 return ApiResponse.<BookingResponse>builder()
                                 .success(true)
                                 .message("Booking marked as no-show successfully")
+                                .data(response)
+                                .build();
+        }
+
+        @PostMapping("/{id}/add-ons")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> addBookingAddOns(
+                        @PathVariable Long id,
+                        @Valid @RequestBody AddBookingAddOnsRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails,
+                        Authentication authentication) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String role = authentication.getAuthorities().stream().findFirst().orElseThrow().getAuthority();
+                BookingResponse response = bookingService.addBookingAddOns(id, staffUserId, role, request);
+                auditLogService.createAuditLog(
+                                staffUserId,
+                                AuditAction.BOOKING_ADD_ONS_ADDED,
+                                AuditTargetType.BOOKING,
+                                id,
+                                AuditMetadata.of(
+                                                "servicePackageIds", request.getServicePackageIds(),
+                                                "originalPrice", response.getOriginalPrice(),
+                                                "finalPrice", response.getFinalPrice()));
+
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true)
+                                .message("Add-on service packages added successfully")
                                 .data(response)
                                 .build();
         }

@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -25,6 +26,12 @@ public class BookingAddOnServicePackage {
 
     @Column(name = "sort_order")
     private Integer sortOrder;
+
+    @Column(name = "unit_price", precision = 18, scale = 2)
+    private BigDecimal unitPrice;
+
+    @Column(name = "added_by_user_id")
+    private Long addedByUserId;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
