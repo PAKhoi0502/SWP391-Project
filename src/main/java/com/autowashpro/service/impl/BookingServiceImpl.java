@@ -63,6 +63,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -157,7 +158,8 @@ public class BookingServiceImpl implements BookingService {
                 List<ServicePackage> addOns = new ArrayList<>();
                 if (addOnServicePackageIds != null) {
                         for (Long addOnId : new java.util.LinkedHashSet<>(addOnServicePackageIds)) {
-                                if (addOnId == null || addOnId.equals(servicePackageId)) continue;
+                                if (addOnId == null || addOnId.equals(servicePackageId))
+                                        continue;
                                 servicePackageRepository.findById(addOnId).ifPresent(addOns::add);
                         }
                 }
@@ -199,7 +201,8 @@ public class BookingServiceImpl implements BookingService {
                                         : null;
 
                         boolean bayOk = !rw.requiresWashBay
-                                        || isWashBayAvailable(garageId, vehicleType, start, washEnd != null ? washEnd : end);
+                                        || isWashBayAvailable(garageId, vehicleType, start,
+                                                        washEnd != null ? washEnd : end);
                         boolean staffOk = !rw.requiresCareStaff
                                         || isCareStaffAvailableForPackages(garageId, allPackages,
                                                         careStart != null ? careStart : start,
@@ -244,22 +247,29 @@ public class BookingServiceImpl implements BookingService {
                 String careStaffType;
         }
 
-        /** Compute resource windows (wash duration, care duration, staffing requirements) for a set of packages. */
+        /**
+         * Compute resource windows (wash duration, care duration, staffing
+         * requirements) for a set of packages.
+         */
         private ResourceWindows computeResourceWindows(List<ServicePackage> packages) {
                 ResourceWindows rw = new ResourceWindows();
                 for (ServicePackage pkg : packages) {
                         if (Boolean.TRUE.equals(pkg.getRequiresWashBay())) {
                                 rw.requiresWashBay = true;
                                 rw.totalWashMinutes += pkg.getWashBayDurationMinutes() != null
-                                                ? pkg.getWashBayDurationMinutes() : 0;
+                                                ? pkg.getWashBayDurationMinutes()
+                                                : 0;
                         }
                         if (Boolean.TRUE.equals(pkg.getRequiresCareStaff())) {
                                 rw.requiresCareStaff = true;
                                 rw.totalCareMinutes += pkg.getCareStaffDurationMinutes() != null
-                                                ? pkg.getCareStaffDurationMinutes() : 0;
+                                                ? pkg.getCareStaffDurationMinutes()
+                                                : 0;
                                 // requiredCareStaffCount is max across packages, not sum
-                                int count = pkg.getCareStaffRequiredCount() != null ? pkg.getCareStaffRequiredCount() : 0;
-                                if (count > rw.requiredCareStaffCount) rw.requiredCareStaffCount = count;
+                                int count = pkg.getCareStaffRequiredCount() != null ? pkg.getCareStaffRequiredCount()
+                                                : 0;
+                                if (count > rw.requiredCareStaffCount)
+                                        rw.requiredCareStaffCount = count;
                                 if (pkg.getCareStaffType() != null && !pkg.getCareStaffType().isBlank()) {
                                         rw.careStaffType = pkg.getCareStaffType();
                                 }
@@ -268,7 +278,9 @@ public class BookingServiceImpl implements BookingService {
                 return rw;
         }
 
-        /** Check care staff availability for a list of packages over the given window. */
+        /**
+         * Check care staff availability for a list of packages over the given window.
+         */
         private boolean isCareStaffAvailableForPackages(
                         Long garageId,
                         List<ServicePackage> packages,
@@ -280,7 +292,8 @@ public class BookingServiceImpl implements BookingService {
                         return true;
                 }
                 StaffType staffType = StaffType.valueOf(rw.careStaffType);
-                long totalStaff = staffProfileRepository.countByGarageIdAndStaffTypeAndIsActiveTrue(garageId, staffType);
+                long totalStaff = staffProfileRepository.countByGarageIdAndStaffTypeAndIsActiveTrue(garageId,
+                                staffType);
                 long assigned = bookingAssignedStaffRepository.countAssignedStaffByGarageAndTypeAndTime(
                                 garageId, staffType, start, end);
                 return (totalStaff - assigned) >= rw.requiredCareStaffCount;
@@ -312,7 +325,8 @@ public class BookingServiceImpl implements BookingService {
 
         private List<ServicePackage> buildSelectedPackages(ServicePackage mainPackage, List<ServicePackage> addOns) {
                 // Expand COMBO packages into their constituent leaf packages so that resource
-                // requirements of included sub-packages are included in slot / window calculations.
+                // requirements of included sub-packages are included in slot / window
+                // calculations.
                 LinkedHashMap<Long, ServicePackage> dedupMap = new LinkedHashMap<>();
                 for (ServicePackage p : packageResourceResolver.resolveEffectivePackages(mainPackage)) {
                         dedupMap.put(p.getId(), p);
@@ -657,7 +671,8 @@ public class BookingServiceImpl implements BookingService {
                                                         + tierRule.getMaxUpcomingBookings() + " for tier " + tier);
                 }
 
-                // Section E: chặn cùng xe có nhiều active booking (không phụ thuộc time overlap)
+                // Section E: chặn cùng xe có nhiều active booking (không phụ thuộc time
+                // overlap)
                 long activeVehicleBookings = bookingRepository.countActiveBookingsByVehicleId(
                                 request.getVehicleId(), now);
                 if (activeVehicleBookings > 0) {
@@ -682,10 +697,12 @@ public class BookingServiceImpl implements BookingService {
                 // Issue #3/#4: compute per-phase windows so overlap checks use the right window
                 ResourceWindows rw = computeResourceWindows(selectedPackages);
                 LocalDateTime plannedWashEnd = rw.requiresWashBay
-                                ? startTime.plusMinutes(rw.totalWashMinutes) : endTime;
+                                ? startTime.plusMinutes(rw.totalWashMinutes)
+                                : endTime;
                 LocalDateTime plannedCareStart = rw.requiresCareStaff ? plannedWashEnd : null;
                 LocalDateTime plannedCareEnd = rw.requiresCareStaff
-                                ? plannedWashEnd.plusMinutes(rw.totalCareMinutes) : null;
+                                ? plannedWashEnd.plusMinutes(rw.totalCareMinutes)
+                                : null;
 
                 if (rw.requiresWashBay) {
                         long totalBays = washBayRepository
@@ -730,7 +747,7 @@ public class BookingServiceImpl implements BookingService {
                                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                                                 "Insufficient loyalty points");
                         }
-                        BigDecimal pointDiscount = BigDecimal.valueOf(usedPoints * 1000L);
+                        BigDecimal pointDiscount = BigDecimal.valueOf(usedPoints * 100L);
                         discountAmount = discountAmount.add(pointDiscount);
                 }
 
@@ -862,7 +879,8 @@ public class BookingServiceImpl implements BookingService {
         @Transactional
         public BookingResponse createWalkInBooking(WalkInBookingCreateRequest request, Long staffUserId, String role) {
 
-                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role, request.getGarageId());
+                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role,
+                                request.getGarageId());
 
                 Garage garage = garageRepository.findById(request.getGarageId())
                                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
@@ -921,10 +939,12 @@ public class BookingServiceImpl implements BookingService {
                 // Issue #3/#4: compute per-phase windows so overlap checks use the right window
                 ResourceWindows rw = computeResourceWindows(selectedPackages);
                 LocalDateTime plannedWashEnd = rw.requiresWashBay
-                                ? startTime.plusMinutes(rw.totalWashMinutes) : endTime;
+                                ? startTime.plusMinutes(rw.totalWashMinutes)
+                                : endTime;
                 LocalDateTime plannedCareStart = rw.requiresCareStaff ? plannedWashEnd : null;
                 LocalDateTime plannedCareEnd = rw.requiresCareStaff
-                                ? plannedWashEnd.plusMinutes(rw.totalCareMinutes) : null;
+                                ? plannedWashEnd.plusMinutes(rw.totalCareMinutes)
+                                : null;
 
                 if (rw.requiresWashBay) {
                         long totalBays = washBayRepository.countActiveByGarageAndVehicleType(
@@ -1154,7 +1174,8 @@ public class BookingServiceImpl implements BookingService {
                                         "Vehicle is not compatible with selected service package");
                 }
 
-                // Section C: guest booking không được tự liên kết với registered account chỉ bằng phone
+                // Section C: guest booking không được tự liên kết với registered account chỉ
+                // bằng phone
                 User registeredAccount = findActiveCustomerByPhone(request.getGuestPhone());
                 if (registeredAccount != null) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -1179,10 +1200,12 @@ public class BookingServiceImpl implements BookingService {
                 // Issue #3/#4: compute per-phase windows so overlap checks use the right window
                 ResourceWindows rw = computeResourceWindows(selectedPackages);
                 LocalDateTime plannedWashEnd = rw.requiresWashBay
-                                ? startTime.plusMinutes(rw.totalWashMinutes) : endTime;
+                                ? startTime.plusMinutes(rw.totalWashMinutes)
+                                : endTime;
                 LocalDateTime plannedCareStart = rw.requiresCareStaff ? plannedWashEnd : null;
                 LocalDateTime plannedCareEnd = rw.requiresCareStaff
-                                ? plannedWashEnd.plusMinutes(rw.totalCareMinutes) : null;
+                                ? plannedWashEnd.plusMinutes(rw.totalCareMinutes)
+                                : null;
 
                 if (rw.requiresWashBay) {
                         long totalBays = washBayRepository.countActiveByGarageAndVehicleType(
@@ -1239,6 +1262,8 @@ public class BookingServiceImpl implements BookingService {
                 booking.setPlannedWashEndAt(rw.requiresWashBay ? plannedWashEnd : null);
                 booking.setPlannedCareStartAt(plannedCareStart);
                 booking.setPlannedCareEndAt(plannedCareEnd);
+                booking.setTrackingToken(UUID.randomUUID().toString());
+                booking.setTrackingTokenExpiredAt(guestNow.plusHours(24));
 
                 Booking saved = bookingRepository.save(booking);
 
@@ -1251,12 +1276,27 @@ public class BookingServiceImpl implements BookingService {
                         bookingAddOnServicePackageRepository.save(bookingAddOn);
                 }
 
-                // Hold care staff so concurrent PENDING_DEPOSIT bookings cannot claim the same staff.
+                // Hold care staff so concurrent PENDING_DEPOSIT bookings cannot claim the same
+                // staff.
                 if (rw.requiresCareStaff && plannedCareStart != null && plannedCareEnd != null) {
                         reserveCareStaff(saved, rw, plannedCareStart, plannedCareEnd, "HELD_PENDING_DEPOSIT");
                 }
 
                 return toResponse(saved);
+        }
+
+        @Override
+        public BookingResponse getGuestBookingByTrackingToken(String trackingToken) {
+                Booking booking = bookingRepository.findByTrackingToken(trackingToken)
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Booking not found for this tracking link"));
+
+                if (booking.getTrackingTokenExpiredAt() != null
+                                && booking.getTrackingTokenExpiredAt().isBefore(LocalDateTime.now())) {
+                        throw new ResponseStatusException(HttpStatus.GONE, "This tracking link has expired");
+                }
+
+                return toResponse(booking);
         }
 
         @Override
@@ -1364,7 +1404,8 @@ public class BookingServiceImpl implements BookingService {
 
                 List<Booking> bookings;
 
-                StaffProfile pendingRefundProfile = staffOperationAccessPolicy.requireCustomerServiceOrAdmin(staffUserId, role);
+                StaffProfile pendingRefundProfile = staffOperationAccessPolicy
+                                .requireCustomerServiceOrAdmin(staffUserId, role);
 
                 if (pendingRefundProfile == null) {
 
@@ -1375,7 +1416,8 @@ public class BookingServiceImpl implements BookingService {
                         bookings = bookingRepository
                                         .findRefundPendingBookings()
                                         .stream()
-                                        .filter(b -> Objects.equals(pendingRefundProfile.getGarageId(), b.getGarageId()))
+                                        .filter(b -> Objects.equals(pendingRefundProfile.getGarageId(),
+                                                        b.getGarageId()))
                                         .toList();
 
                 }
@@ -1443,8 +1485,10 @@ public class BookingServiceImpl implements BookingService {
                         String status,
                         LocalDate date) {
 
-                // Explicit allow-list: only CUSTOMER_SERVICE_STAFF sees the garage booking list.
-                // VEHICLE_CARE_STAFF, SERVICE_ADVISOR, MANAGER, and any unknown type are denied.
+                // Explicit allow-list: only CUSTOMER_SERVICE_STAFF sees the garage booking
+                // list.
+                // VEHICLE_CARE_STAFF, SERVICE_ADVISOR, MANAGER, and any unknown type are
+                // denied.
                 requiresServiceOrAdmin(staffUserId, role);
 
                 StaffProfile staffProfile = staffProfileRepository
@@ -1801,7 +1845,8 @@ public class BookingServiceImpl implements BookingService {
 
                 } else {
 
-                        staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(currentUserId, role, booking.getGarageId());
+                        staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(currentUserId, role,
+                                        booking.getGarageId());
 
                         if (!"CONFIRMED".equals(status)
                                         && !"CHECKED_IN".equals(status)
@@ -1881,7 +1926,8 @@ public class BookingServiceImpl implements BookingService {
                                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                                                 "Booking not found: " + bookingId));
 
-                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role, booking.getGarageId());
+                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role,
+                                booking.getGarageId());
 
                 if (!"CONFIRMED".equals(booking.getStatus())) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -1936,7 +1982,8 @@ public class BookingServiceImpl implements BookingService {
                                                 HttpStatus.NOT_FOUND,
                                                 "Booking not found"));
 
-                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role, booking.getGarageId());
+                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role,
+                                booking.getGarageId());
 
                 if (booking.getCustomerId() != null) {
                         throw new ResponseStatusException(
@@ -1986,10 +2033,12 @@ public class BookingServiceImpl implements BookingService {
         private void expireOneDepositBooking(Booking booking) {
 
                 // Idempotency: skip if already processed (race with PayOS webhook)
-                if (!"PENDING_DEPOSIT".equals(booking.getStatus())) return;
+                if (!"PENDING_DEPOSIT".equals(booking.getStatus()))
+                        return;
                 if ("PAID".equals(booking.getDepositStatus())
                                 || "REFUND_PENDING".equals(booking.getDepositStatus())
-                                || "REFUNDED".equals(booking.getDepositStatus())) return;
+                                || "REFUNDED".equals(booking.getDepositStatus()))
+                        return;
 
                 releaseBookingResources(booking);
 
@@ -2037,7 +2086,8 @@ public class BookingServiceImpl implements BookingService {
                         }
                 }
 
-                // STAFF — explicit allow-list: only CUSTOMER_SERVICE_STAFF may read booking service steps.
+                // STAFF — explicit allow-list: only CUSTOMER_SERVICE_STAFF may read booking
+                // service steps.
                 // VEHICLE_CARE_STAFF and other staff types use their own care-task endpoints.
                 if ("STAFF".equalsIgnoreCase(role)) {
 
@@ -2086,7 +2136,8 @@ public class BookingServiceImpl implements BookingService {
                                                 "Booking not found: " + bookingId));
 
                 // 2. Validate garage permission — ADMIN bypass + CSS type check
-                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role, booking.getGarageId());
+                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role,
+                                booking.getGarageId());
 
                 // 3. Validate status
                 if (!"IN_PROGRESS".equals(booking.getStatus())) {
@@ -2109,7 +2160,8 @@ public class BookingServiceImpl implements BookingService {
 
                 LocalDateTime completedAt = LocalDateTime.now();
 
-                // 4. Release wash bay only when this booking still owns it (safety check prevents
+                // 4. Release wash bay only when this booking still owns it (safety check
+                // prevents
                 // corrupting another booking's resource in the rare event of an ID mismatch)
                 if (booking.getWashBayId() != null) {
                         washBayRepository.findById(booking.getWashBayId()).ifPresent(washBay -> {
@@ -2151,7 +2203,8 @@ public class BookingServiceImpl implements BookingService {
                 try {
                         bookingReviewService.maybeCreateReviewRequestNotification(saved.getId());
                 } catch (Exception e) {
-                        log.warn("Failed to send review request notification for booking {}: {}", saved.getId(), e.getMessage());
+                        log.warn("Failed to send review request notification for booking {}: {}", saved.getId(),
+                                        e.getMessage());
                 }
 
                 return toResponse(saved);
@@ -2198,7 +2251,8 @@ public class BookingServiceImpl implements BookingService {
         private void validateAllStepsCompleted(Long bookingId) {
                 List<BookingServiceStep> steps = bookingServiceStepRepository
                                 .findByBookingIdOrderByStepOrder(bookingId);
-                if (steps == null || steps.isEmpty()) return;
+                if (steps == null || steps.isEmpty())
+                        return;
                 long incomplete = steps.stream()
                                 .filter(s -> !"COMPLETED".equals(s.getStatus()))
                                 .count();
@@ -2212,7 +2266,8 @@ public class BookingServiceImpl implements BookingService {
         /**
          * Rejects if the requested phase has no configured steps, contains incomplete
          * steps, or the booking still has an unclassified pending step. This is
-         * intentionally fail-closed so a resource is never released on bad configuration.
+         * intentionally fail-closed so a resource is never released on bad
+         * configuration.
          * Callers: completeCare (VEHICLE_CARE), completeWash (AUTOMATED_WASH).
          */
         private void validatePhaseStepsCompleted(Long bookingId, String executionPhase) {
@@ -2258,7 +2313,8 @@ public class BookingServiceImpl implements BookingService {
         }
 
         /**
-         * For care bookings: rejects if the AFTER_WASH inspection was recorded BEFORE care was completed.
+         * For care bookings: rejects if the AFTER_WASH inspection was recorded BEFORE
+         * care was completed.
          * Staff must reconfirm the vehicle's final condition after care finishes.
          * No-care bookings skip this check (no careCompletedAt).
          */
@@ -2277,7 +2333,7 @@ public class BookingServiceImpl implements BookingService {
                                         if (inspTime != null && inspTime.isBefore(booking.getCareCompletedAt())) {
                                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                                                                 "AFTER_WASH inspection is stale — it was recorded before Vehicle Care was completed. "
-                                                                + "Review the vehicle's final condition and reconfirm the inspection before completing final inspection.");
+                                                                                + "Review the vehicle's final condition and reconfirm the inspection before completing final inspection.");
                                         }
                                 });
         }
@@ -2285,7 +2341,8 @@ public class BookingServiceImpl implements BookingService {
         /**
          * Fail-closed operationPhase guard for completeService.
          * All bookings must be at READY_FOR_HANDOVER.
-         * Care bookings must first advance via completeFinalInspection (FINAL_INSPECTION → READY_FOR_HANDOVER).
+         * Care bookings must first advance via completeFinalInspection
+         * (FINAL_INSPECTION → READY_FOR_HANDOVER).
          * No-care bookings: READY_FOR_HANDOVER or legacy null phase are valid.
          */
         private void validateCompleteServicePhase(Booking booking) {
@@ -2307,9 +2364,9 @@ public class BookingServiceImpl implements BookingService {
                         if ("FINAL_INSPECTION".equals(currentPhase)) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                                                 "Booking " + booking.getId() + " is at FINAL_INSPECTION. "
-                                                + "Call PATCH /bookings/" + booking.getId()
-                                                + "/operations/complete-final-inspection first "
-                                                + "to advance to READY_FOR_HANDOVER, then complete handover.");
+                                                                + "Call PATCH /bookings/" + booking.getId()
+                                                                + "/operations/complete-final-inspection first "
+                                                                + "to advance to READY_FOR_HANDOVER, then complete handover.");
                         }
                         throw new ResponseStatusException(HttpStatus.CONFLICT,
                                         "Cannot complete care-required booking from phase: "
@@ -2319,9 +2376,9 @@ public class BookingServiceImpl implements BookingService {
                         if ("FINAL_INSPECTION".equals(currentPhase)) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                                                 "Booking " + booking.getId() + " is at FINAL_INSPECTION. "
-                                                + "Call PATCH /bookings/" + booking.getId()
-                                                + "/operations/complete-final-inspection first "
-                                                + "to advance to READY_FOR_HANDOVER, then complete handover.");
+                                                                + "Call PATCH /bookings/" + booking.getId()
+                                                                + "/operations/complete-final-inspection first "
+                                                                + "to advance to READY_FOR_HANDOVER, then complete handover.");
                         }
                         throw new ResponseStatusException(HttpStatus.CONFLICT,
                                         "Cannot complete no-care booking from phase: " + currentPhase
@@ -2334,8 +2391,10 @@ public class BookingServiceImpl implements BookingService {
                 if (booking.getPlannedCareStartAt() != null) {
                         return true;
                 }
-                // Use canonical resource resolver — only packages that actually require care staff
-                // need an AFTER_WASH inspection, not any package that happens to be an ADD_ON or COMBO.
+                // Use canonical resource resolver — only packages that actually require care
+                // staff
+                // need an AFTER_WASH inspection, not any package that happens to be an ADD_ON
+                // or COMBO.
                 ServicePackage mainPkg = servicePackageRepository.findById(booking.getServicePackageId()).orElse(null);
                 List<ServicePackage> allPackages = buildAllPackagesForBooking(booking, mainPkg);
                 ResourceWindows rw = computeResourceWindows(allPackages);
@@ -2343,9 +2402,12 @@ public class BookingServiceImpl implements BookingService {
         }
 
         /**
-         * Recovery endpoint for bookings that were incorrectly placed in READY_FOR_HANDOVER
-         * despite requiring care staff (caused by the historical COMBO resource-aggregation bug).
-         * Moves the booking back to WAITING_FOR_CARE, computes care windows if missing, and
+         * Recovery endpoint for bookings that were incorrectly placed in
+         * READY_FOR_HANDOVER
+         * despite requiring care staff (caused by the historical COMBO
+         * resource-aggregation bug).
+         * Moves the booking back to WAITING_FOR_CARE, computes care windows if missing,
+         * and
          * reserves care staff (idempotent — will not create duplicate assignments).
          * Safe to run multiple times.
          */
@@ -2356,7 +2418,8 @@ public class BookingServiceImpl implements BookingService {
                                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                                                 "Booking not found: " + bookingId));
 
-                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role, booking.getGarageId());
+                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role,
+                                booking.getGarageId());
 
                 String bStatus = booking.getStatus();
                 if ("COMPLETED".equals(bStatus) || "CANCELED".equals(bStatus)
@@ -2366,7 +2429,8 @@ public class BookingServiceImpl implements BookingService {
                 }
                 if (!"IN_PROGRESS".equals(bStatus) && !"CHECKED_IN".equals(bStatus)) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                        "Recovery only applies to IN_PROGRESS or CHECKED_IN bookings. Current: " + bStatus);
+                                        "Recovery only applies to IN_PROGRESS or CHECKED_IN bookings. Current: "
+                                                        + bStatus);
                 }
                 String currentPhase = booking.getOperationPhase();
                 if (!"FINAL_INSPECTION".equals(currentPhase) && !"READY_FOR_HANDOVER".equals(currentPhase)) {
@@ -2443,7 +2507,8 @@ public class BookingServiceImpl implements BookingService {
                                                 HttpStatus.NOT_FOUND,
                                                 "Booking not found"));
 
-                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role, booking.getGarageId());
+                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role,
+                                booking.getGarageId());
 
                 if (!"IN_PROGRESS".equals(booking.getStatus())) {
 
@@ -2499,7 +2564,8 @@ public class BookingServiceImpl implements BookingService {
                                                 HttpStatus.NOT_FOUND,
                                                 "Booking not found"));
 
-                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role, booking.getGarageId());
+                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role,
+                                booking.getGarageId());
 
                 if (!"IN_PROGRESS".equals(booking.getStatus())) {
 
@@ -2541,7 +2607,8 @@ public class BookingServiceImpl implements BookingService {
                                                 HttpStatus.NOT_FOUND,
                                                 "Booking not found"));
 
-                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role, booking.getGarageId());
+                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role,
+                                booking.getGarageId());
 
                 if (!"COMPLETED".equals(booking.getStatus())) {
 
@@ -2586,7 +2653,8 @@ public class BookingServiceImpl implements BookingService {
                 try {
                         bookingReviewService.maybeCreateReviewRequestNotification(saved.getId());
                 } catch (Exception e) {
-                        log.warn("Failed to send review request notification for booking {}: {}", saved.getId(), e.getMessage());
+                        log.warn("Failed to send review request notification for booking {}: {}", saved.getId(),
+                                        e.getMessage());
                 }
                 return toResponse(saved);
         }
@@ -2606,7 +2674,8 @@ public class BookingServiceImpl implements BookingService {
                                                 HttpStatus.NOT_FOUND,
                                                 "Booking not found"));
 
-                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role, booking.getGarageId());
+                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role,
+                                booking.getGarageId());
 
                 String normalized = request.getPaymentMethod().trim().toUpperCase();
                 if (!normalized.equals("CASH") && !normalized.equals("PAYOS") && !normalized.equals("BANK_TRANSFER")) {
@@ -2625,14 +2694,16 @@ public class BookingServiceImpl implements BookingService {
         // ===================== HELPER =====================
 
         private void requirePackageMappedToGarage(Long garageId, Long packageId) {
-                if (!garageServicePackageRepository.existsByGarageIdAndServicePackageIdAndIsActiveTrue(garageId, packageId)) {
+                if (!garageServicePackageRepository.existsByGarageIdAndServicePackageIdAndIsActiveTrue(garageId,
+                                packageId)) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                                         "PACKAGE_NOT_AVAILABLE_AT_GARAGE: This service package is not available at the selected garage");
                 }
         }
 
         private User findActiveCustomerByPhone(String phone) {
-                if (phone == null || phone.isBlank()) return null;
+                if (phone == null || phone.isBlank())
+                        return null;
                 String normalizedPhone = VietnamesePhoneNumber.normalizeMobile(phone);
 
                 return userRepository.findByPhone(normalizedPhone)
@@ -2755,12 +2826,15 @@ public class BookingServiceImpl implements BookingService {
                 // customerBookingNumber
                 Integer customerBookingNumber = null;
                 if (booking.getCustomerId() != null && booking.getId() != null) {
-                        long pos = bookingRepository.countByCustomerIdAndIdLessThanEqual(booking.getCustomerId(), booking.getId());
-                        if (pos > 0) customerBookingNumber = (int) pos;
+                        long pos = bookingRepository.countByCustomerIdAndIdLessThanEqual(booking.getCustomerId(),
+                                        booking.getId());
+                        if (pos > 0)
+                                customerBookingNumber = (int) pos;
                 }
 
                 boolean depositPaid = "PAID".equals(booking.getDepositStatus());
-                BigDecimal depositAmount = booking.getDepositAmount() != null ? booking.getDepositAmount() : BigDecimal.ZERO;
+                BigDecimal depositAmount = booking.getDepositAmount() != null ? booking.getDepositAmount()
+                                : BigDecimal.ZERO;
 
                 if (!depositPaid || depositAmount.compareTo(BigDecimal.ZERO) <= 0) {
                         return CancellationPreviewResponse.builder()
@@ -2773,8 +2847,8 @@ public class BookingServiceImpl implements BookingService {
                                         .eligibleForRefund(false)
                                         .ruleCode("NO_DEPOSIT")
                                         .message(depositPaid
-                                                ? "No deposit amount was set for this booking."
-                                                : "Deposit has not been paid — no refund applicable.")
+                                                        ? "No deposit amount was set for this booking."
+                                                        : "Deposit has not been paid — no refund applicable.")
                                         .build();
                 }
 
@@ -2897,7 +2971,8 @@ public class BookingServiceImpl implements BookingService {
                 Integer customerBookingNumber = null;
                 if (b.getCustomerId() != null && b.getId() != null) {
                         long pos = bookingRepository.countByCustomerIdAndIdLessThanEqual(b.getCustomerId(), b.getId());
-                        if (pos > 0) customerBookingNumber = (int) pos;
+                        if (pos > 0)
+                                customerBookingNumber = (int) pos;
                 }
 
                 return BookingResponse.builder()
@@ -2928,6 +3003,7 @@ public class BookingServiceImpl implements BookingService {
                                 .guestName(b.getGuestName())
                                 .guestPhone(b.getGuestPhone())
                                 .licensePlate(resolveLicensePlate(b))
+                                .trackingToken(b.getTrackingToken())
                                 .createdByStaffId(b.getCreatedByStaffId())
                                 .checkedInAt(b.getCheckedInAt())
                                 .startedAt(b.getStartedAt())
@@ -2965,7 +3041,8 @@ public class BookingServiceImpl implements BookingService {
                 if (bookingId == null) {
                         return List.of();
                 }
-                // Include RELEASED — staff who completed care are still historically assigned to the booking.
+                // Include RELEASED — staff who completed care are still historically assigned
+                // to the booking.
                 // CANCELED records are excluded.
                 return bookingAssignedStaffRepository.findByBookingId(bookingId)
                                 .stream()
@@ -2978,14 +3055,19 @@ public class BookingServiceImpl implements BookingService {
         }
 
         private boolean resolveCareStaffShortage(Booking b) {
-                // Shortage is only relevant while a booking is actively waiting for care to begin.
-                // Restricting to WAITING_FOR_CARE avoids N+1 package queries on list-view responses.
-                if (!"WAITING_FOR_CARE".equals(b.getOperationPhase())) return false;
+                // Shortage is only relevant while a booking is actively waiting for care to
+                // begin.
+                // Restricting to WAITING_FOR_CARE avoids N+1 package queries on list-view
+                // responses.
+                if (!"WAITING_FOR_CARE".equals(b.getOperationPhase()))
+                        return false;
                 ServicePackage mainPkg = servicePackageRepository.findById(b.getServicePackageId()).orElse(null);
                 List<ServicePackage> allPkgs = buildAllPackagesForBooking(b, mainPkg);
                 ResourceWindows rw = computeResourceWindows(allPkgs);
-                if (!rw.requiresCareStaff || rw.requiredCareStaffCount <= 0) return false;
-                // Count only VEHICLE_CARE_STAFF assignments (ASSIGNED/RESERVED/ACTIVE) via shared helper.
+                if (!rw.requiresCareStaff || rw.requiredCareStaffCount <= 0)
+                        return false;
+                // Count only VEHICLE_CARE_STAFF assignments (ASSIGNED/RESERVED/ACTIVE) via
+                // shared helper.
                 long activeCount = bookingAssignedStaffRepository.findByBookingId(b.getId())
                                 .stream()
                                 .filter(this::isActiveCareAssignment)
@@ -3021,12 +3103,15 @@ public class BookingServiceImpl implements BookingService {
                 Vehicle vehicle = b.getVehicleId() != null
                                 ? vehicleRepository.findById(b.getVehicleId()).orElse(null)
                                 : null;
-                // Task 3: customerBookingNumber for summary responses (used in admin/staff views).
-                // When called from getCustomerBookings(), the caller overrides this field via seqMap.
+                // Task 3: customerBookingNumber for summary responses (used in admin/staff
+                // views).
+                // When called from getCustomerBookings(), the caller overrides this field via
+                // seqMap.
                 Integer customerBookingNumber = null;
                 if (b.getCustomerId() != null && b.getId() != null) {
                         long pos = bookingRepository.countByCustomerIdAndIdLessThanEqual(b.getCustomerId(), b.getId());
-                        if (pos > 0) customerBookingNumber = (int) pos;
+                        if (pos > 0)
+                                customerBookingNumber = (int) pos;
                 }
                 User customer = b.getCustomerId() != null ? userMap.get(b.getCustomerId()) : null;
                 String customerName = customer != null ? customer.getFullName() : b.getGuestName();
@@ -3195,11 +3280,14 @@ public class BookingServiceImpl implements BookingService {
                                 .build();
         }
 
-        // ===================== ISSUE #169 Operation Phase Methods =====================
+        // ===================== ISSUE #169 Operation Phase Methods
+        // =====================
 
         /**
-         * Returns true only when the assignment counts toward the required care staff quota:
-         * roleInBooking must be VEHICLE_CARE_STAFF and status must be ASSIGNED, RESERVED, or ACTIVE.
+         * Returns true only when the assignment counts toward the required care staff
+         * quota:
+         * roleInBooking must be VEHICLE_CARE_STAFF and status must be ASSIGNED,
+         * RESERVED, or ACTIVE.
          * RELEASED/CANCELED and other roles are intentionally excluded.
          */
         private boolean isActiveCareAssignment(BookingAssignedStaff a) {
@@ -3215,7 +3303,8 @@ public class BookingServiceImpl implements BookingService {
          * Replaces the old deny-list approach with an explicit allow-list.
          */
         private void requiresServiceOrAdmin(Long staffUserId, String role) {
-                if ("ROLE_ADMIN".equals(role)) return;
+                if ("ROLE_ADMIN".equals(role))
+                        return;
                 StaffProfile staffProfile = staffProfileRepository.findByUser_Id(staffUserId)
                                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
                                                 "Staff profile not found"));
@@ -3229,7 +3318,8 @@ public class BookingServiceImpl implements BookingService {
         }
 
         private StaffProfile requireStaffForGarage(Long staffUserId, String role, Long garageId) {
-                if ("ROLE_ADMIN".equals(role)) return null;
+                if ("ROLE_ADMIN".equals(role))
+                        return null;
                 StaffProfile staff = staffProfileRepository.findByUser_Id(staffUserId)
                                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN,
                                                 "Staff profile not found"));
@@ -3248,19 +3338,22 @@ public class BookingServiceImpl implements BookingService {
                 requiresServiceOrAdmin(staffUserId, role);
 
                 Booking booking = bookingRepository.findById(bookingId)
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
 
                 requireStaffForGarage(staffUserId, role, booking.getGarageId());
 
                 if (!"CHECKED_IN".equals(booking.getStatus())) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                        "Booking must be CHECKED_IN to start wash. Current status: " + booking.getStatus());
+                                        "Booking must be CHECKED_IN to start wash. Current status: "
+                                                        + booking.getStatus());
                 }
 
                 if (!"WAITING_FOR_INTAKE".equals(booking.getOperationPhase())
                                 && booking.getOperationPhase() != null) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                        "Booking must be in WAITING_FOR_INTAKE phase. Current phase: " + booking.getOperationPhase());
+                                        "Booking must be in WAITING_FOR_INTAKE phase. Current phase: "
+                                                        + booking.getOperationPhase());
                 }
 
                 // Check BEFORE_WASH inspection exists
@@ -3276,7 +3369,8 @@ public class BookingServiceImpl implements BookingService {
 
                 // Assign wash bay
                 ServicePackage servicePackage = servicePackageRepository.findById(booking.getServicePackageId())
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Service package not found"));
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Service package not found"));
 
                 if (Boolean.TRUE.equals(servicePackage.getRequiresWashBay())) {
                         String bayType = mapVehicleTypeToBayType(booking.getVehicleType());
@@ -3293,12 +3387,14 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 // Generate booking service steps if not already created
-                List<BookingServiceStep> existingSteps = bookingServiceStepRepository.findByBookingIdOrderByStepOrder(bookingId);
+                List<BookingServiceStep> existingSteps = bookingServiceStepRepository
+                                .findByBookingIdOrderByStepOrder(bookingId);
                 if (existingSteps.isEmpty()) {
                         generateBookingServiceSteps(booking, servicePackage);
                 }
 
-                // BEFORE_WASH inspection already captured intake — auto-complete any INTAKE_INSPECTION steps
+                // BEFORE_WASH inspection already captured intake — auto-complete any
+                // INTAKE_INSPECTION steps
                 bookingServiceStepRepository.findByBookingIdOrderByStepOrder(bookingId).stream()
                                 .filter(s -> "INTAKE_INSPECTION".equalsIgnoreCase(s.getExecutionPhase()))
                                 .filter(s -> !"COMPLETED".equals(s.getStatus()))
@@ -3324,17 +3420,20 @@ public class BookingServiceImpl implements BookingService {
 
         @Override
         @Transactional
-        public BookingResponse completeWash(Long bookingId, Long staffUserId, String role, OperationPhaseRequest request) {
+        public BookingResponse completeWash(Long bookingId, Long staffUserId, String role,
+                        OperationPhaseRequest request) {
                 requiresServiceOrAdmin(staffUserId, role);
 
                 Booking booking = bookingRepository.findById(bookingId)
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
 
                 requireStaffForGarage(staffUserId, role, booking.getGarageId());
 
                 if (!"AUTOMATED_WASH".equals(booking.getOperationPhase())) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                        "Booking must be in AUTOMATED_WASH phase. Current phase: " + booking.getOperationPhase());
+                                        "Booking must be in AUTOMATED_WASH phase. Current phase: "
+                                                        + booking.getOperationPhase());
                 }
 
                 // All AUTOMATED_WASH steps must be COMPLETED before releasing bay
@@ -3365,12 +3464,13 @@ public class BookingServiceImpl implements BookingService {
                         // compute and persist the care window now so startCare can proceed.
                         if (booking.getPlannedCareStartAt() == null) {
                                 LocalDateTime careStart = now;
-                                LocalDateTime careEnd = careStart.plusMinutes(rw.totalCareMinutes > 0 ? rw.totalCareMinutes : 60);
+                                LocalDateTime careEnd = careStart
+                                                .plusMinutes(rw.totalCareMinutes > 0 ? rw.totalCareMinutes : 60);
                                 booking.setPlannedCareStartAt(careStart);
                                 booking.setPlannedCareEndAt(careEnd);
                                 log.warn("[COMBO_RECOVERY] Booking {} had null care window; set to {} – {}. "
-                                        + "Run repair_combo_care_windows.sql to fix remaining bookings.",
-                                        booking.getId(), careStart, careEnd);
+                                                + "Run repair_combo_care_windows.sql to fix remaining bookings.",
+                                                booking.getId(), careStart, careEnd);
                                 // Reserve care staff using the recovered window
                                 reserveCareStaff(booking, rw, careStart, careEnd);
                         }
@@ -3394,13 +3494,15 @@ public class BookingServiceImpl implements BookingService {
                 requiresServiceOrAdmin(staffUserId, role);
 
                 Booking booking = bookingRepository.findById(bookingId)
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
 
                 requireStaffForGarage(staffUserId, role, booking.getGarageId());
 
                 if (!"WAITING_FOR_CARE".equals(booking.getOperationPhase())) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                        "Booking must be in WAITING_FOR_CARE phase. Current phase: " + booking.getOperationPhase());
+                                        "Booking must be in WAITING_FOR_CARE phase. Current phase: "
+                                                        + booking.getOperationPhase());
                 }
 
                 if (resolveCareStaffShortage(booking)) {
@@ -3432,17 +3534,20 @@ public class BookingServiceImpl implements BookingService {
 
         @Override
         @Transactional
-        public BookingResponse completeCare(Long bookingId, Long staffUserId, String role, OperationPhaseRequest request) {
+        public BookingResponse completeCare(Long bookingId, Long staffUserId, String role,
+                        OperationPhaseRequest request) {
                 requiresServiceOrAdmin(staffUserId, role);
 
                 Booking booking = bookingRepository.findById(bookingId)
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
 
                 requireStaffForGarage(staffUserId, role, booking.getGarageId());
 
                 if (!"VEHICLE_CARE".equals(booking.getOperationPhase())) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                        "Booking must be in VEHICLE_CARE phase. Current phase: " + booking.getOperationPhase());
+                                        "Booking must be in VEHICLE_CARE phase. Current phase: "
+                                                        + booking.getOperationPhase());
                 }
 
                 // All VEHICLE_CARE steps must be COMPLETED before releasing care staff
@@ -3477,7 +3582,8 @@ public class BookingServiceImpl implements BookingService {
                                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                                                 "Booking not found: " + bookingId));
 
-                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role, booking.getGarageId());
+                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(staffUserId, role,
+                                booking.getGarageId());
 
                 if (!"IN_PROGRESS".equals(booking.getStatus())) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -3505,20 +3611,24 @@ public class BookingServiceImpl implements BookingService {
 
         @Override
         @Transactional
-        public BookingResponse assignCareStaff(Long bookingId, Long staffUserId, String role, CareAssignmentRequest request) {
+        public BookingResponse assignCareStaff(Long bookingId, Long staffUserId, String role,
+                        CareAssignmentRequest request) {
                 requiresServiceOrAdmin(staffUserId, role);
 
                 // PESSIMISTIC_WRITE on booking first to prevent race conditions
                 Booking booking = bookingRepository.findByIdWithLock(bookingId)
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
 
                 requireStaffForGarage(staffUserId, role, booking.getGarageId());
 
-                // Only allow assignment while booking is still open and in a phase that precedes care
+                // Only allow assignment while booking is still open and in a phase that
+                // precedes care
                 String bStatus = booking.getStatus();
                 if (!"CONFIRMED".equals(bStatus) && !"CHECKED_IN".equals(bStatus) && !"IN_PROGRESS".equals(bStatus)) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                        "Care staff can only be assigned when booking is CONFIRMED, CHECKED_IN, or IN_PROGRESS (current: " + bStatus + ")");
+                                        "Care staff can only be assigned when booking is CONFIRMED, CHECKED_IN, or IN_PROGRESS (current: "
+                                                        + bStatus + ")");
                 }
 
                 // Phase gate: assignment window closes once care has started
@@ -3530,7 +3640,8 @@ public class BookingServiceImpl implements BookingService {
                                                         + "'. Assignment is only allowed before care begins.");
                 }
 
-                // Always compute ResourceWindows from canonical package data — never trust operationPhase alone
+                // Always compute ResourceWindows from canonical package data — never trust
+                // operationPhase alone
                 ServicePackage mainPkg = servicePackageRepository.findById(booking.getServicePackageId()).orElse(null);
                 List<ServicePackage> allPkgs = buildAllPackagesForBooking(booking, mainPkg);
                 ResourceWindows rw = computeResourceWindows(allPkgs);
@@ -3552,7 +3663,8 @@ public class BookingServiceImpl implements BookingService {
                                         "Invalid care window: plannedCareEndAt must be after plannedCareStartAt");
                 }
 
-                // PESSIMISTIC_WRITE on target staff — consistent lock order: booking first, then staff
+                // PESSIMISTIC_WRITE on target staff — consistent lock order: booking first,
+                // then staff
                 StaffProfile careStaff = staffProfileRepository.findByIdWithLock(request.getStaffProfileId())
                                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                                                 "Care staff profile not found: " + request.getStaffProfileId()));
@@ -3579,11 +3691,14 @@ public class BookingServiceImpl implements BookingService {
                 if (currentCount >= rw.requiredCareStaffCount) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT,
                                         "Booking already has " + currentCount
-                                                        + " care staff assigned (required: " + rw.requiredCareStaffCount + ")");
+                                                        + " care staff assigned (required: " + rw.requiredCareStaffCount
+                                                        + ")");
                 }
 
-                // Check all existing records for this booking+staff pair (not just active ones).
-                // This prevents UQ_booking_staff violations and gives meaningful business messages.
+                // Check all existing records for this booking+staff pair (not just active
+                // ones).
+                // This prevents UQ_booking_staff violations and gives meaningful business
+                // messages.
                 java.util.Optional<BookingAssignedStaff> existingForStaff = existing.stream()
                                 .filter(a -> careStaff.getId().equals(a.getStaffProfileId())
                                                 && "VEHICLE_CARE_STAFF".equals(a.getRoleInBooking()))
@@ -3592,7 +3707,8 @@ public class BookingServiceImpl implements BookingService {
                 if (existingForStaff.isPresent()) {
                         String existingStatus = existingForStaff.get().getStatus();
                         if ("RELEASED".equals(existingStatus)) {
-                                // Staff has already completed care for this booking — re-assignment is not allowed here.
+                                // Staff has already completed care for this booking — re-assignment is not
+                                // allowed here.
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                                                 "Care assignment has already been completed for staff "
                                                                 + careStaff.getStaffCode()
@@ -3646,7 +3762,8 @@ public class BookingServiceImpl implements BookingService {
                 requiresServiceOrAdmin(userId, role);
 
                 Booking booking = bookingRepository.findById(bookingId)
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
 
                 requireStaffForGarage(userId, role, booking.getGarageId());
 
@@ -3686,14 +3803,16 @@ public class BookingServiceImpl implements BookingService {
                                         "Invalid care window: plannedCareEndAt must be after plannedCareStartAt");
                 }
 
-                // Use findAvailableStaff — excludes staff with ASSIGNED/RESERVED/ACTIVE overlaps
+                // Use findAvailableStaff — excludes staff with ASSIGNED/RESERVED/ACTIVE
+                // overlaps
                 // (RELEASED/CANCELED are not considered busy, so they don't block availability)
                 StaffType staffType = StaffType.VEHICLE_CARE_STAFF;
                 List<StaffProfile> available = bookingAssignedStaffRepository.findAvailableStaff(
                                 booking.getGarageId(), staffType, careStart, careEnd);
 
                 // Exclude staff already assigned to THIS booking (ASSIGNED/RESERVED/ACTIVE)
-                List<BookingAssignedStaff> thisBookingAssignments = bookingAssignedStaffRepository.findByBookingId(bookingId);
+                List<BookingAssignedStaff> thisBookingAssignments = bookingAssignedStaffRepository
+                                .findByBookingId(bookingId);
                 java.util.Set<Long> alreadyAssignedIds = thisBookingAssignments.stream()
                                 .filter(this::isActiveCareAssignment)
                                 .map(BookingAssignedStaff::getStaffProfileId)
@@ -3703,12 +3822,14 @@ public class BookingServiceImpl implements BookingService {
                                 .filter(sp -> !alreadyAssignedIds.contains(sp.getId()))
                                 .sorted(java.util.Comparator.comparing(sp -> {
                                         String name = sp.getUser() != null && sp.getUser().getFullName() != null
-                                                        ? sp.getUser().getFullName() : sp.getStaffCode();
+                                                        ? sp.getUser().getFullName()
+                                                        : sp.getStaffCode();
                                         return name != null ? name : "";
                                 }))
                                 .map(sp -> AvailableCareStaffResponse.builder()
                                                 .staffProfileId(sp.getId())
-                                                .displayName(sp.getUser() != null ? sp.getUser().getFullName() : sp.getStaffCode())
+                                                .displayName(sp.getUser() != null ? sp.getUser().getFullName()
+                                                                : sp.getStaffCode())
                                                 .staffCode(sp.getStaffCode())
                                                 .garageId(sp.getGarageId())
                                                 .build())
@@ -3721,7 +3842,8 @@ public class BookingServiceImpl implements BookingService {
                 requiresServiceOrAdmin(userId, role);
 
                 Booking booking = bookingRepository.findById(bookingId)
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
 
                 requireStaffForGarage(userId, role, booking.getGarageId());
 
@@ -3773,7 +3895,8 @@ public class BookingServiceImpl implements BookingService {
                 boolean shortage;
 
                 if (careWorkflowCompleted) {
-                        // RELEASED = care was completed; count as "assigned" so UI shows history correctly.
+                        // RELEASED = care was completed; count as "assigned" so UI shows history
+                        // correctly.
                         assignedCount = (int) assignments.stream()
                                         .filter(a -> "VEHICLE_CARE_STAFF".equals(a.getRoleInBooking())
                                                         && !"CANCELED".equals(a.getStatus()))
@@ -3811,7 +3934,8 @@ public class BookingServiceImpl implements BookingService {
                 requiresServiceOrAdmin(userId, role);
 
                 Booking booking = bookingRepository.findById(bookingId)
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
 
                 requireStaffForGarage(userId, role, booking.getGarageId());
 
@@ -3834,7 +3958,8 @@ public class BookingServiceImpl implements BookingService {
                                                         .assignmentStatus(a.getStatus())
                                                         .build();
                                 })
-                                .sorted(java.util.Comparator.comparing(r -> r.getDisplayName() != null ? r.getDisplayName() : ""))
+                                .sorted(java.util.Comparator
+                                                .comparing(r -> r.getDisplayName() != null ? r.getDisplayName() : ""))
                                 .toList();
         }
 
@@ -3842,7 +3967,8 @@ public class BookingServiceImpl implements BookingService {
 
         @Override
         @Transactional(readOnly = true)
-        public List<CareTaskResponse> getCareTasksForCurrentStaff(Long careStaffUserId, String status, LocalDate date, int page, int limit) {
+        public List<CareTaskResponse> getCareTasksForCurrentStaff(Long careStaffUserId, String status, LocalDate date,
+                        int page, int limit) {
                 if (page < 0) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Page must be >= 0");
                 }
@@ -3852,11 +3978,11 @@ public class BookingServiceImpl implements BookingService {
 
                 // Validate optional status filter before hitting the DB
                 String normalizedStatus = (status == null || status.isBlank() || "ALL".equalsIgnoreCase(status))
-                        ? null
-                        : status.toUpperCase();
+                                ? null
+                                : status.toUpperCase();
                 if (normalizedStatus != null && !VALID_CARE_TASK_STATUSES.contains(normalizedStatus)) {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                "Invalid status filter. Must be one of: RESERVED, ACTIVE, RELEASED, ALL");
+                                        "Invalid status filter. Must be one of: RESERVED, ACTIVE, RELEASED, ALL");
                 }
 
                 StaffProfile staffProfile = staffProfileRepository.findByUser_Id(careStaffUserId)
@@ -3886,15 +4012,16 @@ public class BookingServiceImpl implements BookingService {
                 return assignments.stream()
                                 .map(a -> {
                                         Booking b = bookingRepository.findById(a.getBookingId()).orElse(null);
-                                        if (b == null) return null;
+                                        if (b == null)
+                                                return null;
 
                                         // Collect service names without exposing financial data
                                         List<String> serviceNames = new ArrayList<>();
                                         servicePackageRepository.findById(b.getServicePackageId())
                                                         .ifPresent(pkg -> serviceNames.add(pkg.getName()));
-                                        getBookingAddOnIds(b.getId()).forEach(addOnId ->
-                                                        servicePackageRepository.findById(addOnId)
-                                                                        .ifPresent(pkg -> serviceNames.add(pkg.getName())));
+                                        getBookingAddOnIds(b.getId()).forEach(addOnId -> servicePackageRepository
+                                                        .findById(addOnId)
+                                                        .ifPresent(pkg -> serviceNames.add(pkg.getName())));
 
                                         return CareTaskResponse.builder()
                                                         .assignmentId(a.getId())
@@ -3915,7 +4042,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         /**
-         * Returns the execution phase for a step template.  Uses the template's stored
+         * Returns the execution phase for a step template. Uses the template's stored
          * value when set; otherwise infers from the template's own service package:
          * a package requiring care staff → VEHICLE_CARE, otherwise → AUTOMATED_WASH.
          */
@@ -3931,7 +4058,10 @@ public class BookingServiceImpl implements BookingService {
                 return "AUTOMATED_WASH";
         }
 
-        /** Build the effective package list for an existing booking, expanding COMBO includes. */
+        /**
+         * Build the effective package list for an existing booking, expanding COMBO
+         * includes.
+         */
         private List<ServicePackage> buildAllPackagesForBooking(Booking booking, ServicePackage mainPkg) {
                 LinkedHashMap<Long, ServicePackage> dedupMap = new LinkedHashMap<>();
                 if (mainPkg != null) {
@@ -3954,7 +4084,8 @@ public class BookingServiceImpl implements BookingService {
                 List<ServicePackageStep> mainTemplates = comboStepResolver.resolveSteps(servicePackage);
                 List<ServicePackageStep> addOnTemplates = new ArrayList<>();
                 for (Long addOnId : getBookingAddOnIds(booking.getId())) {
-                        addOnTemplates.addAll(servicePackageStepRepository.findByServicePackage_IdOrderByStepOrder(addOnId));
+                        addOnTemplates.addAll(
+                                        servicePackageStepRepository.findByServicePackage_IdOrderByStepOrder(addOnId));
                 }
                 List<ServicePackageStep> orderedTemplates = new ArrayList<>();
                 orderedTemplates.addAll(mainTemplates);
@@ -3977,9 +4108,11 @@ public class BookingServiceImpl implements BookingService {
         }
 
         /**
-         * Reserve care staff for an already-confirmed booking if it requires care staff and
-         * no reservation exists yet.  Idempotent — safe to call multiple times.
-         * Intended to be called after a DEPOSIT webhook confirms a PENDING_DEPOSIT online booking.
+         * Reserve care staff for an already-confirmed booking if it requires care staff
+         * and
+         * no reservation exists yet. Idempotent — safe to call multiple times.
+         * Intended to be called after a DEPOSIT webhook confirms a PENDING_DEPOSIT
+         * online booking.
          */
         @Override
         @Transactional
@@ -4035,7 +4168,8 @@ public class BookingServiceImpl implements BookingService {
         }
 
         /**
-         * Reserve care staff for a booking immediately at creation with RESERVED status.
+         * Reserve care staff for a booking immediately at creation with RESERVED
+         * status.
          * Used for CONFIRMED walk-in and after-deposit paths.
          */
         private void reserveCareStaff(Booking booking, ResourceWindows rw,
@@ -4045,8 +4179,10 @@ public class BookingServiceImpl implements BookingService {
 
         /**
          * Reserve care staff with an explicit initial status.
-         * Use "HELD_PENDING_DEPOSIT" when the booking is in PENDING_DEPOSIT state so the hold
-         * is visible to availability queries but can be upgraded to RESERVED after payment.
+         * Use "HELD_PENDING_DEPOSIT" when the booking is in PENDING_DEPOSIT state so
+         * the hold
+         * is visible to availability queries but can be upgraded to RESERVED after
+         * payment.
          * Use "RESERVED" for CONFIRMED walk-ins and after deposit webhook.
          */
         private void reserveCareStaff(Booking booking, ResourceWindows rw,
@@ -4067,13 +4203,15 @@ public class BookingServiceImpl implements BookingService {
                                 .findAvailableStaff(booking.getGarageId(), staffType, careStart, careEnd);
                 int reserved = 0;
                 for (StaffProfile candidate : candidates) {
-                        if (reserved >= rw.requiredCareStaffCount) break;
+                        if (reserved >= rw.requiredCareStaffCount)
+                                break;
                         // Reuse an existing CANCELED or HELD_PENDING_DEPOSIT record for idempotency
-                        BookingAssignedStaff bas = bookingAssignedStaffRepository.findByBookingId(booking.getId()).stream()
+                        BookingAssignedStaff bas = bookingAssignedStaffRepository.findByBookingId(booking.getId())
+                                        .stream()
                                         .filter(a -> candidate.getId().equals(a.getStaffProfileId()))
                                         .filter(a -> "VEHICLE_CARE_STAFF".equals(a.getRoleInBooking()))
                                         .filter(a -> "CANCELED".equals(a.getStatus())
-                                                || "HELD_PENDING_DEPOSIT".equals(a.getStatus()))
+                                                        || "HELD_PENDING_DEPOSIT".equals(a.getStatus()))
                                         .findFirst()
                                         .orElseGet(BookingAssignedStaff::new);
                         bas.setBookingId(booking.getId());
@@ -4087,10 +4225,10 @@ public class BookingServiceImpl implements BookingService {
                 }
                 if (reserved < rw.requiredCareStaffCount) {
                         log.error(
-                                "[CARE_STAFF_SHORTAGE] Booking {} ({}) only {}/{} care staff held "
-                                + "(garage={}, careWindow={} – {}). Manual assignment required.",
-                                booking.getId(), initialStatus, reserved, rw.requiredCareStaffCount,
-                                booking.getGarageId(), careStart, careEnd);
+                                        "[CARE_STAFF_SHORTAGE] Booking {} ({}) only {}/{} care staff held "
+                                                        + "(garage={}, careWindow={} – {}). Manual assignment required.",
+                                        booking.getId(), initialStatus, reserved, rw.requiredCareStaffCount,
+                                        booking.getGarageId(), careStart, careEnd);
                 }
         }
 
@@ -4098,7 +4236,8 @@ public class BookingServiceImpl implements BookingService {
 
         @Override
         public StaffBookingSummaryResponse getStaffBookingSummary(Long staffUserId, String role) {
-                // Only CUSTOMER_SERVICE_STAFF may call this — ADMIN and VEHICLE_CARE_STAFF are denied.
+                // Only CUSTOMER_SERVICE_STAFF may call this — ADMIN and VEHICLE_CARE_STAFF are
+                // denied.
                 StaffProfile staffProfile = staffProfileRepository.findByUser_Id(staffUserId)
                                 .orElseThrow(() -> new ResponseStatusException(
                                                 HttpStatus.FORBIDDEN, "Staff profile not found"));
@@ -4148,7 +4287,7 @@ public class BookingServiceImpl implements BookingService {
                 Long garageId = staffProfile.getGarageId();
 
                 LocalDateTime start = LocalDateTime.of(year, month, 1, 0, 0);
-                LocalDateTime end   = start.plusMonths(1);
+                LocalDateTime end = start.plusMonths(1);
 
                 List<Object[]> rows = bookingRepository.findDateAndStatusForCalendar(garageId, start, end);
 
@@ -4160,8 +4299,10 @@ public class BookingServiceImpl implements BookingService {
                         java.time.LocalDate date = dt.toLocalDate();
                         dayMap.computeIfAbsent(date, d -> new long[2]);
                         long[] counts = dayMap.get(date);
-                        if ("CONFIRMED".equals(status)) counts[0]++;
-                        else if ("CANCELED".equals(status) || "CANCELLED".equals(status)) counts[1]++;
+                        if ("CONFIRMED".equals(status))
+                                counts[0]++;
+                        else if ("CANCELED".equals(status) || "CANCELLED".equals(status))
+                                counts[1]++;
                 }
 
                 return dayMap.entrySet().stream()

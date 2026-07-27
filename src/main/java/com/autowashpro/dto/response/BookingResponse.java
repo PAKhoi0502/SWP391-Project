@@ -39,6 +39,7 @@ public class BookingResponse {
     private String guestName;
     private String guestPhone;
     private String licensePlate;
+    private String trackingToken;
     private Long createdByStaffId;
     private LocalDateTime startedAt;
     private Long washBayId;

@@ -42,6 +42,8 @@ public interface BookingService {
 
         BookingResponse createGuestBooking(WalkInBookingCreateRequest request);
 
+        BookingResponse getGuestBookingByTrackingToken(String trackingToken);
+
         void checkGuestPhoneEligibility(String phone);
 
         WalkInCustomerLookupResponse lookupWalkInCustomerByPhone(

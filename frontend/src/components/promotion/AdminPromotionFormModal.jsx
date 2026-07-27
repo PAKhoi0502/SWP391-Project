@@ -76,7 +76,7 @@ const validate = (form, isCreate) => {
   return errors
 }
 
-export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, promotionId }) {
+export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, promotionId, presetTarget }) {
   const isCreate = !promotionId
 
   const [form, setForm] = useState(EMPTY_FORM)
@@ -89,7 +89,10 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
   useEffect(() => {
     if (!isOpen) return
     if (isCreate) {
-      setForm(EMPTY_FORM)
+      setForm({
+        ...EMPTY_FORM,
+        code: presetTarget ? `VIP${presetTarget.customerId}` : '',
+      })
       setErrors({})
       setApiError('')
       return
@@ -127,7 +130,7 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
       .finally(() => { if (mounted) setLoadingDetail(false) })
 
     return () => { mounted = false }
-  }, [isOpen, promotionId, isCreate])
+  }, [isOpen, promotionId, isCreate, presetTarget])
 
   if (!isOpen) return null
 
@@ -169,6 +172,7 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
       allowLoyaltyStack: form.allowLoyaltyStack,
       maxLoyaltyPoints: form.allowLoyaltyStack && form.maxLoyaltyPoints !== '' ? Number(form.maxLoyaltyPoints) : null,
       applicableTiers: form.applicableTiers.length > 0 ? form.applicableTiers : [],
+      targetCustomerId: presetTarget ? presetTarget.customerId : null,
     }
 
     if (isCreate) {
@@ -181,10 +185,13 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
       if (isCreate) {
         const created = await promotionApi.createPromotion(payload)
         // Auto-send VOUCHER_RECEIVED notification only if promotion is immediately active
-        // (i.e. isActive=true AND startAt is null/past — not a scheduled future promotion)
+        // (i.e. isActive=true AND startAt is null/past — not a scheduled future promotion).
+        // Skipped here for a targeted promotion: sendVoucher has no "single customer" filter,
+        // so broadcasting would notify everyone about a code only one customer can redeem.
+        // (The backend notifies the target customer directly in createPromotion instead.)
         const startsAt = form.startAt ? new Date(toLocalDateTime(form.startAt)) : null
         const isImmediatelyActive = form.isActive && (!startsAt || startsAt <= new Date())
-        if (created?.id && isImmediatelyActive) {
+        if (created?.id && isImmediatelyActive && !presetTarget) {
           if (form.applicableTiers.length > 0) {
             await Promise.allSettled(
               form.applicableTiers.map((tier) =>
@@ -221,6 +228,12 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
         ) : (
           <form className="apm-form" onSubmit={handleSubmit}>
             {apiError && <div className="apm-api-error">{apiError}</div>}
+
+            {presetTarget && (
+              <div className="apm-target-banner">
+                Private promotion for <strong>{presetTarget.label}</strong> — only this customer can redeem it.
+              </div>
+            )}
 
             <div className="apm-grid">
               {/* Code — create only */}
@@ -374,22 +387,24 @@ export default function AdminPromotionFormModal({ isOpen, onClose, onSuccess, pr
                 {errors.endAt && <span className="apm-err">{errors.endAt}</span>}
               </div>
 
-              {/* Applicable tiers */}
-              <div className="apm-field apm-field-full">
-                <label>Applies to tiers <span className="apm-label-hint">(leave blank = all tiers)</span></label>
-                <div className="apm-tier-group">
-                  {TIER_OPTIONS.map((tier) => (
-                    <label key={tier} className={`apm-tier-chip ${form.applicableTiers.includes(tier) ? 'selected' : ''}`}>
-                      <input
-                        type="checkbox"
-                        checked={form.applicableTiers.includes(tier)}
-                        onChange={() => toggleTier(tier)}
-                      />
-                      {TIER_LABELS[tier]}
-                    </label>
-                  ))}
+              {/* Applicable tiers — not shown for a customer-targeted promotion */}
+              {!presetTarget && (
+                <div className="apm-field apm-field-full">
+                  <label>Applies to tiers <span className="apm-label-hint">(leave blank = all tiers)</span></label>
+                  <div className="apm-tier-group">
+                    {TIER_OPTIONS.map((tier) => (
+                      <label key={tier} className={`apm-tier-chip ${form.applicableTiers.includes(tier) ? 'selected' : ''}`}>
+                        <input
+                          type="checkbox"
+                          checked={form.applicableTiers.includes(tier)}
+                          onChange={() => toggleTier(tier)}
+                        />
+                        {TIER_LABELS[tier]}
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Is active */}
               <div className="apm-field apm-field-full">

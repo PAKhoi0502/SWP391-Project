@@ -40,4 +40,6 @@ public class CreatePromotionRequest {
     private Integer maxLoyaltyPoints;
 
     private List<String> applicableTiers;
+
+    private Long targetCustomerId;
 }

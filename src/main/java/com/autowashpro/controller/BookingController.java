@@ -139,6 +139,18 @@ public class BookingController {
                                 .build();
         }
 
+        @GetMapping("/guest/track/{token}")
+        public ApiResponse<BookingResponse> getGuestBookingByTrackingToken(
+                        @PathVariable String token) {
+
+                BookingResponse response = bookingService.getGuestBookingByTrackingToken(token);
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true)
+                                .message("Booking status retrieved")
+                                .data(response)
+                                .build();
+        }
+
         @PostMapping("/guest/phone-eligibility")
         public ApiResponse<java.util.Map<String, Boolean>> checkGuestPhoneEligibility(
                         @Valid @RequestBody GuestPhoneEligibilityRequest request) {

@@ -21,6 +21,8 @@ public interface PromotionService {
 
         List<PromotionResponse> getActivePromotions();
 
+        List<PromotionResponse> getAllPromotionsForAdmin();
+
         List<PromotionResponse> getEligiblePromotions(
                         Long customerId,
                         Long servicePackageId,

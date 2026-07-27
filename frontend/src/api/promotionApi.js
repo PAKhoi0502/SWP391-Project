@@ -33,8 +33,12 @@ const promotionApi = {
   },
 
   // ── Admin ─────────────────────────────────────────────────
-  // NOTE: GET /promotions returns ACTIVE promotions only (no admin-all endpoint).
-  // Admin list reuses getActivePromotions(); inactive promotions are hidden after page reload.
+  async getAllPromotionsAdmin() {
+    const response = await api.get('/promotions/admin')
+    const payload = unwrap(response)
+    return Array.isArray(payload) ? payload : []
+  },
+
   async createPromotion(payload) {
     const response = await api.post('/promotions/admin', payload)
     return unwrap(response)

@@ -20,6 +20,13 @@
   margin: 0;
 }
 
+.drp-empty-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
 .drp-detail {
   color: #334155;
   font-size: 13.5px;

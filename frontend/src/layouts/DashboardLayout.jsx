@@ -23,6 +23,7 @@ const NAV_ITEMS = {
     { to: '/admin/waitlist', label: 'Waitlist' },
     { to: '/admin/loyalty/tier-rules', label: 'Membership Tiers' },
     { to: '/admin/loyalty/adjust-points', label: 'Adjust Points' },
+    { to: '/admin/loyalty/top-customers', label: 'Top Customers' },
     { to: '/admin/promotions', label: 'Promotions' },
     { to: '/admin/notifications/test-email', label: 'Test Email' },
     { to: '/admin/research/export', label: 'Export Research Data' },

@@ -74,6 +74,15 @@ public class BankAccountServiceImpl implements BankAccountService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Bank account not found or not owned by current user"));
 
+        if (request.getBankCode() != null) {
+            bankAccount.setBankCode(request.getBankCode());
+        }
+        if (request.getBankName() != null) {
+            bankAccount.setBankName(request.getBankName());
+        }
+        if (request.getAccountNumber() != null) {
+            bankAccount.setAccountNumber(request.getAccountNumber());
+        }
         if (request.getAccountHolderName() != null) {
             bankAccount.setAccountHolderName(request.getAccountHolderName());
         }

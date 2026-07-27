@@ -11,6 +11,17 @@ const emptyForm = {
   isDefault: false,
 }
 
+const DIACRITIC_MARKS_REGEX = new RegExp('[̀-ͯ]', 'g')
+
+function toBankHolderName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(DIACRITIC_MARKS_REGEX, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toUpperCase()
+}
+
 function maskAccountNumber(number) {
   const value = String(number || '')
   if (value.length <= 4) return value
@@ -89,7 +100,12 @@ export default function BankAccountsModal({ open, onClose }) {
     setFormError('')
     try {
       if (editingAccount) {
-        await bankAccountService.update(editingAccount.id, { accountHolderName: form.accountHolderName.trim() })
+        await bankAccountService.update(editingAccount.id, {
+          bankCode: form.bankCode,
+          bankName: form.bankName,
+          accountNumber: form.accountNumber.trim(),
+          accountHolderName: form.accountHolderName.trim(),
+        })
       } else {
         await bankAccountService.create({
           bankCode: form.bankCode,
@@ -248,26 +264,22 @@ export default function BankAccountsModal({ open, onClose }) {
             <form className="ba-form" onSubmit={handleSave}>
               {formError && <p className="ba-error">{formError}</p>}
 
-              {!editingAccount && (
-                <label className="ba-field">
-                  <span className="ba-label">Bank *</span>
-                  <select required className="ba-select" value={form.bankCode} onChange={(e) => handleBankChange(e.target.value)}>
-                    <option value="">Select bank</option>
-                    {banks.map((b) => <option key={b.code} value={b.code}>{b.shortName || b.name}</option>)}
-                  </select>
-                </label>
-              )}
+              <label className="ba-field">
+                <span className="ba-label">Bank *</span>
+                <select required className="ba-select" value={form.bankCode} onChange={(e) => handleBankChange(e.target.value)}>
+                  <option value="">Select bank</option>
+                  {banks.map((b) => <option key={b.code} value={b.code}>{b.shortName || b.name}</option>)}
+                </select>
+              </label>
 
-              {!editingAccount && (
-                <label className="ba-field">
-                  <span className="ba-label">Account Number *</span>
-                  <input required className="ba-input" value={form.accountNumber} onChange={(e) => f('accountNumber', e.target.value)} placeholder="0123456789" />
-                </label>
-              )}
+              <label className="ba-field">
+                <span className="ba-label">Account Number *</span>
+                <input required className="ba-input" value={form.accountNumber} onChange={(e) => f('accountNumber', e.target.value)} placeholder="0123456789" />
+              </label>
 
               <label className="ba-field">
                 <span className="ba-label">Account Holder Name *</span>
-                <input required className="ba-input" value={form.accountHolderName} onChange={(e) => f('accountHolderName', e.target.value)} placeholder="NGUYEN VAN A" />
+                <input required className="ba-input" value={form.accountHolderName} onChange={(e) => f('accountHolderName', toBankHolderName(e.target.value))} placeholder="NGUYEN VAN A" />
               </label>
 
               {!editingAccount && (

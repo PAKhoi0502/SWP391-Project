@@ -10,6 +10,7 @@ import { loyaltyApi } from '../../api/loyaltyApi'
 import promotionApi from '../../api/promotionApi'
 import { waitlistApi } from '../../api/waitlistApi'
 import DepositQrModal from '../../components/Booking/DepositQrModal'
+import VehiclesModal from '../../components/profile/VehiclesModal'
 import BookingErrorToast, { useBookingErrorToast } from '../../components/Booking/BookingErrorToast'
 import { normalizeBookingError } from '../../utils/bookingErrorMapper'
 import './CustomerCreateBookingPage.css'
@@ -243,6 +244,16 @@ export default function CustomerCreateBookingPage() {
   const [slots, setSlots] = useState([])
   // Show vehicles in groups of 2; expands by 2 on demand
   const [vehiclesVisible, setVehiclesVisible] = useState(2)
+  const [vehicleModalOpen, setVehicleModalOpen] = useState(false)
+
+  const refreshVehicles = async () => {
+    try {
+      const vehicleData = await customerBookingFlowApi.getVehicles()
+      setVehicles(vehicleData)
+    } catch {
+      // Keep the previously loaded list if the refresh fails
+    }
+  }
 
   const [selectedVehicleId, setSelectedVehicleId] = useState('')
   const [selectedGarageId, setSelectedGarageId] = useState('')
@@ -1062,6 +1073,13 @@ export default function CustomerCreateBookingPage() {
                       <div className="bk-empty">
                         <p>No vehicles found</p>
                         <span>Please add a vehicle in My Vehicles first.</span>
+                        <button
+                          type="button"
+                          className="bk-btn-primary bk-empty-add-btn"
+                          onClick={() => setVehicleModalOpen(true)}
+                        >
+                          + Add Vehicle
+                        </button>
                       </div>
                     ) : (
                       <>
@@ -1789,6 +1807,10 @@ export default function CustomerCreateBookingPage() {
         onDismiss={dismissErrorToast}
         onMouseEnter={pauseErrorToast}
         onMouseLeave={resumeErrorToast}
+      />
+      <VehiclesModal
+        open={vehicleModalOpen}
+        onClose={() => { setVehicleModalOpen(false); refreshVehicles() }}
       />
     </main>
   )

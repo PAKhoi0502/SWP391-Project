@@ -114,6 +114,18 @@ export const loyaltyApi = {
     const response = await api.get('/loyalty/leaderboard', { params: { period, page, limit } })
     return unwrap(response)
   },
+
+  async getTopCustomers({ tier, licensePlate, page = 1, limit = 20 } = {}) {
+    const response = await api.get('/loyalty/admin/top-customers', {
+      params: {
+        page,
+        limit,
+        ...(tier ? { tier } : {}),
+        ...(licensePlate ? { licensePlate } : {}),
+      },
+    })
+    return unwrap(response)
+  },
 }
 
 export default loyaltyApi

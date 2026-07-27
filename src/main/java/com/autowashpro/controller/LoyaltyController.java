@@ -18,6 +18,7 @@ import com.autowashpro.dto.response.LoyaltyOverviewResponse;
 import com.autowashpro.dto.response.LoyaltyTierRuleResponse;
 import com.autowashpro.dto.response.PointTransactionResponse;
 import com.autowashpro.dto.response.RedeemPreviewResponse;
+import com.autowashpro.dto.response.TopCustomerResponse;
 import com.autowashpro.entity.ExpiryRunLog;
 import com.autowashpro.repository.ExpiryRunLogRepository;
 import com.autowashpro.scheduler.LoyaltyPointExpiryScheduler;
@@ -197,6 +198,20 @@ public class LoyaltyController {
                 .success(true)
                 .message("Customer loyalty overview retrieved successfully")
                 .data(loyaltyService.getMyLoyalty(customerId))
+                .build();
+    }
+
+    @GetMapping("/admin/top-customers")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Page<TopCustomerResponse>> getTopCustomers(
+            @RequestParam(required = false) String tier,
+            @RequestParam(required = false) String licensePlate,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int limit) {
+        return ApiResponse.<Page<TopCustomerResponse>>builder()
+                .success(true)
+                .message("Top customers retrieved successfully")
+                .data(loyaltyService.getTopCustomers(tier, licensePlate, page, limit))
                 .build();
     }
 

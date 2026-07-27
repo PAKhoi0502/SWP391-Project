@@ -64,6 +64,9 @@ public class Promotion {
     @Column(name = "max_loyalty_points")
     private Integer maxLoyaltyPoints;
 
+    @Column(name = "target_customer_id")
+    private Long targetCustomerId;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

@@ -65,6 +65,11 @@ export const bookingApi = {
     return unwrap(response)
   },
 
+  async getGuestBookingByTrackingToken(token) {
+    const response = await api.get(`/bookings/guest/track/${token}`)
+    return unwrap(response)
+  },
+
   async lookupWalkInCustomer({ phone, licensePlate, vehicleType } = {}) {
     const response = await api.get('/bookings/walk-in/customer-lookup', {
       params: {

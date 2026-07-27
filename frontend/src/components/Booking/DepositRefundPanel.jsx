@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { depositRefundApi } from '../../api/depositRefundApi'
 import { bankAccountService } from '../../services/bankAccountService'
+import BankAccountsModal from '../profile/BankAccountsModal'
 import './DepositRefundPanel.css'
 
 const formatMoney = (value) =>
@@ -31,6 +32,16 @@ export default function DepositRefundPanel({ bookingId, refundAmount, onRefunded
   const [bankAccounts, setBankAccounts] = useState([])
   const [selectedBankAccountId, setSelectedBankAccountId] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [bankModalOpen, setBankModalOpen] = useState(false)
+
+  const refreshBankAccounts = async () => {
+    try {
+      const accounts = await bankAccountService.listOwn()
+      setBankAccounts((Array.isArray(accounts) ? accounts : []).filter((account) => account.isActive))
+    } catch {
+      // Keep the previously loaded list if the refresh fails
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -134,7 +145,16 @@ export default function DepositRefundPanel({ bookingId, refundAmount, onRefunded
       )}
 
       {bankAccounts.length === 0 ? (
-        <p className="drp-empty">Add a bank account in your profile to request this refund.</p>
+        <div className="drp-empty-wrap">
+          <p className="drp-empty">Add a bank account to receive your deposit refund.</p>
+          <button
+            type="button"
+            className="drp-submit-btn"
+            onClick={() => setBankModalOpen(true)}
+          >
+            Add bank account
+          </button>
+        </div>
       ) : (
         <>
           <div className="drp-accounts">
@@ -158,6 +178,11 @@ export default function DepositRefundPanel({ bookingId, refundAmount, onRefunded
       )}
 
       {error && <p className="drp-error">{error}</p>}
+
+      <BankAccountsModal
+        open={bankModalOpen}
+        onClose={() => { setBankModalOpen(false); refreshBankAccounts() }}
+      />
     </div>
   )
 }

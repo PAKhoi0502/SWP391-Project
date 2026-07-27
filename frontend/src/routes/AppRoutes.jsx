@@ -41,6 +41,7 @@ import WashHistoryDetailPage from '../pages/washHistory/WashHistoryDetailPage'
 import AdminWashHistoryListPage from '../pages/washHistory/AdminWashHistoryListPage'
 import AdminTierRulesPage from '../pages/loyalty/AdminTierRulesPage'
 import AdminAdjustPointsPage from '../pages/loyalty/AdminAdjustPointsPage'
+import AdminTopCustomersPage from '../pages/loyalty/AdminTopCustomersPage'
 import AdminPromotionManagementPage from '../pages/admin/AdminPromotionManagementPage'
 import CustomerPromotionListPage from '../pages/promotion/CustomerPromotionListPage'
 import CustomerPromotionDetailPage from '../pages/promotion/CustomerPromotionDetailPage'
@@ -146,6 +147,7 @@ function AppRoutes() {
           <Route path="admin/waitlist" element={<StaffWaitlistPage />} />
           <Route path="admin/loyalty/tier-rules" element={<AdminTierRulesPage />} />
           <Route path="admin/loyalty/adjust-points" element={<AdminAdjustPointsPage />} />
+          <Route path="admin/loyalty/top-customers" element={<AdminTopCustomersPage />} />
           <Route path="admin/promotions" element={<AdminPromotionManagementPage />} />
           <Route path="admin/notifications/test-email" element={<AdminTestEmailPage />} />
           <Route path="admin/research/export" element={<AdminResearchExportPage />} />

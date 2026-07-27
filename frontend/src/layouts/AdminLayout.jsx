@@ -79,9 +79,10 @@ const NAV_GROUPS = [
     label: 'Growth & Engagement',
     icon: 'star',
     items: [
-      { to: '/admin/loyalty/tier-rules',    label: 'Loyalty Tiers', icon: 'star'    },
-      { to: '/admin/loyalty/adjust-points', label: 'Loyalty Management', icon: 'dollar'  },
-      { to: '/admin/promotions',            label: 'Promotions',    icon: 'tag'     },
+      { to: '/admin/loyalty/tier-rules',     label: 'Loyalty Tiers', icon: 'star'    },
+      { to: '/admin/loyalty/adjust-points',  label: 'Loyalty Management', icon: 'dollar'  },
+      { to: '/admin/loyalty/top-customers',  label: 'Top Customers', icon: 'star'    },
+      { to: '/admin/promotions',             label: 'Promotions',    icon: 'tag'     },
       { to: '/admin/reviews',               label: 'Reviews',       icon: 'message' },
     ],
   },

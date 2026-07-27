@@ -136,6 +136,7 @@ public class PromotionServiceImpl implements PromotionService {
                                 .map(t -> t.getTier())
                                 .toList()
                 )
+                .targetCustomerId(promotion.getTargetCustomerId())
                 .build();
     }
 
@@ -198,6 +199,10 @@ public class PromotionServiceImpl implements PromotionService {
                         ? request.getAllowLoyaltyStack()
                         : false);
         promotion.setMaxLoyaltyPoints(request.getMaxLoyaltyPoints());
+        promotion.setTargetCustomerId(request.getTargetCustomerId());
+        if (request.getTargetCustomerId() != null && promotion.getPerUserLimit() == null) {
+            promotion.setPerUserLimit(1);
+        }
 
         promotion = promotionRepository.save(promotion);
 
@@ -214,6 +219,16 @@ public class PromotionServiceImpl implements PromotionService {
 
                 promotionApplicableTierRepository.save(item);
             }
+        }
+
+        if (promotion.getTargetCustomerId() != null
+                && Boolean.TRUE.equals(promotion.getIsActive())
+                && !promotion.getStartAt().isAfter(LocalDateTime.now())) {
+
+            notificationService.notifyVoucherReceived(
+                    promotion.getTargetCustomerId(),
+                    promotion.getCode(),
+                    promotion.getName());
         }
 
         return map(promotion);
@@ -254,6 +269,10 @@ public class PromotionServiceImpl implements PromotionService {
             promotion.setAllowLoyaltyStack(request.getAllowLoyaltyStack());
         }
         promotion.setMaxLoyaltyPoints(request.getMaxLoyaltyPoints());
+        promotion.setTargetCustomerId(request.getTargetCustomerId());
+        if (request.getTargetCustomerId() != null && promotion.getPerUserLimit() == null) {
+            promotion.setPerUserLimit(1);
+        }
 
         promotionRepository.save(promotion);
 
@@ -294,7 +313,16 @@ public class PromotionServiceImpl implements PromotionService {
     @Override
     public List<PromotionResponse> getActivePromotions() {
 
-        return promotionRepository.findByIsActiveTrue()
+        return promotionRepository.findByIsActiveTrueAndTargetCustomerIdIsNull()
+                .stream()
+                .map(this::map)
+                .toList();
+    }
+
+    @Override
+    public List<PromotionResponse> getAllPromotionsForAdmin() {
+
+        return promotionRepository.findAll()
                 .stream()
                 .map(this::map)
                 .toList();
@@ -330,6 +358,7 @@ public class PromotionServiceImpl implements PromotionService {
                 .allowLoyaltyStack(promotion.getAllowLoyaltyStack())
                 .maxLoyaltyPoints(promotion.getMaxLoyaltyPoints())
                 .applicableTiers(tiers)
+                .targetCustomerId(promotion.getTargetCustomerId())
                 .build();
     }
 
@@ -410,6 +439,18 @@ public class PromotionServiceImpl implements PromotionService {
         }
     }
 
+    private void validateTarget(Promotion promotion,
+            Long customerId) {
+
+        if (promotion.getTargetCustomerId() == null) {
+            return;
+        }
+
+        if (!promotion.getTargetCustomerId().equals(customerId)) {
+            throw new RuntimeException("This promotion is not available for your account");
+        }
+    }
+
     private BigDecimal calculateDiscount(Promotion promotion,
             BigDecimal orderAmount) {
 
@@ -456,6 +497,10 @@ public class PromotionServiceImpl implements PromotionService {
                 customerId);
 
         validateTier(
+                promotion,
+                customerId);
+
+        validateTarget(
                 promotion,
                 customerId);
 
@@ -507,6 +552,10 @@ public class PromotionServiceImpl implements PromotionService {
                                 customerId);
 
                         validateTier(
+                                promotion,
+                                customerId);
+
+                        validateTarget(
                                 promotion,
                                 customerId);
 
@@ -630,6 +679,21 @@ public class PromotionServiceImpl implements PromotionService {
 public int sendVoucher(Long promotionId, SendVoucherRequest request) {
     Promotion promotion = promotionRepository.findById(promotionId)
             .orElseThrow(() -> new RuntimeException("Promotion not found"));
+
+    if ("TARGET".equalsIgnoreCase(request.getFilterType())) {
+        if (promotion.getTargetCustomerId() == null) {
+            throw new RuntimeException("This promotion has no target customer");
+        }
+        notificationService.notifyVoucherReceived(
+                promotion.getTargetCustomerId(),
+                promotion.getCode(),
+                promotion.getName());
+        return 1;
+    }
+
+    if (promotion.getTargetCustomerId() != null) {
+        throw new RuntimeException("This is a private promotion — use filterType TARGET to notify its customer");
+    }
 
     List<CustomerLoyalty> targets;
 
