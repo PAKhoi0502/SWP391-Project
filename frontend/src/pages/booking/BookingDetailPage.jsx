@@ -310,6 +310,7 @@ const getOperationPhaseText = (phase) => {
   const value = String(phase || '').toUpperCase()
   if (value === 'WAITING_FOR_INTAKE') return 'Awaiting Intake'
   if (value === 'AUTOMATED_WASH') return 'In Wash'
+  if (value === 'ADDON_SERVICE') return 'Add-on Service'
   if (value === 'WAITING_FOR_CARE') return 'Awaiting Care'
   if (value === 'VEHICLE_CARE') return 'In Care'
   if (value === 'FINAL_INSPECTION') return 'Final Inspection'
@@ -751,11 +752,14 @@ function BookingDetailPage() {
   const canStartWash = canEditBooking && currentStatus === 'CHECKED_IN' && operationPhase === 'WAITING_FOR_INTAKE'
   // Phase-specific step completion derived state
   const washSteps = serviceSteps.filter((s) => String(s.executionPhase || '').toUpperCase() === 'AUTOMATED_WASH')
+  const addonServiceSteps = serviceSteps.filter((s) => String(s.executionPhase || '').toUpperCase() === 'ADDON_SERVICE')
   const careSteps = serviceSteps.filter((s) => String(s.executionPhase || '').toUpperCase() === 'VEHICLE_CARE')
   // No wash/care steps configured means the package has none — passes the guard (backend will also validate).
   const allWashStepsDone = washSteps.length === 0 || washSteps.every((s) => String(s.status || '').toUpperCase() === 'COMPLETED')
+  const allAddonServiceStepsDone = addonServiceSteps.length === 0 || addonServiceSteps.every((s) => String(s.status || '').toUpperCase() === 'COMPLETED')
   const allCareStepsDone = careSteps.length === 0 || careSteps.every((s) => String(s.status || '').toUpperCase() === 'COMPLETED')
   const pendingWashStepCount = washSteps.filter((s) => String(s.status || '').toUpperCase() !== 'COMPLETED').length
+  const pendingAddonServiceStepCount = addonServiceSteps.filter((s) => String(s.status || '').toUpperCase() !== 'COMPLETED').length
   const pendingCareStepCount = careSteps.filter((s) => String(s.status || '').toUpperCase() !== 'COMPLETED').length
   // Legacy data may already be at FINAL_INSPECTION although a care step is still pending.
   // It must be returned to VEHICLE_CARE; final inspection must never hide/skip that step.
@@ -766,15 +770,18 @@ function BookingDetailPage() {
   const nonIntakeSteps = serviceSteps.filter((s) => String(s.executionPhase || '').toUpperCase() !== 'INTAKE_INSPECTION')
   const visibleServiceSteps = operationPhase === 'AUTOMATED_WASH' || operationPhase === 'WAITING_FOR_INTAKE'
     ? washSteps
-    : operationPhase === 'WAITING_FOR_CARE' || operationPhase === 'VEHICLE_CARE'
-      ? careSteps
-      : nonIntakeSteps
+    : operationPhase === 'ADDON_SERVICE'
+      ? addonServiceSteps
+      : operationPhase === 'WAITING_FOR_CARE' || operationPhase === 'VEHICLE_CARE'
+        ? careSteps
+        : nonIntakeSteps
   const serviceStepsReadOnly = role === 'customer'
     || operationPhase === 'WAITING_FOR_INTAKE'
     || operationPhase === 'WAITING_FOR_CARE'
     || operationPhase === 'FINAL_INSPECTION'
     || operationPhase === 'READY_FOR_HANDOVER'
   const canCompleteWash = canEditBooking && currentStatus === 'IN_PROGRESS' && operationPhase === 'AUTOMATED_WASH'
+  const canCompleteAddonService = canEditBooking && currentStatus === 'IN_PROGRESS' && operationPhase === 'ADDON_SERVICE'
   const careStaffShortage = careAssignmentStatus != null
     ? Boolean(careAssignmentStatus.shortage)
     : Boolean(booking?.careStaffShortage)
@@ -2044,6 +2051,22 @@ function BookingDetailPage() {
     }
   }
 
+  const handleCompleteAddonService = async () => {
+    if (!canCompleteAddonService) return
+    setPhaseActionLoading(true)
+    setPhaseActionError('')
+    try {
+      await bookingApi.completeAddonService(id, '')
+      setActionMessage('Add-on service completed.')
+      await loadDetail()
+      await loadServiceSteps()
+    } catch (err) {
+      setPhaseActionError(getActionErrorMessage(err) || 'Failed to complete add-on service.')
+    } finally {
+      setPhaseActionLoading(false)
+    }
+  }
+
   const handleStartCare = async () => {
     if (!canStartCare) return
     setPhaseActionLoading(true)
@@ -2799,6 +2822,30 @@ function BookingDetailPage() {
                     onClick={handleCompleteWash}
                   >
                     {phaseActionLoading ? 'Completing...' : 'Complete Wash & Release Bay'}
+                  </button>
+                </>
+              )}
+              {canCompleteAddonService && (
+                <>
+                  {!allAddonServiceStepsDone && (
+                    <p className="bd-care-assign-error">
+                      {addonServiceSteps.length === 0
+                        ? 'No Add-on Service steps are configured.'
+                        : `${pendingAddonServiceStepCount} add-on step(s) must be completed before continuing.`}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="bd-btn bd-btn--complete"
+                    disabled={phaseActionLoading || actionLoading || !allAddonServiceStepsDone}
+                    title={!allAddonServiceStepsDone
+                      ? addonServiceSteps.length === 0
+                        ? 'No Add-on Service steps are configured'
+                        : `${pendingAddonServiceStepCount} add-on step(s) still incomplete`
+                      : undefined}
+                    onClick={handleCompleteAddonService}
+                  >
+                    {phaseActionLoading ? 'Completing...' : 'Complete Add-on Service'}
                   </button>
                 </>
               )}

@@ -83,8 +83,11 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         // ====================
 
         // Issue #11 (updated): Đếm booking chiếm wash bay theo garage + vehicle type — tính cả PENDING_DEPOSIT còn hạn
-        // Uses COALESCE(plannedWashEndAt, endTime) so that a booking whose wash phase has ended
-        // does not block the wash bay during its subsequent care phase.
+        // Uses COALESCE(washBayEndTime, plannedWashEndAt, endTime) so that a booking whose wash
+        // phase has ended does not block the wash bay during its subsequent care phase.
+        // washBayEndTime (set when staff actually completes the wash) takes priority over
+        // plannedWashEndAt (the estimate computed at booking creation) once it's known — otherwise
+        // a bay released earlier than planned still shows as occupied until the planned time passes.
         @Query("""
                         SELECT COUNT(b) FROM Booking b
                         WHERE b.garageId = :garageId
@@ -92,7 +95,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                         AND (b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
                              OR (b.status = 'PENDING_DEPOSIT' AND b.paymentExpiredAt > :now))
                         AND b.startTime < :endTime
-                        AND COALESCE(b.plannedWashEndAt, b.endTime) > :startTime
+                        AND COALESCE(b.washBayEndTime, b.plannedWashEndAt, b.endTime) > :startTime
                         """)
         long countOverlappingBookingsByGarageAndVehicleType(
                         @Param("garageId") Long garageId,

@@ -205,6 +205,11 @@ export const bookingApi = {
     return unwrap(response)
   },
 
+  async completeAddonService(bookingId, note) {
+    const response = await api.patch(`/bookings/${bookingId}/operations/complete-addon-service`, { note: note || '' })
+    return unwrap(response)
+  },
+
   async startCare(bookingId, note) {
     const response = await api.patch(`/bookings/${bookingId}/operations/start-care`, { note: note || '' })
     return unwrap(response)

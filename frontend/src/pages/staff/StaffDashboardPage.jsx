@@ -19,6 +19,7 @@ const formatDateTime = (value) => {
 
 const getPhaseText = (phase) => {
   const v = String(phase || '').toUpperCase()
+  if (v === 'ADDON_SERVICE') return 'Add-on Service'
   if (v === 'WAITING_FOR_CARE') return 'Awaiting Care'
   if (v === 'VEHICLE_CARE') return 'In Care'
   if (v === 'FINAL_INSPECTION') return 'Final Inspection'

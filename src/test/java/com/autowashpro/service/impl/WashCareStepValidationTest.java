@@ -345,6 +345,87 @@ class WashCareStepValidationTest {
         verify(washBayRepository, never()).save(any());
     }
 
+    // ── 11: completeWash releases bay + goes to ADDON_SERVICE even though the
+    //        non-care add-on's ADDON_SERVICE step is still pending ───────────────
+
+    @Test
+    void completeWash_pendingAddonServiceStep_releasesBayAndSetsAddonServicePhase() {
+        ServicePackage pkg = washOnlyPackage();
+        Booking booking = automatedWashBooking(pkg);
+        booking.setWashBayId(99L);
+        BookingServiceStep doneWashStep = step(booking.getId(), "AUTOMATED_WASH", "COMPLETED");
+        BookingServiceStep pendingAddonStep = step(booking.getId(), "ADDON_SERVICE", "PENDING");
+
+        when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
+        when(servicePackageRepository.findById(pkg.getId())).thenReturn(Optional.of(pkg));
+        when(bookingServiceStepRepository.findByBookingIdOrderByStepOrder(booking.getId()))
+                .thenReturn(List.of(doneWashStep, pendingAddonStep));
+        when(washBayRepository.findById(99L)).thenReturn(Optional.of(TestFixtures.washBay(garage)));
+
+        BookingResponse response = bookingService.completeWash(booking.getId(), staffUser.getId(), "ROLE_STAFF", null);
+
+        assertEquals("ADDON_SERVICE", response.getOperationPhase());
+        // The bay must already be released — add-on work happens outside it.
+        verify(washBayRepository).save(any());
+    }
+
+    // ── 12: completeAddonService with pending ADDON_SERVICE step → 409 ──────────
+
+    @Test
+    void completeAddonService_pendingAddonServiceStep_returns409() {
+        ServicePackage pkg = washOnlyPackage();
+        Booking booking = addonServiceBooking(pkg);
+        BookingServiceStep pendingStep = step(booking.getId(), "ADDON_SERVICE", "PENDING");
+
+        when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
+        when(bookingServiceStepRepository.findByBookingIdOrderByStepOrder(booking.getId()))
+                .thenReturn(List.of(pendingStep));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> bookingService.completeAddonService(booking.getId(), staffUser.getId(), "ROLE_STAFF", null));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertEquals("ADDON_SERVICE", booking.getOperationPhase());
+    }
+
+    // ── 13: completeAddonService all steps done, no-care package → FINAL_INSPECTION
+
+    @Test
+    void completeAddonService_allStepsDone_noCare_returnsFinalInspection() {
+        ServicePackage pkg = washOnlyPackage();
+        Booking booking = addonServiceBooking(pkg);
+        BookingServiceStep done = step(booking.getId(), "ADDON_SERVICE", "COMPLETED");
+
+        when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
+        when(servicePackageRepository.findById(pkg.getId())).thenReturn(Optional.of(pkg));
+        when(bookingServiceStepRepository.findByBookingIdOrderByStepOrder(booking.getId()))
+                .thenReturn(List.of(done));
+
+        BookingResponse response = bookingService.completeAddonService(booking.getId(), staffUser.getId(), "ROLE_STAFF", null);
+
+        assertEquals("FINAL_INSPECTION", response.getOperationPhase());
+    }
+
+    // ── 14: completeAddonService all steps done, care package → WAITING_FOR_CARE ─
+
+    @Test
+    void completeAddonService_allStepsDone_care_returnsWaitingForCare() {
+        ServicePackage pkg = carePackage();
+        Booking booking = addonServiceBooking(pkg);
+        booking.setPlannedCareStartAt(TestFixtures.BASE_TIME.plusMinutes(30));
+        booking.setPlannedCareEndAt(TestFixtures.BASE_TIME.plusMinutes(75));
+        BookingServiceStep done = step(booking.getId(), "ADDON_SERVICE", "COMPLETED");
+
+        when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
+        when(servicePackageRepository.findById(pkg.getId())).thenReturn(Optional.of(pkg));
+        when(bookingServiceStepRepository.findByBookingIdOrderByStepOrder(booking.getId()))
+                .thenReturn(List.of(done));
+
+        BookingResponse response = bookingService.completeAddonService(booking.getId(), staffUser.getId(), "ROLE_STAFF", null);
+
+        assertEquals("WAITING_FOR_CARE", response.getOperationPhase());
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private ServicePackage washOnlyPackage() {
@@ -401,6 +482,13 @@ class WashCareStepValidationTest {
         Booking b = automatedWashBooking(pkg);
         b.setId(51L);
         b.setOperationPhase("VEHICLE_CARE");
+        return b;
+    }
+
+    private Booking addonServiceBooking(ServicePackage pkg) {
+        Booking b = automatedWashBooking(pkg);
+        b.setId(52L);
+        b.setOperationPhase("ADDON_SERVICE");
         return b;
     }
 

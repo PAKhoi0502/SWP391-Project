@@ -17,6 +17,7 @@ export const getInspectionByType = (inspections, type) =>
  */
 const PAST_INTAKE_PHASES = [
   'AUTOMATED_WASH',
+  'ADDON_SERVICE',
   'WAITING_FOR_CARE',
   'VEHICLE_CARE',
   'FINAL_INSPECTION',

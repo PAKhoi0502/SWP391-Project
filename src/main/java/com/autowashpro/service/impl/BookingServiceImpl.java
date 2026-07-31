@@ -3457,6 +3457,35 @@ public class BookingServiceImpl implements BookingService {
                 List<ServicePackage> allPackages = buildAllPackagesForBooking(booking, servicePackage);
                 ResourceWindows rw = computeResourceWindows(allPackages);
 
+                // Add-on steps that don't need the wash bay (ADDON_SERVICE) run after the
+                // bay is released and before care/final-inspection — they must not block
+                // the bay release above, but they still gate the rest of the workflow.
+                if (hasStepsInPhase(bookingId, "ADDON_SERVICE")) {
+                        booking.setOperationPhase("ADDON_SERVICE");
+                } else {
+                        advancePastWashPhase(booking, now, rw);
+                }
+
+                if (request != null && request.getNote() != null && !request.getNote().isBlank()) {
+                        booking.setNote(request.getNote());
+                }
+
+                Booking saved = bookingRepository.save(booking);
+                return toResponse(saved);
+        }
+
+        private boolean hasStepsInPhase(Long bookingId, String executionPhase) {
+                return bookingServiceStepRepository.findByBookingIdOrderByStepOrder(bookingId).stream()
+                                .anyMatch(s -> executionPhase.equalsIgnoreCase(s.getExecutionPhase()));
+        }
+
+        /**
+         * Advances the booking past the wash-bay-owning part of the workflow into
+         * either WAITING_FOR_CARE (if any package requires care staff) or straight to
+         * FINAL_INSPECTION. Called once the bay has been released and any
+         * bay-independent ADDON_SERVICE steps are done (or never existed).
+         */
+        private void advancePastWashPhase(Booking booking, LocalDateTime now, ResourceWindows rw) {
                 if (rw.requiresCareStaff) {
                         booking.setOperationPhase("WAITING_FOR_CARE");
                         // Runtime recovery: if this is an old COMBO booking whose care window was
@@ -3479,6 +3508,37 @@ public class BookingServiceImpl implements BookingService {
                         // No care service: proceed directly to final inspection
                         booking.setOperationPhase("FINAL_INSPECTION");
                 }
+        }
+
+        @Override
+        @Transactional
+        public BookingResponse completeAddonService(Long bookingId, Long staffUserId, String role,
+                        OperationPhaseRequest request) {
+                requiresServiceOrAdmin(staffUserId, role);
+
+                Booking booking = bookingRepository.findById(bookingId)
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Booking not found"));
+
+                requireStaffForGarage(staffUserId, role, booking.getGarageId());
+
+                if (!"ADDON_SERVICE".equals(booking.getOperationPhase())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Booking must be in ADDON_SERVICE phase. Current phase: "
+                                                        + booking.getOperationPhase());
+                }
+
+                // All ADDON_SERVICE steps must be COMPLETED before advancing
+                validatePhaseStepsCompleted(bookingId, "ADDON_SERVICE");
+
+                LocalDateTime now = LocalDateTime.now();
+
+                ServicePackage servicePackage = servicePackageRepository.findById(booking.getServicePackageId())
+                                .orElse(null);
+                List<ServicePackage> allPackages = buildAllPackagesForBooking(booking, servicePackage);
+                ResourceWindows rw = computeResourceWindows(allPackages);
+
+                advancePastWashPhase(booking, now, rw);
 
                 if (request != null && request.getNote() != null && !request.getNote().isBlank()) {
                         booking.setNote(request.getNote());
@@ -4045,17 +4105,27 @@ public class BookingServiceImpl implements BookingService {
          * Returns the execution phase for a step template. Uses the template's stored
          * value when set; otherwise infers from the template's own service package:
          * a package requiring care staff → VEHICLE_CARE, otherwise → AUTOMATED_WASH.
+         *
+         * For add-on-origin templates (isAddOnOrigin=true), a resolved AUTOMATED_WASH
+         * is remapped to ADDON_SERVICE: add-on work happens outside the wash bay, so
+         * it must not block completeWash's bay-release gate the way the main
+         * package's own AUTOMATED_WASH steps do.
          */
-        private String inferExecutionPhase(ServicePackageStep template) {
+        private String inferExecutionPhase(ServicePackageStep template, boolean isAddOnOrigin) {
                 String stored = template.getExecutionPhase();
+                String resolved;
                 if (stored != null && !stored.isBlank()) {
-                        return stored;
+                        resolved = stored;
+                } else {
+                        ServicePackage pkg = template.getServicePackage();
+                        resolved = (pkg != null && Boolean.TRUE.equals(pkg.getRequiresCareStaff()))
+                                        ? "VEHICLE_CARE"
+                                        : "AUTOMATED_WASH";
                 }
-                ServicePackage pkg = template.getServicePackage();
-                if (pkg != null && Boolean.TRUE.equals(pkg.getRequiresCareStaff())) {
-                        return "VEHICLE_CARE";
+                if (isAddOnOrigin && "AUTOMATED_WASH".equals(resolved)) {
+                        return "ADDON_SERVICE";
                 }
-                return "AUTOMATED_WASH";
+                return resolved;
         }
 
         /**
@@ -4087,24 +4157,30 @@ public class BookingServiceImpl implements BookingService {
                         addOnTemplates.addAll(
                                         servicePackageStepRepository.findByServicePackage_IdOrderByStepOrder(addOnId));
                 }
-                List<ServicePackageStep> orderedTemplates = new ArrayList<>();
-                orderedTemplates.addAll(mainTemplates);
-                orderedTemplates.addAll(addOnTemplates);
 
                 int stepOrder = 1;
-                for (ServicePackageStep template : orderedTemplates) {
-                        BookingServiceStep step = new BookingServiceStep();
-                        step.setBookingId(booking.getId());
-                        step.setServicePackageId(template.getServicePackage().getId());
-                        step.setServicePackageStepId(template.getId());
-                        step.setStepOrder(stepOrder++);
-                        step.setName(template.getName());
-                        step.setDescription(template.getDescription());
-                        step.setStatus("PENDING");
-                        step.setExecutionPhase(inferExecutionPhase(template));
-                        step.setDurationMinutes(template.getDurationMinutes());
-                        bookingServiceStepRepository.save(step);
+                for (ServicePackageStep template : mainTemplates) {
+                        stepOrder = saveBookingServiceStep(booking, template, false, stepOrder);
                 }
+                for (ServicePackageStep template : addOnTemplates) {
+                        stepOrder = saveBookingServiceStep(booking, template, true, stepOrder);
+                }
+        }
+
+        private int saveBookingServiceStep(Booking booking, ServicePackageStep template, boolean isAddOnOrigin,
+                        int stepOrder) {
+                BookingServiceStep step = new BookingServiceStep();
+                step.setBookingId(booking.getId());
+                step.setServicePackageId(template.getServicePackage().getId());
+                step.setServicePackageStepId(template.getId());
+                step.setStepOrder(stepOrder);
+                step.setName(template.getName());
+                step.setDescription(template.getDescription());
+                step.setStatus("PENDING");
+                step.setExecutionPhase(inferExecutionPhase(template, isAddOnOrigin));
+                step.setDurationMinutes(template.getDurationMinutes());
+                bookingServiceStepRepository.save(step);
+                return stepOrder + 1;
         }
 
         /**

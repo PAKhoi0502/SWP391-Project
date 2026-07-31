@@ -652,6 +652,23 @@ public class BookingController {
                                 .success(true).message("Wash completed successfully").data(response).build();
         }
 
+        @PatchMapping("/{id}/operations/complete-addon-service")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<BookingResponse> completeAddonService(
+                        @PathVariable Long id,
+                        @RequestBody(required = false) OperationPhaseRequest request,
+                        @AuthenticationPrincipal UserDetails userDetails) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String role = userDetails.getAuthorities().iterator().next().getAuthority();
+                BookingResponse response = bookingService.completeAddonService(id, staffUserId, role, request);
+                auditLogService.createAuditLog(staffUserId, AuditAction.BOOKING_SERVICE_COMPLETED,
+                                AuditTargetType.BOOKING, id,
+                                AuditMetadata.of("operationPhase", response.getOperationPhase()));
+                return ApiResponse.<BookingResponse>builder()
+                                .success(true).message("Add-on service completed successfully").data(response).build();
+        }
+
         @PatchMapping("/{id}/operations/start-care")
         @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
         public ApiResponse<BookingResponse> startCare(

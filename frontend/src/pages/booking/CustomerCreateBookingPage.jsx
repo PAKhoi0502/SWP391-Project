@@ -224,8 +224,12 @@ export default function CustomerCreateBookingPage() {
 
   const garageIdParam        = searchParams.get('garageId') || ''
   const servicePackageIdParam = searchParams.get('servicePackageId') || ''
+  const vehicleIdParam       = searchParams.get('vehicleId') || ''
+  const addOnIdsParam        = searchParams.get('addOnServicePackageIds') || ''
+  const stepParam            = Number(searchParams.get('step')) || 0
   // Consumed once after packages first load to avoid clearing on re-load
   const pendingPackageIdRef  = useRef(servicePackageIdParam)
+  const pendingAddOnIdsRef   = useRef(addOnIdsParam ? addOnIdsParam.split(',').filter(Boolean) : [])
   // Task 1: success messages (e.g., booking created) auto-clear after 7 s
   const [successMessage, setSuccessMessage] = useTransientMessage(7000)
   const {
@@ -236,7 +240,9 @@ export default function CustomerCreateBookingPage() {
     resume: resumeErrorToast,
   } = useBookingErrorToast()
 
-  const [currentStep, setCurrentStep] = useState(1)
+  const [currentStep, setCurrentStep] = useState(
+    stepParam >= 1 && stepParam <= 5 ? stepParam : 1,
+  )
 
   const [vehicles, setVehicles] = useState([])
   const [garages, setGarages] = useState([])
@@ -409,6 +415,11 @@ export default function CustomerCreateBookingPage() {
         setVehicles(vehicleData)
         setGarages(garageData)
 
+        if (vehicleIdParam) {
+          const matchedVehicle = vehicleData.find((v) => String(getId(v)) === vehicleIdParam)
+          if (matchedVehicle) setSelectedVehicleId(vehicleIdParam)
+        }
+
         if (garageIdParam) {
           const matched = garageData.find((g) => String(getId(g)) === garageIdParam)
           if (matched) setSelectedGarageId(garageIdParam)
@@ -473,6 +484,13 @@ export default function CustomerCreateBookingPage() {
             const matched = data.find((p) => String(getId(p)) === pkgId)
             if (matched) setSelectedPackageId(pkgId)
             pendingPackageIdRef.current = ''
+          }
+          if (pendingAddOnIdsRef.current.length > 0) {
+            const validAddOnIds = pendingAddOnIdsRef.current.filter((id) =>
+              data.some((p) => String(getId(p)) === id),
+            )
+            if (validAddOnIds.length > 0) setSelectedAddOnIds(validAddOnIds)
+            pendingAddOnIdsRef.current = []
           }
         }
       } catch (error) {
