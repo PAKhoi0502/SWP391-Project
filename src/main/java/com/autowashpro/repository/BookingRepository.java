@@ -104,6 +104,24 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                         @Param("endTime") LocalDateTime endTime,
                         @Param("now") LocalDateTime now);
 
+        @Query("""
+                        SELECT COUNT(b) FROM Booking b
+                        WHERE b.id <> :bookingId
+                        AND b.garageId = :garageId
+                        AND b.vehicleType = :vehicleType
+                        AND (b.status IN ('CONFIRMED', 'CHECKED_IN', 'IN_PROGRESS')
+                             OR (b.status = 'PENDING_DEPOSIT' AND b.paymentExpiredAt > :now))
+                        AND b.startTime < :endTime
+                        AND COALESCE(b.plannedWashEndAt, b.endTime) > :startTime
+                        """)
+        long countOtherOverlappingBookingsByGarageAndVehicleType(
+                        @Param("bookingId") Long bookingId,
+                        @Param("garageId") Long garageId,
+                        @Param("vehicleType") String vehicleType,
+                        @Param("startTime") LocalDateTime startTime,
+                        @Param("endTime") LocalDateTime endTime,
+                        @Param("now") LocalDateTime now);
+
         // Issue #12 (updated): Kiểm tra license plate overlap — tính cả PENDING_DEPOSIT còn hạn
         @Query("""
                         SELECT COUNT(b) FROM Booking b

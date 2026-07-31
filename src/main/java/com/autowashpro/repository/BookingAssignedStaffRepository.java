@@ -108,4 +108,20 @@ public interface BookingAssignedStaffRepository extends JpaRepository<BookingAss
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime
     );
+
+    @Query("""
+            SELECT COUNT(b)
+            FROM BookingAssignedStaff b
+            WHERE b.staffProfileId = :staffProfileId
+              AND b.bookingId <> :bookingId
+              AND b.status IN ('ASSIGNED', 'HELD_PENDING_DEPOSIT', 'RESERVED', 'ACTIVE')
+              AND b.assignedFrom < :endTime
+              AND b.assignedTo > :startTime
+            """)
+    long countOverlapExcludingBooking(
+            @Param("staffProfileId") Long staffProfileId,
+            @Param("bookingId") Long bookingId,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime
+    );
 }
