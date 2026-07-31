@@ -858,6 +858,15 @@
   background: #1d4ed8;
 }
 
+.bd-btn--addon {
+  background: #6366f1;
+  color: #ffffff;
+}
+
+.bd-btn--addon:hover:not(:disabled) {
+  background: #4f46e5;
+}
+
 .bd-btn--payment {
   background: #10b981;
   color: #ffffff;

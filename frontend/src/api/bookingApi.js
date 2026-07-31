@@ -280,4 +280,11 @@ export const bookingApi = {
     const response = await api.get('/bookings/staff/calendar', { params: { year, month } })
     return unwrap(response) ?? []
   },
+
+  async addBookingAddOns(bookingId, servicePackageIds) {
+    const response = await api.post(`/bookings/${bookingId}/add-ons`, {
+      servicePackageIds: servicePackageIds.map(Number),
+    })
+    return unwrap(response)
+  },
 }

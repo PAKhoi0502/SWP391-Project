@@ -3,12 +3,14 @@ BEGIN
     ALTER TABLE dbo.booking_add_on_service_packages
         ADD unit_price DECIMAL(18, 2) NULL;
 END;
+GO
 
 IF COL_LENGTH('dbo.booking_add_on_service_packages', 'added_by_user_id') IS NULL
 BEGIN
     ALTER TABLE dbo.booking_add_on_service_packages
         ADD added_by_user_id BIGINT NULL;
 END;
+GO
 
 UPDATE ba
 SET unit_price = sp.base_price
