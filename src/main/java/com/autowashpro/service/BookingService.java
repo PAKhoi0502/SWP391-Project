@@ -163,6 +163,10 @@ public interface BookingService {
 
         BookingResponse completeWash(Long bookingId, Long staffUserId, String role, OperationPhaseRequest request);
 
+        /** Advance booking from ADDON_SERVICE to WAITING_FOR_CARE or FINAL_INSPECTION. */
+        BookingResponse completeAddonService(Long bookingId, Long staffUserId, String role,
+                        OperationPhaseRequest request);
+
         BookingResponse startCare(Long bookingId, Long staffUserId, String role, OperationPhaseRequest request);
 
         BookingResponse completeCare(Long bookingId, Long staffUserId, String role, OperationPhaseRequest request);

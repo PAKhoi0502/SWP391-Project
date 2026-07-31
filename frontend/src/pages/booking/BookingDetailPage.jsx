@@ -11,6 +11,7 @@ import { vehicleService } from '../../services/vehicleService'
 import { getWashBayById } from '../../services/washBayApi'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import ImageUpload from '../../components/upload/ImageUpload'
+import AddBookingAddOnsModal from '../../components/Booking/AddBookingAddOnsModal'
 import CheckInBookingModal from '../../components/Booking/CheckInBookingModal'
 import CompleteServiceModal from '../../components/Booking/CompleteServiceModal'
 import NoShowBookingModal from '../../components/Booking/NoShowBookingModal'
@@ -310,6 +311,7 @@ const getOperationPhaseText = (phase) => {
   const value = String(phase || '').toUpperCase()
   if (value === 'WAITING_FOR_INTAKE') return 'Awaiting Intake'
   if (value === 'AUTOMATED_WASH') return 'In Wash'
+  if (value === 'ADDON_SERVICE') return 'Add-on Service'
   if (value === 'WAITING_FOR_CARE') return 'Awaiting Care'
   if (value === 'VEHICLE_CARE') return 'In Care'
   if (value === 'FINAL_INSPECTION') return 'Final Inspection'
@@ -377,6 +379,25 @@ const getCompleteServiceErrorMessage = (err) => {
     return 'You do not have permission to perform this action.'
   }
   return err?.response?.data?.message || err?.message || 'Failed to complete service.'
+}
+
+const getAddOnsErrorMessage = (err) => {
+  const raw = err?.response?.data?.message || err?.message || ''
+
+  if (raw.includes('WASH_BAY_CAPACITY_FULL')) {
+    return 'Not enough time/wash bay capacity left for the extra service.'
+  }
+  if (raw.includes('CARE_STAFF_CAPACITY_FULL')) {
+    return 'Not enough care staff available in the new time window.'
+  }
+  if (raw.toLowerCase().includes('already included')) {
+    return 'This service was already added by another staff member or is already part of a combo.'
+  }
+  if (raw.toLowerCase().includes('add-ons can only be added')) {
+    return 'This booking has moved past the stage where services can still be added.'
+  }
+
+  return raw || 'Failed to add the service.'
 }
 
 const isStaffProfileError = (err) => {
@@ -700,6 +721,10 @@ function BookingDetailPage() {
   const [assignedCareStaff, setAssignedCareStaff] = useState([])
   const [editingAfterWash, setEditingAfterWash] = useState(false)
   const [cancelTxToast, setCancelTxToast] = useState('')
+  const [addOnsModalOpen, setAddOnsModalOpen] = useState(false)
+  const [addOnsLoading, setAddOnsLoading] = useState(false)
+  const [addOnsError, setAddOnsError] = useState('')
+  const careAssignSectionRef = useRef(null)
 
   const role = location.pathname.startsWith('/admin')
     ? 'admin'
@@ -749,13 +774,21 @@ function BookingDetailPage() {
   const canCompleteService = canEditBooking && currentStatus === 'IN_PROGRESS' && !hasOperationPhase
   // Phase-based action buttons
   const canStartWash = canEditBooking && currentStatus === 'CHECKED_IN' && operationPhase === 'WAITING_FOR_INTAKE'
+  // Runtime add-ons: only while the wash stage is still open (before Vehicle Care starts).
+  const canAddServices = canEditBooking && (
+    (currentStatus === 'CHECKED_IN' && operationPhase === 'WAITING_FOR_INTAKE') ||
+    (currentStatus === 'IN_PROGRESS' && operationPhase === 'AUTOMATED_WASH')
+  )
   // Phase-specific step completion derived state
   const washSteps = serviceSteps.filter((s) => String(s.executionPhase || '').toUpperCase() === 'AUTOMATED_WASH')
+  const addonServiceSteps = serviceSteps.filter((s) => String(s.executionPhase || '').toUpperCase() === 'ADDON_SERVICE')
   const careSteps = serviceSteps.filter((s) => String(s.executionPhase || '').toUpperCase() === 'VEHICLE_CARE')
   // No wash/care steps configured means the package has none — passes the guard (backend will also validate).
   const allWashStepsDone = washSteps.length === 0 || washSteps.every((s) => String(s.status || '').toUpperCase() === 'COMPLETED')
+  const allAddonServiceStepsDone = addonServiceSteps.length === 0 || addonServiceSteps.every((s) => String(s.status || '').toUpperCase() === 'COMPLETED')
   const allCareStepsDone = careSteps.length === 0 || careSteps.every((s) => String(s.status || '').toUpperCase() === 'COMPLETED')
   const pendingWashStepCount = washSteps.filter((s) => String(s.status || '').toUpperCase() !== 'COMPLETED').length
+  const pendingAddonServiceStepCount = addonServiceSteps.filter((s) => String(s.status || '').toUpperCase() !== 'COMPLETED').length
   const pendingCareStepCount = careSteps.filter((s) => String(s.status || '').toUpperCase() !== 'COMPLETED').length
   // Legacy data may already be at FINAL_INSPECTION although a care step is still pending.
   // It must be returned to VEHICLE_CARE; final inspection must never hide/skip that step.
@@ -766,15 +799,18 @@ function BookingDetailPage() {
   const nonIntakeSteps = serviceSteps.filter((s) => String(s.executionPhase || '').toUpperCase() !== 'INTAKE_INSPECTION')
   const visibleServiceSteps = operationPhase === 'AUTOMATED_WASH' || operationPhase === 'WAITING_FOR_INTAKE'
     ? washSteps
-    : operationPhase === 'WAITING_FOR_CARE' || operationPhase === 'VEHICLE_CARE'
-      ? careSteps
-      : nonIntakeSteps
+    : operationPhase === 'ADDON_SERVICE'
+      ? addonServiceSteps
+      : operationPhase === 'WAITING_FOR_CARE' || operationPhase === 'VEHICLE_CARE'
+        ? careSteps
+        : nonIntakeSteps
   const serviceStepsReadOnly = role === 'customer'
     || operationPhase === 'WAITING_FOR_INTAKE'
     || operationPhase === 'WAITING_FOR_CARE'
     || operationPhase === 'FINAL_INSPECTION'
     || operationPhase === 'READY_FOR_HANDOVER'
   const canCompleteWash = canEditBooking && currentStatus === 'IN_PROGRESS' && operationPhase === 'AUTOMATED_WASH'
+  const canCompleteAddonService = canEditBooking && currentStatus === 'IN_PROGRESS' && operationPhase === 'ADDON_SERVICE'
   const careStaffShortage = careAssignmentStatus != null
     ? Boolean(careAssignmentStatus.shortage)
     : Boolean(booking?.careStaffShortage)
@@ -843,6 +879,7 @@ function BookingDetailPage() {
     if (packageResult.status === 'fulfilled' && packageResult.value) {
       enriched.servicePackageName = getPackageName(packageResult.value)
       enriched.servicePackageType = packageResult.value.serviceType || packageResult.value.packageType || packageResult.value.type
+      enriched.vehicleType = packageResult.value.vehicleType || enriched.vehicleType
       enriched.servicePackageDescription = packageResult.value.description || ''
       enriched.servicePackageSteps = normalizeServiceSteps(getPackageStepSource(packageResult.value))
       enriched.requiresCareStaff = Boolean(packageResult.value.requiresCareStaff)
@@ -1540,6 +1577,48 @@ function BookingDetailPage() {
     }
   }
 
+  const handleOpenAddOns = () => {
+    if (!canAddServices) return
+    setAddOnsError('')
+    setAddOnsModalOpen(true)
+  }
+
+  const handleConfirmAddOns = async (servicePackageIds) => {
+    setAddOnsLoading(true)
+    setAddOnsError('')
+    try {
+      const result = await bookingApi.addBookingAddOns(id, servicePackageIds)
+      setAddOnsModalOpen(false)
+      if (result) {
+        setBooking((prev) => (prev ? { ...prev, ...result } : prev))
+        writeCachedBooking(result.id, result)
+      }
+      await loadDetail()
+      if (currentStatus === 'IN_PROGRESS' || result?.status === 'IN_PROGRESS') {
+        await loadServiceSteps()
+      }
+      setActionMessage('Service added successfully.')
+      if (result?.careStaffShortage) {
+        await loadCareAssignmentData()
+        await loadAssignedCareStaff()
+        careAssignSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    } catch (err) {
+      const status = err?.response?.status
+      const message = getAddOnsErrorMessage(err)
+      if (status === 400) {
+        // Keep the modal open so the user can adjust the selection.
+        setAddOnsError(message)
+        return
+      }
+      setAddOnsModalOpen(false)
+      setActionMessage(message)
+      await loadDetail()
+    } finally {
+      setAddOnsLoading(false)
+    }
+  }
+
   const handleCompleteService = () => {
     if (!canFinishService) return
     setCompleteServiceError('')
@@ -2044,6 +2123,22 @@ function BookingDetailPage() {
     }
   }
 
+  const handleCompleteAddonService = async () => {
+    if (!canCompleteAddonService) return
+    setPhaseActionLoading(true)
+    setPhaseActionError('')
+    try {
+      await bookingApi.completeAddonService(id, '')
+      setActionMessage('Add-on service completed.')
+      await loadDetail()
+      await loadServiceSteps()
+    } catch (err) {
+      setPhaseActionError(getActionErrorMessage(err) || 'Failed to complete add-on service.')
+    } finally {
+      setPhaseActionLoading(false)
+    }
+  }
+
   const handleStartCare = async () => {
     if (!canStartCare) return
     setPhaseActionLoading(true)
@@ -2405,7 +2500,10 @@ function BookingDetailPage() {
 
           {/* ── Care staff assignment ── */}
           {canManageCareAssignment && careAssignmentStatus?.requiresCareStaff && (
-            <div className={`bd-action-msg ${careAssignmentStatus.shortage ? 'bd-action-msg--warn' : 'bd-action-msg--info'}`}>
+            <div
+              ref={careAssignSectionRef}
+              className={`bd-action-msg ${careAssignmentStatus.shortage ? 'bd-action-msg--warn' : 'bd-action-msg--info'}`}
+            >
               {(careAssignmentStatus.operationPhase === 'FINAL_INSPECTION'
                 || careAssignmentStatus.operationPhase === 'READY_FOR_HANDOVER'
                 || careAssignmentStatus.operationPhase === 'DONE') ? (
@@ -2774,6 +2872,11 @@ function BookingDetailPage() {
                   {actionLoading ? 'Completing...' : TEXT.completeService}
                 </button>
               )}
+              {canAddServices && (
+                <button type="button" className="bd-btn bd-btn--addon" disabled={actionLoading} onClick={handleOpenAddOns}>
+                  Add service
+                </button>
+              )}
               {/* ── Operation phase buttons ── */}
               {/* NOTE: canStartWash — "Start Automated Wash" button is now rendered in the
                   Before-Wash Inspection gate section above, where it is gated on the
@@ -2799,6 +2902,30 @@ function BookingDetailPage() {
                     onClick={handleCompleteWash}
                   >
                     {phaseActionLoading ? 'Completing...' : 'Complete Wash & Release Bay'}
+                  </button>
+                </>
+              )}
+              {canCompleteAddonService && (
+                <>
+                  {!allAddonServiceStepsDone && (
+                    <p className="bd-care-assign-error">
+                      {addonServiceSteps.length === 0
+                        ? 'No Add-on Service steps are configured.'
+                        : `${pendingAddonServiceStepCount} add-on step(s) must be completed before continuing.`}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="bd-btn bd-btn--complete"
+                    disabled={phaseActionLoading || actionLoading || !allAddonServiceStepsDone}
+                    title={!allAddonServiceStepsDone
+                      ? addonServiceSteps.length === 0
+                        ? 'No Add-on Service steps are configured'
+                        : `${pendingAddonServiceStepCount} add-on step(s) still incomplete`
+                      : undefined}
+                    onClick={handleCompleteAddonService}
+                  >
+                    {phaseActionLoading ? 'Completing...' : 'Complete Add-on Service'}
                   </button>
                 </>
               )}
@@ -2894,6 +3021,16 @@ function BookingDetailPage() {
         error={startServiceError}
         onClose={() => { if (!startServiceLoading) { setStartServiceModalOpen(false); setStartServiceError('') } }}
         onConfirm={handleStartServiceConfirm}
+      />
+
+      <AddBookingAddOnsModal
+        open={addOnsModalOpen}
+        bookingId={displayBookingNo}
+        booking={booking}
+        loading={addOnsLoading}
+        error={addOnsError}
+        onClose={() => { if (!addOnsLoading) { setAddOnsModalOpen(false); setAddOnsError('') } }}
+        onConfirm={handleConfirmAddOns}
       />
 
       <CompleteServiceModal

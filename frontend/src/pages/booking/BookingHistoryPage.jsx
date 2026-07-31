@@ -785,6 +785,18 @@ export default function BookingHistoryPage() {
     }
   }
 
+  const handleRebook = (booking) => {
+    const params = new URLSearchParams()
+    if (booking?.vehicleId) params.set('vehicleId', String(booking.vehicleId))
+    if (booking?.garageId) params.set('garageId', String(booking.garageId))
+    if (booking?.servicePackageId) params.set('servicePackageId', String(booking.servicePackageId))
+    if (Array.isArray(booking?.addOnServicePackageIds) && booking.addOnServicePackageIds.length > 0) {
+      params.set('addOnServicePackageIds', booking.addOnServicePackageIds.join(','))
+    }
+    params.set('step', '4')
+    navigate(`/booking?${params.toString()}`)
+  }
+
   const handlePayDeposit = async (booking) => {
     const bookingId = getBookingId(booking)
     if (!bookingId) return
@@ -1165,6 +1177,15 @@ export default function BookingHistoryPage() {
                         disabled={cancelingId === bookingId}
                       >
                         {cancelingId === bookingId ? 'Cancelling…' : 'Cancel'}
+                      </button>
+                    )}
+                    {status === 'COMPLETED' && (
+                      <button
+                        type="button"
+                        className="bhp-rebook-btn"
+                        onClick={() => handleRebook(booking)}
+                      >
+                        Rebook
                       </button>
                     )}
                     {status === 'COMPLETED' && paymentStatus === 'PAID' && reviewedIdsLoaded && !reviewedIdsError && (

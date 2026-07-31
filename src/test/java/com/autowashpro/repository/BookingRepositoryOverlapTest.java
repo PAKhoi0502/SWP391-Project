@@ -58,6 +58,31 @@ class BookingRepositoryOverlapTest {
     }
 
     @Test
+    void garageVehicleTypeOverlapExcludesBookingsWithCompletedWash() {
+        Vehicle car = persistVehicle("0902000009", "51H92345", "CAR");
+        LocalDateTime start = slotStart();
+        // Planned wash window 9:00–9:30 (full booking 9:00–10:00), but staff completed
+        // the wash early at 9:10 — washBayEndTime must take priority over plannedWashEndAt.
+        Booking booking = persistBooking(1L, car.getId(), 9L, "IN_PROGRESS", start, start.plusHours(1), "51H92345");
+        booking.setPlannedWashEndAt(start.plusMinutes(30));
+        booking.setWashBayEndTime(start.plusMinutes(10));
+        entityManager.persistAndFlush(booking);
+
+        // A new request for 9:15–9:45 falls inside the old planned window but after the
+        // real completion time — the bay must already be considered free.
+        long overlapsAfterEarlyCompletion = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
+                9L, "CAR", start.plusMinutes(15), start.plusMinutes(45), LocalDateTime.now());
+        // A request that starts before the real completion time must still see it as occupied.
+        long overlapsBeforeCompletion = bookingRepository.countOverlappingBookingsByGarageAndVehicleType(
+                9L, "CAR", start.plusMinutes(5), start.plusMinutes(20), LocalDateTime.now());
+
+        assertEquals(0, overlapsAfterEarlyCompletion,
+                "Bay released early via washBayEndTime must not block a new slot after that time");
+        assertEquals(1, overlapsBeforeCompletion,
+                "Bay must still count as occupied before the real completion time");
+    }
+
+    @Test
     void licensePlateOverlapCountsWalkInActiveBookings() {
         LocalDateTime start = slotStart();
         persistBooking(null, null, 3L, "IN_PROGRESS", start, start.plusHours(1), "51H99999");

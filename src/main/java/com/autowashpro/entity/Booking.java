@@ -171,8 +171,8 @@ public class Booking {
 
     // ===================== ISSUE #169 Operation Phase =====================
 
-    /** Current operation phase: WAITING_FOR_INTAKE, AUTOMATED_WASH, WAITING_FOR_CARE,
-     *  VEHICLE_CARE, FINAL_INSPECTION, READY_FOR_HANDOVER, DONE */
+    /** Current operation phase: WAITING_FOR_INTAKE, AUTOMATED_WASH, ADDON_SERVICE,
+     *  WAITING_FOR_CARE, VEHICLE_CARE, FINAL_INSPECTION, READY_FOR_HANDOVER, DONE */
     @Column(name = "operation_phase", length = 30)
     private String operationPhase;
 

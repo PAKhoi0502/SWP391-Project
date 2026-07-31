@@ -4,10 +4,12 @@ import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
 import com.autowashpro.dto.request.WalkInBookingCreateRequest;
 import com.autowashpro.dto.response.BookingResponse;
 import com.autowashpro.entity.Booking;
+import com.autowashpro.entity.BookingAddOnServicePackage;
 import com.autowashpro.entity.BookingAssignedStaff;
 import com.autowashpro.entity.BookingServiceStep;
 import com.autowashpro.entity.Garage;
 import com.autowashpro.entity.ServicePackage;
+import com.autowashpro.entity.ServicePackageStep;
 import com.autowashpro.entity.StaffProfile;
 import com.autowashpro.entity.User;
 import com.autowashpro.entity.Vehicle;
@@ -515,6 +517,111 @@ class BookingOperationPhaseTest {
                 eq(garage.getId()), eq("CAR"), eq(slotStart), endCaptor.capture(), any());
         assertEquals(expectedWashEnd, endCaptor.getValue(),
                 "Wash bay overlap check should use wash window end, not full booking end");
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Test 16 – startWash generates ADDON_SERVICE phase for a non-care add-on's
+    //           steps, so they don't block the bay-release gate in completeWash
+    // ────────────────────────────────────────────────────────────────────────────
+    @Test
+    void startWashGeneratesAddonServicePhaseForNonCareAddOn() {
+        User staffUser = TestFixtures.staff();
+        Garage garage = TestFixtures.garage();
+        ServicePackage pkg = washOnlyPackage();
+        ServicePackage nonCareAddOn = ServicePackage.builder()
+                .id(30L).name("Interior Vacuum").code("ADDON-VAC")
+                .vehicleType("CAR").serviceType("ADDON")
+                .basePrice(new BigDecimal("30000.00"))
+                .durationMinutes(15).washBayDurationMinutes(0)
+                .requiresWashBay(false).requiresCareStaff(false)
+                .careStaffRequiredCount(0).careStaffDurationMinutes(0)
+                .isActive(true).build();
+        ServicePackageStep addOnStepTemplate = ServicePackageStep.builder()
+                .id(200L).servicePackage(nonCareAddOn).stepOrder(1)
+                .name("Vacuum interior").durationMinutes(15).build();
+        Booking booking = checkedInBooking(garage, pkg);
+        WashBay washBay = TestFixtures.washBay(garage);
+        StaffProfile profile = TestFixtures.customerServiceStaff(staffUser, garage);
+        BookingAddOnServicePackage addOnLink = new BookingAddOnServicePackage();
+        addOnLink.setBookingId(booking.getId());
+        addOnLink.setServicePackageId(nonCareAddOn.getId());
+        addOnLink.setSortOrder(1);
+
+        when(staffProfileRepository.findByUser_Id(staffUser.getId())).thenReturn(Optional.of(profile));
+        when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
+        when(servicePackageRepository.findById(pkg.getId())).thenReturn(Optional.of(pkg));
+        when(vehicleInspectionRepository.findByBookingIdOrderByCreatedAtAsc(booking.getId()))
+                .thenReturn(List.of(inspection("BEFORE_WASH")));
+        when(washBayRepository.findFirstByGarageIdAndVehicleTypeAndStatusAndIsActiveTrue(
+                garage.getId(), "CAR", WashBayStatus.AVAILABLE)).thenReturn(Optional.of(washBay));
+        when(washBayRepository.save(any(WashBay.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(bookingServiceStepRepository.findByBookingIdOrderByStepOrder(booking.getId())).thenReturn(List.of());
+        when(comboStepResolver.resolveSteps(pkg)).thenReturn(List.of());
+        when(bookingAddOnServicePackageRepository.findByBookingIdOrderBySortOrderAsc(booking.getId()))
+                .thenReturn(List.of(addOnLink));
+        when(servicePackageStepRepository.findByServicePackage_IdOrderByStepOrder(nonCareAddOn.getId()))
+                .thenReturn(List.of(addOnStepTemplate));
+        when(bookingServiceStepRepository.save(any(BookingServiceStep.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        bookingService.startWash(booking.getId(), staffUser.getId(), "ROLE_STAFF", null);
+
+        ArgumentCaptor<BookingServiceStep> captor = ArgumentCaptor.forClass(BookingServiceStep.class);
+        verify(bookingServiceStepRepository).save(captor.capture());
+        assertEquals("ADDON_SERVICE", captor.getValue().getExecutionPhase(),
+                "Non-care add-on steps must not share the AUTOMATED_WASH phase with the main package");
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Test 17 – startWash keeps VEHICLE_CARE phase for a care-required add-on's
+    //           steps (unchanged prior behavior)
+    // ────────────────────────────────────────────────────────────────────────────
+    @Test
+    void startWashKeepsVehicleCarePhaseForCareAddOn() {
+        User staffUser = TestFixtures.staff();
+        Garage garage = TestFixtures.garage();
+        ServicePackage pkg = washOnlyPackage();
+        ServicePackage careAddOn = ServicePackage.builder()
+                .id(31L).name("Pet Hair Removal").code("ADDON-PET")
+                .vehicleType("CAR").serviceType("ADDON")
+                .basePrice(new BigDecimal("50000.00"))
+                .durationMinutes(20).washBayDurationMinutes(0)
+                .requiresWashBay(false).requiresCareStaff(true)
+                .careStaffType("VEHICLE_CARE_STAFF")
+                .careStaffRequiredCount(1).careStaffDurationMinutes(20)
+                .isActive(true).build();
+        ServicePackageStep addOnStepTemplate = ServicePackageStep.builder()
+                .id(201L).servicePackage(careAddOn).stepOrder(1)
+                .name("Remove pet hair").durationMinutes(20).build();
+        Booking booking = checkedInBooking(garage, pkg);
+        WashBay washBay = TestFixtures.washBay(garage);
+        StaffProfile profile = TestFixtures.customerServiceStaff(staffUser, garage);
+        BookingAddOnServicePackage addOnLink = new BookingAddOnServicePackage();
+        addOnLink.setBookingId(booking.getId());
+        addOnLink.setServicePackageId(careAddOn.getId());
+        addOnLink.setSortOrder(1);
+
+        when(staffProfileRepository.findByUser_Id(staffUser.getId())).thenReturn(Optional.of(profile));
+        when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
+        when(servicePackageRepository.findById(pkg.getId())).thenReturn(Optional.of(pkg));
+        when(vehicleInspectionRepository.findByBookingIdOrderByCreatedAtAsc(booking.getId()))
+                .thenReturn(List.of(inspection("BEFORE_WASH")));
+        when(washBayRepository.findFirstByGarageIdAndVehicleTypeAndStatusAndIsActiveTrue(
+                garage.getId(), "CAR", WashBayStatus.AVAILABLE)).thenReturn(Optional.of(washBay));
+        when(washBayRepository.save(any(WashBay.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(bookingServiceStepRepository.findByBookingIdOrderByStepOrder(booking.getId())).thenReturn(List.of());
+        when(comboStepResolver.resolveSteps(pkg)).thenReturn(List.of());
+        when(bookingAddOnServicePackageRepository.findByBookingIdOrderBySortOrderAsc(booking.getId()))
+                .thenReturn(List.of(addOnLink));
+        when(servicePackageStepRepository.findByServicePackage_IdOrderByStepOrder(careAddOn.getId()))
+                .thenReturn(List.of(addOnStepTemplate));
+        when(bookingServiceStepRepository.save(any(BookingServiceStep.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        bookingService.startWash(booking.getId(), staffUser.getId(), "ROLE_STAFF", null);
+
+        ArgumentCaptor<BookingServiceStep> captor = ArgumentCaptor.forClass(BookingServiceStep.class);
+        verify(bookingServiceStepRepository).save(captor.capture());
+        assertEquals("VEHICLE_CARE", captor.getValue().getExecutionPhase(),
+                "Care-required add-on steps must keep the existing VEHICLE_CARE phase");
     }
 
     // ────────────────────────────────────────────────────────────────────────────

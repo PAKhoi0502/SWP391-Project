@@ -205,6 +205,11 @@ export const bookingApi = {
     return unwrap(response)
   },
 
+  async completeAddonService(bookingId, note) {
+    const response = await api.patch(`/bookings/${bookingId}/operations/complete-addon-service`, { note: note || '' })
+    return unwrap(response)
+  },
+
   async startCare(bookingId, note) {
     const response = await api.patch(`/bookings/${bookingId}/operations/start-care`, { note: note || '' })
     return unwrap(response)
@@ -274,5 +279,12 @@ export const bookingApi = {
   async getStaffCalendar(year, month) {
     const response = await api.get('/bookings/staff/calendar', { params: { year, month } })
     return unwrap(response) ?? []
+  },
+
+  async addBookingAddOns(bookingId, servicePackageIds) {
+    const response = await api.post(`/bookings/${bookingId}/add-ons`, {
+      servicePackageIds: servicePackageIds.map(Number),
+    })
+    return unwrap(response)
   },
 }
