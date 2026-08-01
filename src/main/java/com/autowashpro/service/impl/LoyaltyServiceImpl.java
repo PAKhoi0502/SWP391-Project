@@ -709,13 +709,12 @@ String newTier = newTierHolder[0];
                 ? request.getSubtotalAfterPromotion()
                 : originalPrice;
 
-        // max 50% of eligible amount AND final must remain >= 50,000đ
-        BigDecimal maxByPercent = eligibleAmount.multiply(BigDecimal.valueOf(0.5));
+        // max discount is 50,000đ AND final must remain >= 50,000đ
         BigDecimal maxByMinPayable = eligibleAmount.subtract(BigDecimal.valueOf(50000));
-        BigDecimal maxDiscount = maxByPercent.min(maxByMinPayable);
+        BigDecimal maxDiscount = maxByMinPayable.min(BigDecimal.valueOf(50000));
         if (maxDiscount.compareTo(BigDecimal.ZERO) < 0) maxDiscount = BigDecimal.ZERO;
 
-        int maxPoints = maxDiscount.divide(BigDecimal.valueOf(1000), RoundingMode.DOWN).intValue();
+        int maxPoints = maxDiscount.divide(BigDecimal.valueOf(100), RoundingMode.DOWN).intValue();
         maxPoints = (maxPoints / 10) * 10;
 
         int validPoints = (requestedPoints / 10) * 10;
@@ -731,13 +730,13 @@ String newTier = newTierHolder[0];
                 );
             } else {
                 message = String.format(
-                    "Chỉ áp dụng tối đa %d điểm (giảm tối đa 50%% và giữ tổng thanh toán ≥ 50.000đ).",
+                    "Chỉ áp dụng tối đa %d điểm (giảm tối đa 50.000đ và giữ tổng thanh toán ≥ 50.000đ).",
                     validPoints
                 );
             }
         }
 
-        BigDecimal discountAmount = BigDecimal.valueOf(validPoints * 1000L);
+        BigDecimal discountAmount = BigDecimal.valueOf(validPoints * 100L);
         BigDecimal estimatedFinalPrice = eligibleAmount.subtract(discountAmount);
 
         return RedeemPreviewResponse.builder()

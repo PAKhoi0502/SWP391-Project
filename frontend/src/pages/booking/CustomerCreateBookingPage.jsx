@@ -13,6 +13,7 @@ import DepositQrModal from '../../components/Booking/DepositQrModal'
 import VehiclesModal from '../../components/profile/VehiclesModal'
 import BookingErrorToast, { useBookingErrorToast } from '../../components/Booking/BookingErrorToast'
 import { normalizeBookingError } from '../../utils/bookingErrorMapper'
+import { findActivePendingTransaction } from '../../utils/paymentTransactionUtils'
 import './CustomerCreateBookingPage.css'
 import { getPackageType } from '../../services/servicePackageApi'
 
@@ -216,6 +217,34 @@ const getSlotEnd = (slot) => {
   return raw ? formatTime(raw) : ''
 }
 
+const timeStringToMinutes = (value) => {
+  if (!value) return null
+  const [h, m] = String(value).split(':').map(Number)
+  if (Number.isNaN(h)) return null
+  return h * 60 + (Number.isNaN(m) ? 0 : m)
+}
+
+const minutesToTimeString = (minutes) => {
+  const h = Math.floor(minutes / 60) % 24
+  const m = minutes % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+/** Build a list of "HH:MM" options spanning a garage's opening → closing hours. */
+const buildGarageTimeOptions = (garage) => {
+  const open = timeStringToMinutes(garage?.openingTime)
+  const close = timeStringToMinutes(garage?.closingTime)
+  const interval = Number(garage?.slotIntervalMinutes) || 30
+
+  if (open == null || close == null || interval <= 0) return []
+
+  const options = []
+  for (let m = open; m <= close; m += interval) {
+    options.push(minutesToTimeString(m))
+  }
+  return options
+}
+
 export default function CustomerCreateBookingPage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -269,6 +298,29 @@ export default function CustomerCreateBookingPage() {
   const [selectedSlotId, setSelectedSlotId] = useState('')
   const [bookingWindowDays, setBookingWindowDays] = useState(7)
 
+  // Step 3 "pick by desired time" mode (Option 2) — browse-by-package stays the default.
+  const [packageSelectMode, setPackageSelectMode] = useState('BROWSE')
+  const [desiredDate, setDesiredDate] = useState(minBookingDateIso())
+  const [desiredTime, setDesiredTime] = useState('')
+  const [desiredEndTime, setDesiredEndTime] = useState('')
+  const [suggestedPackages, setSuggestedPackages] = useState([])
+  const [suggestedLoading, setSuggestedLoading] = useState(false)
+  const [suggestedError, setSuggestedError] = useState('')
+  const [suggestedSearched, setSuggestedSearched] = useState(false)
+  // The exact start time confirmed available for the currently-selected suggested package.
+  const [confirmedDesiredStart, setConfirmedDesiredStart] = useState('')
+  // Consumed once Step 4's slot list loads, to auto-select the exact slot the
+  // customer already confirmed was available when picking a suggested package.
+  const pendingDesiredStartRef = useRef('')
+  // Bumped every time "pick by time" jumps to Step 5, so the slot-loading effect below
+  // always re-runs (and re-consumes pendingDesiredStartRef) even if the date/package/
+  // add-ons happened not to change since the last run — a plain state no-op wouldn't
+  // retrigger the effect otherwise.
+  const [bytimeReloadToken, setBytimeReloadToken] = useState(0)
+  // Whether Step 5 (Confirm) was reached via the "pick by time" shortcut — used so the
+  // Back button returns to Step 3 instead of the never-visited Step 4 date/time picker.
+  const [skipDateTimeStep, setSkipDateTimeStep] = useState(false)
+
   const [promotionCode, setPromotionCode] = useState('')
   const [promotionResult, setPromotionResult] = useState(null)
   const [showPromoDropdown, setShowPromoDropdown] = useState(false)
@@ -276,6 +328,7 @@ export default function CustomerCreateBookingPage() {
   const [loadingEligible, setLoadingEligible] = useState(false)
   const [loyaltyPoints, setLoyaltyPoints] = useState('')
   const [loyaltyPreview, setLoyaltyPreview] = useState(null)
+  const [availableLoyaltyPoints, setAvailableLoyaltyPoints] = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('')
 
   const [waitlistModal, setWaitlistModal]           = useState(null)
@@ -320,6 +373,8 @@ export default function CustomerCreateBookingPage() {
     () => garages.find((item) => String(getId(item)) === String(selectedGarageId)),
     [garages, selectedGarageId],
   )
+
+  const garageTimeOptions = useMemo(() => buildGarageTimeOptions(selectedGarage), [selectedGarage])
 
   const selectedPackage = useMemo(
     () => servicePackages.find((item) => String(getId(item)) === String(selectedPackageId)),
@@ -381,6 +436,26 @@ export default function CustomerCreateBookingPage() {
     return { washMinutes, careMinutes }
   }, [selectedPackage, selectedAddOns])
 
+  // "Select your time" mode — estimated finish for the confirmed start, recomputed
+  // live as add-ons are toggled on top of the chosen suggested package.
+  const bytimeEstimatedFinish = useMemo(() => {
+    if (!confirmedDesiredStart) return null
+    const totalMinutes = durationSummary.washMinutes + durationSummary.careMinutes
+    if (totalMinutes <= 0) return null
+    const start = new Date(confirmedDesiredStart)
+    if (Number.isNaN(start.getTime())) return null
+    return new Date(start.getTime() + totalMinutes * 60000)
+  }, [confirmedDesiredStart, durationSummary])
+
+  // True once add-ons push the estimated finish past the free-time window the
+  // customer picked (desiredEndTime) — used to flag the estimate in red.
+  const bytimeExceedsWindow = useMemo(() => {
+    if (!bytimeEstimatedFinish || !desiredDate || !desiredEndTime) return false
+    const endBoundary = new Date(`${desiredDate}T${desiredEndTime}:00`)
+    if (Number.isNaN(endBoundary.getTime())) return false
+    return bytimeEstimatedFinish > endBoundary
+  }, [bytimeEstimatedFinish, desiredDate, desiredEndTime])
+
   const priceSummary = useMemo(() => {
     const mainPrice = bookingFlowUtils.getPackagePrice(selectedPackage)
     const addOnsPrice = selectedAddOns.reduce(
@@ -424,6 +499,8 @@ export default function CustomerCreateBookingPage() {
           const matched = garageData.find((g) => String(getId(g)) === garageIdParam)
           if (matched) setSelectedGarageId(garageIdParam)
         }
+
+        setAvailableLoyaltyPoints(loyaltyResult?.availablePoints ?? 0)
 
         const currentTier = String(loyaltyResult?.currentTier || 'BRONZE').toUpperCase()
         const currentRule = tierRulesResult.find(
@@ -533,7 +610,21 @@ export default function CustomerCreateBookingPage() {
           addOnServicePackageIds: selectedAddOnIds.map(Number),
         })
 
-        if (mounted) setSlots(data)
+        if (mounted) {
+          setSlots(data)
+
+          // Option 2 ("pick by time") flow — auto-select the exact slot the customer
+          // already confirmed was available when picking a suggested package.
+          if (pendingDesiredStartRef.current) {
+            const targetPrefix = pendingDesiredStartRef.current.slice(0, 16) // YYYY-MM-DDTHH:mm
+            const matched = (Array.isArray(data) ? data : []).find((slot) => {
+              const raw = slot?.startTime || slot?.start || slot?.from
+              return raw && String(raw).slice(0, 16) === targetPrefix
+            })
+            if (matched) setSelectedSlotId(String(getId(matched)))
+            pendingDesiredStartRef.current = ''
+          }
+        }
       } catch (error) {
         if (mounted) {
           setSlots([])
@@ -552,7 +643,7 @@ export default function CustomerCreateBookingPage() {
     return () => {
       mounted = false
     }
-  }, [selectedDate, selectedGarageId, selectedPackageId, selectedVehicle, selectedAddOnIds])
+  }, [selectedDate, selectedGarageId, selectedPackageId, selectedVehicle, selectedAddOnIds, bytimeReloadToken])
 
   useEffect(() => {
     if (
@@ -788,6 +879,8 @@ export default function CustomerCreateBookingPage() {
     }
 
     setMessage('')
+    // Reached via the normal step-by-step flow — Step 5's Back should return to Step 4.
+    setSkipDateTimeStep(false)
     setCurrentStep((step) => Math.min(step + 1, 5))
   }
 
@@ -806,11 +899,90 @@ export default function CustomerCreateBookingPage() {
   const handleSelectPackage = (servicePackage) => {
     const id = String(getId(servicePackage))
     setSelectedPackageId(id)
+    // Browsing manually invalidates any confirmed "pick by time" start — avoids
+    // Step 3's Next button skipping to Confirm with a stale time if the mode is
+    // switched back to "Select your time" without searching again.
+    setConfirmedDesiredStart('')
+    setSkipDateTimeStep(false)
 
     // Combo is a standalone package — selecting a combo clears any selected add-ons
     if (normalizePackageType(servicePackage) === 'COMBO') {
       setSelectedAddOnIds([])
     }
+  }
+
+  const handleFindPackagesByTime = async () => {
+    if (!selectedGarageId || !selectedVehicle || !desiredDate || !desiredTime || !desiredEndTime) return
+
+    if (desiredEndTime <= desiredTime) {
+      setSuggestedError('End time must be after start time.')
+      return
+    }
+
+    setSuggestedLoading(true)
+    setSuggestedError('')
+    setSuggestedSearched(false)
+    setSelectedPackageId('')
+    setSelectedAddOnIds([])
+    setConfirmedDesiredStart('')
+    try {
+      const startTime = `${desiredDate}T${desiredTime}:00`
+      const endBoundary = new Date(`${desiredDate}T${desiredEndTime}:00`)
+      const result = await customerBookingFlowApi.getAvailablePackagesForStartTime({
+        garageId: selectedGarageId,
+        vehicleId: getId(selectedVehicle),
+        startTime,
+      })
+      const all = Array.isArray(result?.packages) ? result.packages : []
+      // Only keep packages that finish before the customer's free window closes.
+      const withinWindow = all.filter((pkg) => {
+        const end = pkg?.endTime ? new Date(pkg.endTime) : null
+        return end && end <= endBoundary
+      })
+      setSuggestedPackages(withinWindow)
+    } catch (error) {
+      setSuggestedPackages([])
+      setSuggestedError(
+        error?.response?.data?.message || error.message || 'Could not find packages for this time.',
+      )
+    } finally {
+      setSuggestedLoading(false)
+      setSuggestedSearched(true)
+    }
+  }
+
+  const handleSelectSuggestedPackage = (pkg) => {
+    const id = String(pkg.servicePackageId)
+    setSelectedPackageId(id)
+    setConfirmedDesiredStart(pkg.startTime || `${desiredDate}T${desiredTime}:00`)
+
+    // Combo is a standalone package — selecting a combo clears any selected add-ons
+    if (pkg.serviceType === 'COMBO') {
+      setSelectedAddOnIds([])
+    }
+  }
+
+  // Step 3's "Next" button: browse mode advances to Step 4 as usual; "pick by time"
+  // mode already has a confirmed start time, so it jumps straight to Step 5 (Confirm).
+  const handleStep3Next = () => {
+    if (!canGoNext()) {
+      setMessage('Please select a service package first.')
+      return
+    }
+
+    setMessage('')
+
+    if (packageSelectMode === 'BY_TIME' && confirmedDesiredStart) {
+      setSelectedDate(clampBookingDate(desiredDate, bookingWindowDays))
+      pendingDesiredStartRef.current = confirmedDesiredStart
+      setBytimeReloadToken((token) => token + 1)
+      setSkipDateTimeStep(true)
+      setCurrentStep(5)
+      return
+    }
+
+    setSkipDateTimeStep(false)
+    setCurrentStep((step) => Math.min(step + 1, 5))
   }
 
   const handleSubmitBooking = async () => {
@@ -918,6 +1090,15 @@ export default function CustomerCreateBookingPage() {
     setDepositQrError('')
     setDepositSuccess(false)
     try {
+      const existingTransactions = await bookingApi.getPaymentTransactions(bookingId).catch(() => [])
+      const activePending = findActivePendingTransaction(existingTransactions, 'DEPOSIT')
+      if (activePending) {
+        setDepositTransaction(activePending)
+        setDepositCheckoutUrl(activePending.checkoutUrl || '')
+        setDepositQrOpen(true)
+        return
+      }
+
       const result = await bookingApi.createPayOSPayment(bookingId)
       persistPayOSReturnPath('/customer/booking-history', result)
 
@@ -1220,7 +1401,161 @@ export default function CustomerCreateBookingPage() {
                       <h2 className="bk-step-title">Select Service Package</h2>
                     </div>
 
-                    {loadingPackages ? (
+                    <div className="bk-pkgmode-toggle">
+                      <button
+                        type="button"
+                        className={`bk-pkgmode-btn${packageSelectMode === 'BROWSE' ? ' bk-pkgmode-btn--active' : ''}`}
+                        onClick={() => setPackageSelectMode('BROWSE')}
+                      >
+                        Select package
+                      </button>
+                      <button
+                        type="button"
+                        className={`bk-pkgmode-btn${packageSelectMode === 'BY_TIME' ? ' bk-pkgmode-btn--active' : ''}`}
+                        onClick={() => setPackageSelectMode('BY_TIME')}
+                      >
+                        Select your time
+                      </button>
+                    </div>
+
+                    {packageSelectMode === 'BY_TIME' ? (
+                      <div className="bk-bytime">
+                        <p className="bk-bytime-hint">
+                          Pick the date and the time window you're free — we'll suggest the packages that fit.
+                        </p>
+                        <div className="bk-bytime-inputs">
+                          <label className="bk-bytime-field">
+                            <span>Date</span>
+                            <input
+                              type="date"
+                              className="bk-input"
+                              value={desiredDate}
+                              min={minBookingDateIso()}
+                              max={maxBookingDateIso(bookingWindowDays)}
+                              onChange={(e) => setDesiredDate(clampBookingDate(e.target.value, bookingWindowDays))}
+                            />
+                          </label>
+                          <label className="bk-bytime-field">
+                            <span>Start time</span>
+                            <select
+                              className="bk-input"
+                              value={desiredTime}
+                              onChange={(e) => setDesiredTime(e.target.value)}
+                            >
+                              <option value="">--:--</option>
+                              {garageTimeOptions.map((t) => (
+                                <option key={t} value={t}>{t}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="bk-bytime-field">
+                            <span>End time</span>
+                            <select
+                              className="bk-input"
+                              value={desiredEndTime}
+                              onChange={(e) => setDesiredEndTime(e.target.value)}
+                            >
+                              <option value="">--:--</option>
+                              {garageTimeOptions
+                                .filter((t) => !desiredTime || t > desiredTime)
+                                .map((t) => (
+                                  <option key={t} value={t}>{t}</option>
+                                ))}
+                            </select>
+                          </label>
+                          <button
+                            type="button"
+                            className="bk-btn-primary bk-btn-sm"
+                            disabled={!desiredDate || !desiredTime || !desiredEndTime || suggestedLoading}
+                            onClick={handleFindPackagesByTime}
+                          >
+                            {suggestedLoading ? 'Searching...' : 'Find packages'}
+                          </button>
+                        </div>
+
+                        {confirmedDesiredStart && bytimeEstimatedFinish && (
+                          <p className={`bk-bytime-estimate${bytimeExceedsWindow ? ' bk-bytime-estimate--over' : ''}`}>
+                            Estimated finish: <strong>{formatTime(bytimeEstimatedFinish)}</strong>
+                            {bytimeExceedsWindow && (
+                              <span className="bk-bytime-estimate-warn"> — past your {desiredEndTime} deadline</span>
+                            )}
+                          </p>
+                        )}
+
+                        {suggestedError && <span className="bk-field-error">{suggestedError}</span>}
+
+                        {suggestedSearched && !suggestedLoading && !suggestedError && suggestedPackages.length === 0 && (
+                          <div className="bk-empty">
+                            <p>No packages fit this window</p>
+                            <span>Try a wider time range or another date.</span>
+                          </div>
+                        )}
+
+                        {suggestedPackages.length > 0 && (
+                          <div className="bk-pkg-grid">
+                            {suggestedPackages.map((pkg) => {
+                              const sel = selectedPackageId === String(pkg.servicePackageId)
+                              return (
+                                <button
+                                  type="button"
+                                  key={pkg.servicePackageId}
+                                  className={`bk-pkg-card${sel ? ' bk-pkg-card--sel' : ''}`}
+                                  onClick={() => handleSelectSuggestedPackage(pkg)}
+                                >
+                                  <div className="bk-pkg-card-top">
+                                    <div className="bk-pkg-card-meta">
+                                      <span className={`bk-pkg-badge bk-pkg-badge--${pkg.serviceType === 'COMBO' ? 'combo' : 'main'}`}>
+                                        {pkg.serviceType === 'COMBO' ? 'Combo' : 'Main'}
+                                      </span>
+                                      {pkg.durationMinutes > 0 && <span className="bk-pkg-duration">⏱ {pkg.durationMinutes} min</span>}
+                                    </div>
+                                    <span className="bk-pkg-name">{pkg.name}</span>
+                                  </div>
+                                  <div className="bk-pkg-card-foot">
+                                    <span className="bk-pkg-price">{formatMoney(pkg.basePrice)}</span>
+                                    {sel && <span className="bk-pkg-check">✓</span>}
+                                  </div>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        {/* Add-ons — same pool used in "Select package" mode, offered on top of the chosen suggestion */}
+                        {selectedPackageId && !isComboSelected && addOnPackages.length > 0 && (
+                          <div className="bk-pkg-section bk-bytime-addons">
+                            <p className="bk-pkg-section-title">
+                              Add-ons <span className="bk-pkg-section-hint"> — select multiple, optional</span>
+                            </p>
+                            <div className="bk-pkg-grid">
+                              {addOnPackages.map((pkg) => {
+                                const pid = String(getId(pkg))
+                                const sel = selectedAddOnIds.includes(pid)
+                                return (
+                                  <button
+                                    type="button"
+                                    key={pid}
+                                    className={`bk-pkg-card${sel ? ' bk-pkg-card--sel' : ''}`}
+                                    onClick={() => toggleAddOn(pid)}
+                                  >
+                                    <div className="bk-pkg-card-top">
+                                      <div className="bk-pkg-card-meta">
+                                        <span className="bk-pkg-badge bk-pkg-badge--addon">Add-on</span>
+                                      </div>
+                                      <span className="bk-pkg-name">{getName(pkg, 'Add-on')}</span>
+                                    </div>
+                                    <div className="bk-pkg-card-foot">
+                                      <span className="bk-pkg-price">{formatMoney(bookingFlowUtils.getPackagePrice(pkg))}</span>
+                                      {sel && <span className="bk-pkg-check">✓</span>}
+                                    </div>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : loadingPackages ? (
                       <div className="bk-loading-inline">
                         <div className="bk-spinner-sm" />
                         Loading packages...
@@ -1351,7 +1686,7 @@ export default function CustomerCreateBookingPage() {
 
                     <div className="bk-step-nav">
                       <button type="button" className="bk-btn-ghost" onClick={handlePrevStep}>← Back</button>
-                      <button type="button" className="bk-btn-primary" disabled={!canGoNext()} onClick={handleNextStep}>Next →</button>
+                      <button type="button" className="bk-btn-primary" disabled={!canGoNext()} onClick={handleStep3Next}>Next →</button>
                     </div>
                   </div>
                 )}
@@ -1450,6 +1785,20 @@ export default function CustomerCreateBookingPage() {
                       <h2 className="bk-step-title">Offers & Confirm</h2>
                     </div>
 
+                    {packageSelectMode === 'BY_TIME' && !loadingSlots && selectedPackageId && !selectedSlot && (
+                      <div className="bk-msg">
+                        The time you picked is no longer available — it may have just been booked, or the
+                        add-ons you selected no longer fit that window.{' '}
+                        <button
+                          type="button"
+                          className="bk-btn-ghost bk-btn-sm"
+                          onClick={() => { setMessage(''); setCurrentStep(4) }}
+                        >
+                          Choose another time →
+                        </button>
+                      </div>
+                    )}
+
                     {/* Promo section */}
                     <div className="bk-section">
                       <p className="bk-section-title">Promo code</p>
@@ -1536,7 +1885,12 @@ export default function CustomerCreateBookingPage() {
 
                     {/* Loyalty section */}
                     <div className="bk-section">
-                      <p className="bk-section-title">Loyalty points</p>
+                      <p className="bk-section-title">
+                        Loyalty points
+                        {availableLoyaltyPoints != null && (
+                          <span className="bk-loyalty-balance"> ({availableLoyaltyPoints} available)</span>
+                        )}
+                      </p>
                       {promotionResult?.valid && !promotionResult?.allowLoyaltyStack ? (
                         <p className="booking-loyalty-blocked">
                           This promo code cannot be combined with loyalty points.
@@ -1611,7 +1965,18 @@ export default function CustomerCreateBookingPage() {
                     </div>
 
                     <div className="bk-step-nav">
-                      <button type="button" className="bk-btn-ghost" onClick={handlePrevStep}>← Back</button>
+                      <button
+                        type="button"
+                        className="bk-btn-ghost"
+                        onClick={() => {
+                          setMessage('')
+                          // "Pick by time" skipped Step 4 entirely — going back should
+                          // return to Step 3, not the date/time picker that was never shown.
+                          setCurrentStep(skipDateTimeStep ? 3 : 4)
+                        }}
+                      >
+                        ← Back
+                      </button>
                     </div>
                   </div>
                 )}

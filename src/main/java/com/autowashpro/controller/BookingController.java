@@ -11,6 +11,7 @@ import com.autowashpro.dto.request.GuestPhoneEligibilityRequest;
 import com.autowashpro.dto.request.WalkInBookingCreateRequest;
 import com.autowashpro.dto.response.AssignedCareStaffResponse;
 import com.autowashpro.dto.response.AvailableCareStaffResponse;
+import com.autowashpro.dto.response.AvailablePackagesForTimeResponse;
 import com.autowashpro.dto.response.AvailableSlotResponse;
 import com.autowashpro.dto.response.BookingResponse;
 import com.autowashpro.dto.response.BookingSummaryResponse;
@@ -34,6 +35,7 @@ import com.autowashpro.dto.request.BookingCheckInRequest;
 import java.util.List;
 import com.autowashpro.dto.request.StartServiceRequest;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import com.autowashpro.dto.request.CancelBookingRequest;
 import com.autowashpro.dto.request.ManualRefundRequest;
 import com.autowashpro.dto.request.CompleteBookingServiceStepRequest;
@@ -70,6 +72,32 @@ public class BookingController {
                                 .message("Available slots retrieved")
                                 .data(bookingService.getAvailableSlots(garageId, servicePackageId, vehicleType, date,
                                                 isWalkIn, addOnServicePackageIds))
+                                .build();
+        }
+
+        @GetMapping("/available-packages")
+        public ApiResponse<AvailablePackagesForTimeResponse> getAvailablePackagesForStartTime(
+                        @RequestParam("garage_id") Long garageId,
+                        @RequestParam("vehicle_id") Long vehicleId,
+                        @RequestParam("start_time") String startTimeRaw,
+                        @RequestParam(value = "is_walk_in", required = false, defaultValue = "false") boolean isWalkIn) {
+
+                LocalDateTime startTime;
+                try {
+                        // Parsed directly (yyyy-MM-dd'T'HH:mm[:ss]) instead of relying on Spring's
+                        // ISO.DATE_TIME conversion, which requires a fractional-seconds component.
+                        startTime = LocalDateTime.parse(startTimeRaw);
+                } catch (java.time.format.DateTimeParseException ex) {
+                        throw new org.springframework.web.server.ResponseStatusException(
+                                        org.springframework.http.HttpStatus.BAD_REQUEST,
+                                        "Invalid start_time format, expected yyyy-MM-ddTHH:mm:ss");
+                }
+
+                return ApiResponse.<AvailablePackagesForTimeResponse>builder()
+                                .success(true)
+                                .message("Available packages retrieved")
+                                .data(bookingService.getAvailablePackagesForStartTime(garageId, vehicleId, startTime,
+                                                isWalkIn))
                                 .build();
         }
 

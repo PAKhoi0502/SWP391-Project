@@ -15,6 +15,8 @@ import com.autowashpro.dto.request.StartServiceRequest;
 import com.autowashpro.dto.request.WalkInBookingCreateRequest;
 import com.autowashpro.dto.response.AssignedCareStaffResponse;
 import com.autowashpro.dto.response.AvailableCareStaffResponse;
+import com.autowashpro.dto.response.AvailablePackageAtTimeResponse;
+import com.autowashpro.dto.response.AvailablePackagesForTimeResponse;
 import com.autowashpro.dto.response.AvailableSlotResponse;
 import com.autowashpro.dto.response.BookingResponse;
 import com.autowashpro.dto.response.BookingServiceStepResponse;
@@ -84,6 +86,9 @@ public class BookingServiceImpl implements BookingService {
         private static final long PAYMENT_TIMEOUT_MINUTES = 15L;
         private static final long ONLINE_BOOKING_MIN_LEAD_MINUTES = 15L;
         private static final long GRACE_PERIOD_MINUTES = 30L;
+        // Walk-in bookings are staff-mediated at the counter, so this is a sanity ceiling
+        // against misclicks rather than a tight loyalty-tier-style window.
+        private static final long WALK_IN_MAX_ADVANCE_DAYS = 30L;
 
         private static final long GRACE_MIN_HOURS_BEFORE_SERVICE = 2L;
 
@@ -235,6 +240,119 @@ public class BookingServiceImpl implements BookingService {
                                 .servicePackageId(servicePackageId)
                                 .date(date)
                                 .slots(slots)
+                                .build();
+        }
+
+        // ===================== "Pick a time first" flow =====================
+
+        @Override
+        public AvailablePackagesForTimeResponse getAvailablePackagesForStartTime(
+                        Long garageId,
+                        Long vehicleId,
+                        LocalDateTime desiredStart,
+                        boolean isWalkIn) {
+
+                Garage garage = garageRepository.findById(garageId)
+                                .orElseThrow(() -> new RuntimeException("Garage not found"));
+
+                Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                                .orElseThrow(() -> new RuntimeException("Vehicle not found"));
+
+                List<String> supportedVehicleTypes = washBayRepository.findDistinctVehicleTypesByGarageId(garageId);
+                if (resolveGarageBayType(supportedVehicleTypes, vehicle.getVehicleType()) == null) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Garage does not support vehicle type: " + vehicle.getVehicleType());
+                }
+
+                LocalDateTime now = LocalDateTime.now();
+                LocalDateTime earliestAllowedStart = isWalkIn
+                                ? now
+                                : now.plusMinutes(ONLINE_BOOKING_MIN_LEAD_MINUTES);
+                if (desiredStart.isBefore(earliestAllowedStart)) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Selected time is too soon. Please choose a later time.");
+                }
+
+                LocalTime desiredClock = desiredStart.toLocalTime();
+                if (desiredClock.isBefore(garage.getOpeningTime()) || !desiredClock.isBefore(garage.getClosingTime())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Selected time is outside garage operating hours.");
+                }
+
+                List<Long> mappedPackageIds = garageServicePackageRepository.findActivePackageIdsByGarageId(garageId);
+                List<AvailablePackageAtTimeResponse> results = new ArrayList<>();
+
+                if (!mappedPackageIds.isEmpty()) {
+                        for (ServicePackage candidate : servicePackageRepository.findByIsActiveTrue()) {
+                                if (!mappedPackageIds.contains(candidate.getId())) {
+                                        continue;
+                                }
+
+                                // Add-ons are never booked standalone — only offered on top of a MAIN/COMBO package.
+                                String candidateType = normalizeServiceType(candidate.getServiceType());
+                                if ("ADD_ON".equals(candidateType)) {
+                                        continue;
+                                }
+
+                                if (!isVehicleTypeCompatible(vehicle, candidate)) {
+                                        continue;
+                                }
+
+                                // Expand COMBO into its leaf packages so resource requirements of included
+                                // sub-packages (e.g. an included add-on) are reflected, same as getAvailableSlots.
+                                List<ServicePackage> allPackages = buildSelectedPackages(candidate, List.of());
+                                ResourceWindows rw = computeResourceWindows(allPackages);
+                                int slotDurationMinutes = resolveSlotDurationMinutes(allPackages, garage);
+                                LocalDateTime end = desiredStart.plusMinutes(slotDurationMinutes);
+
+                                if (end.toLocalTime().isAfter(garage.getClosingTime())) {
+                                        continue; // does not finish before closing time
+                                }
+
+                                LocalDateTime washEnd = rw.requiresWashBay
+                                                ? desiredStart.plusMinutes(rw.totalWashMinutes)
+                                                : null;
+                                LocalDateTime careStart = rw.requiresCareStaff
+                                                ? (washEnd != null ? washEnd : desiredStart)
+                                                : null;
+                                LocalDateTime careEnd = rw.requiresCareStaff && careStart != null
+                                                ? careStart.plusMinutes(rw.totalCareMinutes)
+                                                : null;
+
+                                boolean bayOk = !rw.requiresWashBay
+                                                || isWashBayAvailable(garageId, vehicle.getVehicleType(), desiredStart,
+                                                                washEnd != null ? washEnd : end);
+                                boolean staffOk = !rw.requiresCareStaff
+                                                || isCareStaffAvailableForPackages(garageId, allPackages,
+                                                                careStart != null ? careStart : desiredStart,
+                                                                careEnd != null ? careEnd : end);
+
+                                if (!bayOk || !staffOk) {
+                                        continue;
+                                }
+
+                                results.add(AvailablePackageAtTimeResponse.builder()
+                                                .servicePackageId(candidate.getId())
+                                                .name(candidate.getName())
+                                                .serviceType(candidateType)
+                                                .vehicleType(candidate.getVehicleType())
+                                                .basePrice(candidate.getBasePrice())
+                                                .durationMinutes(candidate.getDurationMinutes())
+                                                .washBayDurationMinutes(rw.totalWashMinutes)
+                                                .careStaffDurationMinutes(rw.totalCareMinutes)
+                                                .startTime(desiredStart)
+                                                .endTime(end)
+                                                .washEndAt(washEnd)
+                                                .careEndAt(careEnd)
+                                                .build());
+                        }
+                }
+
+                return AvailablePackagesForTimeResponse.builder()
+                                .garageId(garageId)
+                                .vehicleId(vehicleId)
+                                .startTime(desiredStart)
+                                .packages(results)
                                 .build();
         }
 
@@ -748,7 +866,18 @@ public class BookingServiceImpl implements BookingService {
                                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                                                 "Insufficient loyalty points");
                         }
-                        BigDecimal pointDiscount = BigDecimal.valueOf(usedPoints * 1000L);
+                        // max discount is 50,000đ AND final must remain >= 50,000đ
+                        BigDecimal eligibleAmount = originalPrice.subtract(promotionDiscountAmount);
+                        BigDecimal maxByMinPayable = eligibleAmount.subtract(BigDecimal.valueOf(50000));
+                        BigDecimal maxPointDiscount = maxByMinPayable.min(BigDecimal.valueOf(50000));
+                        if (maxPointDiscount.compareTo(BigDecimal.ZERO) < 0) maxPointDiscount = BigDecimal.ZERO;
+                        int maxPoints = maxPointDiscount.divide(BigDecimal.valueOf(100), RoundingMode.DOWN).intValue();
+                        maxPoints = (maxPoints / 10) * 10;
+                        if (usedPoints > maxPoints) {
+                                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                                "Số điểm vượt quá mức tối đa được áp dụng (tối đa " + maxPoints + " điểm)");
+                        }
+                        BigDecimal pointDiscount = BigDecimal.valueOf(usedPoints * 100L);
                         discountAmount = discountAmount.add(pointDiscount);
                 }
 
@@ -931,6 +1060,12 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 LocalDateTime walkInNow = LocalDateTime.now();
+
+                LocalDateTime walkInMaxBookingTime = walkInNow.plusDays(WALK_IN_MAX_ADVANCE_DAYS);
+                if (startTime.isAfter(walkInMaxBookingTime)) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Booking date exceeds allowed window of " + WALK_IN_MAX_ADVANCE_DAYS + " days");
+                }
 
                 long plateOverlap = bookingRepository.countOverlappingBookingsByLicensePlateAndVehicleType(
                                 normalizedPlate, bayType, startTime, endTime, walkInNow);
@@ -1163,6 +1298,18 @@ public class BookingServiceImpl implements BookingService {
                                         "Online bookings must be made at least 15 minutes in advance");
                 }
 
+                // Guests have no loyalty tier — cap advance booking at the baseline (BRONZE)
+                // window so an anonymous, unverified request can't hold a slot indefinitely far out.
+                LoyaltyTierRule guestTierRule = loyaltyTierRuleRepository.findByTierAndIsActiveTrue("BRONZE")
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                                                "Loyalty tier rule not found for tier: BRONZE"));
+                int guestAllowedWindowDays = guestTierRule.getBookingWindowDays();
+                LocalDateTime guestMaxBookingTime = guestNow.plusDays(guestAllowedWindowDays);
+                if (startTime.isAfter(guestMaxBookingTime)) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Booking date exceeds allowed window of " + guestAllowedWindowDays + " days");
+                }
+
                 List<String> supportedTypes = washBayRepository
                                 .findDistinctVehicleTypesByGarageId(request.getGarageId());
                 if (resolveGarageBayType(supportedTypes, request.getVehicleType()) == null) {
@@ -1345,6 +1492,8 @@ public class BookingServiceImpl implements BookingService {
                                                                                 : v.getNormalizedLicensePlate())
                                                 .vehicleType(v.getVehicleType())
                                                 .vehicleName(buildVehicleName(v))
+                                                .brand(knownOrNull(v.getBrand()))
+                                                .model(knownOrNull(v.getModel()))
                                                 .build())
                                 .collect(java.util.stream.Collectors.toList());
 
@@ -1377,6 +1526,13 @@ public class BookingServiceImpl implements BookingService {
                         return brand.trim() + " " + model.trim();
                 }
                 return null;
+        }
+
+        private String knownOrNull(String value) {
+                if (value == null || value.isBlank() || "Không rõ".equalsIgnoreCase(value.trim())) {
+                        return null;
+                }
+                return value.trim();
         }
 
         @Override

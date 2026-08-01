@@ -46,7 +46,12 @@ export default function AddBookingAddOnsModal({ open, onClose, onConfirm, bookin
     setPackagesError('')
 
     const existingAddOnIds = (booking?.addOnServicePackageIds || []).map(String)
-    const excludedIds = new Set([...existingAddOnIds, String(booking?.servicePackageId)])
+    const includedInMainPackageIds = (booking?.mainPackageIncludedServiceIds || []).map(String)
+    const excludedIds = new Set([
+      ...existingAddOnIds,
+      ...includedInMainPackageIds,
+      String(booking?.servicePackageId),
+    ])
 
     let mounted = true
     setPackagesLoading(true)
@@ -71,7 +76,14 @@ export default function AddBookingAddOnsModal({ open, onClose, onConfirm, bookin
       })
 
     return () => { mounted = false }
-  }, [open, booking?.garageId, booking?.vehicleType, booking?.servicePackageId, booking?.addOnServicePackageIds])
+  }, [
+    open,
+    booking?.garageId,
+    booking?.vehicleType,
+    booking?.servicePackageId,
+    booking?.addOnServicePackageIds,
+    booking?.mainPackageIncludedServiceIds,
+  ])
 
   if (!open) return null
 

@@ -192,6 +192,18 @@ export const customerBookingFlowApi = {
     return unwrap(response)
   },
 
+  async getAvailablePackagesForStartTime({ garageId, vehicleId, startTime, isWalkIn = false }) {
+    const response = await api.get('/bookings/available-packages', {
+      params: {
+        garage_id: garageId,
+        vehicle_id: vehicleId,
+        start_time: startTime,
+        ...(isWalkIn ? { is_walk_in: true } : {}),
+      },
+    })
+    return unwrap(response)
+  },
+
   async getCustomerBookings() {
     const response = await api.get('/bookings')
     return toArray(response)

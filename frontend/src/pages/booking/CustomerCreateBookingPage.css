@@ -615,6 +615,97 @@
   border-color: rgba(46, 194, 247, 0.7);
 }
 
+/* ═══════ PACKAGE SELECT MODE TOGGLE ═══════ */
+.bk-pkgmode-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding: 4px;
+  background: #F8F9FB;
+  border: 1.5px solid rgba(23, 32, 51, 0.10);
+  border-radius: 14px;
+}
+
+.bk-pkgmode-btn {
+  flex: 1;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #64748b;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.bk-pkgmode-btn--active {
+  background: #ffffff;
+  color: #0B1F3A;
+  box-shadow: 0 2px 8px rgba(23, 32, 51, 0.12);
+}
+
+/* ═══════ "PICK BY TIME" PANEL ═══════ */
+.bk-bytime-hint {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.bk-bytime-inputs {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.bk-bytime-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #475569;
+  flex: 1;
+  min-width: 140px;
+}
+
+.bk-bytime-addons {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px dashed rgba(23, 32, 51, 0.12);
+}
+
+.bk-bytime-estimate {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  background: rgba(46, 194, 247, 0.08);
+  border: 1px solid rgba(46, 194, 247, 0.25);
+  border-radius: 10px;
+  font-size: 13px;
+  color: #0B1F3A;
+}
+
+.bk-bytime-estimate strong {
+  color: #0879B8;
+}
+
+.bk-bytime-estimate--over {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.bk-bytime-estimate--over strong {
+  color: #DC2626;
+}
+
+.bk-bytime-estimate-warn {
+  color: #DC2626;
+  font-weight: 600;
+}
+
 /* ═══════ PACKAGE CARDS ═══════ */
 .bk-pkg-section { margin-bottom: 20px; }
 
@@ -950,6 +1041,11 @@
   font-weight: 900;
   color: #172033;
   margin: 0 0 12px;
+}
+
+.bk-loyalty-balance {
+  font-weight: 600;
+  color: #667085;
 }
 
 /* Promo input row */

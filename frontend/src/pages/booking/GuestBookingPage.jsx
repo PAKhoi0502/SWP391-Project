@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { bookingApi } from '../../api/bookingApi'
+import { loyaltyApi } from '../../api/loyaltyApi'
 import { getGarages } from '../../api/GarageApi'
 import {
   extractList,
@@ -24,6 +25,22 @@ import './GuestBookingPage.css'
 function todayIso() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Guests have no loyalty tier — mirror the backend's BRONZE-tier ceiling (see
+// BookingServiceImpl#createGuestBooking) so an anonymous request can't be held open indefinitely.
+function maxBookingDateIso(bookingWindowDays = 7) {
+  const d = new Date()
+  d.setDate(d.getDate() + Number(bookingWindowDays || 7))
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function clampBookingDate(value, bookingWindowDays = 7) {
+  const minDate = todayIso()
+  const maxDate = maxBookingDateIso(bookingWindowDays)
+  if (!value || value < minDate) return minDate
+  if (value > maxDate) return maxDate
+  return value
 }
 
 function extractGarages(payload) {
@@ -129,6 +146,7 @@ export default function GuestBookingPage() {
   const [garages, setGarages] = useState([])
   const [packages, setPackages] = useState([])
   const [slots, setSlots] = useState([])
+  const [bookingWindowDays, setBookingWindowDays] = useState(7)
 
   const [loadingInitial, setLoadingInitial] = useState(true)
   const [loadingSlots, setLoadingSlots] = useState(false)
@@ -143,9 +161,10 @@ export default function GuestBookingPage() {
     async function loadInitialData() {
       try {
         setLoadingInitial(true)
-        const [garageResult, packageResult] = await Promise.allSettled([
+        const [garageResult, packageResult, tierRulesResult] = await Promise.allSettled([
           getGarages({ page: 1, limit: 100, isActive: true }),
           getServicePackages({ isActive: true, limit: 200 }),
+          loyaltyApi.getTierRules(),
         ])
 
         if (!active) return
@@ -154,6 +173,14 @@ export default function GuestBookingPage() {
         setGarages(loadedGarages)
         const allPackages = packageResult.status === 'fulfilled' ? extractList(packageResult.value) : []
         setPackages(allPackages)
+
+        const tierRules = tierRulesResult.status === 'fulfilled' ? tierRulesResult.value : []
+        const bronzeRule = Array.isArray(tierRules)
+          ? tierRules.find((rule) => String(rule?.tier || '').toUpperCase() === 'BRONZE')
+          : null
+        if (bronzeRule?.bookingWindowDays) {
+          setBookingWindowDays(Number(bronzeRule.bookingWindowDays))
+        }
 
         const formUpdates = {}
 
@@ -316,7 +343,7 @@ export default function GuestBookingPage() {
       if (nextPackage && normalizePackageType(nextPackage) === 'COMBO') setSelectedAddOnIds([])
     }
     setForm((prev) => {
-      const next = { ...prev, [name]: value }
+      const next = { ...prev, [name]: name === 'date' ? clampBookingDate(value, bookingWindowDays) : value }
       if (name === 'vehicleType') {
         next.servicePackageId = ''
         next.startTime = ''
@@ -716,10 +743,13 @@ export default function GuestBookingPage() {
                 type="date"
                 value={form.date}
                 min={todayIso()}
+                max={maxBookingDateIso(bookingWindowDays)}
                 onChange={handleChange}
                 className={fieldErrors.date ? 'swi-input-error' : ''}
               />
-              <span className="swi-help">Online bookings must be made at least 15 minutes in advance.</span>
+              <span className="swi-help">
+                Online bookings must be made at least 15 minutes in advance, up to {bookingWindowDays} days ahead.
+              </span>
               {fieldErrors.date && <p className="swi-field-error">{fieldErrors.date}</p>}
             </div>
 

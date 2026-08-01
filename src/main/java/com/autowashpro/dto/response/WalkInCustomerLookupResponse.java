@@ -38,5 +38,7 @@ public class WalkInCustomerLookupResponse {
         private String licensePlate;
         private String vehicleType;
         private String vehicleName;
+        private String brand;
+        private String model;
     }
 }
