@@ -6,6 +6,7 @@ import com.autowashpro.dto.request.CareAssignmentRequest;
 import com.autowashpro.dto.request.OperationPhaseRequest;
 import com.autowashpro.dto.response.AssignedCareStaffResponse;
 import com.autowashpro.dto.response.AvailableCareStaffResponse;
+import com.autowashpro.dto.response.AvailablePackagesForTimeResponse;
 import com.autowashpro.dto.response.AvailableSlotResponse;
 import com.autowashpro.dto.response.BookingResponse;
 import com.autowashpro.dto.response.BookingDetailResponse;
@@ -25,6 +26,7 @@ import com.autowashpro.dto.request.AddBookingAddOnsRequest;
 import com.autowashpro.dto.response.CancellationPreviewResponse;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface BookingService {
@@ -36,6 +38,17 @@ public interface BookingService {
                         LocalDate date,
                         boolean isWalkIn,
                         List<Long> addOnServicePackageIds);
+
+        /**
+         * "Pick a time first" flow: given a fixed desired start time, return every
+         * bookable (MAIN/COMBO) package compatible with the vehicle that still has
+         * enough wash bay / care staff capacity to start exactly at that time.
+         */
+        AvailablePackagesForTimeResponse getAvailablePackagesForStartTime(
+                        Long garageId,
+                        Long vehicleId,
+                        LocalDateTime desiredStart,
+                        boolean isWalkIn);
 
         BookingResponse createBooking(BookingCreateRequest request, Long customerId);
 

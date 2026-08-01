@@ -7,6 +7,7 @@ import { loyaltyApi } from '../../api/loyaltyApi'
 import { getServicePackageById, getPackageName } from '../../services/servicePackageApi'
 import { vehicleInspectionApi } from '../../api/vehicleInspectionApi'
 import { getInspectionByType, getHistoryTimelineItems } from '../../utils/bookingTimeline'
+import { findActivePendingTransaction } from '../../utils/paymentTransactionUtils'
 import CancelBookingModal from '../../components/Booking/CancelBookingModal'
 import DepositQrModal from '../../components/Booking/DepositQrModal'
 import DepositRefundPanel from '../../components/Booking/DepositRefundPanel'
@@ -793,7 +794,10 @@ export default function BookingHistoryPage() {
     if (Array.isArray(booking?.addOnServicePackageIds) && booking.addOnServicePackageIds.length > 0) {
       params.set('addOnServicePackageIds', booking.addOnServicePackageIds.join(','))
     }
-    params.set('step', '4')
+    // Land on the Package step (not Date & Time) — the customer's previous package
+    // comes pre-selected/highlighted there, but they can now also switch to
+    // "Select your time" mode if they'd rather pick a time first this time.
+    params.set('step', '3')
     navigate(`/booking?${params.toString()}`)
   }
 
@@ -805,6 +809,15 @@ export default function BookingHistoryPage() {
     setDepositQrError('')
     setDepositSuccess(false)
     try {
+      const existingTransactions = await bookingApi.getPaymentTransactions(bookingId).catch(() => [])
+      const activePending = findActivePendingTransaction(existingTransactions, 'DEPOSIT')
+      if (activePending) {
+        setDepositTransaction(activePending)
+        setDepositCheckoutUrl(activePending.checkoutUrl || '')
+        setDepositQrOpen(true)
+        return
+      }
+
       const result = await bookingApi.createPayOSPayment(bookingId)
       persistPayOSReturnPath('/customer/booking-history', result)
 

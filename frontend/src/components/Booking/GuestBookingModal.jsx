@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { bookingApi } from '../../api/bookingApi'
+import { loyaltyApi } from '../../api/loyaltyApi'
 import { getGarages } from '../../api/GarageApi'
 import {
   extractList,
@@ -32,6 +33,14 @@ import './GuestBookingModal.css'
 
 function todayIso() {
   const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Guests have no loyalty tier — mirror the backend's BRONZE-tier ceiling (see
+// BookingServiceImpl#createGuestBooking) so an anonymous request can't be held open indefinitely.
+function maxWindowDateIso(bookingWindowDays = 7) {
+  const d = new Date()
+  d.setDate(d.getDate() + Number(bookingWindowDays || 7))
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
@@ -96,7 +105,7 @@ function packageMatchesVehicle(pkg, vehicleType, seatCount, motorbikeGroup) {
   return true
 }
 
-function getCalendarDays(year, month) {
+function getCalendarDays(year, month, maxDateIso) {
   const firstDow = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const todayStr = todayIso()
@@ -105,7 +114,13 @@ function getCalendarDays(year, month) {
   for (let i = 0; i < leadingBlanks; i++) cells.push(null)
   for (let d = 1; d <= daysInMonth; d++) {
     const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-    cells.push({ day: d, iso, isToday: iso === todayStr, isPast: iso < todayStr })
+    cells.push({
+      day: d,
+      iso,
+      isToday: iso === todayStr,
+      isPast: iso < todayStr,
+      isTooFar: maxDateIso ? iso > maxDateIso : false,
+    })
   }
   return cells
 }
@@ -215,6 +230,7 @@ export default function GuestBookingModal({
   const [stepIndex, setStepIndex] = useState(0)
   const [garages, setGarages] = useState([])
   const [packages, setPackages] = useState([])
+  const [bookingWindowDays, setBookingWindowDays] = useState(7)
   const [slots, setSlots] = useState([])
   const [loadingData, setLoadingData] = useState(false)
   const [loadingSlots, setLoadingSlots] = useState(false)
@@ -277,6 +293,16 @@ export default function GuestBookingModal({
       .then((res) => { if (!active) return; setGarages(extractGarages(res)) })
       .catch(() => {})
       .finally(() => { if (active) setLoadingData(false) })
+
+    loyaltyApi.getTierRules()
+      .then((rules) => {
+        if (!active) return
+        const bronzeRule = Array.isArray(rules)
+          ? rules.find((rule) => String(rule?.tier || '').toUpperCase() === 'BRONZE')
+          : null
+        if (bronzeRule?.bookingWindowDays) setBookingWindowDays(Number(bronzeRule.bookingWindowDays))
+      })
+      .catch(() => {})
 
     return () => { active = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -465,6 +491,9 @@ export default function GuestBookingModal({
     }
     if (step === 'slot') {
       if (!form.date) errors.date = 'Please select a date.'
+      else if (form.date > maxWindowDateIso(bookingWindowDays)) {
+        errors.date = `Bookings can only be made up to ${bookingWindowDays} days ahead.`
+      }
       if (!form.startTime) errors.startTime = 'Please select a time slot.'
     }
     setFieldErrors(errors)
@@ -930,7 +959,8 @@ export default function GuestBookingModal({
 
           {/* ── STEP: slot ── */}
           {currentStep === 'slot' && (() => {
-            const calDays = getCalendarDays(calendarYear, calendarMonth)
+            const maxDateIso = maxWindowDateIso(bookingWindowDays)
+            const calDays = getCalendarDays(calendarYear, calendarMonth, maxDateIso)
             const nowDate = new Date()
             const isCurrentMonth = calendarYear === nowDate.getFullYear() && calendarMonth === nowDate.getMonth()
             const monthLabel = new Date(calendarYear, calendarMonth, 1)
@@ -961,7 +991,7 @@ export default function GuestBookingModal({
                       {calDays.map((cell, idx) => {
                         if (!cell) return <button key={`blank-${idx}`} className="gbm-cal-day gbm-cal-day--blank" tabIndex={-1} aria-hidden="true" />
                         const isSelected = form.date === cell.iso
-                        const isDisabled = cell.isPast
+                        const isDisabled = cell.isPast || cell.isTooFar
                         return (
                           <button
                             key={cell.iso}
@@ -987,7 +1017,9 @@ export default function GuestBookingModal({
                       })}
                     </div>
                     {fieldErrors.date && <p className="gbm-field-err" style={{ marginTop: 8 }}>{fieldErrors.date}</p>}
-                    <p className="gbm-help" style={{ marginTop: 8 }}>Bookings must be at least 15 min in advance.</p>
+                    <p className="gbm-help" style={{ marginTop: 8 }}>
+                      Bookings must be at least 15 min in advance, up to {bookingWindowDays} days ahead.
+                    </p>
                   </div>
 
                   {/* Right: grouped slots */}

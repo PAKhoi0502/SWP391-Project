@@ -21,6 +21,7 @@ import DepositRefundPanel from '../../components/Booking/DepositRefundPanel'
 import PaymentCollectionModal from '../../components/Booking/PaymentCollectionModal'
 import ServiceStepsProgress from '../../components/Booking/ServiceStepsProgress'
 import StartServiceModal from '../../components/Booking/StartServiceModal'
+import { findActivePendingTransaction } from '../../utils/paymentTransactionUtils'
 import './BookingDetailPage.css'
 
 const BOOKING_CACHE_PREFIX = 'booking-detail-cache-'
@@ -880,6 +881,10 @@ function BookingDetailPage() {
       enriched.servicePackageName = getPackageName(packageResult.value)
       enriched.servicePackageType = packageResult.value.serviceType || packageResult.value.packageType || packageResult.value.type
       enriched.vehicleType = packageResult.value.vehicleType || enriched.vehicleType
+      // Add-ons already bundled inside the main/combo package must not be offered again in "Add service".
+      enriched.mainPackageIncludedServiceIds = Array.isArray(packageResult.value.includedServiceIds)
+        ? packageResult.value.includedServiceIds
+        : []
       enriched.servicePackageDescription = packageResult.value.description || ''
       enriched.servicePackageSteps = normalizeServiceSteps(getPackageStepSource(packageResult.value))
       enriched.requiresCareStaff = Boolean(packageResult.value.requiresCareStaff)
@@ -1705,6 +1710,16 @@ function BookingDetailPage() {
     setPayosQrError('')
     setPayosSuccess(false)
     try {
+      const existingTransactions = await bookingApi.getPaymentTransactions(id).catch(() => [])
+      const activePending = findActivePendingTransaction(existingTransactions, 'FINAL')
+      if (activePending) {
+        setPayosTransaction(activePending)
+        setPayosCheckoutUrl(activePending.checkoutUrl || '')
+        setPaymentCollectionOpen(false)
+        setPayosQrOpen(true)
+        return
+      }
+
       const result = await bookingApi.createFinalPayOSPayment(id)
       writeCachedPaymentMethod(id, booking?.paymentMethod || 'PAYOS')
       if (result?.checkoutUrl) {
@@ -1813,6 +1828,15 @@ function BookingDetailPage() {
     setDepositQrError('')
     setDepositSuccess(false)
     try {
+      const existingTransactions = await bookingApi.getPaymentTransactions(id).catch(() => [])
+      const activePending = findActivePendingTransaction(existingTransactions, 'DEPOSIT')
+      if (activePending) {
+        setDepositTransaction(activePending)
+        setDepositCheckoutUrl(activePending.checkoutUrl || '')
+        setDepositQrOpen(true)
+        return
+      }
+
       const result = await bookingApi.createDepositPayOSPayment(id)
       persistPayOSReturnPath(location.pathname, result)
 

@@ -19,6 +19,7 @@ import {
   getVietnameseMobileError,
   normalizeVietnameseMobile,
 } from '../../utils/identityValidation'
+import { findActivePendingTransaction } from '../../utils/paymentTransactionUtils'
 import './StaffWalkInBookingPage.css'
 
 const DEPOSIT_PERCENT = 0.30
@@ -37,6 +38,15 @@ function persistPayOSReturnPath(path, result) {
 
 function todayIso() {
   const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Sanity ceiling against misclicks, mirroring WALK_IN_MAX_ADVANCE_DAYS in BookingServiceImpl.
+const WALK_IN_MAX_ADVANCE_DAYS = 30
+
+function maxWalkInDateIso() {
+  const d = new Date()
+  d.setDate(d.getDate() + WALK_IN_MAX_ADVANCE_DAYS)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
@@ -377,16 +387,25 @@ export default function StaffWalkInBookingPage() {
     if (customerLookup?.found && customerLookup.vehicleId && customerLookup.vehicleType) {
       const normalized = normalizeVehicleType(customerLookup.vehicleType)
       const uiType = normalized === 'MOTORBIKE' ? 'MOTORBIKE' : 'CAR'
+      const matchedVehicle = customerLookup.vehicles?.find(
+        (v) => String(v.id) === String(customerLookup.vehicleId),
+      )
       setForm((prev) => {
-        if (prev.vehicleType === uiType) return prev
+        const brand = matchedVehicle?.brand || ''
+        const model = matchedVehicle?.model || ''
+        if (prev.vehicleType === uiType && prev.vehicleBrand === brand && prev.vehicleModel === model) return prev
         const currentPkg = packages.find((p) => String(getPackageId(p)) === String(prev.servicePackageId))
         const compatible = currentPkg && packageMatchesVehicle(currentPkg, uiType)
         const fallbackPkg = !compatible ? packages.find((p) => packageMatchesVehicle(p, uiType)) : null
         return {
           ...prev,
           vehicleType: uiType,
-          servicePackageId: compatible ? prev.servicePackageId : fallbackPkg ? String(getPackageId(fallbackPkg)) : '',
-          startTime: '',
+          vehicleBrand: brand,
+          vehicleModel: model,
+          servicePackageId: prev.vehicleType === uiType
+            ? prev.servicePackageId
+            : compatible ? prev.servicePackageId : fallbackPkg ? String(getPackageId(fallbackPkg)) : '',
+          startTime: prev.vehicleType === uiType ? prev.startTime : '',
         }
       })
     }
@@ -490,15 +509,15 @@ export default function StaffWalkInBookingPage() {
     })
   }
 
-  const useExistingVehicle = (vehicle) => {
+  const applyExistingVehicle = (vehicle) => {
     const normalized = normalizeVehicleType(vehicle.vehicleType || '')
     const uiType = normalized === 'MOTORBIKE' ? 'MOTORBIKE' : 'CAR'
     setForm((prev) => ({
       ...prev,
       licensePlate: vehicle.licensePlate || prev.licensePlate,
       vehicleType: uiType,
-      vehicleBrand: '',
-      vehicleModel: '',
+      vehicleBrand: vehicle.brand || '',
+      vehicleModel: vehicle.model || '',
       servicePackageId: prev.vehicleType !== uiType ? '' : prev.servicePackageId,
       startTime: prev.vehicleType !== uiType ? '' : prev.startTime,
     }))
@@ -525,6 +544,9 @@ export default function StaffWalkInBookingPage() {
     if (!form.garageId) errors.garageId = 'Please select a garage.'
     if (!form.servicePackageId) errors.servicePackageId = 'Please select a service package.'
     if (!form.date) errors.date = 'Please select a date.'
+    else if (form.date > maxWalkInDateIso()) {
+      errors.date = `Walk-in bookings can only be made up to ${WALK_IN_MAX_ADVANCE_DAYS} days ahead.`
+    }
     if (!form.startTime) errors.startTime = 'Please select a time slot.'
 
     setFieldErrors(errors)
@@ -590,6 +612,15 @@ export default function StaffWalkInBookingPage() {
     setDepositQrError('')
     setDepositSuccess(false)
     try {
+      const existingTransactions = await bookingApi.getPaymentTransactions(bookingId).catch(() => [])
+      const activePending = findActivePendingTransaction(existingTransactions, 'DEPOSIT')
+      if (activePending) {
+        setDepositTransaction(activePending)
+        setDepositCheckoutUrl(activePending.checkoutUrl || '')
+        setDepositQrOpen(true)
+        return
+      }
+
       const result = await bookingApi.createPayOSPayment(bookingId)
       persistPayOSReturnPath(`/staff/bookings/${bookingId}`, result)
 
@@ -776,6 +807,7 @@ export default function StaffWalkInBookingPage() {
 
   const calendarCells = buildCalendar(calendarYear, calendarMonth)
   const todayStr = todayIso()
+  const maxDateStr = maxWalkInDateIso()
   const activePackages = packageTab === 'MAIN' ? mainPackages : comboPackages
 
   return (
@@ -828,17 +860,19 @@ export default function StaffWalkInBookingPage() {
               </div>
             </div>
 
-            <div className="swi-field">
-              <label>
-                Email <span className="swi-optional">(optional — not used for account lookup)</span>
-              </label>
-              <input
-                name="guestEmail"
-                type="email"
-                value={form.guestEmail}
-                onChange={handleChange}
-                placeholder="email@example.com"
-              />
+            <div className="swi-row">
+              <div className="swi-field">
+                <label>
+                  Email <span className="swi-optional">(optional — not used for account lookup)</span>
+                </label>
+                <input
+                  name="guestEmail"
+                  type="email"
+                  value={form.guestEmail}
+                  onChange={handleChange}
+                  placeholder="email@example.com"
+                />
+              </div>
             </div>
 
             {loadingCustomer && <p className="swi-lookup-note">Looking up customer...</p>}
@@ -860,6 +894,28 @@ export default function StaffWalkInBookingPage() {
           {/* ── Vehicle ── */}
           <section className="swi-section">
             <h2 className="swi-section-title">Vehicle</h2>
+
+            {customerLookup?.found && customerLookup.vehicles?.length > 0 && (
+              <div className="swi-row">
+                <div className="swi-field">
+                  <label>Saved vehicles on this account</label>
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const vehicle = customerLookup.vehicles.find((v) => String(v.id) === e.target.value)
+                      if (vehicle) applyExistingVehicle(vehicle)
+                    }}
+                  >
+                    <option value="">Select a saved vehicle...</option>
+                    {customerLookup.vehicles.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.licensePlate}{v.vehicleName ? ` · ${v.vehicleName}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
 
             <div className="swi-row">
               <div className="swi-field">
@@ -906,7 +962,7 @@ export default function StaffWalkInBookingPage() {
               </div>
             </div>
 
-            {customerLookup?.found && !customerLookup?.vehicleId && form.licensePlate.trim().length > 0 && (
+            {customerLookup?.found && form.licensePlate.trim().length > 0 && (
               <div className="swi-row">
                 <div className="swi-field">
                   <label>Make</label>
@@ -914,9 +970,14 @@ export default function StaffWalkInBookingPage() {
                     name="vehicleBrand"
                     value={form.vehicleBrand}
                     onChange={handleChange}
+                    disabled={!!customerLookup?.vehicleId}
                     placeholder="Toyota, Honda, Yamaha..."
                   />
-                  <span className="swi-help">New vehicle will be saved to customer account.</span>
+                  <span className="swi-help">
+                    {customerLookup?.vehicleId
+                      ? 'Loaded from the saved vehicle.'
+                      : 'New vehicle will be saved to customer account.'}
+                  </span>
                 </div>
                 <div className="swi-field">
                   <label>Model</label>
@@ -924,6 +985,7 @@ export default function StaffWalkInBookingPage() {
                     name="vehicleModel"
                     value={form.vehicleModel}
                     onChange={handleChange}
+                    disabled={!!customerLookup?.vehicleId}
                     placeholder="Vios, Camry, Air Blade..."
                   />
                 </div>
@@ -1136,15 +1198,17 @@ export default function StaffWalkInBookingPage() {
                       const dayIso = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
                       const isToday = dayIso === todayStr
                       const isPast = dayIso < todayStr
+                      const isTooFar = dayIso > maxDateStr
                       const isSelected = dayIso === form.date
                       return (
                         <button
                           type="button"
                           key={day}
-                          disabled={isPast}
+                          disabled={isPast || isTooFar}
+                          title={isTooFar ? `Walk-in bookings can only be made up to ${WALK_IN_MAX_ADVANCE_DAYS} days ahead.` : undefined}
                           className={[
                             'swi-cal-day',
-                            isPast ? 'swi-cal-day--disabled' : '',
+                            (isPast || isTooFar) ? 'swi-cal-day--disabled' : '',
                             isToday && !isSelected ? 'swi-cal-day--today' : '',
                             isSelected ? 'swi-cal-day--selected' : '',
                           ].filter(Boolean).join(' ')}
