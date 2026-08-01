@@ -1024,43 +1024,47 @@ export default function StaffWalkInBookingPage() {
             )}
 
             {selectedVehicleType === 'CAR' && packageSeatCount && (
-              <div className="swi-field">
-                <label>Seat count</label>
-                <input
-                  name="seatCount"
-                  value={form.seatCount}
-                  onChange={handleChange}
-                  disabled={!!matchedVehicleId && !!form.seatCount}
-                  placeholder="e.g. 5"
-                  inputMode="numeric"
-                  className={fieldErrors.seatCount ? 'swi-input-error' : ''}
-                />
-                <span className="swi-help">
-                  {matchedVehicleId && form.seatCount
-                    ? 'Loaded from the saved vehicle.'
-                    : `Selected package requires ${packageSeatCount} seats.`}
-                </span>
-                {fieldErrors.seatCount && <p className="swi-field-error">{fieldErrors.seatCount}</p>}
+              <div className="swi-row">
+                <div className="swi-field">
+                  <label>Seat count</label>
+                  <input
+                    name="seatCount"
+                    value={form.seatCount}
+                    onChange={handleChange}
+                    disabled={!!matchedVehicleId && !!form.seatCount}
+                    placeholder="e.g. 5"
+                    inputMode="numeric"
+                    className={fieldErrors.seatCount ? 'swi-input-error' : ''}
+                  />
+                  <span className="swi-help">
+                    {matchedVehicleId && form.seatCount
+                      ? 'Loaded from the saved vehicle.'
+                      : `Selected package requires ${packageSeatCount} seats.`}
+                  </span>
+                  {fieldErrors.seatCount && <p className="swi-field-error">{fieldErrors.seatCount}</p>}
+                </div>
               </div>
             )}
 
             {selectedVehicleType === 'MOTORBIKE' && packageMotorbikeGroup && (
-              <div className="swi-field">
-                <label>Motorbike group</label>
-                <input
-                  name="motorbikeGroup"
-                  value={form.motorbikeGroup}
-                  onChange={handleChange}
-                  disabled={!!matchedVehicleId && !!form.motorbikeGroup}
-                  placeholder="e.g. standard"
-                  className={fieldErrors.motorbikeGroup ? 'swi-input-error' : ''}
-                />
-                <span className="swi-help">
-                  {matchedVehicleId && form.motorbikeGroup
-                    ? 'Loaded from the saved vehicle.'
-                    : `Selected package requires group: ${packageMotorbikeGroup}.`}
-                </span>
-                {fieldErrors.motorbikeGroup && <p className="swi-field-error">{fieldErrors.motorbikeGroup}</p>}
+              <div className="swi-row">
+                <div className="swi-field">
+                  <label>Motorbike group</label>
+                  <input
+                    name="motorbikeGroup"
+                    value={form.motorbikeGroup}
+                    onChange={handleChange}
+                    disabled={!!matchedVehicleId && !!form.motorbikeGroup}
+                    placeholder="e.g. standard"
+                    className={fieldErrors.motorbikeGroup ? 'swi-input-error' : ''}
+                  />
+                  <span className="swi-help">
+                    {matchedVehicleId && form.motorbikeGroup
+                      ? 'Loaded from the saved vehicle.'
+                      : `Selected package requires group: ${packageMotorbikeGroup}.`}
+                  </span>
+                  {fieldErrors.motorbikeGroup && <p className="swi-field-error">{fieldErrors.motorbikeGroup}</p>}
+                </div>
               </div>
             )}
           </section>
