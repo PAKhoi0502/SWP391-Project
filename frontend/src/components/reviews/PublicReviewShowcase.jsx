@@ -1,12 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
-import { flushSync } from 'react-dom'
+import { useEffect, useState, useCallback } from 'react'
 import reviewApi from '../../api/reviewApi'
 import { onReviewCreated } from '../../utils/reviewEvents'
 import { LeaderboardAvatar } from '../../pages/leaderboard/LeaderboardAvatar'
 import './PublicReviewShowcase.css'
-
-const INTERVAL  = 3500  // ms between auto-advances
-const SCROLL_MS = 520   // belt scroll duration
 
 // Avatar size in the review card
 const AVATAR_SIZE = 56
@@ -87,7 +83,7 @@ function ReviewCard({ review }) {
           {review.comment}
           <span className="prs-qmark prs-qmark--r">"</span>
           </>
-        ) : '\u00a0'}
+        ) : ' '}
       </blockquote>
 
       {Array.isArray(review.imageUrls) && review.imageUrls.length > 0 && (
@@ -113,57 +109,22 @@ function ReviewCard({ review }) {
 }
 
 export default function PublicReviewShowcase() {
-  const [reviews, setReviews]     = useState([])
-  const [stats, setStats]         = useState(null)
-  const [activeIdx, setActiveIdx] = useState(0)
-  const [status, setStatus]       = useState('loading')
-
-  // DOM refs
-  const stageRef = useRef(null)
-  const trackRef = useRef(null)
-  const cardRef  = useRef(null)
-
-  // Timer / flag refs — window.* to avoid confusion with VS Code's setInterval shim
-  const timerRef     = useRef(null)
-  const exitTimer    = useRef(null)
-  const animatingRef = useRef(false)
-  const mountedRef   = useRef(false)
-
-  // Track mount/unmount — clears all timers and resets animation state on leave
-  useEffect(() => {
-    mountedRef.current = true
-
-    return () => {
-      mountedRef.current = false
-      window.clearInterval(timerRef.current)
-      window.clearTimeout(exitTimer.current)
-      timerRef.current   = null
-      exitTimer.current  = null
-      animatingRef.current = false
-    }
-  }, [])
+  const [reviews, setReviews] = useState([])
+  const [stats, setStats]     = useState(null)
+  const [status, setStatus]   = useState('loading')
 
   const fetchReviews = useCallback(() => {
-    if (!mountedRef.current) return
     Promise.all([
       reviewApi.getPublicReviews({ page: 1, limit: 10 }),
       reviewApi.getPublicStats().catch(() => null),
     ])
       .then(([page, s]) => {
-        if (!mountedRef.current) return
         const list = page?.content ?? []
-        // Clear animation state before swapping data to avoid carousel flicker
-        window.clearInterval(timerRef.current)
-        window.clearTimeout(exitTimer.current)
-        animatingRef.current = false
-        timerRef.current = null
-        exitTimer.current = null
         setReviews(list)
         setStats(s)
-        setActiveIdx(0)
         setStatus(list.length > 0 ? 'ready' : 'empty')
       })
-      .catch(() => { if (mountedRef.current) setStatus('empty') })
+      .catch(() => setStatus('empty'))
   }, [])
 
   // Initial fetch
@@ -173,79 +134,6 @@ export default function PublicReviewShowcase() {
   useEffect(() => {
     return onReviewCreated(fetchReviews)
   }, [fetchReviews])
-
-  useLayoutEffect(() => {
-    if (status !== 'ready') return
-    const mainEl  = cardRef.current
-    const stageEl = stageRef.current
-    const trackEl = trackRef.current
-    if (!mainEl || !stageEl || !trackEl) return
-
-    const H   = mainEl.offsetHeight
-    const gap = 12
-
-    stageEl.style.height = `${H + gap + Math.round(H * 0.48)}px`
-
-    if (!animatingRef.current) {
-      trackEl.style.transition = 'none'
-      trackEl.style.transform  = `translateY(-${H + gap}px)`
-    }
-  }, [activeIdx, status, reviews.length])
-
-  const advance = useCallback(() => {
-    if (reviews.length <= 1 || animatingRef.current) return
-
-    const trackEl = trackRef.current
-    const mainEl  = cardRef.current
-    if (!trackEl || !mainEl) return
-
-    animatingRef.current = true
-    const H   = mainEl.offsetHeight
-    const gap = 12
-
-    trackEl.style.transition = `transform ${SCROLL_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`
-    trackEl.style.transform  = `translateY(-${2 * (H + gap)}px)`
-
-    exitTimer.current = window.setTimeout(() => {
-      const el = trackRef.current
-
-      if (!mountedRef.current || !el) {
-        animatingRef.current = false
-        exitTimer.current    = null
-        return
-      }
-
-      flushSync(() => {
-        setActiveIdx(prev => (prev + 1) % reviews.length)
-      })
-
-      el.style.transition = 'none'
-      el.style.transform  = `translateY(-${H + gap}px)`
-      animatingRef.current = false
-      exitTimer.current    = null
-    }, SCROLL_MS + 20)
-  }, [reviews.length])
-
-  // Single interval — cleared and re-created whenever advance/status/count changes.
-  // Does NOT depend on activeIdx so it never multiplies.
-  useEffect(() => {
-    if (status !== 'ready' || reviews.length <= 1) return undefined
-
-    // Clear any stale interval/timeout leftover from previous mount or status change
-    window.clearInterval(timerRef.current)
-    window.clearTimeout(exitTimer.current)
-    animatingRef.current = false
-
-    timerRef.current = window.setInterval(advance, INTERVAL)
-
-    return () => {
-      window.clearInterval(timerRef.current)
-      window.clearTimeout(exitTimer.current)
-      timerRef.current  = null
-      exitTimer.current = null
-      animatingRef.current = false
-    }
-  }, [advance, status, reviews.length])
 
   if (status === 'loading') {
     return (
@@ -281,12 +169,7 @@ export default function PublicReviewShowcase() {
     )
   }
 
-  const n        = reviews.length
-  const ghostIdx = (activeIdx - 1 + n) % n
-  const curIdx   = activeIdx
-  const nextIdx  = (activeIdx + 1) % n
-  const afterIdx = (activeIdx + 2) % n
-
+  const n     = reviews.length
   const avg   = stats?.averageRating ?? (reviews.reduce((s, r) => s + (r.rating ?? 0), 0) / n)
   const total = stats?.totalReviews  ?? n
 
@@ -309,34 +192,12 @@ export default function PublicReviewShowcase() {
           </div>
         </div>
 
-        <div className="prs-stage" ref={stageRef}>
-          <div className="prs-track" ref={trackRef}>
-
-            {/* Slot 0 — ghost (hidden above) */}
-            <div className="prs-slot" aria-hidden="true">
-              <ReviewCard review={reviews[ghostIdx]} />
+        <div className="prs-all-scroll">
+          {reviews.map((review, i) => (
+            <div className="prs-all-item" key={review.id ?? i}>
+              <ReviewCard review={review} />
             </div>
-
-            {/* Slot 1 — main card */}
-            <div className="prs-slot" ref={cardRef}>
-              <ReviewCard review={reviews[curIdx]} />
-            </div>
-
-            {/* Slot 2 — preview */}
-            {n > 1 && (
-              <div className="prs-slot">
-                <ReviewCard review={reviews[nextIdx]} />
-              </div>
-            )}
-
-            {/* Slot 3 — buffer */}
-            {n > 1 && (
-              <div className="prs-slot" aria-hidden="true">
-                <ReviewCard review={reviews[afterIdx]} />
-              </div>
-            )}
-
-          </div>
+          ))}
         </div>
 
       </div>

@@ -167,6 +167,13 @@ export default function StaffWalkInBookingPage() {
   const [slots, setSlots] = useState([])
   const [staffProfile, setStaffProfile] = useState(null)
   const [customerLookup, setCustomerLookup] = useState(null)
+  // Explicitly picked via "Saved vehicles" dropdown / "Use this info" — kept independent
+  // of the plate re-lookup below, which silently skips its API call (and so never sets
+  // customerLookup.vehicleId) whenever the stored plate doesn't pass the strict local
+  // format regex, even though it's a perfectly real vehicle on the account.
+  const [selectedVehicleId, setSelectedVehicleId] = useState(null)
+  const matchedVehicleId = selectedVehicleId ?? (customerLookup?.found ? customerLookup?.vehicleId : null) ?? null
+  const matchedVehicle = customerLookup?.vehicles?.find((v) => String(v.id) === String(matchedVehicleId)) || null
 
   const [loadingInitial, setLoadingInitial] = useState(true)
   const [loadingSlots, setLoadingSlots] = useState(false)
@@ -336,15 +343,23 @@ export default function StaffWalkInBookingPage() {
     if (!selectedPackage) return
     const seatCount = getPackageSeatCount(selectedPackage)
     const motorbikeGroup = getPackageMotorbikeGroup(selectedPackage)
-    setForm((prev) => ({
-      ...prev,
-      seatCount: normalizeVehicleType(prev.vehicleType) === 'CAR' && seatCount ? String(seatCount) : prev.seatCount,
-      motorbikeGroup:
-        normalizeVehicleType(prev.vehicleType) === 'MOTORBIKE' && motorbikeGroup
-          ? String(motorbikeGroup)
-          : prev.motorbikeGroup,
-    }))
-  }, [selectedPackage])
+    setForm((prev) => {
+      const type = normalizeVehicleType(prev.vehicleType)
+      // A matched saved vehicle's own seat count / motorbike group is authoritative —
+      // don't let the package's generic requirement clobber a known value.
+      const lockSeatCount = !!matchedVehicle && type === 'CAR' && !!prev.seatCount
+      const lockMotorbikeGroup = !!matchedVehicle && type === 'MOTORBIKE' && !!prev.motorbikeGroup
+      return {
+        ...prev,
+        seatCount: lockSeatCount
+          ? prev.seatCount
+          : type === 'CAR' && seatCount ? String(seatCount) : prev.seatCount,
+        motorbikeGroup: lockMotorbikeGroup
+          ? prev.motorbikeGroup
+          : type === 'MOTORBIKE' && motorbikeGroup ? String(motorbikeGroup) : prev.motorbikeGroup,
+      }
+    })
+  }, [selectedPackage, matchedVehicle])
 
   // Sync packageTab when selectedPackage type changes (UI-only)
   useEffect(() => {
@@ -384,32 +399,38 @@ export default function StaffWalkInBookingPage() {
   }, [form.guestPhone, form.licensePlate, form.vehicleType])
 
   useEffect(() => {
-    if (customerLookup?.found && customerLookup.vehicleId && customerLookup.vehicleType) {
-      const normalized = normalizeVehicleType(customerLookup.vehicleType)
-      const uiType = normalized === 'MOTORBIKE' ? 'MOTORBIKE' : 'CAR'
-      const matchedVehicle = customerLookup.vehicles?.find(
-        (v) => String(v.id) === String(customerLookup.vehicleId),
-      )
-      setForm((prev) => {
-        const brand = matchedVehicle?.brand || ''
-        const model = matchedVehicle?.model || ''
-        if (prev.vehicleType === uiType && prev.vehicleBrand === brand && prev.vehicleModel === model) return prev
-        const currentPkg = packages.find((p) => String(getPackageId(p)) === String(prev.servicePackageId))
-        const compatible = currentPkg && packageMatchesVehicle(currentPkg, uiType)
-        const fallbackPkg = !compatible ? packages.find((p) => packageMatchesVehicle(p, uiType)) : null
-        return {
-          ...prev,
-          vehicleType: uiType,
-          vehicleBrand: brand,
-          vehicleModel: model,
-          servicePackageId: prev.vehicleType === uiType
-            ? prev.servicePackageId
-            : compatible ? prev.servicePackageId : fallbackPkg ? String(getPackageId(fallbackPkg)) : '',
-          startTime: prev.vehicleType === uiType ? prev.startTime : '',
-        }
-      })
-    }
-  }, [customerLookup, packages])
+    if (!matchedVehicle) return
+    const normalized = normalizeVehicleType(matchedVehicle.vehicleType || '')
+    const uiType = normalized === 'MOTORBIKE' ? 'MOTORBIKE' : 'CAR'
+    setForm((prev) => {
+      const brand = matchedVehicle.brand || ''
+      const model = matchedVehicle.model || ''
+      const seatCount = matchedVehicle.seatCount ? String(matchedVehicle.seatCount) : ''
+      const motorbikeGroup = matchedVehicle.motorbikeGroup || ''
+      if (
+        prev.vehicleType === uiType &&
+        prev.vehicleBrand === brand &&
+        prev.vehicleModel === model &&
+        prev.seatCount === seatCount &&
+        prev.motorbikeGroup === motorbikeGroup
+      ) return prev
+      const currentPkg = packages.find((p) => String(getPackageId(p)) === String(prev.servicePackageId))
+      const compatible = currentPkg && packageMatchesVehicle(currentPkg, uiType)
+      const fallbackPkg = !compatible ? packages.find((p) => packageMatchesVehicle(p, uiType)) : null
+      return {
+        ...prev,
+        vehicleType: uiType,
+        vehicleBrand: brand,
+        vehicleModel: model,
+        seatCount,
+        motorbikeGroup,
+        servicePackageId: prev.vehicleType === uiType
+          ? prev.servicePackageId
+          : compatible ? prev.servicePackageId : fallbackPkg ? String(getPackageId(fallbackPkg)) : '',
+        startTime: prev.vehicleType === uiType ? prev.startTime : '',
+      }
+    })
+  }, [matchedVehicle, packages])
 
   useEffect(() => {
     const { garageId, servicePackageId, vehicleType, date } = form
@@ -469,6 +490,7 @@ export default function StaffWalkInBookingPage() {
     setError('')
     setFieldErrors((prev) => ({ ...prev, [name]: '' }))
     if (name === 'vehicleType') setSelectedAddOnIds([])
+    if (name === 'guestPhone' || name === 'licensePlate') setSelectedVehicleId(null)
     if (name === 'servicePackageId') {
       const nextPackage = packages.find((pkg) => String(getPackageId(pkg)) === String(value))
       if (nextPackage && normalizePackageType(nextPackage) === 'COMBO') setSelectedAddOnIds([])
@@ -492,6 +514,7 @@ export default function StaffWalkInBookingPage() {
 
   const useMatchedCustomer = () => {
     if (!customerLookup?.found) return
+    if (customerLookup.vehicleId) setSelectedVehicleId(customerLookup.vehicleId)
     setForm((prev) => {
       const next = {
         ...prev,
@@ -501,9 +524,14 @@ export default function StaffWalkInBookingPage() {
       }
       if (customerLookup.vehicleId && customerLookup.licensePlate) {
         const normalized = normalizeVehicleType(customerLookup.vehicleType || '')
+        const matched = customerLookup.vehicles?.find(
+          (v) => String(v.id) === String(customerLookup.vehicleId),
+        )
         next.vehicleType = normalized === 'MOTORBIKE' ? 'MOTORBIKE' : 'CAR'
-        next.vehicleBrand = ''
-        next.vehicleModel = ''
+        next.vehicleBrand = matched?.brand || ''
+        next.vehicleModel = matched?.model || ''
+        next.seatCount = matched?.seatCount ? String(matched.seatCount) : ''
+        next.motorbikeGroup = matched?.motorbikeGroup || ''
       }
       return next
     })
@@ -512,12 +540,15 @@ export default function StaffWalkInBookingPage() {
   const applyExistingVehicle = (vehicle) => {
     const normalized = normalizeVehicleType(vehicle.vehicleType || '')
     const uiType = normalized === 'MOTORBIKE' ? 'MOTORBIKE' : 'CAR'
+    setSelectedVehicleId(vehicle.id)
     setForm((prev) => ({
       ...prev,
       licensePlate: vehicle.licensePlate || prev.licensePlate,
       vehicleType: uiType,
       vehicleBrand: vehicle.brand || '',
       vehicleModel: vehicle.model || '',
+      seatCount: vehicle.seatCount ? String(vehicle.seatCount) : '',
+      motorbikeGroup: vehicle.motorbikeGroup || '',
       servicePackageId: prev.vehicleType !== uiType ? '' : prev.servicePackageId,
       startTime: prev.vehicleType !== uiType ? '' : prev.startTime,
     }))
@@ -927,9 +958,9 @@ export default function StaffWalkInBookingPage() {
                   placeholder="51A-12345"
                   className={fieldErrors.licensePlate ? 'swi-input-error' : ''}
                 />
-                {customerLookup?.vehicleId && (
+                {matchedVehicleId && (
                   <p className="swi-plate-match">
-                    Vehicle found in system{customerLookup.vehicleName ? ` · ${customerLookup.vehicleName}` : ''}
+                    Vehicle found in system{matchedVehicle?.vehicleName ? ` · ${matchedVehicle.vehicleName}` : ''}
                   </p>
                 )}
                 {fieldErrors.licensePlate && <p className="swi-field-error">{fieldErrors.licensePlate}</p>}
@@ -940,7 +971,7 @@ export default function StaffWalkInBookingPage() {
                 <div className="swi-vtype-toggle">
                   <button
                     type="button"
-                    disabled={!!customerLookup?.vehicleId}
+                    disabled={!!matchedVehicleId}
                     className={`swi-vtype-btn${form.vehicleType === 'CAR' ? ' swi-vtype-btn--active' : ''}`}
                     onClick={() => handleChange({ target: { name: 'vehicleType', value: 'CAR' } })}
                   >
@@ -948,14 +979,14 @@ export default function StaffWalkInBookingPage() {
                   </button>
                   <button
                     type="button"
-                    disabled={!!customerLookup?.vehicleId}
+                    disabled={!!matchedVehicleId}
                     className={`swi-vtype-btn${form.vehicleType === 'MOTORBIKE' ? ' swi-vtype-btn--active' : ''}`}
                     onClick={() => handleChange({ target: { name: 'vehicleType', value: 'MOTORBIKE' } })}
                   >
                     Motorbike
                   </button>
                 </div>
-                {customerLookup?.vehicleId && (
+                {matchedVehicleId && (
                   <span className="swi-help">Vehicle type determined by system.</span>
                 )}
                 {fieldErrors.vehicleType && <p className="swi-field-error">{fieldErrors.vehicleType}</p>}
@@ -965,16 +996,16 @@ export default function StaffWalkInBookingPage() {
             {customerLookup?.found && form.licensePlate.trim().length > 0 && (
               <div className="swi-row">
                 <div className="swi-field">
-                  <label>Make</label>
+                  <label>Brand</label>
                   <input
                     name="vehicleBrand"
                     value={form.vehicleBrand}
                     onChange={handleChange}
-                    disabled={!!customerLookup?.vehicleId}
+                    disabled={!!matchedVehicleId}
                     placeholder="Toyota, Honda, Yamaha..."
                   />
                   <span className="swi-help">
-                    {customerLookup?.vehicleId
+                    {matchedVehicleId
                       ? 'Loaded from the saved vehicle.'
                       : 'New vehicle will be saved to customer account.'}
                   </span>
@@ -985,7 +1016,7 @@ export default function StaffWalkInBookingPage() {
                     name="vehicleModel"
                     value={form.vehicleModel}
                     onChange={handleChange}
-                    disabled={!!customerLookup?.vehicleId}
+                    disabled={!!matchedVehicleId}
                     placeholder="Vios, Camry, Air Blade..."
                   />
                 </div>
@@ -999,11 +1030,16 @@ export default function StaffWalkInBookingPage() {
                   name="seatCount"
                   value={form.seatCount}
                   onChange={handleChange}
+                  disabled={!!matchedVehicleId && !!form.seatCount}
                   placeholder="e.g. 5"
                   inputMode="numeric"
                   className={fieldErrors.seatCount ? 'swi-input-error' : ''}
                 />
-                <span className="swi-help">Selected package requires {packageSeatCount} seats.</span>
+                <span className="swi-help">
+                  {matchedVehicleId && form.seatCount
+                    ? 'Loaded from the saved vehicle.'
+                    : `Selected package requires ${packageSeatCount} seats.`}
+                </span>
                 {fieldErrors.seatCount && <p className="swi-field-error">{fieldErrors.seatCount}</p>}
               </div>
             )}
@@ -1015,10 +1051,15 @@ export default function StaffWalkInBookingPage() {
                   name="motorbikeGroup"
                   value={form.motorbikeGroup}
                   onChange={handleChange}
+                  disabled={!!matchedVehicleId && !!form.motorbikeGroup}
                   placeholder="e.g. standard"
                   className={fieldErrors.motorbikeGroup ? 'swi-input-error' : ''}
                 />
-                <span className="swi-help">Selected package requires group: {packageMotorbikeGroup}.</span>
+                <span className="swi-help">
+                  {matchedVehicleId && form.motorbikeGroup
+                    ? 'Loaded from the saved vehicle.'
+                    : `Selected package requires group: ${packageMotorbikeGroup}.`}
+                </span>
                 {fieldErrors.motorbikeGroup && <p className="swi-field-error">{fieldErrors.motorbikeGroup}</p>}
               </div>
             )}
