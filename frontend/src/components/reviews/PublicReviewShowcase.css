@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════
-   PublicReviewShowcase — vertical conveyor belt
+   PublicReviewShowcase — scrollable review list
    Before footer, full-width section
    ════════════════════════════════════════════ */
 
@@ -83,54 +83,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-/* ════════════════════════════════════════════
-   CONVEYOR BELT CAROUSEL
-   ════════════════════════════════════════════
-
-   Stage: clips the belt. Height = 1 full card + gap + ~half card.
-   The ::after gradient covers the preview (lower) half,
-   creating the "dim zone". Cards escape it as they scroll up.
-
-   Track: 4 DOM slots in a flex column.
-   Track always starts at translateY = -(cardH + gap) so slot1 (main) is at y=0.
-   Advance scrolls to -(2·cardH + 2·gap); reset seamlessly to -(cardH+gap).
-*/
-
-.prs-stage {
-  overflow: hidden;
-  position: relative;
-  /* height set imperatively by useLayoutEffect */
-}
-
-/* Gradient "dim zone" covering the preview card area.
-   Starts at ~65% of stage height (just before the preview card begins)
-   and fades to near-white at the bottom. */
-.prs-stage::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    to bottom,
-    transparent 62%,
-    rgba(255, 255, 255, 0.75) 78%,
-    rgba(255, 255, 255, 0.97) 100%
-  );
-  pointer-events: none;
-  z-index: 1;
-}
-
-.prs-track {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  /* transform set imperatively */
-}
-
-.prs-slot {
-  width: 100%;
-  flex-shrink: 0;
 }
 
 /* ════════════════════════════════════════════
@@ -298,6 +250,23 @@
   font-size: 11px;
   color: #94a3b8;
   font-weight: 500;
+}
+
+/* ════════════════════════════════════════════
+   ALL REVIEWS — scrollable list
+   ════════════════════════════════════════════ */
+
+.prs-all-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 4px;
+}
+
+.prs-all-item .prs-card-inner {
+  box-shadow: none;
 }
 
 /* ── Empty state ── */

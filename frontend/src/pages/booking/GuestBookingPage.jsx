@@ -588,7 +588,7 @@ export default function GuestBookingPage() {
 
             <div className="swi-row">
               <div className="swi-field">
-                <label>Make <span className="swi-optional">(optional)</span></label>
+                <label>Brand <span className="swi-optional">(optional)</span></label>
                 <input
                   name="vehicleBrand"
                   value={form.vehicleBrand}

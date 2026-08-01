@@ -849,7 +849,7 @@ export default function GuestBookingModal({
               </div>
               <div className="gbm-row">
                 <div className="gbm-field">
-                  <label>Make <span className="gbm-opt">(optional)</span></label>
+                  <label>Brand <span className="gbm-opt">(optional)</span></label>
                   <input name="vehicleBrand" value={form.vehicleBrand} onChange={handleChange} placeholder="Toyota, Honda…" />
                 </div>
                 <div className="gbm-field">

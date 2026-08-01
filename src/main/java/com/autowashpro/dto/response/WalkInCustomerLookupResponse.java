@@ -40,5 +40,7 @@ public class WalkInCustomerLookupResponse {
         private String vehicleName;
         private String brand;
         private String model;
+        private Integer seatCount;
+        private String motorbikeGroup;
     }
 }

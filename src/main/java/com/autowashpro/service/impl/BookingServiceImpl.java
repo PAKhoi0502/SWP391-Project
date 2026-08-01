@@ -1494,6 +1494,8 @@ public class BookingServiceImpl implements BookingService {
                                                 .vehicleName(buildVehicleName(v))
                                                 .brand(knownOrNull(v.getBrand()))
                                                 .model(knownOrNull(v.getModel()))
+                                                .seatCount(v.getSeatCount())
+                                                .motorbikeGroup(v.getMotorbikeGroup())
                                                 .build())
                                 .collect(java.util.stream.Collectors.toList());
 
