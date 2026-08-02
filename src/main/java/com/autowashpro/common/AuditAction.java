@@ -48,6 +48,8 @@ public final class AuditAction {
     public static final String DEPOSIT_REFUND_APPROVED = "DEPOSIT_REFUND_APPROVED";
     public static final String DEPOSIT_REFUND_REJECTED = "DEPOSIT_REFUND_REJECTED";
     public static final String DEPOSIT_REFUND_EXECUTED = "DEPOSIT_REFUND_EXECUTED";
+    public static final String SPECIAL_DAY_CREATED = "SPECIAL_DAY_CREATED";
+    public static final String SPECIAL_DAY_UPDATED = "SPECIAL_DAY_UPDATED";
 
     private AuditAction() {
     }

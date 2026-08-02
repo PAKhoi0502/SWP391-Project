@@ -7,6 +7,7 @@ import {
 } from '../../api/customerBookingFlowApi'
 import { bookingApi } from '../../api/bookingApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
+import specialDayApi from '../../api/specialDayApi'
 import promotionApi from '../../api/promotionApi'
 import { waitlistApi } from '../../api/waitlistApi'
 import DepositQrModal from '../../components/Booking/DepositQrModal'
@@ -297,16 +298,34 @@ export default function CustomerCreateBookingPage() {
   const [selectedDate, setSelectedDate] = useState(minBookingDateIso())
   const [selectedSlotId, setSelectedSlotId] = useState('')
   const [bookingWindowDays, setBookingWindowDays] = useState(7)
+  const [specialDaySurcharge, setSpecialDaySurcharge] = useState({ isSpecialDay: false, surchargeRate: 0 })
+
+  useEffect(() => {
+    if (!selectedDate) return
+    let active = true
+    specialDayApi.check(selectedDate)
+      .then((result) => {
+        if (!active) return
+        setSpecialDaySurcharge({
+          isSpecialDay: !!result?.isSpecialDay,
+          surchargeRate: Number(result?.surchargeRate) || 0,
+        })
+      })
+      .catch(() => { if (active) setSpecialDaySurcharge({ isSpecialDay: false, surchargeRate: 0 }) })
+    return () => { active = false }
+  }, [selectedDate])
 
   // Step 3 "pick by desired time" mode (Option 2) — browse-by-package stays the default.
   const [packageSelectMode, setPackageSelectMode] = useState('BROWSE')
   const [desiredDate, setDesiredDate] = useState(minBookingDateIso())
   const [desiredTime, setDesiredTime] = useState('')
-  const [desiredEndTime, setDesiredEndTime] = useState('')
   const [suggestedPackages, setSuggestedPackages] = useState([])
-  const [suggestedLoading, setSuggestedLoading] = useState(false)
   const [suggestedError, setSuggestedError] = useState('')
   const [suggestedSearched, setSuggestedSearched] = useState(false)
+  // Per-grid-time availability, pre-fetched so the "pick by time" grid can show real
+  // available/full state per slot instead of blind Start/End dropdowns.
+  const [bytimeSlotAvailability, setBytimeSlotAvailability] = useState({})
+  const [loadingBytimeSlots, setLoadingBytimeSlots] = useState(false)
   // The exact start time confirmed available for the currently-selected suggested package.
   const [confirmedDesiredStart, setConfirmedDesiredStart] = useState('')
   // Consumed once Step 4's slot list loads, to auto-select the exact slot the
@@ -334,6 +353,12 @@ export default function CustomerCreateBookingPage() {
   const [waitlistModal, setWaitlistModal]           = useState(null)
   const [waitlistSubmitting, setWaitlistSubmitting] = useState(false)
   const [waitlistResult, setWaitlistResult]         = useState(null)
+  // Set when waitlisting from "pick by time" mode, where no package is chosen yet —
+  // browse mode already has selectedPackageId, so this stays empty there.
+  const [waitlistPackageId, setWaitlistPackageId]   = useState('')
+  // Add-ons for the waitlist entry — unlike the rest of the booking flow, combos don't
+  // hide add-on selection here (waitlist just records desired items, staff sorts it out).
+  const [waitlistAddOnIds, setWaitlistAddOnIds]     = useState([])
 
   const [loadingInitial, setLoadingInitial] = useState(true)
   const [loadingPackages, setLoadingPackages] = useState(false)
@@ -409,7 +434,13 @@ export default function CustomerCreateBookingPage() {
       .join(' + ')
   }
 
+  // Add-ons already bundled inside the selected combo — offering them again separately
+  // would double-charge the customer for something the combo already covers.
+  const getIncludedServiceIdSet = (comboPkg) =>
+    new Set((comboPkg?.includedServiceIds || []).map(String))
+
   const isComboSelected = selectedPackage && normalizePackageType(selectedPackage) === 'COMBO'
+  const selectedComboIncludedIds = isComboSelected ? getIncludedServiceIdSet(selectedPackage) : null
 
   const selectedAddOns = useMemo(
     () =>
@@ -447,15 +478,6 @@ export default function CustomerCreateBookingPage() {
     return new Date(start.getTime() + totalMinutes * 60000)
   }, [confirmedDesiredStart, durationSummary])
 
-  // True once add-ons push the estimated finish past the free-time window the
-  // customer picked (desiredEndTime) — used to flag the estimate in red.
-  const bytimeExceedsWindow = useMemo(() => {
-    if (!bytimeEstimatedFinish || !desiredDate || !desiredEndTime) return false
-    const endBoundary = new Date(`${desiredDate}T${desiredEndTime}:00`)
-    if (Number.isNaN(endBoundary.getTime())) return false
-    return bytimeEstimatedFinish > endBoundary
-  }, [bytimeEstimatedFinish, desiredDate, desiredEndTime])
-
   const priceSummary = useMemo(() => {
     const mainPrice = bookingFlowUtils.getPackagePrice(selectedPackage)
     const addOnsPrice = selectedAddOns.reduce(
@@ -463,12 +485,15 @@ export default function CustomerCreateBookingPage() {
       0,
     )
     const subtotal = mainPrice + addOnsPrice
+    const surchargeAmount = specialDaySurcharge.isSpecialDay
+      ? Math.round(subtotal * (specialDaySurcharge.surchargeRate / 100))
+      : 0
     const promotionDiscount = bookingFlowUtils.getDiscountAmount(promotionResult)
     const loyaltyDiscount = bookingFlowUtils.getDiscountAmount(loyaltyPreview)
-    const finalPrice = Math.max(subtotal - promotionDiscount - loyaltyDiscount, 0)
+    const finalPrice = Math.max(subtotal + surchargeAmount - promotionDiscount - loyaltyDiscount, 0)
 
-    return { subtotal, promotionDiscount, loyaltyDiscount, finalPrice }
-  }, [promotionResult, loyaltyPreview, selectedPackage, selectedAddOns])
+    return { subtotal, surchargeAmount, promotionDiscount, loyaltyDiscount, finalPrice }
+  }, [promotionResult, loyaltyPreview, selectedPackage, selectedAddOns, specialDaySurcharge])
 
   useEffect(() => {
     let mounted = true
@@ -824,20 +849,33 @@ export default function CustomerCreateBookingPage() {
     )
   }
 
-  const handleJoinWaitlist = (slot) => {
+  const handleJoinWaitlist = (slot, { date, packageId } = {}) => {
     setWaitlistResult(null)
-    setWaitlistModal(slot)
+    setWaitlistPackageId(packageId || selectedPackageId || '')
+    setWaitlistAddOnIds(selectedPackageId ? selectedAddOnIds : [])
+    setWaitlistModal({ ...slot, date: date || selectedDate })
+  }
+
+  const toggleWaitlistAddOn = (id) => {
+    setWaitlistAddOnIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    )
   }
 
   const handleConfirmWaitlist = async () => {
     if (!waitlistModal) return
+    if (!waitlistPackageId) {
+      setWaitlistResult({ ok: false, msg: 'Vui lòng chọn gói dịch vụ trước.' })
+      return
+    }
     setWaitlistSubmitting(true)
     setWaitlistResult(null)
     try {
       await waitlistApi.join({
         garageId: getId(selectedGarage),
         vehicleId: getId(selectedVehicle),
-        servicePackageId: getId(selectedPackage),
+        servicePackageId: waitlistPackageId,
+        addOnServicePackageIds: waitlistAddOnIds,
         desiredStartTime: waitlistModal?.startTime || waitlistModal?.start || waitlistModal?.from,
         reason: 'NO_BAY',
       })
@@ -905,50 +943,80 @@ export default function CustomerCreateBookingPage() {
     setConfirmedDesiredStart('')
     setSkipDateTimeStep(false)
 
-    // Combo is a standalone package — selecting a combo clears any selected add-ons
+    // Combos can still take extra add-ons — just drop any that are already bundled
+    // inside this specific combo, since re-adding them would double-charge the customer.
     if (normalizePackageType(servicePackage) === 'COMBO') {
-      setSelectedAddOnIds([])
+      const includedIds = getIncludedServiceIdSet(servicePackage)
+      setSelectedAddOnIds((prev) => prev.filter((addOnId) => !includedIds.has(addOnId)))
     }
   }
 
-  const handleFindPackagesByTime = async () => {
-    if (!selectedGarageId || !selectedVehicle || !desiredDate || !desiredTime || !desiredEndTime) return
-
-    if (desiredEndTime <= desiredTime) {
-      setSuggestedError('End time must be after start time.')
+  // Pre-fetch per-slot availability (which packages, if any, are available starting at
+  // each garage time option) so the "pick by time" grid can show real available/full
+  // state per button instead of blind Start/End dropdowns.
+  useEffect(() => {
+    if (packageSelectMode !== 'BY_TIME') return
+    if (!selectedGarageId || !selectedVehicle || !desiredDate || garageTimeOptions.length === 0) {
+      setBytimeSlotAvailability({})
       return
     }
-
-    setSuggestedLoading(true)
+    let active = true
+    setLoadingBytimeSlots(true)
     setSuggestedError('')
-    setSuggestedSearched(false)
+    Promise.all(
+      garageTimeOptions.map((t) =>
+        customerBookingFlowApi
+          .getAvailablePackagesForStartTime({
+            garageId: selectedGarageId,
+            vehicleId: getId(selectedVehicle),
+            startTime: `${desiredDate}T${t}:00`,
+          })
+          .then((result) => [t, Array.isArray(result?.packages) ? result.packages : []])
+          .catch(() => [t, []]),
+      ),
+    )
+      .then((entries) => {
+        if (!active) return
+        setBytimeSlotAvailability(Object.fromEntries(entries))
+      })
+      .catch(() => {
+        if (active) setSuggestedError('Could not check availability for this date.')
+      })
+      .finally(() => {
+        if (active) setLoadingBytimeSlots(false)
+      })
+    return () => { active = false }
+  }, [packageSelectMode, selectedGarageId, selectedVehicle, desiredDate, garageTimeOptions])
+
+  // Nearest earlier/later grid time (from the pre-fetched availability map) that
+  // actually has at least one package available — powers the "try this time instead" hint.
+  const findNearestAvailableTimes = (time) => {
+    const idx = garageTimeOptions.indexOf(time)
+    let before = null
+    let after = null
+    for (let i = idx - 1; i >= 0; i--) {
+      if ((bytimeSlotAvailability[garageTimeOptions[i]] || []).length > 0) {
+        before = garageTimeOptions[i]
+        break
+      }
+    }
+    for (let i = idx + 1; i < garageTimeOptions.length; i++) {
+      if ((bytimeSlotAvailability[garageTimeOptions[i]] || []).length > 0) {
+        after = garageTimeOptions[i]
+        break
+      }
+    }
+    return { before, after }
+  }
+
+  const handlePickDesiredTime = (time) => {
+    setDesiredTime(time)
+    setSuggestedError('')
     setSelectedPackageId('')
     setSelectedAddOnIds([])
     setConfirmedDesiredStart('')
-    try {
-      const startTime = `${desiredDate}T${desiredTime}:00`
-      const endBoundary = new Date(`${desiredDate}T${desiredEndTime}:00`)
-      const result = await customerBookingFlowApi.getAvailablePackagesForStartTime({
-        garageId: selectedGarageId,
-        vehicleId: getId(selectedVehicle),
-        startTime,
-      })
-      const all = Array.isArray(result?.packages) ? result.packages : []
-      // Only keep packages that finish before the customer's free window closes.
-      const withinWindow = all.filter((pkg) => {
-        const end = pkg?.endTime ? new Date(pkg.endTime) : null
-        return end && end <= endBoundary
-      })
-      setSuggestedPackages(withinWindow)
-    } catch (error) {
-      setSuggestedPackages([])
-      setSuggestedError(
-        error?.response?.data?.message || error.message || 'Could not find packages for this time.',
-      )
-    } finally {
-      setSuggestedLoading(false)
-      setSuggestedSearched(true)
-    }
+    setSuggestedPackages(bytimeSlotAvailability[time] || [])
+    setSuggestedSearched(true)
   }
 
   const handleSelectSuggestedPackage = (pkg) => {
@@ -956,9 +1024,13 @@ export default function CustomerCreateBookingPage() {
     setSelectedPackageId(id)
     setConfirmedDesiredStart(pkg.startTime || `${desiredDate}T${desiredTime}:00`)
 
-    // Combo is a standalone package — selecting a combo clears any selected add-ons
+    // Combos can still take extra add-ons — just drop any that are already bundled
+    // inside this specific combo. The "suggested package" shape doesn't carry
+    // includedServiceIds, so look up the full package from servicePackages.
     if (pkg.serviceType === 'COMBO') {
-      setSelectedAddOnIds([])
+      const fullPackage = servicePackages.find((item) => String(getId(item)) === id)
+      const includedIds = getIncludedServiceIdSet(fullPackage)
+      setSelectedAddOnIds((prev) => prev.filter((addOnId) => !includedIds.has(addOnId)))
     }
   }
 
@@ -1421,75 +1493,98 @@ export default function CustomerCreateBookingPage() {
                     {packageSelectMode === 'BY_TIME' ? (
                       <div className="bk-bytime">
                         <p className="bk-bytime-hint">
-                          Pick the date and the time window you're free — we'll suggest the packages that fit.
+                          Pick a date, then tap an available time — we'll show the packages that fit.
                         </p>
-                        <div className="bk-bytime-inputs">
-                          <label className="bk-bytime-field">
-                            <span>Date</span>
-                            <input
-                              type="date"
-                              className="bk-input"
-                              value={desiredDate}
-                              min={minBookingDateIso()}
-                              max={maxBookingDateIso(bookingWindowDays)}
-                              onChange={(e) => setDesiredDate(clampBookingDate(e.target.value, bookingWindowDays))}
-                            />
-                          </label>
-                          <label className="bk-bytime-field">
-                            <span>Start time</span>
-                            <select
-                              className="bk-input"
-                              value={desiredTime}
-                              onChange={(e) => setDesiredTime(e.target.value)}
-                            >
-                              <option value="">--:--</option>
-                              {garageTimeOptions.map((t) => (
-                                <option key={t} value={t}>{t}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="bk-bytime-field">
-                            <span>End time</span>
-                            <select
-                              className="bk-input"
-                              value={desiredEndTime}
-                              onChange={(e) => setDesiredEndTime(e.target.value)}
-                            >
-                              <option value="">--:--</option>
-                              {garageTimeOptions
-                                .filter((t) => !desiredTime || t > desiredTime)
-                                .map((t) => (
-                                  <option key={t} value={t}>{t}</option>
-                                ))}
-                            </select>
-                          </label>
-                          <button
-                            type="button"
-                            className="bk-btn-primary bk-btn-sm"
-                            disabled={!desiredDate || !desiredTime || !desiredEndTime || suggestedLoading}
-                            onClick={handleFindPackagesByTime}
-                          >
-                            {suggestedLoading ? 'Searching...' : 'Find packages'}
-                          </button>
-                        </div>
+                        <label className="bk-bytime-field bk-bytime-field--date">
+                          <span>Date</span>
+                          <input
+                            type="date"
+                            className="bk-input"
+                            value={desiredDate}
+                            min={minBookingDateIso()}
+                            max={maxBookingDateIso(bookingWindowDays)}
+                            onChange={(e) => setDesiredDate(clampBookingDate(e.target.value, bookingWindowDays))}
+                          />
+                        </label>
+
+                        {loadingBytimeSlots ? (
+                          <div className="bk-loading-inline">
+                            <div className="bk-spinner-sm" />
+                            Checking availability...
+                          </div>
+                        ) : garageTimeOptions.length === 0 ? (
+                          <p className="bk-bytime-hint">Select a garage first.</p>
+                        ) : (
+                          <div className="bk-bytime-slotgrid">
+                            {garageTimeOptions.map((t) => {
+                              const known = bytimeSlotAvailability[t] !== undefined
+                              const available = known && bytimeSlotAvailability[t].length > 0
+                              const isSelected = desiredTime === t
+                              const full = known && !available
+                              return (
+                                <button
+                                  type="button"
+                                  key={t}
+                                  className={[
+                                    'bk-bytime-slot',
+                                    isSelected ? 'bk-bytime-slot--sel' : '',
+                                    full ? 'bk-bytime-slot--full' : '',
+                                  ].filter(Boolean).join(' ')}
+                                  onClick={() => {
+                                    if (full) {
+                                      handleJoinWaitlist({ startTime: `${desiredDate}T${t}:00`, label: t }, { date: desiredDate })
+                                      return
+                                    }
+                                    handlePickDesiredTime(t)
+                                  }}
+                                >
+                                  {t}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        {desiredTime && suggestedSearched && !loadingBytimeSlots && suggestedPackages.length === 0 && (() => {
+                          const { before, after } = findNearestAvailableTimes(desiredTime)
+                          return (
+                            <div className="bk-bytime-suggest">
+                              <p>Sorry, {desiredTime} is fully booked on this date.</p>
+                              {before || after ? (
+                                <div className="bk-bytime-suggest-actions">
+                                  {before && (
+                                    <button
+                                      type="button"
+                                      className="bk-btn-outline bk-btn-sm"
+                                      onClick={() => handlePickDesiredTime(before)}
+                                    >
+                                      Try {before} instead
+                                    </button>
+                                  )}
+                                  {after && (
+                                    <button
+                                      type="button"
+                                      className="bk-btn-outline bk-btn-sm"
+                                      onClick={() => handlePickDesiredTime(after)}
+                                    >
+                                      Try {after} instead
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <span>No other time is free on this date — try another date.</span>
+                              )}
+                            </div>
+                          )
+                        })()}
 
                         {confirmedDesiredStart && bytimeEstimatedFinish && (
-                          <p className={`bk-bytime-estimate${bytimeExceedsWindow ? ' bk-bytime-estimate--over' : ''}`}>
+                          <p className="bk-bytime-estimate">
                             Estimated finish: <strong>{formatTime(bytimeEstimatedFinish)}</strong>
-                            {bytimeExceedsWindow && (
-                              <span className="bk-bytime-estimate-warn"> — past your {desiredEndTime} deadline</span>
-                            )}
                           </p>
                         )}
 
                         {suggestedError && <span className="bk-field-error">{suggestedError}</span>}
-
-                        {suggestedSearched && !suggestedLoading && !suggestedError && suggestedPackages.length === 0 && (
-                          <div className="bk-empty">
-                            <p>No packages fit this window</p>
-                            <span>Try a wider time range or another date.</span>
-                          </div>
-                        )}
 
                         {suggestedPackages.length > 0 && (
                           <div className="bk-pkg-grid">
@@ -1522,25 +1617,35 @@ export default function CustomerCreateBookingPage() {
                         )}
 
                         {/* Add-ons — same pool used in "Select package" mode, offered on top of the chosen suggestion */}
-                        {selectedPackageId && !isComboSelected && addOnPackages.length > 0 && (
+                        {selectedPackageId && addOnPackages.length > 0 && (
                           <div className="bk-pkg-section bk-bytime-addons">
                             <p className="bk-pkg-section-title">
-                              Add-ons <span className="bk-pkg-section-hint"> — select multiple, optional</span>
+                              Add-ons
+                              {isComboSelected
+                                ? <span className="bk-pkg-section-hint"> — already-included ones are grayed out</span>
+                                : <span className="bk-pkg-section-hint"> — select multiple, optional</span>
+                              }
                             </p>
                             <div className="bk-pkg-grid">
                               {addOnPackages.map((pkg) => {
                                 const pid = String(getId(pkg))
                                 const sel = selectedAddOnIds.includes(pid)
+                                const alreadyIncluded = !!selectedComboIncludedIds?.has(pid)
                                 return (
                                   <button
                                     type="button"
                                     key={pid}
+                                    disabled={alreadyIncluded}
+                                    title={alreadyIncluded ? 'Already included in the selected combo' : undefined}
                                     className={`bk-pkg-card${sel ? ' bk-pkg-card--sel' : ''}`}
                                     onClick={() => toggleAddOn(pid)}
                                   >
                                     <div className="bk-pkg-card-top">
                                       <div className="bk-pkg-card-meta">
                                         <span className="bk-pkg-badge bk-pkg-badge--addon">Add-on</span>
+                                        {alreadyIncluded && (
+                                          <span className="bk-pkg-badge bk-pkg-badge--included">Included</span>
+                                        )}
                                       </div>
                                       <span className="bk-pkg-name">{getName(pkg, 'Add-on')}</span>
                                     </div>
@@ -1639,7 +1744,7 @@ export default function CustomerCreateBookingPage() {
                             <p className="bk-pkg-section-title">
                               Add-ons
                               {isComboSelected
-                                ? <span className="bk-pkg-section-hint"> — not available with combo</span>
+                                ? <span className="bk-pkg-section-hint"> — already-included ones are grayed out</span>
                                 : <span className="bk-pkg-section-hint"> — select multiple</span>
                               }
                             </p>
@@ -1647,17 +1752,22 @@ export default function CustomerCreateBookingPage() {
                               {addOnPackages.map((pkg) => {
                                 const pid = String(getId(pkg))
                                 const sel = selectedAddOnIds.includes(pid)
+                                const alreadyIncluded = !!selectedComboIncludedIds?.has(pid)
                                 return (
                                   <button
                                     type="button"
                                     key={pid}
-                                    disabled={isComboSelected}
+                                    disabled={alreadyIncluded}
+                                    title={alreadyIncluded ? 'Already included in the selected combo' : undefined}
                                     className={`bk-pkg-card${sel ? ' bk-pkg-card--sel' : ''}`}
                                     onClick={() => toggleAddOn(pid)}
                                   >
                                     <div className="bk-pkg-card-top">
                                       <div className="bk-pkg-card-meta">
                                         <span className="bk-pkg-badge bk-pkg-badge--addon">Add-on</span>
+                                        {alreadyIncluded && (
+                                          <span className="bk-pkg-badge bk-pkg-badge--included">Included</span>
+                                        )}
                                       </div>
                                       <span className="bk-pkg-name">{getName(pkg, 'Add-on')}</span>
                                       {(pkg?.description || pkg?.shortDescription) && (
@@ -2045,6 +2155,12 @@ export default function CustomerCreateBookingPage() {
                     <span>Subtotal</span>
                     <strong>{formatMoney(priceSummary.subtotal)}</strong>
                   </div>
+                  {priceSummary.surchargeAmount > 0 && (
+                    <div className="bk-summary-row bk-summary-row--surcharge">
+                      <span>Holiday surcharge (+{specialDaySurcharge.surchargeRate}%)</span>
+                      <strong>+{formatMoney(priceSummary.surchargeAmount)}</strong>
+                    </div>
+                  )}
                   {priceSummary.promotionDiscount > 0 && (
                     <div className="bk-summary-row bk-summary-row--discount">
                       <span>Promo discount</span>
@@ -2104,15 +2220,53 @@ export default function CustomerCreateBookingPage() {
             ) : (
               <>
                 <p className="bk-wl-desc">
-                  Slot <strong>{getSlotLabel(waitlistModal)}</strong> ngày <strong>{selectedDate}</strong> hiện đã đầy.
+                  Slot <strong>{getSlotLabel(waitlistModal)}</strong> ngày <strong>{waitlistModal?.date || selectedDate}</strong> hiện đã đầy.
                   Bạn có muốn tham gia danh sách chờ không?
                 </p>
 
                 <div className="bk-wl-info">
                   <div className="bk-wl-info-row"><span>Garage</span><strong>{getName(selectedGarage, '—')}</strong></div>
-                  <div className="bk-wl-info-row"><span>Dịch vụ</span><strong>{getName(selectedPackage, '—')}</strong></div>
+                  {selectedPackageId ? (
+                    <div className="bk-wl-info-row"><span>Dịch vụ</span><strong>{getName(selectedPackage, '—')}</strong></div>
+                  ) : (
+                    <label className="bk-wl-info-row bk-wl-info-row--select">
+                      <span>Dịch vụ *</span>
+                      <select
+                        className="bk-wl-select"
+                        value={waitlistPackageId}
+                        onChange={(e) => setWaitlistPackageId(e.target.value)}
+                      >
+                        <option value="">-- Chọn gói --</option>
+                        {[...mainPackages, ...comboPackages].map((pkg) => (
+                          <option key={getId(pkg)} value={getId(pkg)}>{getName(pkg, 'Service package')}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   <div className="bk-wl-info-row"><span>Xe</span><strong>{getVehicleDisplayName(selectedVehicle) || getName(selectedVehicle, '—')}</strong></div>
                 </div>
+
+                {addOnPackages.length > 0 && (
+                  <div className="bk-wl-addons">
+                    <p className="bk-wl-addons-title">Add-on (optional)</p>
+                    <div className="bk-wl-addons-list">
+                      {addOnPackages.map((pkg) => {
+                        const pid = String(getId(pkg))
+                        const checked = waitlistAddOnIds.includes(pid)
+                        return (
+                          <label key={pid} className="bk-wl-addon-item">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleWaitlistAddOn(pid)}
+                            />
+                            <span>{getName(pkg, 'Add-on')}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {waitlistResult?.ok === false && (
                   <p className="bk-wl-error">{waitlistResult.msg}</p>
@@ -2122,7 +2276,11 @@ export default function CustomerCreateBookingPage() {
                   <button className="bk-wl-btn bk-wl-btn--ghost" disabled={waitlistSubmitting} onClick={() => setWaitlistModal(null)}>
                     Huỷ
                   </button>
-                  <button className="bk-wl-btn bk-wl-btn--primary" disabled={waitlistSubmitting} onClick={handleConfirmWaitlist}>
+                  <button
+                    className="bk-wl-btn bk-wl-btn--primary"
+                    disabled={waitlistSubmitting || !waitlistPackageId}
+                    onClick={handleConfirmWaitlist}
+                  >
                     {waitlistSubmitting ? 'Đang đăng ký…' : 'Tham gia danh sách chờ'}
                   </button>
                 </div>

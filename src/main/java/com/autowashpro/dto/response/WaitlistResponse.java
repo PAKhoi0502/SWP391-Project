@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -17,6 +18,8 @@ public class WaitlistResponse {
     private String vehicleName;
     private Long servicePackageId;
     private String servicePackageName;
+    private List<Long> addOnServicePackageIds;
+    private List<String> addOnServicePackageNames;
     private Long offeredBookingId;
     private LocalDateTime desiredStartTime;
     private LocalDateTime desiredEndTime;

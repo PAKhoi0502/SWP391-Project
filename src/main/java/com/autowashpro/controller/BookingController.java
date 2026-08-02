@@ -47,6 +47,7 @@ import com.autowashpro.dto.request.AddBookingAddOnsRequest;
 import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
 import com.autowashpro.dto.response.BookingServiceStepResponse;
 import com.autowashpro.dto.response.CancellationPreviewResponse;
+import com.autowashpro.dto.response.AddOnAvailabilityResponse;
 import org.springframework.security.core.Authentication;
 
 @RestController
@@ -481,6 +482,26 @@ public class BookingController {
                 return ApiResponse.<BookingResponse>builder()
                                 .success(true)
                                 .message("Booking marked as no-show successfully")
+                                .data(response)
+                                .build();
+        }
+
+        @GetMapping("/{id}/add-ons/availability")
+        @PreAuthorize("hasRole('STAFF') or hasRole('ADMIN')")
+        public ApiResponse<List<AddOnAvailabilityResponse>> getAddOnAvailability(
+                        @PathVariable Long id,
+                        @RequestParam("service_package_ids") List<Long> servicePackageIds,
+                        @AuthenticationPrincipal UserDetails userDetails,
+                        Authentication authentication) {
+
+                Long staffUserId = Long.valueOf(userDetails.getUsername());
+                String role = authentication.getAuthorities().stream().findFirst().orElseThrow().getAuthority();
+                List<AddOnAvailabilityResponse> response = bookingService.getAddOnAvailability(
+                                id, staffUserId, role, servicePackageIds);
+
+                return ApiResponse.<List<AddOnAvailabilityResponse>>builder()
+                                .success(true)
+                                .message("Add-on availability retrieved successfully")
                                 .data(response)
                                 .build();
         }

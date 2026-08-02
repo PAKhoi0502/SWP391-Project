@@ -37,6 +37,8 @@ public class BookingDetailResponse {
 
     private BigDecimal originalPrice;
 
+    private BigDecimal surchargeAmount;
+
     private BigDecimal discountAmount;
 
     private BigDecimal finalPrice;

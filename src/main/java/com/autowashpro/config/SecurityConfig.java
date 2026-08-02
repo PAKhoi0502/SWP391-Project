@@ -106,6 +106,9 @@ public class SecurityConfig {
 .requestMatchers(HttpMethod.GET, "/loyalty/tier-rules")
 .permitAll()
 
+.requestMatchers(HttpMethod.GET, "/special-days/check")
+.permitAll()
+
                         .anyRequest()
                         .authenticated())
                 .addFilterBefore(

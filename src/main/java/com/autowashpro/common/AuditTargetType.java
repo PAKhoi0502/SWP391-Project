@@ -15,6 +15,7 @@ public final class AuditTargetType {
     public static final String CUSTOMER_LOYALTY = "CUSTOMER_LOYALTY";
     public static final String POINT_TRANSACTION = "POINT_TRANSACTION";
     public static final String DEPOSIT_REFUND = "DEPOSIT_REFUND";
+    public static final String SPECIAL_DAY = "SPECIAL_DAY";
 
     private AuditTargetType() {
     }

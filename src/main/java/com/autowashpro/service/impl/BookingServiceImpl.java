@@ -13,6 +13,7 @@ import com.autowashpro.dto.request.PromotionValidateRequest;
 import com.autowashpro.dto.request.ReopenBookingServiceStepRequest;
 import com.autowashpro.dto.request.StartServiceRequest;
 import com.autowashpro.dto.request.WalkInBookingCreateRequest;
+import com.autowashpro.dto.response.AddOnAvailabilityResponse;
 import com.autowashpro.dto.response.AssignedCareStaffResponse;
 import com.autowashpro.dto.response.AvailableCareStaffResponse;
 import com.autowashpro.dto.response.AvailablePackageAtTimeResponse;
@@ -32,6 +33,7 @@ import com.autowashpro.service.BookingService;
 import com.autowashpro.service.LoyaltyService;
 import com.autowashpro.service.LoyaltyPointExpiryService;
 import com.autowashpro.service.PromotionService;
+import com.autowashpro.service.SpecialDayService;
 import com.autowashpro.service.EmailService;
 import com.autowashpro.service.support.VietnameseLicensePlate;
 import com.autowashpro.service.support.VietnamesePhoneNumber;
@@ -88,7 +90,16 @@ public class BookingServiceImpl implements BookingService {
         private static final long GRACE_PERIOD_MINUTES = 30L;
         // Walk-in bookings are staff-mediated at the counter, so this is a sanity ceiling
         // against misclicks rather than a tight loyalty-tier-style window.
-        private static final long WALK_IN_MAX_ADVANCE_DAYS = 30L;
+        private static final long WALK_IN_MAX_ADVANCE_DAYS = 7L;
+        // Operation phases reached only after the wash bay has already been released —
+        // see addBookingAddOns(), which only allows care-only add-ons once here.
+        // FINAL_INSPECTION is deliberately excluded: a newly added add-on's step resolves to
+        // VEHICLE_CARE, and completeBookingServiceStep() requires the step's phase to match
+        // the booking's CURRENT phase exactly — since phase only ever moves forward, a step
+        // added at FINAL_INSPECTION (after VEHICLE_CARE has already passed) could never be
+        // completed.
+        private static final java.util.Set<String> PAST_WASH_PHASES = java.util.Set.of(
+                        "ADDON_SERVICE", "WAITING_FOR_CARE", "VEHICLE_CARE");
 
         private static final long GRACE_MIN_HOURS_BEFORE_SERVICE = 2L;
 
@@ -104,6 +115,7 @@ public class BookingServiceImpl implements BookingService {
         private final VehicleRepository vehicleRepository;
         private final CustomerLoyaltyRepository customerLoyaltyRepository;
         private final LoyaltyTierRuleRepository loyaltyTierRuleRepository;
+        private final SpecialDayService specialDayService;
         private final PromotionRepository promotionRepository;
         private final PromotionUsageRepository promotionUsageRepository;
         private final BookingAssignedStaffRepository bookingAssignedStaffRepository;
@@ -458,6 +470,22 @@ public class BookingServiceImpl implements BookingService {
                 return new ArrayList<>(dedupMap.values());
         }
 
+        // Combos can still take extra add-ons, but re-selecting a service already bundled
+        // inside the combo would double-charge for it — buildSelectedPackages() already
+        // dedupes it silently for price/duration purposes, but the request should be
+        // rejected outright so the customer/staff gets a clear error instead of a silent no-op.
+        private void rejectAddOnsAlreadyInPackage(ServicePackage mainPackage, List<ServicePackage> addOns) {
+                Set<Long> mainEffectiveIds = packageResourceResolver.resolveEffectivePackages(mainPackage).stream()
+                                .map(ServicePackage::getId)
+                                .collect(java.util.stream.Collectors.toSet());
+                for (ServicePackage addOn : addOns) {
+                        if (mainEffectiveIds.contains(addOn.getId())) {
+                                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                                "Add-on is already included in the selected package: " + addOn.getName());
+                        }
+                }
+        }
+
         private List<ServicePackage> loadAddOnPackages(List<Long> addOnIds, Long mainPackageId, Vehicle vehicle) {
                 if (addOnIds == null || addOnIds.isEmpty()) {
                         return List.of();
@@ -561,8 +589,14 @@ public class BookingServiceImpl implements BookingService {
                                 continue;
                         }
 
+                        // Multiple packages needing the same staff type share ONE combined care
+                        // session (one staff member performs each service in turn on the same
+                        // vehicle) — so capacity needs the max required headcount across packages,
+                        // not a sum. Matches computeResourceWindows(), which already does this
+                        // correctly; this function previously summed, undercounting available
+                        // capacity whenever a booking had several add-ons needing the same type.
                         StaffType staffType = StaffType.valueOf(servicePackage.getCareStaffType());
-                        requiredByType.merge(staffType, servicePackage.getCareStaffRequiredCount(), Integer::sum);
+                        requiredByType.merge(staffType, servicePackage.getCareStaffRequiredCount(), Integer::max);
                 }
 
                 for (Map.Entry<StaffType, Integer> entry : requiredByType.entrySet()) {
@@ -724,6 +758,7 @@ public class BookingServiceImpl implements BookingService {
                                 request.getAddOnServicePackageIds(),
                                 request.getServicePackageId(),
                                 vehicle);
+                rejectAddOnsAlreadyInPackage(pkg, addOns);
                 List<ServicePackage> selectedPackages = buildSelectedPackages(pkg, addOns);
 
                 Garage garage = garageRepository.findById(request.getGarageId())
@@ -885,7 +920,8 @@ public class BookingServiceImpl implements BookingService {
                         discountAmount = originalPrice;
                 }
 
-                BigDecimal finalPrice = originalPrice.subtract(discountAmount);
+                BigDecimal surchargeAmount = specialDayService.computeSurcharge(startTime.toLocalDate(), originalPrice);
+                BigDecimal finalPrice = originalPrice.add(surchargeAmount).subtract(discountAmount);
                 BigDecimal depositAmount = finalPrice
                                 .multiply(DEPOSIT_PERCENT)
                                 .setScale(2, RoundingMode.HALF_UP);
@@ -910,7 +946,7 @@ public class BookingServiceImpl implements BookingService {
                 booking.setPaymentMethod("PAYOS");
 
                 booking.setOriginalPrice(originalPrice);
-                booking.setSurchargeAmount(BigDecimal.ZERO);
+                booking.setSurchargeAmount(surchargeAmount);
                 booking.setDiscountAmount(discountAmount);
                 booking.setPromotionDiscountAmount(
                                 promotionDiscountAmount);
@@ -1036,6 +1072,7 @@ public class BookingServiceImpl implements BookingService {
                 for (ServicePackage addOn : addOns) {
                         requirePackageMappedToGarage(request.getGarageId(), addOn.getId());
                 }
+                rejectAddOnsAlreadyInPackage(pkg, addOns);
                 List<ServicePackage> selectedPackages = buildSelectedPackages(pkg, addOns);
 
                 String bayType = VietnameseLicensePlate.normalizeVehicleType(request.getVehicleType());
@@ -1138,6 +1175,8 @@ public class BookingServiceImpl implements BookingService {
                                 request.getPaymentMethod());
 
                 BigDecimal originalPrice = sumBasePrice(selectedPackages);
+                BigDecimal surchargeAmount = specialDayService.computeSurcharge(startTime.toLocalDate(), originalPrice);
+                BigDecimal finalPrice = originalPrice.add(surchargeAmount);
 
                 // Walk-in customers are physically at the counter, so a slot starting soon
                 // (within the next hour) is treated as an immediate wash — no deposit needed.
@@ -1155,7 +1194,7 @@ public class BookingServiceImpl implements BookingService {
 
                 if (depositRequired) {
 
-                        depositAmount = originalPrice
+                        depositAmount = finalPrice
                                         .multiply(DEPOSIT_PERCENT)
                                         .setScale(2, RoundingMode.HALF_UP);
 
@@ -1194,9 +1233,9 @@ public class BookingServiceImpl implements BookingService {
                 booking.setPaymentStatus("UNPAID");
                 booking.setPaymentMethod(depositPaymentMethod);
                 booking.setOriginalPrice(originalPrice);
-                booking.setSurchargeAmount(BigDecimal.ZERO);
+                booking.setSurchargeAmount(surchargeAmount);
                 booking.setDiscountAmount(BigDecimal.ZERO);
-                booking.setFinalPrice(originalPrice);
+                booking.setFinalPrice(finalPrice);
                 booking.setDepositAmount(depositAmount);
                 booking.setDepositStatus(depositStatus);
                 booking.setPaymentExpiredAt(paymentExpiredAt);
@@ -1283,6 +1322,7 @@ public class BookingServiceImpl implements BookingService {
                 for (ServicePackage addOn : addOns) {
                         requirePackageMappedToGarage(request.getGarageId(), addOn.getId());
                 }
+                rejectAddOnsAlreadyInPackage(pkg, addOns);
                 List<ServicePackage> selectedPackages = buildSelectedPackages(pkg, addOns);
 
                 String bayType = VietnameseLicensePlate.normalizeVehicleType(request.getVehicleType());
@@ -1376,7 +1416,9 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 BigDecimal originalPrice = sumBasePrice(selectedPackages);
-                BigDecimal depositAmount = originalPrice
+                BigDecimal surchargeAmount = specialDayService.computeSurcharge(startTime.toLocalDate(), originalPrice);
+                BigDecimal finalPrice = originalPrice.add(surchargeAmount);
+                BigDecimal depositAmount = finalPrice
                                 .multiply(DEPOSIT_PERCENT)
                                 .setScale(2, RoundingMode.HALF_UP);
                 LocalDateTime paymentExpiredAt = LocalDateTime.now()
@@ -1396,9 +1438,9 @@ public class BookingServiceImpl implements BookingService {
                 booking.setPaymentStatus("UNPAID");
                 booking.setPaymentMethod("PAYOS");
                 booking.setOriginalPrice(originalPrice);
-                booking.setSurchargeAmount(BigDecimal.ZERO);
+                booking.setSurchargeAmount(surchargeAmount);
                 booking.setDiscountAmount(BigDecimal.ZERO);
-                booking.setFinalPrice(originalPrice);
+                booking.setFinalPrice(finalPrice);
                 booking.setDepositAmount(depositAmount);
                 booking.setDepositStatus("UNPAID");
                 booking.setPaymentExpiredAt(paymentExpiredAt);
@@ -2135,9 +2177,14 @@ public class BookingServiceImpl implements BookingService {
                 boolean waitingForIntake = "CHECKED_IN".equals(status)
                                 && (phase == null || "WAITING_FOR_INTAKE".equals(phase));
                 boolean washing = "IN_PROGRESS".equals(status) && "AUTOMATED_WASH".equals(phase);
-                if (!waitingForIntake && !washing) {
+                // Wash bay has already been released by this point — only care-only add-ons
+                // (no wash bay requirement) can still be tacked on, so staff can act on a late
+                // customer request without losing track of it once the wash step is done.
+                boolean pastWash = "IN_PROGRESS".equals(status) && phase != null
+                                && PAST_WASH_PHASES.contains(phase);
+                if (!waitingForIntake && !washing && !pastWash) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT,
-                                        "Add-ons can only be added before intake or during automated wash");
+                                        "Add-ons can no longer be added — the booking is past the final inspection stage");
                 }
 
                 LinkedHashSet<Long> requestedIds = new LinkedHashSet<>(request.getServicePackageIds());
@@ -2192,9 +2239,15 @@ public class BookingServiceImpl implements BookingService {
                         }
                         requirePackageMappedToGarage(booking.getGarageId(), packageId);
 
+                        if (pastWash && Boolean.TRUE.equals(addOn.getRequiresWashBay())) {
+                                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                                "This add-on requires a wash bay, which is no longer available at this stage: "
+                                                                + addOn.getName());
+                        }
+
                         List<ServicePackageStep> templates = servicePackageStepRepository
                                         .findByServicePackage_IdOrderByStepOrder(packageId);
-                        if (washing && templates.stream()
+                        if ((washing || pastWash) && templates.stream()
                                         .map(template -> resolveRuntimeStepPhase(template, addOn))
                                         .anyMatch("INTAKE_INSPECTION"::equals)) {
                                 throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -2216,7 +2269,7 @@ public class BookingServiceImpl implements BookingService {
                 ResourceWindows resourceWindows = computeResourceWindows(currentPackages);
                 validateSingleCareStaffType(currentPackages);
 
-                LocalDateTime scheduleStart = washing
+                LocalDateTime scheduleStart = (washing || pastWash)
                                 ? firstNonNull(booking.getWashBayStartTime(), booking.getStartedAt(),
                                                 booking.getStartTime(), LocalDateTime.now())
                                 : booking.getStartTime();
@@ -2227,13 +2280,23 @@ public class BookingServiceImpl implements BookingService {
                 LocalDateTime careEnd = resourceWindows.requiresCareStaff
                                 ? careStart.plusMinutes(resourceWindows.totalCareMinutes)
                                 : null;
-                LocalDateTime calculatedEnd = scheduleStart
-                                .plusMinutes(resolveSlotDurationMinutes(currentPackages, garage));
+                // Use the same wash/care resource windows just computed above as the source of
+                // truth for the new finish time — resolveSlotDurationMinutes() sums the package's
+                // plain `durationMinutes` field, which is a separate admin-entered value that can
+                // drift from the step-derived wash/care durations actually driving the schedule,
+                // so it understated the real finish time and silently failed to extend endTime.
+                LocalDateTime calculatedEnd = resourceWindows.requiresCareStaff ? careEnd : washEnd;
                 LocalDateTime updatedEnd = booking.getEndTime() != null && booking.getEndTime().isAfter(calculatedEnd)
                                 ? booking.getEndTime()
                                 : calculatedEnd;
 
-                ensureUpdatedWashCapacity(booking, resourceWindows, scheduleStart, washEnd);
+                // Skip re-validating wash-bay capacity once past the wash phase — that window is
+                // already historical (the bay has been released), and no new wash-requiring
+                // add-on can reach this point anyway (rejected above), so re-checking it against
+                // "now" would only risk a false WASH_BAY_CAPACITY_FULL conflict.
+                if (!pastWash) {
+                        ensureUpdatedWashCapacity(booking, resourceWindows, scheduleStart, washEnd);
+                }
                 synchronizeCareReservations(booking, resourceWindows, careStart, careEnd);
 
                 if (washing && resourceWindows.requiresWashBay && booking.getWashBayId() == null) {
@@ -2277,7 +2340,7 @@ public class BookingServiceImpl implements BookingService {
                         bookingAddOnServicePackageRepository.save(link);
                 }
 
-                if (washing) {
+                if (washing || pastWash) {
                         List<BookingServiceStep> currentSteps = bookingServiceStepRepository
                                         .findByBookingIdOrderByStepOrder(bookingId);
                         int nextStepOrder = currentSteps.stream()
@@ -2311,6 +2374,185 @@ public class BookingServiceImpl implements BookingService {
                 response.setAddOnServicePackageIds(allAddOnIds);
                 response.setAssignedCareStaffIds(resolveAssignedCareStaffIds(saved.getId()));
                 return response;
+        }
+
+        @Override
+        @Transactional(readOnly = true)
+        public List<AddOnAvailabilityResponse> getAddOnAvailability(
+                        Long bookingId,
+                        Long staffUserId,
+                        String role,
+                        List<Long> servicePackageIds) {
+
+                if (servicePackageIds == null || servicePackageIds.isEmpty()) {
+                        return List.of();
+                }
+                List<Long> distinctIds = servicePackageIds.stream().distinct().toList();
+
+                Booking booking = bookingRepository.findById(bookingId)
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Booking not found: " + bookingId));
+
+                staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(
+                                staffUserId, role, booking.getGarageId());
+
+                String status = booking.getStatus();
+                String phase = booking.getOperationPhase();
+                boolean waitingForIntake = "CHECKED_IN".equals(status)
+                                && (phase == null || "WAITING_FOR_INTAKE".equals(phase));
+                boolean washing = "IN_PROGRESS".equals(status) && "AUTOMATED_WASH".equals(phase);
+                boolean pastWash = "IN_PROGRESS".equals(status) && phase != null
+                                && PAST_WASH_PHASES.contains(phase);
+                boolean addable = ("CHECKED_IN".equals(status) || "IN_PROGRESS".equals(status))
+                                && !"PAID".equals(booking.getPaymentStatus())
+                                && (waitingForIntake || washing || pastWash);
+
+                if (!addable) {
+                        return distinctIds.stream()
+                                        .map(id -> AddOnAvailabilityResponse.builder()
+                                                        .servicePackageId(id)
+                                                        .available(false)
+                                                        .reason("Add-ons cannot be added to this booking right now")
+                                                        .build())
+                                        .toList();
+                }
+
+                ServicePackage mainPackage = servicePackageRepository.findById(booking.getServicePackageId())
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                                "Main service package not found"));
+                List<ServicePackage> currentPackages = buildAllPackagesForBooking(booking, mainPackage);
+                Set<Long> effectivePackageIds = currentPackages.stream()
+                                .map(ServicePackage::getId)
+                                .filter(Objects::nonNull)
+                                .collect(java.util.stream.Collectors.toSet());
+
+                Vehicle vehicle = booking.getVehicleId() == null
+                                ? null
+                                : vehicleRepository.findById(booking.getVehicleId()).orElse(null);
+
+                List<AddOnAvailabilityResponse> results = new ArrayList<>();
+                for (Long packageId : distinctIds) {
+                        String reason = checkAddOnAvailabilityReason(
+                                        booking, currentPackages, effectivePackageIds, vehicle,
+                                        washing, pastWash, packageId);
+                        results.add(AddOnAvailabilityResponse.builder()
+                                        .servicePackageId(packageId)
+                                        .available(reason == null)
+                                        .reason(reason)
+                                        .build());
+                }
+                return results;
+        }
+
+        // Read-only per-candidate check mirroring addBookingAddOns()'s validation, so the "Add
+        // service" UI can grey out an add-on BEFORE staff attempt to submit it — e.g. when
+        // extending this booking's care window would collide with another booking's already
+        // reserved care staff. Evaluates each candidate independently against the booking's
+        // CURRENT committed packages (not combined with other unsubmitted candidates).
+        private String checkAddOnAvailabilityReason(
+                        Booking booking,
+                        List<ServicePackage> currentPackages,
+                        Set<Long> effectivePackageIds,
+                        Vehicle vehicle,
+                        boolean washing,
+                        boolean pastWash,
+                        Long packageId) {
+
+                if (effectivePackageIds.contains(packageId)
+                                || bookingAddOnServicePackageRepository
+                                                .existsByBookingIdAndServicePackageId(booking.getId(), packageId)) {
+                        return "Already included in this booking";
+                }
+
+                ServicePackage addOn = servicePackageRepository.findById(packageId).orElse(null);
+                if (addOn == null) {
+                        return "Add-on service package not found";
+                }
+                if (!Boolean.TRUE.equals(addOn.getIsActive())) {
+                        return "Add-on service package is inactive";
+                }
+                if (!"ADD_ON".equals(normalizeServiceType(addOn.getServiceType()))) {
+                        return "Only ADD_ON service packages can be added";
+                }
+                boolean compatible = vehicle != null
+                                ? isVehicleTypeCompatible(vehicle, addOn)
+                                : isVehicleTypeCompatible(booking.getVehicleType(), addOn);
+                if (!compatible) {
+                        return "Vehicle is not compatible with this add-on";
+                }
+                if (!garageServicePackageRepository.existsByGarageIdAndServicePackageIdAndIsActiveTrue(
+                                booking.getGarageId(), packageId)) {
+                        return "PACKAGE_NOT_AVAILABLE_AT_GARAGE: This service package is not available at the selected garage";
+                }
+                if (pastWash && Boolean.TRUE.equals(addOn.getRequiresWashBay())) {
+                        return "This add-on requires a wash bay, which is no longer available at this stage";
+                }
+                if (washing || pastWash) {
+                        List<ServicePackageStep> templates = servicePackageStepRepository
+                                        .findByServicePackage_IdOrderByStepOrder(packageId);
+                        boolean hasIntakeStep = templates.stream()
+                                        .map(template -> resolveRuntimeStepPhase(template, addOn))
+                                        .anyMatch("INTAKE_INSPECTION"::equals);
+                        if (hasIntakeStep) {
+                                return "This add-on contains an intake step that can no longer be performed";
+                        }
+                }
+
+                List<ServicePackage> candidatePackages = new ArrayList<>(currentPackages);
+                Set<Long> candidateIds = new java.util.HashSet<>(effectivePackageIds);
+                for (ServicePackage effective : packageResourceResolver.resolveEffectivePackages(addOn)) {
+                        if (effective.getId() != null && candidateIds.add(effective.getId())) {
+                                candidatePackages.add(effective);
+                        }
+                }
+
+                Set<String> careStaffTypes = candidatePackages.stream()
+                                .filter(pkg -> Boolean.TRUE.equals(pkg.getRequiresCareStaff()))
+                                .map(ServicePackage::getCareStaffType)
+                                .filter(type -> type != null && !type.isBlank())
+                                .map(type -> type.trim().toUpperCase())
+                                .collect(java.util.stream.Collectors.toSet());
+                if (careStaffTypes.size() > 1) {
+                        return "The selected services require incompatible care staff types";
+                }
+
+                ResourceWindows resourceWindows = computeResourceWindows(candidatePackages);
+                LocalDateTime scheduleStart = (washing || pastWash)
+                                ? firstNonNull(booking.getWashBayStartTime(), booking.getStartedAt(),
+                                                booking.getStartTime(), LocalDateTime.now())
+                                : booking.getStartTime();
+                LocalDateTime washEnd = resourceWindows.requiresWashBay
+                                ? scheduleStart.plusMinutes(resourceWindows.totalWashMinutes)
+                                : scheduleStart;
+                LocalDateTime careStart = resourceWindows.requiresCareStaff ? washEnd : null;
+                LocalDateTime careEnd = resourceWindows.requiresCareStaff
+                                ? careStart.plusMinutes(resourceWindows.totalCareMinutes)
+                                : null;
+
+                if (!pastWash && resourceWindows.requiresWashBay
+                                && resourceWindows.totalWashMinutes > 0 && washEnd.isAfter(scheduleStart)) {
+                        String bayType = mapVehicleTypeToBayType(booking.getVehicleType());
+                        long totalBays = washBayRepository.countActiveByGarageAndVehicleType(
+                                        booking.getGarageId(), bayType);
+                        long occupiedBays = bookingRepository
+                                        .countOtherOverlappingBookingsByGarageAndVehicleType(
+                                                        booking.getId(),
+                                                        booking.getGarageId(),
+                                                        booking.getVehicleType(),
+                                                        scheduleStart,
+                                                        washEnd,
+                                                        LocalDateTime.now());
+                        if (totalBays <= occupiedBays) {
+                                return "WASH_BAY_CAPACITY_FULL: The added service exceeds wash bay capacity";
+                        }
+                }
+
+                CareCapacityCheck check = checkCareStaffCapacity(booking, resourceWindows, careStart, careEnd);
+                if (!check.available) {
+                        return check.reason;
+                }
+
+                return null;
         }
 
         @Override
@@ -3103,13 +3345,47 @@ public class BookingServiceImpl implements BookingService {
                 }
         }
 
-        private void synchronizeCareReservations(
+        private static final class CareCapacityCheck {
+                final boolean available;
+                final String reason;
+                final List<BookingAssignedStaff> usableAssignments;
+                final List<StaffProfile> additionalStaff;
+                final List<BookingAssignedStaff> staleAssignments;
+                final String staffTypeName;
+
+                private CareCapacityCheck(boolean available, String reason,
+                                List<BookingAssignedStaff> usableAssignments, List<StaffProfile> additionalStaff,
+                                List<BookingAssignedStaff> staleAssignments, String staffTypeName) {
+                        this.available = available;
+                        this.reason = reason;
+                        this.usableAssignments = usableAssignments;
+                        this.additionalStaff = additionalStaff;
+                        this.staleAssignments = staleAssignments;
+                        this.staffTypeName = staffTypeName;
+                }
+
+                static CareCapacityCheck unavailable(String reason) {
+                        return new CareCapacityCheck(false, reason, List.of(), List.of(), List.of(), null);
+                }
+
+                static CareCapacityCheck available(List<BookingAssignedStaff> usableAssignments,
+                                List<StaffProfile> additionalStaff, List<BookingAssignedStaff> staleAssignments,
+                                String staffTypeName) {
+                        return new CareCapacityCheck(true, null, usableAssignments, additionalStaff, staleAssignments,
+                                        staffTypeName);
+                }
+        }
+
+        // Read-only: computes whether the given care window/headcount can be satisfied for this
+        // booking without mutating anything. Shared by synchronizeCareReservations() (which
+        // applies the result) and getAddOnAvailability() (which only reports it to the UI).
+        private CareCapacityCheck checkCareStaffCapacity(
                         Booking booking,
                         ResourceWindows resourceWindows,
                         LocalDateTime careStart,
                         LocalDateTime careEnd) {
                 if (!resourceWindows.requiresCareStaff) {
-                        return;
+                        return CareCapacityCheck.available(List.of(), List.of(), List.of(), null);
                 }
                 if (resourceWindows.requiredCareStaffCount <= 0
                                 || resourceWindows.careStaffType == null
@@ -3117,16 +3393,14 @@ public class BookingServiceImpl implements BookingService {
                                 || careStart == null
                                 || careEnd == null
                                 || !careEnd.isAfter(careStart)) {
-                        throw new ResponseStatusException(HttpStatus.CONFLICT,
-                                        "Added service has an invalid care staff configuration");
+                        return CareCapacityCheck.unavailable("Added service has an invalid care staff configuration");
                 }
 
                 StaffType staffType;
                 try {
                         staffType = StaffType.valueOf(resourceWindows.careStaffType.trim().toUpperCase());
                 } catch (IllegalArgumentException exception) {
-                        throw new ResponseStatusException(HttpStatus.CONFLICT,
-                                        "Added service has an unsupported care staff type");
+                        return CareCapacityCheck.unavailable("Added service has an unsupported care staff type");
                 }
 
                 List<BookingAssignedStaff> activeAssignments = bookingAssignedStaffRepository
@@ -3142,7 +3416,13 @@ public class BookingServiceImpl implements BookingService {
                                                 profile -> profile,
                                                 (left, right) -> left));
 
+                // An existing staff member who can no longer cover the extended window doesn't
+                // automatically fail the whole request — with more than one care staff at the
+                // garage, another member may be free for the extended window. Such assignments
+                // are collected as "stale" so a free replacement can be sought below; only if no
+                // replacement exists do we ultimately report unavailable.
                 List<BookingAssignedStaff> usableAssignments = new ArrayList<>();
+                List<BookingAssignedStaff> staleAssignments = new ArrayList<>();
                 for (BookingAssignedStaff assignment : activeAssignments) {
                         if (!staffById.containsKey(assignment.getStaffProfileId())) {
                                 continue;
@@ -3153,10 +3433,10 @@ public class BookingServiceImpl implements BookingService {
                                         careStart,
                                         careEnd);
                         if (overlap > 0) {
-                                throw new ResponseStatusException(HttpStatus.CONFLICT,
-                                                "CARE_STAFF_CAPACITY_FULL: Existing care staff is unavailable for the extended window");
+                                staleAssignments.add(assignment);
+                        } else {
+                                usableAssignments.add(assignment);
                         }
-                        usableAssignments.add(assignment);
                 }
 
                 Set<Long> assignedIds = usableAssignments.stream()
@@ -3173,11 +3453,33 @@ public class BookingServiceImpl implements BookingService {
                                 .toList();
 
                 if (usableAssignments.size() + additionalStaff.size() < resourceWindows.requiredCareStaffCount) {
-                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        return CareCapacityCheck.unavailable(
                                         "CARE_STAFF_CAPACITY_FULL: Not enough care staff for the added service");
                 }
 
-                for (BookingAssignedStaff assignment : usableAssignments) {
+                return CareCapacityCheck.available(usableAssignments, additionalStaff, staleAssignments,
+                                staffType.name());
+        }
+
+        private void synchronizeCareReservations(
+                        Booking booking,
+                        ResourceWindows resourceWindows,
+                        LocalDateTime careStart,
+                        LocalDateTime careEnd) {
+                CareCapacityCheck check = checkCareStaffCapacity(booking, resourceWindows, careStart, careEnd);
+                if (!check.available) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, check.reason);
+                }
+
+                for (BookingAssignedStaff assignment : check.staleAssignments) {
+                        // Superseded by a replacement staff member covering the full extended
+                        // window (see additionalStaff below) — release so this slot isn't held
+                        // needlessly and doesn't show as a duplicate assignment on the booking.
+                        assignment.setStatus("RELEASED");
+                        bookingAssignedStaffRepository.save(assignment);
+                }
+
+                for (BookingAssignedStaff assignment : check.usableAssignments) {
                         assignment.setAssignedFrom(careStart);
                         assignment.setAssignedTo(careEnd);
                         if ("HELD_PENDING_DEPOSIT".equals(assignment.getStatus())) {
@@ -3186,13 +3488,13 @@ public class BookingServiceImpl implements BookingService {
                         bookingAssignedStaffRepository.save(assignment);
                 }
 
-                for (StaffProfile profile : additionalStaff) {
+                for (StaffProfile profile : check.additionalStaff) {
                         BookingAssignedStaff assignment = new BookingAssignedStaff();
                         assignment.setBookingId(booking.getId());
                         assignment.setStaffProfileId(profile.getId());
                         assignment.setAssignedFrom(careStart);
                         assignment.setAssignedTo(careEnd);
-                        assignment.setRoleInBooking(staffType.name());
+                        assignment.setRoleInBooking(check.staffTypeName);
                         assignment.setStatus("RESERVED");
                         bookingAssignedStaffRepository.save(assignment);
                 }
@@ -3494,6 +3796,7 @@ public class BookingServiceImpl implements BookingService {
                                 .paymentStatus(b.getPaymentStatus())
                                 .paymentMethod(b.getPaymentMethod())
                                 .originalPrice(b.getOriginalPrice())
+                                .surchargeAmount(b.getSurchargeAmount())
                                 .discountAmount(b.getDiscountAmount())
                                 .finalPrice(b.getFinalPrice())
                                 .depositAmount(b.getDepositAmount())

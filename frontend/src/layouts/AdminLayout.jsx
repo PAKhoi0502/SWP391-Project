@@ -62,6 +62,7 @@ const NAV_GROUPS = [
       { to: '/admin/garages',          label: 'Garages',          icon: 'building' },
       { to: '/admin/wash-bays',        label: 'Wash Bays',        icon: 'droplet'  },
       { to: '/admin/service-packages', label: 'Service Packages', icon: 'package'  },
+      { to: '/admin/special-days',     label: 'Special Days',     icon: 'calendar' },
     ],
   },
   {

@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class CreateWaitlistRequest {
@@ -16,6 +17,8 @@ public class CreateWaitlistRequest {
 
     @NotNull
     private Long servicePackageId;
+
+    private List<Long> addOnServicePackageIds;
 
     @NotNull
     private LocalDateTime desiredStartTime;

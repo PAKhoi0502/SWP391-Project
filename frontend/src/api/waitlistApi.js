@@ -11,11 +11,14 @@ const toPage = (response) => {
 
 export const waitlistApi = {
   // ===== Customer =====
-  async join({ garageId, vehicleId, servicePackageId, desiredStartTime, reason }) {
+  async join({ garageId, vehicleId, servicePackageId, addOnServicePackageIds, desiredStartTime, reason }) {
     const response = await api.post('/waitlist', {
       garageId: Number(garageId),
       vehicleId: Number(vehicleId),
       servicePackageId: Number(servicePackageId),
+      addOnServicePackageIds: Array.isArray(addOnServicePackageIds)
+        ? addOnServicePackageIds.map(Number)
+        : [],
       desiredStartTime,
       reason,
     })

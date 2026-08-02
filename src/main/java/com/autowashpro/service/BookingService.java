@@ -24,6 +24,7 @@ import com.autowashpro.dto.request.MarkBookingPaidRequest;
 import com.autowashpro.dto.request.UpdatePaymentMethodRequest;
 import com.autowashpro.dto.request.AddBookingAddOnsRequest;
 import com.autowashpro.dto.response.CancellationPreviewResponse;
+import com.autowashpro.dto.response.AddOnAvailabilityResponse;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -118,6 +119,17 @@ public interface BookingService {
                         Long staffUserId,
                         String role,
                         AddBookingAddOnsRequest request);
+
+        /**
+         * Read-only preview: for each candidate service package id, reports whether it could
+         * currently be added to this booking via addBookingAddOns() without hitting a care
+         * staff capacity conflict. Used to disable doomed options in the UI before staff submit.
+         */
+        List<AddOnAvailabilityResponse> getAddOnAvailability(
+                        Long bookingId,
+                        Long staffUserId,
+                        String role,
+                        List<Long> servicePackageIds);
 
         // ===================== ISSUE #54 =====================
 

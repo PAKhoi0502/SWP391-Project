@@ -775,10 +775,17 @@ function BookingDetailPage() {
   const canCompleteService = canEditBooking && currentStatus === 'IN_PROGRESS' && !hasOperationPhase
   // Phase-based action buttons
   const canStartWash = canEditBooking && currentStatus === 'CHECKED_IN' && operationPhase === 'WAITING_FOR_INTAKE'
-  // Runtime add-ons: only while the wash stage is still open (before Vehicle Care starts).
+  // Runtime add-ons: available from check-in all the way through Vehicle Care, so a late
+  // customer request doesn't get lost. Once the wash bay is released (past AUTOMATED_WASH),
+  // only care-only add-ons can still be added — see addOnsPastWash below and the matching
+  // backend guard in BookingServiceImpl#addBookingAddOns. FINAL_INSPECTION is excluded: a
+  // step added there could never be completed since operation phase only moves forward.
+  const addOnsPastWash = currentStatus === 'IN_PROGRESS'
+    && ['ADDON_SERVICE', 'WAITING_FOR_CARE', 'VEHICLE_CARE'].includes(operationPhase)
   const canAddServices = canEditBooking && (
     (currentStatus === 'CHECKED_IN' && operationPhase === 'WAITING_FOR_INTAKE') ||
-    (currentStatus === 'IN_PROGRESS' && operationPhase === 'AUTOMATED_WASH')
+    (currentStatus === 'IN_PROGRESS' && operationPhase === 'AUTOMATED_WASH') ||
+    addOnsPastWash
   )
   // Phase-specific step completion derived state
   const washSteps = serviceSteps.filter((s) => String(s.executionPhase || '').toUpperCase() === 'AUTOMATED_WASH')
@@ -2435,6 +2442,14 @@ function BookingDetailPage() {
               <span className="bd-info-label">{TEXT.paidAt}</span>
               <span className="bd-info-value"><strong>{formatDateTime(booking.paidAt)}</strong></span>
             </div>
+            {Number(booking.surchargeAmount) > 0 && (
+              <div className="bd-info-cell">
+                <span className="bd-info-label">Holiday surcharge</span>
+                <span className="bd-info-value">
+                  <strong>+{formatMoney(booking.surchargeAmount)}</strong>
+                </span>
+              </div>
+            )}
             {Number(booking.depositAmount) > 0 && (
               <div className="bd-info-cell">
                 <span className="bd-info-label">Deposit</span>
@@ -3051,6 +3066,7 @@ function BookingDetailPage() {
         open={addOnsModalOpen}
         bookingId={displayBookingNo}
         booking={booking}
+        pastWash={addOnsPastWash}
         loading={addOnsLoading}
         error={addOnsError}
         onClose={() => { if (!addOnsLoading) { setAddOnsModalOpen(false); setAddOnsError('') } }}
