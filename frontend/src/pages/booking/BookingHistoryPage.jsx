@@ -401,6 +401,12 @@ function BookingDetailModal({ booking, steps, inspections, onClose, onRefunded }
           {/* Payment */}
           <div className="bhp-detail-section">
             <p className="bhp-detail-section-label">Payment</p>
+            {Number(booking?.surchargeAmount) > 0 && (
+              <div className="bhp-detail-row">
+                <span className="bhp-detail-row-label">Holiday surcharge</span>
+                <span className="bhp-detail-row-value">+{formatMoney(booking.surchargeAmount)}</span>
+              </div>
+            )}
             <div className="bhp-detail-row">
               <span className="bhp-detail-row-label">Total</span>
               <span className="bhp-detail-row-value">

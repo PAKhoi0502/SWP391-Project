@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { bookingApi } from '../../api/bookingApi'
+import specialDayApi from '../../api/specialDayApi'
 import { getGarages } from '../../api/GarageApi'
 import {
   extractList,
@@ -42,7 +43,7 @@ function todayIso() {
 }
 
 // Sanity ceiling against misclicks, mirroring WALK_IN_MAX_ADVANCE_DAYS in BookingServiceImpl.
-const WALK_IN_MAX_ADVANCE_DAYS = 30
+const WALK_IN_MAX_ADVANCE_DAYS = 7
 
 function maxWalkInDateIso() {
   const d = new Date()
@@ -287,6 +288,11 @@ export default function StaffWalkInBookingPage() {
       .join(' + ')
   }
 
+  // Add-ons already bundled inside the selected combo — offering them again separately
+  // would double-charge the customer for something the combo already covers.
+  const getIncludedServiceIdSet = (comboPkg) => new Set((comboPkg?.includedServiceIds || []).map(String))
+  const selectedComboIncludedIds = isComboSelected ? getIncludedServiceIdSet(selectedPackage) : null
+
   const selectedAddOns = useMemo(
     () => addOnPackages.filter((pkg) => selectedAddOnIds.includes(String(getPackageId(pkg)))),
     [addOnPackages, selectedAddOnIds],
@@ -305,6 +311,28 @@ export default function StaffWalkInBookingPage() {
       selectedAddOns.reduce((sum, pkg) => sum + getPackagePrice(pkg), 0),
     [selectedPackage, selectedAddOns],
   )
+
+  const [specialDaySurcharge, setSpecialDaySurcharge] = useState({ isSpecialDay: false, surchargeRate: 0 })
+
+  useEffect(() => {
+    if (!form.date) return
+    let active = true
+    specialDayApi.check(form.date)
+      .then((result) => {
+        if (!active) return
+        setSpecialDaySurcharge({
+          isSpecialDay: !!result?.isSpecialDay,
+          surchargeRate: Number(result?.surchargeRate) || 0,
+        })
+      })
+      .catch(() => { if (active) setSpecialDaySurcharge({ isSpecialDay: false, surchargeRate: 0 }) })
+    return () => { active = false }
+  }, [form.date])
+
+  const surchargeAmount = specialDaySurcharge.isSpecialDay
+    ? Math.round(totalPrice * (specialDaySurcharge.surchargeRate / 100))
+    : 0
+  const totalWithSurcharge = totalPrice + surchargeAmount
 
   const totalDuration = useMemo(
     () =>
@@ -327,8 +355,8 @@ export default function StaffWalkInBookingPage() {
   }, [form.startTime])
 
   const estimatedDeposit = useMemo(
-    () => (isDepositRequired ? Math.round(totalPrice * DEPOSIT_PERCENT) : 0),
-    [isDepositRequired, totalPrice],
+    () => (isDepositRequired ? Math.round(totalWithSurcharge * DEPOSIT_PERCENT) : 0),
+    [isDepositRequired, totalWithSurcharge],
   )
 
   // Slot groups (UI-only derived from existing `slots`)
@@ -493,7 +521,10 @@ export default function StaffWalkInBookingPage() {
     if (name === 'guestPhone' || name === 'licensePlate') setSelectedVehicleId(null)
     if (name === 'servicePackageId') {
       const nextPackage = packages.find((pkg) => String(getPackageId(pkg)) === String(value))
-      if (nextPackage && normalizePackageType(nextPackage) === 'COMBO') setSelectedAddOnIds([])
+      if (nextPackage && normalizePackageType(nextPackage) === 'COMBO') {
+        const includedIds = getIncludedServiceIdSet(nextPackage)
+        setSelectedAddOnIds((prev) => prev.filter((addOnId) => !includedIds.has(addOnId)))
+      }
     }
     setForm((prev) => {
       const next = { ...prev, [name]: value }
@@ -1182,27 +1213,29 @@ export default function StaffWalkInBookingPage() {
               <div className="swi-addons-section">
                 <p className="swi-addons-label">
                   Add-ons
-                  {isComboSelected && <span className="swi-help"> — not available with combo</span>}
+                  {isComboSelected && <span className="swi-help"> — already-included ones are grayed out</span>}
                 </p>
                 <div className="swi-addon-chips">
                   {addOnPackages.map((pkg) => {
                     const id = String(getPackageId(pkg))
                     const isActive = selectedAddOnIds.includes(id)
+                    const alreadyIncluded = !!selectedComboIncludedIds?.has(id)
                     return (
                       <button
                         type="button"
                         key={id}
-                        disabled={isComboSelected}
+                        disabled={alreadyIncluded}
+                        title={alreadyIncluded ? 'Already included in the selected combo' : undefined}
                         className={[
                           'swi-addon-chip',
                           isActive ? 'swi-addon-chip--active' : '',
-                          isComboSelected ? 'swi-addon-chip--disabled' : '',
+                          alreadyIncluded ? 'swi-addon-chip--disabled' : '',
                         ].filter(Boolean).join(' ')}
                         onClick={() => toggleAddOn(id)}
                       >
                         <span className="swi-addon-chip-name">{getPackageName(pkg)}</span>
                         <span className="swi-addon-chip-price">{formatMoney(getPackagePrice(pkg))}</span>
-                        {isComboSelected && <span className="swi-addon-chip-included">Included</span>}
+                        {alreadyIncluded && <span className="swi-addon-chip-included">Included</span>}
                       </button>
                     )
                   })}
@@ -1415,9 +1448,15 @@ export default function StaffWalkInBookingPage() {
           {selectedPackage && (
             <>
               <div className="swi-summary-divider" />
+              {surchargeAmount > 0 && (
+                <div className="swi-summary-row">
+                  <span>Holiday surcharge (+{specialDaySurcharge.surchargeRate}%)</span>
+                  <strong>+{formatMoney(surchargeAmount)}</strong>
+                </div>
+              )}
               <div className="swi-summary-row swi-summary-total">
                 <span>Total</span>
-                <strong className="swi-summary-price">{formatMoney(totalPrice)}</strong>
+                <strong className="swi-summary-price">{formatMoney(totalWithSurcharge)}</strong>
               </div>
               {totalDuration > 0 && (
                 <div className="swi-summary-row">

@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 public class WaitlistServiceImpl implements WaitlistService {
 
     private final WaitlistRepository waitlistRepository;
+    private final WaitlistAddOnServicePackageRepository waitlistAddOnServicePackageRepository;
     private final GarageRepository garageRepository;
     private final VehicleRepository vehicleRepository;
     private final ServicePackageRepository servicePackageRepository;
@@ -63,8 +64,27 @@ public class WaitlistServiceImpl implements WaitlistService {
         ServicePackage pkg = servicePackageRepository.findById(request.getServicePackageId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Service package not found"));
 
+        List<Long> addOnIds = request.getAddOnServicePackageIds() != null
+                ? request.getAddOnServicePackageIds().stream().distinct().toList()
+                : List.of();
+        List<ServicePackage> addOnPackages = addOnIds.isEmpty()
+                ? List.of()
+                : servicePackageRepository.findAllById(addOnIds);
+        if (addOnPackages.size() != addOnIds.size()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "One or more add-on packages not found");
+        }
+        for (ServicePackage addOn : addOnPackages) {
+            if (!"ADD_ON".equalsIgnoreCase(addOn.getServiceType())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        addOn.getName() + " is not an add-on package");
+            }
+        }
+
+        int totalDurationMinutes = pkg.getDurationMinutes()
+                + addOnPackages.stream().mapToInt(ServicePackage::getDurationMinutes).sum();
+
         LocalDateTime desiredStart = request.getDesiredStartTime();
-        LocalDateTime desiredEnd = desiredStart.plusMinutes(pkg.getDurationMinutes());
+        LocalDateTime desiredEnd = desiredStart.plusMinutes(totalDurationMinutes);
 
         // Rule: cutoff 12h — không cho tạo waitlist nếu đã quá gần giờ hẹn
         LocalDateTime cutoffLimit = desiredStart.minusHours(cutoffHours);
@@ -109,6 +129,14 @@ public class WaitlistServiceImpl implements WaitlistService {
         waitlist.setReason(reason);
 
         Waitlist saved = waitlistRepository.save(waitlist);
+
+        for (Long addOnId : addOnIds) {
+            WaitlistAddOnServicePackage link = new WaitlistAddOnServicePackage();
+            link.setWaitlistId(saved.getId());
+            link.setServicePackageId(addOnId);
+            waitlistAddOnServicePackageRepository.save(link);
+        }
+
         return toResponse(saved);
     }
 
@@ -303,6 +331,10 @@ public class WaitlistServiceImpl implements WaitlistService {
         bookingRequest.setGarageId(waitlist.getGarageId());
         bookingRequest.setVehicleId(waitlist.getVehicleId());
         bookingRequest.setServicePackageId(waitlist.getServicePackageId());
+        bookingRequest.setAddOnServicePackageIds(
+                waitlistAddOnServicePackageRepository.findByWaitlistId(waitlist.getId()).stream()
+                        .map(WaitlistAddOnServicePackage::getServicePackageId)
+                        .toList());
         bookingRequest.setStartTime(waitlist.getDesiredStartTime());
         bookingRequest.setUsedPoints(0);
 
@@ -378,6 +410,14 @@ public class WaitlistServiceImpl implements WaitlistService {
     }
 
     private WaitlistResponse toResponse(Waitlist w) {
+        List<Long> addOnIds = waitlistAddOnServicePackageRepository.findByWaitlistId(w.getId()).stream()
+                .map(WaitlistAddOnServicePackage::getServicePackageId)
+                .toList();
+        List<String> addOnNames = addOnIds.stream()
+                .map(this::getServicePackageName)
+                .filter(name -> name != null)
+                .toList();
+
         return WaitlistResponse.builder()
                 .id(w.getId())
                 .garageId(w.getGarageId())
@@ -388,6 +428,8 @@ public class WaitlistServiceImpl implements WaitlistService {
                 .vehicleName(getVehicleName(w.getVehicleId()))
                 .servicePackageId(w.getServicePackageId())
                 .servicePackageName(getServicePackageName(w.getServicePackageId()))
+                .addOnServicePackageIds(addOnIds)
+                .addOnServicePackageNames(addOnNames)
                 .offeredBookingId(w.getOfferedBookingId())
                 .desiredStartTime(w.getDesiredStartTime())
                 .desiredEndTime(w.getDesiredEndTime())

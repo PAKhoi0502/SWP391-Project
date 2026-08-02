@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { bookingApi } from '../../api/bookingApi'
 import { loyaltyApi } from '../../api/loyaltyApi'
+import specialDayApi from '../../api/specialDayApi'
 import { getGarages } from '../../api/GarageApi'
 import {
   extractList,
@@ -231,6 +232,22 @@ export default function GuestBookingModal({
   const [garages, setGarages] = useState([])
   const [packages, setPackages] = useState([])
   const [bookingWindowDays, setBookingWindowDays] = useState(7)
+  const [specialDaySurcharge, setSpecialDaySurcharge] = useState({ isSpecialDay: false, surchargeRate: 0 })
+
+  useEffect(() => {
+    if (!open || !form.date) return
+    let active = true
+    specialDayApi.check(form.date)
+      .then((result) => {
+        if (!active) return
+        setSpecialDaySurcharge({
+          isSpecialDay: !!result?.isSpecialDay,
+          surchargeRate: Number(result?.surchargeRate) || 0,
+        })
+      })
+      .catch(() => { if (active) setSpecialDaySurcharge({ isSpecialDay: false, surchargeRate: 0 }) })
+    return () => { active = false }
+  }, [open, form.date])
   const [slots, setSlots] = useState([])
   const [loadingData, setLoadingData] = useState(false)
   const [loadingSlots, setLoadingSlots] = useState(false)
@@ -402,11 +419,21 @@ export default function GuestBookingModal({
     [selectedPackage, selectedAddOns],
   )
 
+  const surchargeAmount = specialDaySurcharge.isSpecialDay
+    ? Math.round(totalPrice * (specialDaySurcharge.surchargeRate / 100))
+    : 0
+  const totalWithSurcharge = totalPrice + surchargeAmount
+
   const getIncludedNames = (pkg) => {
     const ids = pkg?.includedServiceIds || []
     return ids.map((id) => packages.find((p) => String(getPackageId(p)) === String(id)))
       .filter(Boolean).map(getPackageName).join(' + ')
   }
+
+  // Add-ons already bundled inside the selected combo — offering them again separately
+  // would double-charge the customer for something the combo already covers.
+  const getIncludedIdSet = (pkg) => new Set((pkg?.includedServiceIds || []).map(String))
+  const selectedComboIncludedIds = isCombo ? getIncludedIdSet(selectedPackage) : null
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
   const handleChange = useCallback((e) => {
@@ -417,7 +444,10 @@ export default function GuestBookingModal({
     if (['vehicleType', 'garageId', 'seatCount', 'motorbikeGroup'].includes(name)) setSelectedAddOnIds([])
     if (name === 'servicePackageId') {
       const next = packages.find((p) => String(getPackageId(p)) === String(value))
-      if (next && normalizeType(next) === 'COMBO') setSelectedAddOnIds([])
+      if (next && normalizeType(next) === 'COMBO') {
+        const includedIds = getIncludedIdSet(next)
+        setSelectedAddOnIds((prev) => prev.filter((addOnId) => !includedIds.has(addOnId)))
+      }
     }
     setForm((prev) => {
       const next = { ...prev, [name]: value }
@@ -935,13 +965,15 @@ export default function GuestBookingModal({
                   {addOnPackages.length > 0 && (
                     <div className="gbm-field">
                       <label>Add-ons <span className="gbm-opt">(optional)</span></label>
-                      {isCombo && <p className="gbm-help">Combo package includes services — no add-ons available.</p>}
+                      {isCombo && <p className="gbm-help">Already-included services are grayed out below.</p>}
                       <div className="gbm-addon-grid">
                         {addOnPackages.map((p) => {
                           const id = String(getPackageId(p))
                           const active = selectedAddOnIds.includes(id)
+                          const alreadyIncluded = !!selectedComboIncludedIds?.has(id)
                           return (
-                            <button key={id} type="button" disabled={!!isCombo}
+                            <button key={id} type="button" disabled={alreadyIncluded}
+                              title={alreadyIncluded ? 'Already included in the selected combo' : undefined}
                               className={`gbm-addon-card${active ? ' gbm-addon-card--active' : ''}`}
                               onClick={() => toggleAddOn(id)}>
                               <strong>{getPackageName(p)}</strong>
@@ -1094,13 +1126,19 @@ export default function GuestBookingModal({
                 {selectedPackage && (
                   <>
                     <div className="gbm-summary-divider" />
+                    {surchargeAmount > 0 && (
+                      <div className="gbm-summary-row">
+                        <span>Holiday surcharge (+{specialDaySurcharge.surchargeRate}%)</span>
+                        <strong>+{formatMoney(surchargeAmount)}</strong>
+                      </div>
+                    )}
                     <div className="gbm-summary-row gbm-summary-total">
                       <span>Total</span>
-                      <strong className="gbm-price">{formatMoney(totalPrice)}</strong>
+                      <strong className="gbm-price">{formatMoney(totalWithSurcharge)}</strong>
                     </div>
                     <div className="gbm-summary-row">
                       <span>Deposit (30%)</span>
-                      <strong>{formatMoney(totalPrice * 0.3)}</strong>
+                      <strong>{formatMoney(totalWithSurcharge * 0.3)}</strong>
                     </div>
                     {getPackageDuration(selectedPackage) > 0 && (
                       <div className="gbm-summary-row">

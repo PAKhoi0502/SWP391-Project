@@ -287,4 +287,12 @@ export const bookingApi = {
     })
     return unwrap(response)
   },
+
+  async getAddOnAvailability(bookingId, servicePackageIds) {
+    if (!servicePackageIds || servicePackageIds.length === 0) return []
+    const response = await api.get(`/bookings/${bookingId}/add-ons/availability`, {
+      params: { service_package_ids: servicePackageIds.map(Number) },
+    })
+    return toArray(response)
+  },
 }

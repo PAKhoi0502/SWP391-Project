@@ -40,6 +40,7 @@ import CustomerWashHistoryListPage from '../pages/washHistory/CustomerWashHistor
 import WashHistoryDetailPage from '../pages/washHistory/WashHistoryDetailPage'
 import AdminWashHistoryListPage from '../pages/washHistory/AdminWashHistoryListPage'
 import AdminTierRulesPage from '../pages/loyalty/AdminTierRulesPage'
+import AdminSpecialDaysPage from '../pages/admin/AdminSpecialDaysPage'
 import AdminAdjustPointsPage from '../pages/loyalty/AdminAdjustPointsPage'
 import AdminTopCustomersPage from '../pages/loyalty/AdminTopCustomersPage'
 import AdminPromotionManagementPage from '../pages/admin/AdminPromotionManagementPage'
@@ -141,6 +142,7 @@ function AppRoutes() {
           <Route path="admin/garages/:id/edit" element={<AdminGarageFormPage />} />
           <Route path="admin/wash-bays" element={<AdminWashBayManagementPage />} />
           <Route path="admin/service-packages" element={<AdminServicePackagePage />} />
+          <Route path="admin/special-days" element={<AdminSpecialDaysPage />} />
           <Route path="admin/bookings" element={<AdminBookingListPage />} />
           <Route path="admin/bookings/:id" element={<BookingDetailPage />} />
           <Route path="admin/wash-histories" element={<AdminWashHistoryListPage />} />

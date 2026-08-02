@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { STAFF_TYPES } from '../constants/staffTypes'
 import { useAuth } from '../contexts/AuthContext'
 import { garageService } from '../services/garageService'
 import { staffProfileService } from '../services/staffProfileService'
@@ -114,7 +113,7 @@ function Row({ label, value }) {
 }
 
 function formatStaffType(type) {
-  if (!STAFF_TYPES.includes(type)) return type || '-'
+  if (!type) return '-'
   return type.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase())
 }
 

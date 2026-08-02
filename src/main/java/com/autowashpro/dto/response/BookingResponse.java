@@ -23,6 +23,7 @@ public class BookingResponse {
     private String paymentStatus;
     private String paymentMethod;
     private BigDecimal originalPrice;
+    private BigDecimal surchargeAmount;
     private BigDecimal discountAmount;
     private BigDecimal finalPrice;
     private BigDecimal depositAmount;

@@ -653,14 +653,6 @@
   color: #64748b;
 }
 
-.bk-bytime-inputs {
-  display: flex;
-  gap: 10px;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  margin-bottom: 14px;
-}
-
 .bk-bytime-field {
   display: flex;
   flex-direction: column;
@@ -671,6 +663,87 @@
   flex: 1;
   min-width: 140px;
 }
+
+.bk-bytime-field--date {
+  max-width: 220px;
+  margin-bottom: 14px;
+}
+
+.bk-bytime-slotgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.bk-bytime-slot {
+  padding: 8px 4px;
+  border-radius: 8px;
+  border: 1px solid rgba(23, 32, 51, 0.12);
+  background: #fff;
+  color: #0B1F3A;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.14s, background 0.14s, color 0.14s;
+}
+
+.bk-bytime-slot:hover:not(:disabled) {
+  border-color: #2EC2F7;
+  background: rgba(46, 194, 247, 0.08);
+}
+
+.bk-bytime-slot--sel {
+  border-color: #2EC2F7;
+  background: #2EC2F7;
+  color: #0a1224;
+}
+
+.bk-bytime-slot--full {
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #b91c1c;
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
+.bk-bytime-suggest {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px;
+  font-size: 13px;
+  color: #7f1d1d;
+}
+
+.bk-bytime-suggest p {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.bk-bytime-suggest-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bk-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #2EC2F7;
+  border-radius: 999px;
+  padding: 7px 16px;
+  background: #fff;
+  color: #0879B8;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+
+.bk-btn-outline:hover { background: rgba(46, 194, 247, 0.1); }
 
 .bk-bytime-addons {
   margin-top: 20px;
@@ -690,20 +763,6 @@
 
 .bk-bytime-estimate strong {
   color: #0879B8;
-}
-
-.bk-bytime-estimate--over {
-  background: rgba(239, 68, 68, 0.08);
-  border-color: rgba(239, 68, 68, 0.35);
-}
-
-.bk-bytime-estimate--over strong {
-  color: #DC2626;
-}
-
-.bk-bytime-estimate-warn {
-  color: #DC2626;
-  font-weight: 600;
 }
 
 /* ═══════ PACKAGE CARDS ═══════ */
@@ -781,6 +840,7 @@
 .bk-pkg-badge--main  { background: rgba(8, 121, 184, 0.10); color: #0879B8; border: 1px solid rgba(8,121,184,0.22); }
 .bk-pkg-badge--combo { background: rgba(21, 128, 61, 0.10); color: #166534; border: 1px solid rgba(21,128,61,0.22); }
 .bk-pkg-badge--addon { background: rgba(217, 119, 6, 0.10); color: #b45309; border: 1px solid rgba(217,119,6,0.22); }
+.bk-pkg-badge--included { background: rgba(100, 116, 139, 0.12); color: #64748b; border: 1px solid rgba(100,116,139,0.22); }
 
 .bk-pkg-duration {
   font-size: 11px;
@@ -1281,6 +1341,8 @@
 .bk-summary-row--sub strong { color: #64748b; font-size: 12px; }
 
 .bk-summary-row--discount strong { color: #16a34a; }
+
+.bk-summary-row--surcharge strong { color: #b45309; }
 
 .bk-summary-divider {
   height: 1px;
@@ -1823,6 +1885,39 @@
 }
 .bk-wl-info-row:last-child { border-bottom: none; }
 .bk-wl-info-row strong { color: #0f172a; font-weight: 600; text-align: right; max-width: 60%; }
+.bk-wl-select {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  background: #fff;
+  max-width: 60%;
+}
+.bk-wl-addons { margin: 14px 20px 0; }
+.bk-wl-addons-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.bk-wl-addons-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bk-wl-addon-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #0f172a;
+  cursor: pointer;
+}
+.bk-wl-addon-item input[type='checkbox'] { cursor: pointer; }
 .bk-wl-error { margin: 10px 20px 0; font-size: 13px; color: #dc2626; }
 .bk-wl-actions {
   display: flex; gap: 10px; justify-content: flex-end;
