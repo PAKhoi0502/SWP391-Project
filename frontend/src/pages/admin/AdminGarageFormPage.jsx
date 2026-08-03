@@ -17,6 +17,8 @@ export default function AdminGarageFormPage() {
         openingTime: "08:00",
         closingTime: "20:00",
         slotIntervalMinutes: 30,
+        latitude: "",
+        longitude: "",
     });
 
     const [loading, setLoading] = useState(isEdit);
@@ -40,6 +42,8 @@ export default function AdminGarageFormPage() {
                     openingTime: data.openingTime ? data.openingTime.slice(0, 5) : "08:00",
                     closingTime: data.closingTime ? data.closingTime.slice(0, 5) : "20:00",
                     slotIntervalMinutes: data.slotIntervalMinutes || 30,
+                    latitude: data.latitude ?? "",
+                    longitude: data.longitude ?? "",
                 });
             } catch (err) {
                 setError(err.message || "Unable to load garage");
@@ -81,6 +85,8 @@ export default function AdminGarageFormPage() {
                 openingTime: `${form.openingTime}:00`,
                 closingTime: `${form.closingTime}:00`,
                 slotIntervalMinutes: Number(form.slotIntervalMinutes),
+                latitude: form.latitude === "" ? null : Number(form.latitude),
+                longitude: form.longitude === "" ? null : Number(form.longitude),
             };
 
             if (!isEdit) {
@@ -164,6 +170,36 @@ export default function AdminGarageFormPage() {
                                 name="closingTime"
                                 value={form.closingTime}
                                 onChange={handleChange}
+                            />
+                        </label>
+                    </div>
+
+                    <div className="garage-form-row">
+                        <label>
+                            Latitude
+                            <input
+                                type="number"
+                                name="latitude"
+                                value={form.latitude}
+                                onChange={handleChange}
+                                step="0.000001"
+                                min="-90"
+                                max="90"
+                                placeholder="e.g. 10.7769"
+                            />
+                        </label>
+
+                        <label>
+                            Longitude
+                            <input
+                                type="number"
+                                name="longitude"
+                                value={form.longitude}
+                                onChange={handleChange}
+                                step="0.000001"
+                                min="-180"
+                                max="180"
+                                placeholder="e.g. 106.7009"
                             />
                         </label>
                     </div>

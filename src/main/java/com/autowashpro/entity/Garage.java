@@ -43,6 +43,12 @@ public class Garage {
     @Column(name = "slot_interval_minutes", nullable = false)
     private Integer slotIntervalMinutes;
 
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 

@@ -399,7 +399,10 @@ export default function CustomerCreateBookingPage() {
     [garages, selectedGarageId],
   )
 
-  const garageTimeOptions = useMemo(() => buildGarageTimeOptions(selectedGarage), [selectedGarage])
+  const garageTimeOptions = useMemo(
+    () => buildGarageTimeOptions(selectedGarage).filter((t) => !isPastSlot({ startTime: t }, desiredDate)),
+    [selectedGarage, desiredDate],
+  )
 
   const selectedPackage = useMemo(
     () => servicePackages.find((item) => String(getId(item)) === String(selectedPackageId)),
@@ -2357,7 +2360,7 @@ export default function CustomerCreateBookingPage() {
   )
 }
 
-const STEP_LABELS = ['Vehicle', 'Garage', 'Package', 'Date & Time', 'Confirm']
+const STEP_LABELS = ['Vehicle', 'Garage', 'Service', 'Date & Time', 'Confirm']
 
 const VI_MONTHS = ['January','February','March','April','May','June',
   'July','August','September','October','November','December']

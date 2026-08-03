@@ -14,4 +14,6 @@ public class GarageUpdateRequest {
     private LocalTime openingTime;
     private LocalTime closingTime;
     private Integer slotIntervalMinutes;
+    private Double latitude;
+    private Double longitude;
 }

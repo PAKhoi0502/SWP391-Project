@@ -32,4 +32,8 @@ public class GarageCreateRequest {
 
     @NotNull
     private Integer slotIntervalMinutes;
+
+    private Double latitude;
+
+    private Double longitude;
 }

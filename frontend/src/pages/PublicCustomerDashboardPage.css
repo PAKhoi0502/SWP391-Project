@@ -415,6 +415,94 @@
 /* ════════════════════════════════════════════
    STATS
    ════════════════════════════════════════════ */
+/* ════════════════════════════════════════════
+   NEARBY GARAGES
+   ════════════════════════════════════════════ */
+.pcd-nearby-section {
+  background: var(--pcd-bg);
+  padding: 48px 24px;
+  border-bottom: 1px solid var(--pcd-border);
+}
+
+.pcd-nearby-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.pcd-nearby-title {
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+  font-weight: 900;
+  color: var(--pcd-text);
+  margin: 0 0 8px;
+}
+
+.pcd-nearby-sub {
+  font-size: 14.5px;
+  color: var(--pcd-text-sub);
+  max-width: 480px;
+  margin: 0 auto 20px;
+  line-height: 1.65;
+}
+
+.pcd-nearby-message {
+  font-size: 14px;
+  color: var(--pcd-text-sub);
+  margin-top: 8px;
+}
+
+.pcd-nearby-message a {
+  color: var(--pcd-blue);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.pcd-nearby-grid {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  text-align: left;
+}
+
+.pcd-nearby-card {
+  background: var(--pcd-card);
+  border: 1px solid var(--pcd-border);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 2px 12px rgba(23, 32, 51, 0.05);
+}
+
+.pcd-nearby-card-name {
+  font-size: 15.5px;
+  font-weight: 800;
+  color: var(--pcd-text);
+  margin: 0;
+}
+
+.pcd-nearby-card-address {
+  font-size: 13px;
+  color: var(--pcd-text-sub);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.pcd-nearby-card-distance {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pcd-blue-dark);
+  margin: 0 0 4px;
+}
+
+.pcd-nearby-card .pcd-btn {
+  align-self: flex-start;
+  padding: 9px 18px;
+  font-size: 13px;
+}
+
 .pcd-stats-section {
   background: #fff;
   padding: 48px 24px;
