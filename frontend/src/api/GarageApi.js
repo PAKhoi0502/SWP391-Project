@@ -1,4 +1,10 @@
-const API_BASE_URL = "http://localhost:8080/api";
+function resolveApiBaseUrl() {
+  const configured = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
+  if (!configured) return "/api";
+  return configured.endsWith("/api") ? configured : `${configured}/api`;
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 function getToken() {
   return (
@@ -56,6 +62,21 @@ export async function getGarageById(id) {
   });
 
   return handleResponse(res, "Could not load garage details");
+}
+
+export async function getNearestGarages({ lat, lng, limit = 3 } = {}) {
+  if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+    throw new Error("A valid location is required to find nearby garages");
+  }
+
+  const params = new URLSearchParams({ lat, lng, limit });
+
+  const res = await fetch(`${API_BASE_URL}/garages/nearest?${params.toString()}`, {
+    method: "GET",
+    headers: authHeaders(),
+  });
+
+  return handleResponse(res, "Could not find nearby garages");
 }
 
 export async function getGarageCapabilities(id) {

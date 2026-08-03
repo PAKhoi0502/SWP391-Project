@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useBookingEntry } from '../hooks/useBookingEntry'
 import { loyaltyApi } from '../api/loyaltyApi'
+import { getNearestGarages } from '../api/GarageApi'
 import { TierGemIcon, getTierColor } from '../components/common/TierGem'
 import PublicReviewShowcase from '../components/reviews/PublicReviewShowcase'
 import './PublicCustomerDashboardPage.css'
@@ -11,10 +12,11 @@ function CountUpNumber({ num, suffix = '', decimals = 0 }) {
   const spanRef = useRef(null)
   const hasRun = useRef(false)
 
-  const fmt = (n) =>
+  const fmt = useCallback((n) =>
     decimals > 0
       ? n.toFixed(decimals) + suffix
-      : Math.round(n).toLocaleString('en-US') + suffix
+      : Math.round(n).toLocaleString('en-US') + suffix,
+  [decimals, suffix])
 
   useEffect(() => {
     const el = spanRef.current
@@ -41,7 +43,7 @@ function CountUpNumber({ num, suffix = '', decimals = 0 }) {
 
     observer.observe(el)
     return () => observer.disconnect()
-  }, [num, suffix, decimals])
+  }, [num, fmt])
 
   return <span ref={spanRef}>{fmt(num)}</span>
 }
@@ -157,6 +159,54 @@ const STATS = [
 ]
 
 
+const NEARBY_ERROR_STATES = ['denied', 'timeout', 'unavailable', 'error']
+const NEARBY_GEO_OPTIONS = {
+  enableHighAccuracy: false,
+  timeout: 60000,
+  maximumAge: 10 * 60 * 1000,
+}
+// Some browser/OS combos (seen on this project: Chrome + Windows Location in a slow/
+// half-enabled state) never invoke either getCurrentPosition callback, silently
+// ignoring NEARBY_GEO_OPTIONS.timeout — this hard, JS-side cutoff guarantees the
+// fallback path below still runs instead of hanging forever.
+const NEARBY_HARD_TIMEOUT_MS = 8000
+const FALLBACK_NEARBY_LOCATION = {
+  lat: 10.7769000,
+  lng: 106.7009000,
+  label: 'Ho Chi Minh City center',
+}
+
+let pendingGeolocationRequest = null
+
+function requestBrowserPosition() {
+  if (pendingGeolocationRequest) return pendingGeolocationRequest
+
+  pendingGeolocationRequest = new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, NEARBY_GEO_OPTIONS)
+  }).finally(() => {
+    pendingGeolocationRequest = null
+  })
+
+  return pendingGeolocationRequest
+}
+
+function requestBrowserPositionWithHardTimeout() {
+  const hardTimeout = new Promise((_, reject) => {
+    setTimeout(
+      () => reject({ code: 3, message: 'Browser never responded to the location request' }),
+      NEARBY_HARD_TIMEOUT_MS,
+    )
+  })
+  return Promise.race([requestBrowserPosition(), hardTimeout])
+}
+
+function getGeolocationStatus(error) {
+  if (error?.code === 1) return 'denied'
+  if (error?.code === 2) return 'unavailable'
+  if (error?.code === 3) return 'timeout'
+  return 'error'
+}
+
 export default function PublicCustomerDashboardPage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -209,6 +259,79 @@ export default function PublicCustomerDashboardPage() {
       handleBookingEntry()
     }
   }
+
+  // 'idle' | 'loading' | 'denied' | 'timeout' | 'unavailable' | 'error' | 'done'
+  const [nearbyStatus, setNearbyStatus] = useState('idle')
+  const [nearbyGarages, setNearbyGarages] = useState([])
+  const [nearbyNotice, setNearbyNotice] = useState('')
+  const nearbyRequestIdRef = useRef(0)
+  const autoNearbyRequestedRef = useRef(false)
+
+  const handleFindNearbyGarages = useCallback(async () => {
+    if (!navigator.geolocation) {
+      setNearbyStatus('error')
+      return
+    }
+
+    const requestId = nearbyRequestIdRef.current + 1
+    nearbyRequestIdRef.current = requestId
+    setNearbyStatus('loading')
+    setNearbyNotice('')
+
+    // Reuse the pending browser request so React StrictMode does not fire two
+    // competing geolocation prompts in development.
+    let coords
+    try {
+      const position = await requestBrowserPositionWithHardTimeout()
+      coords = position.coords
+    } catch (geoError) {
+      if (requestId !== nearbyRequestIdRef.current) return
+
+      const status = getGeolocationStatus(geoError)
+      console.error('Geolocation failed:', geoError?.code, geoError?.message)
+
+      if (status !== 'timeout' && status !== 'unavailable') {
+        setNearbyStatus(status)
+        return
+      }
+
+      try {
+        const garages = await getNearestGarages({
+          lat: FALLBACK_NEARBY_LOCATION.lat,
+          lng: FALLBACK_NEARBY_LOCATION.lng,
+          limit: 3,
+        })
+        if (requestId !== nearbyRequestIdRef.current) return
+
+        setNearbyGarages(Array.isArray(garages) ? garages : [])
+        setNearbyNotice(`Browser location was too slow, so we are showing garages near ${FALLBACK_NEARBY_LOCATION.label}.`)
+        setNearbyStatus('done')
+      } catch (fallbackError) {
+        console.error('getNearestGarages fallback failed:', fallbackError)
+        if (requestId === nearbyRequestIdRef.current) setNearbyStatus(status)
+      }
+      return
+    }
+
+    try {
+      const garages = await getNearestGarages({ lat: coords.latitude, lng: coords.longitude, limit: 3 })
+      if (requestId !== nearbyRequestIdRef.current) return
+
+      setNearbyGarages(Array.isArray(garages) ? garages : [])
+      setNearbyStatus('done')
+    } catch (err) {
+      console.error('getNearestGarages failed:', err)
+      if (requestId === nearbyRequestIdRef.current) setNearbyStatus('error')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (autoNearbyRequestedRef.current) return
+    autoNearbyRequestedRef.current = true
+    handleFindNearbyGarages()
+  }, [handleFindNearbyGarages])
+
+  const canRetryNearby = NEARBY_ERROR_STATES.includes(nearbyStatus) || Boolean(nearbyNotice)
 
   return (
     <div className="pcd-page">
@@ -274,6 +397,80 @@ export default function PublicCustomerDashboardPage() {
         </div>
       </section>
 
+      {/* ── NEARBY GARAGES ── */}
+      <section className="pcd-nearby-section">
+        <div className="pcd-nearby-inner">
+          <div className="pcd-nearby-header">
+            <h2 className="pcd-nearby-title">Find the garage nearest you</h2>
+            <p className="pcd-nearby-sub">We use your location to show the closest garages, ranked by real driving distance.</p>
+            {nearbyStatus === 'loading' && <p className="pcd-nearby-message">Locating you…</p>}
+            {canRetryNearby && (
+              <button className="pcd-btn pcd-btn-primary" type="button" onClick={handleFindNearbyGarages}>
+                {nearbyNotice ? 'Use my location' : 'Try again'}
+              </button>
+            )}
+          </div>
+
+          {nearbyNotice && <p className="pcd-nearby-message">{nearbyNotice}</p>}
+
+          {nearbyStatus === 'denied' && (
+            <p className="pcd-nearby-message">
+              Location access was denied. Please allow location access in your browser, or{' '}
+              <a href="#services">browse all services</a> instead.
+            </p>
+          )}
+
+          {nearbyStatus === 'timeout' && (
+            <p className="pcd-nearby-message">
+              Getting your location took too long. Please try again — if this keeps happening, check that
+              Location is turned on in your OS/browser settings, or{' '}
+              <a href="#services">browse all services</a> instead.
+            </p>
+          )}
+
+          {nearbyStatus === 'unavailable' && (
+            <p className="pcd-nearby-message">
+              Your location couldn't be determined. Please check that Location is turned on in your OS/browser
+              settings and try again, or <a href="#services">browse all services</a> instead.
+            </p>
+          )}
+
+          {nearbyStatus === 'error' && (
+            <p className="pcd-nearby-message">
+              We couldn't find nearby garages right now. Please try again, or{' '}
+              <a href="#services">browse all services</a> instead.
+            </p>
+          )}
+
+          {nearbyStatus === 'done' && nearbyGarages.length === 0 && (
+            <p className="pcd-nearby-message">
+              No nearby garages with known locations yet. <a href="#services">Browse all services</a> instead.
+            </p>
+          )}
+
+          {nearbyStatus === 'done' && nearbyGarages.length > 0 && (
+            <div className="pcd-nearby-grid">
+              {nearbyGarages.map((item) => (
+                <div className="pcd-nearby-card" key={item.garage.id}>
+                  <h3 className="pcd-nearby-card-name">{item.garage.name}</h3>
+                  <p className="pcd-nearby-card-address">{item.garage.address}, {item.garage.city}</p>
+                  <p className="pcd-nearby-card-distance">
+                    {item.distanceKm} km · ~{item.durationMinutes} min drive
+                  </p>
+                  <button
+                    className="pcd-btn pcd-btn-primary"
+                    type="button"
+                    onClick={() => handleBookingEntry({ garageId: item.garage.id })}
+                  >
+                    Book now →
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* ── STATS ── */}
       <section className="pcd-stats-section">
         <div className="pcd-stats-grid">
@@ -304,7 +501,7 @@ export default function PublicCustomerDashboardPage() {
             </p>
           </div>
           <div className="pcd-services-grid">
-            {SERVICES.map((svc, i) => (
+            {SERVICES.map((svc) => (
               <div
                 className="pcd-service-card"
                 key={svc.title}

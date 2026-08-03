@@ -18,6 +18,8 @@ public class GarageResponse {
     private LocalTime openingTime;
     private LocalTime closingTime;
     private Integer slotIntervalMinutes;
+    private Double latitude;
+    private Double longitude;
     private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

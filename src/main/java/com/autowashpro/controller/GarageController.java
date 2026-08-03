@@ -9,6 +9,7 @@ import com.autowashpro.dto.request.GarageStatusUpdateRequest;
 import com.autowashpro.dto.request.GarageUpdateRequest;
 import com.autowashpro.dto.response.GarageCapabilitiesResponse;
 import com.autowashpro.dto.response.GarageResponse;
+import com.autowashpro.dto.response.NearbyGarageResponse;
 import com.autowashpro.dto.response.PageResponse;
 import com.autowashpro.service.GarageService;
 import com.autowashpro.service.AuditLogService;
@@ -17,6 +18,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/garages")
@@ -80,6 +83,15 @@ public class GarageController {
                 id,
                 AuditMetadata.of("isActive", response.getIsActive()));
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/nearest")
+    public ResponseEntity<List<NearbyGarageResponse>> nearest(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(defaultValue = "3") int limit
+    ) {
+        return ResponseEntity.ok(garageService.findNearest(lat, lng, limit));
     }
 
     @GetMapping("/{id}/capabilities")
