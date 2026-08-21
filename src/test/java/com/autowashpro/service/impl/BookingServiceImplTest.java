@@ -55,6 +55,7 @@ import com.autowashpro.service.LoyaltyService;
 import com.autowashpro.service.NotificationService;
 import com.autowashpro.service.PromotionService;
 import com.autowashpro.service.BookingReviewService;
+import com.autowashpro.service.SpecialDayService;
 import com.autowashpro.service.WashHistoryService;
 import com.autowashpro.service.support.PackageResourceResolver;
 import com.autowashpro.service.support.StaffOperationAccessPolicy;
@@ -182,11 +183,20 @@ class BookingServiceImplTest {
     @Mock
     private GarageServicePackageRepository garageServicePackageRepository;
 
+    @Mock
+    private SpecialDayService specialDayService;
+
     @InjectMocks
     private BookingServiceImpl bookingService;
 
     @BeforeEach
     void setUp() {
+        lenient().when(specialDayService.computeSurcharge(any(), any())).thenReturn(BigDecimal.ZERO);
+        LoyaltyTierRule bronzeRule = TestFixtures.bronzeTierRule();
+        bronzeRule.setBookingWindowDays(30);
+        bronzeRule.setMaxUpcomingBookings(5);
+        lenient().when(loyaltyTierRuleRepository.findByTierAndIsActiveTrue("BRONZE"))
+                .thenReturn(Optional.of(bronzeRule));
         lenient().when(packageResourceResolver.resolveEffectivePackages(any()))
                 .thenAnswer(inv -> List.of(inv.<ServicePackage>getArgument(0)));
         lenient().when(staffOperationAccessPolicy.requireCustomerServiceOrAdminForGarage(anyLong(), any(), anyLong()))
@@ -326,16 +336,24 @@ class BookingServiceImplTest {
         Garage garage = TestFixtures.garage();
         Vehicle vehicle = TestFixtures.car(TestFixtures.customer());
         ServicePackage mainPackage = mainPackage();
+        ServicePackage addOn = addOnPackage();
+        addOn.setRequiresWashBay(true);
+        addOn.setWashBayDurationMinutes(15);
         Booking booking = confirmedBooking(vehicle, garage, mainPackage);
         booking.setStatus("IN_PROGRESS");
         booking.setOperationPhase("WAITING_FOR_CARE");
         booking.setPaymentStatus("UNPAID");
 
         when(bookingRepository.findByIdWithLock(booking.getId())).thenReturn(Optional.of(booking));
+        when(servicePackageRepository.findById(mainPackage.getId())).thenReturn(Optional.of(mainPackage));
+        when(servicePackageRepository.findById(addOn.getId())).thenReturn(Optional.of(addOn));
+        when(vehicleRepository.findById(vehicle.getId())).thenReturn(Optional.of(vehicle));
+        when(garageServicePackageRepository.existsByGarageIdAndServicePackageIdAndIsActiveTrue(
+                garage.getId(), addOn.getId())).thenReturn(true);
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class,
                 () -> bookingService.addBookingAddOns(
-                        booking.getId(), 99L, "ROLE_STAFF", addOnRequest(2L)));
+                        booking.getId(), 99L, "ROLE_STAFF", addOnRequest(addOn.getId())));
 
         assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
         verify(bookingAddOnServicePackageRepository, never()).save(any());
@@ -678,8 +696,8 @@ class BookingServiceImplTest {
 
         assertEquals(List.of(addOn.getId()), response.getAddOnServicePackageIds());
         assertMoney("150000.00", response.getOriginalPrice());
-        assertMoney("35000.00", response.getDiscountAmount());
-        assertMoney("115000.00", response.getFinalPrice());
+        assertMoney("17000.00", response.getDiscountAmount());
+        assertMoney("133000.00", response.getFinalPrice());
         // Point redemption is now delegated to LoyaltyPointExpiryService.consumePointsFifo
         verify(loyaltyPointExpiryService).consumePointsFifo(eq(customer.getId()), eq(20), any());
         assertEquals(0, promotion.getUsedCount());
@@ -1448,6 +1466,8 @@ class BookingServiceImplTest {
         servicePackage.setCareStaffType(null);
         servicePackage.setCareStaffRequiredCount(0);
         servicePackage.setCareStaffDurationMinutes(0);
+        servicePackage.setWashBayDurationMinutes(45);
+        servicePackage.setDurationMinutes(45);
         return servicePackage;
     }
 
@@ -1469,9 +1489,9 @@ class BookingServiceImplTest {
                 .serviceType("ADD_ON")
                 .basePrice(new BigDecimal("30000.00"))
                 .durationMinutes(20)
-                .washBayDurationMinutes(0)
+                .washBayDurationMinutes(20)
                 .pointsEarned(5)
-                .requiresWashBay(false)
+                .requiresWashBay(true)
                 .requiresCareStaff(false)
                 .careStaffRequiredCount(0)
                 .careStaffDurationMinutes(0)

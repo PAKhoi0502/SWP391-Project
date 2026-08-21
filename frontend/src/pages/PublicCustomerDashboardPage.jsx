@@ -288,7 +288,7 @@ export default function PublicCustomerDashboardPage() {
       if (requestId !== nearbyRequestIdRef.current) return
 
       const status = getGeolocationStatus(geoError)
-      console.error('Geolocation failed:', geoError?.code, geoError?.message)
+      console.warn('Geolocation unavailable, switching to fallback location:', geoError?.message || geoError?.code)
 
       if (status !== 'timeout' && status !== 'unavailable') {
         setNearbyStatus(status)
@@ -307,7 +307,7 @@ export default function PublicCustomerDashboardPage() {
         setNearbyNotice(`Browser location was too slow, so we are showing garages near ${FALLBACK_NEARBY_LOCATION.label}.`)
         setNearbyStatus('done')
       } catch (fallbackError) {
-        console.error('getNearestGarages fallback failed:', fallbackError)
+        console.warn('getNearestGarages fallback:', fallbackError?.message || fallbackError)
         if (requestId === nearbyRequestIdRef.current) setNearbyStatus(status)
       }
       return
