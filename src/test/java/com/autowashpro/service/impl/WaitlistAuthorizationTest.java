@@ -10,6 +10,7 @@ import com.autowashpro.repository.ServicePackageRepository;
 import com.autowashpro.repository.StaffProfileRepository;
 import com.autowashpro.repository.UserRepository;
 import com.autowashpro.repository.VehicleRepository;
+import com.autowashpro.repository.WaitlistAddOnServicePackageRepository;
 import com.autowashpro.repository.WaitlistRepository;
 import com.autowashpro.repository.WashBayRepository;
 import com.autowashpro.service.BookingService;
@@ -28,6 +29,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -35,12 +37,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class WaitlistAuthorizationTest {
 
     @Mock WaitlistRepository waitlistRepository;
+    @Mock WaitlistAddOnServicePackageRepository waitlistAddOnServicePackageRepository;
     @Mock StaffProfileRepository staffProfileRepository;
     @Mock GarageRepository garageRepository;
     @Mock VehicleRepository vehicleRepository;
@@ -63,6 +67,8 @@ class WaitlistAuthorizationTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(waitlistService, "cutoffHours", 12);
+        lenient().when(waitlistAddOnServicePackageRepository.findByWaitlistId(any()))
+                .thenReturn(List.of());
     }
 
     // ── fixture builders ─────────────────────────────────────────────────────

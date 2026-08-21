@@ -107,6 +107,46 @@ class SecurityConfigTest {
     }
 
     @Test
+    void allowsStaffToReadUserById() throws Exception {
+        UserDetailResponse response = UserDetailResponse.builder()
+                .id(4L)
+                .fullName("Customer 4")
+                .role("CUSTOMER")
+                .isActive(true)
+                .build();
+        when(userService.getUserById(4L)).thenReturn(response);
+
+        mockMvc.perform(get("/users/4").with(user("2").roles("STAFF")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(4));
+
+        verify(userService).getUserById(4L);
+    }
+
+    @Test
+    void allowsAdminToReadUserById() throws Exception {
+        UserDetailResponse response = UserDetailResponse.builder()
+                .id(4L)
+                .fullName("Customer 4")
+                .role("CUSTOMER")
+                .isActive(true)
+                .build();
+        when(userService.getUserById(4L)).thenReturn(response);
+
+        mockMvc.perform(get("/users/4").with(user("3").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(4));
+
+        verify(userService).getUserById(4L);
+    }
+
+    @Test
+    void rejectsCustomerToReadOtherUserById() throws Exception {
+        mockMvc.perform(get("/users/4").with(user("1").roles("CUSTOMER")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void allowsCustomerToReadOwnProfile() throws Exception {
         UserDetailResponse response = UserDetailResponse.builder()
                 .id(1L)

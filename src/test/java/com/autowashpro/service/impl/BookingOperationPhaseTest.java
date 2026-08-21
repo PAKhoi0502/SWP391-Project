@@ -42,6 +42,7 @@ import com.autowashpro.service.LoyaltyPointExpiryService;
 import com.autowashpro.service.LoyaltyService;
 import com.autowashpro.service.NotificationService;
 import com.autowashpro.service.PromotionService;
+import com.autowashpro.service.SpecialDayService;
 import com.autowashpro.service.WashHistoryService;
 import com.autowashpro.service.support.PackageResourceResolver;
 import com.autowashpro.service.support.StaffOperationAccessPolicy;
@@ -112,12 +113,14 @@ class BookingOperationPhaseTest {
     @Mock private BookingReviewService bookingReviewService;
     @Mock private StaffOperationAccessPolicy staffOperationAccessPolicy;
     @Mock private PackageResourceResolver packageResourceResolver;
+    @Mock private SpecialDayService specialDayService;
 
     @InjectMocks
     private BookingServiceImpl bookingService;
 
     @BeforeEach
     void setUp() {
+        lenient().when(specialDayService.computeSurcharge(any(), any())).thenReturn(BigDecimal.ZERO);
         lenient().when(garageServicePackageRepository
                 .existsByGarageIdAndServicePackageIdAndIsActiveTrue(anyLong(), anyLong())).thenReturn(true);
         lenient().when(packageResourceResolver.resolveEffectivePackages(any()))

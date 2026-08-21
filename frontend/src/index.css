@@ -1,32 +1,76 @@
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  /* Brand palette */
+  --brand-primary: #0855b3;
+  --brand-primary-hover: #064089;
+  --brand-secondary: #2EC2F7;
+  --brand-accent: #82cde8;
+  --brand-navy: #14213D;
 
-  --sans: 'Be Vietnam Pro', system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: 'Be Vietnam Pro', system-ui, 'Segoe UI', Roboto, sans-serif;
+  /* Neutrals */
+  --text: #475569;
+  --text-h: #0f172a;
+  --text-muted: #64748b;
+  --bg: #f8fafc;
+  --card-bg: #ffffff;
+  --border: #e2e8f0;
+  --border-focus: #2EC2F7;
+  --code-bg: #f1f5f9;
+
+  /* Accents & Highlights */
+  --accent: #2EC2F7;
+  --accent-bg: rgba(46, 194, 247, 0.1);
+  --accent-border: rgba(46, 194, 247, 0.4);
+
+  /* Status Colors */
+  --status-pending-bg: #fef9c3;
+  --status-pending-text: #92400e;
+  --status-confirmed-bg: #dcfce7;
+  --status-confirmed-text: #15803d;
+  --status-checkedin-bg: #dbeafe;
+  --status-checkedin-text: #1e40af;
+  --status-inprogress-bg: #e0f2fe;
+  --status-inprogress-text: #0369a1;
+  --status-completed-bg: #f0fdf4;
+  --status-completed-text: #166534;
+  --status-cancelled-bg: #fee2e2;
+  --status-cancelled-text: #991b1b;
+  --status-noshow-bg: #fef3c7;
+  --status-noshow-text: #92400e;
+
+  /* Loyalty Tiers */
+  --tier-bronze: #cd7f32;
+  --tier-bronze-bg: #fdf6ec;
+  --tier-silver: #94a3b8;
+  --tier-silver-bg: #f8fafc;
+  --tier-gold: #eab308;
+  --tier-gold-bg: #fefce8;
+  --tier-platinum: #06b6d4;
+  --tier-platinum-bg: #ecfeff;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow: var(--shadow-md);
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  --sans: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --heading: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
+  font: 16px/150% var(--sans);
+  letter-spacing: -0.01em;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -104,4 +148,68 @@ code {
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+}
+
+/* ─── Synchronized Form Controls (Inputs, Selects, Textareas, Buttons) ─── */
+input,
+select,
+textarea,
+button {
+  font-family: var(--sans);
+  font-size: 14px;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-h);
+  outline: none;
+  padding: 8px 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+select:focus,
+textarea:focus {
+  border-color: var(--brand-secondary);
+  box-shadow: 0 0 0 3px rgba(46, 194, 247, 0.18);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled,
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+button {
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+/* ─── Universal Scrollbars ─── */
+::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.25);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.45);
 }

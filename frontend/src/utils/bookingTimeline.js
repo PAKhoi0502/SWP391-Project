@@ -37,7 +37,7 @@ const FINAL_PHASES  = ['FINAL_INSPECTION', 'READY_FOR_HANDOVER', 'DONE']
  * @param {Array}    inspections  - vehicle inspection records for this booking
  * @returns {Array<{label, active, time, danger?}>}
  */
-export const getHistoryTimelineItems = (booking, serviceSteps = [], inspections = []) => {
+export const getHistoryTimelineItems = (booking, _serviceSteps = [], inspections = []) => {
   const status         = String(booking?.status || '').toUpperCase()
   const paymentStatus  = String(booking?.paymentStatus || '').toUpperCase()
   const checkedInAt    = booking?.checkedInAt

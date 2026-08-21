@@ -62,10 +62,12 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 "/users",
-                                "/users/*",
                                 "/users/*/status",
                                 "/users/*/role")
                         .hasRole("ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/users/*")
+                        .hasAnyRole("ADMIN", "STAFF")
 
                         .requestMatchers(HttpMethod.GET, "/service-packages/available")
 .permitAll()

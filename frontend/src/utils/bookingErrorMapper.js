@@ -151,7 +151,7 @@ function fallback(_raw, httpStatus) {
 }
 
 export function normalizeBookingError(error) {
-  if (process.env.NODE_ENV !== 'production') {
+  if (typeof globalThis !== 'undefined' && globalThis.process?.env?.NODE_ENV !== 'production') {
     console.error('[booking error]', error)
   }
   const data = error?.response?.data
